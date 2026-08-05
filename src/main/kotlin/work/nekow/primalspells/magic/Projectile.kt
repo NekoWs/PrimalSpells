@@ -7,7 +7,7 @@ import work.nekow.primalspells.magic.effect.Velocity
 abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
 
-    override var cast: Int = 1
+    override var cast: Int = 0
 
     override fun spell() {
         val spellPos = caster.eyePosition.add(0.0, -0.2, 0.0)

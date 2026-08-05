@@ -21,9 +21,9 @@ class Wand(var id: String) {
     var charge: Double = 0.0
     var cast = 1
 
-    val drawPile = arrayListOf<SpellChain>()
-    val hand = arrayListOf<SpellChain>()
-    val discardPile = arrayListOf<SpellChain>()
+    val drawPile = arrayListOf<Magic>()
+    val hand = arrayListOf<Magic>()
+    val discardPile = arrayListOf<Magic>()
 
     data class Status(
         var mana: Double = 0.0,
@@ -32,68 +32,48 @@ class Wand(var id: String) {
     )
     var status: Status = Status()
 
-    /** 解析 innate + magics 为 SpellChain 列表，链接 TriggerSpell.payload，洗入抽牌堆。 */
     fun load() {
         drawPile.clear()
         hand.clear()
         discardPile.clear()
-        drawPile.addAll(parseChains(innate + magics))
+        drawPile.addAll(innate + magics)
         drawPile.shuffle()
-    }
-
-    // TODO：Rebuild
-    private fun parseChains(spells: List<Magic>): List<SpellChain> {
-        // Step 1: 分组为 [修正器..., 投射物]
-        val flat = arrayListOf<SpellChain>()
-        var i = 0
-        while (i < spells.size) {
-            val mods = arrayListOf<Magic>()
-            while (i < spells.size && spells[i] !is Projectile) {
-                mods.add(spells[i])
-                i++
-            }
-            if (i < spells.size) {
-                flat.add(SpellChain(mods, spells[i] as Projectile))
-                i++
-            }
-        }
-
-        // Step 2: 链接 TriggerSpell → 下一个链
-        for (j in 0 until flat.size - 1) {
-            val proj = flat[j].projectile
-            if (proj is TriggerSpell && proj.payload == null) {
-                proj.payload = flat[j + 1]
-            }
-        }
-
-        // Step 3: 只返回根链（不是别人 payload 的）
-        return flat.filterIndexed { idx, _ ->
-            idx == 0 || flat[idx - 1].projectile !is TriggerSpell
-        }
     }
 
     fun spell(caster: Entity) {
         draw(cast)
-        caster.debug("Hand: ${hand.joinToString { it.projectile.javaClass.simpleName }}")
+        caster.debug("Hand: ${hand.joinToString { it.javaClass.simpleName }}")
         castHand(caster, hand)
         discard()
     }
 
-    /** 释放手牌中的每个法术链。 */
-    private fun castHand(caster: Entity, hand: List<SpellChain>) {
-        for (chain in hand) {
-            val allEffects = arrayListOf<BaseEffect>()
-            for (mod in chain.modifiers) {
-                mod.caster = caster
-                mod.wand = this
-                mod.onSpell()
-                allEffects.addAll(mod.effects)
-            }
+    /**
+     * 施放手牌中的法术
+     */
+    private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
+        val effects = arrayListOf<BaseEffect>()
+        for (magic in hand) {
+            if (status.mana < magic.mana) continue
+            status.mana -= magic.mana
+            val clone = magic.clone()
 
-            val projectile = chain.projectile.clone()
-            projectile.effects.addAll(0, allEffects)
-            projectile.spell()
-            MagicManager.add(projectile)
+            if (clone is TriggerSpell) {
+                draw(clone.triggerCast)
+                for (it in hand) {
+                    if (status.mana < it.mana) continue
+                    status.mana -= it.mana
+                    clone.payload.add(it)
+                }
+                discard()
+            }
+            if (clone is Projectile) {
+                clone.effects.addAll(effects)
+                clone.caster = caster
+                clone.spell()
+                MagicManager.add(clone)
+                continue
+            }
+            effects.addAll(magic.effects)
         }
     }
 
@@ -103,13 +83,16 @@ class Wand(var id: String) {
         reshuffleIfNeeded()
     }
 
+    /**
+     * 抓指定数量的牌
+     */
     fun draw(budget: Int): Int {
         var remaining = budget
         var drawn = 0
         while (remaining > 0 && drawPile.isNotEmpty()) {
-            val chain = drawPile.removeFirst()
-            hand += chain
-            remaining -= chain.drawCost
+            val magic = drawPile.removeFirst()
+            hand += magic
+            remaining += magic.cast - 1
             drawn++
         }
         return drawn

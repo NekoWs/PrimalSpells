@@ -1,0 +1,6 @@
+{
+  "itemGroup.primalspells": "Primal Spells",
+  "item.primalspells.wand": "Primal Wand",
+  "tooltip.primalspells.wand_id": "Wand ID: %s",
+  "tooltip.primalspells.wand_id.ungenerated": "Ungenerated"
+}

@@ -3,9 +3,13 @@ package work.nekow.primalspells.magic
 import net.minecraft.core.particles.ParticleTypes
 import work.nekow.primalspells.magic.effect.Trajectory
 
-class TriggerFireball: TriggerMagic() {
+class TriggerFireball: Projectile(), TriggerSpell {
     override val id = "trigger_fireball"
+
     override fun clone() = TriggerFireball().also { copyTo(it) }
+
+    override var triggerCast = 1
+    override var payload = arrayListOf<Magic>()
 
     init {
         mana = 3.0

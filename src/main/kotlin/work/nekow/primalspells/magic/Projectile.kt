@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic
 
+import org.joml.Vector3f
 import work.nekow.primalspells.magic.effect.Move
 import work.nekow.primalspells.magic.effect.Position
 import work.nekow.primalspells.magic.effect.Velocity
@@ -9,13 +10,16 @@ abstract class Projectile: Magic() {
 
     override var cast: Int = 0
 
+    lateinit var position: Vector3f
+    lateinit var velocity: Vector3f
+
     override fun spell() {
-        val spellPos = caster.eyePosition.add(0.0, -0.2, 0.0)
-        effects += Position(spellPos.toVector3f())
+        effects += Position(position)
         effects += Move()
-        effects += Velocity(caster.lookAngle.toVector3f())
+        effects += Velocity(velocity)
 
         effects.forEach {
+            it.projectile = this
             it.status = status
         }
         super.spell()

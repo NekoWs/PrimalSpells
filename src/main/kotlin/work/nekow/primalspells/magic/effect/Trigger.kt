@@ -2,40 +2,25 @@ package work.nekow.primalspells.magic.effect
 
 import net.minecraft.world.entity.Entity
 import org.joml.Vector3f
-import work.nekow.primalspells.magic.MagicManager
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.TriggerSpell
-import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.Magic
 
-class Trigger : BaseEffect() {
+class Trigger(
+    val magics: ArrayList<Magic>,
+    val hitEntity: Boolean = true,
+    val hitBlock: Boolean = true
+) : BaseEffect() {
     override fun onHitEntity(target: Entity) {
-        castPayload()
+        if (hitEntity) start()
     }
 
     override fun onHitBlock(pos: Vector3f) {
-        castPayload()
+        if (hitBlock) start()
     }
 
-    private fun castPayload() {
-        val proj = magic as? Projectile ?: return
-        val spell = proj as? TriggerSpell ?: return
-        val chain = spell.payload ?: return
-
-        val allEffects = arrayListOf<BaseEffect>()
-        for (mod in chain.modifiers) {
-            mod.caster = proj.caster
-            mod.wand = proj.wand
-            mod.onSpell()
-            allEffects.addAll(mod.effects)
+    private fun start() {
+        magics.forEach {
+            it.caster = caster
+            // TODO: 触发施法
         }
-
-        val child = chain.projectile.clone()
-        child.caster = proj.caster
-        child.wand = proj.wand
-        child.effects.addAll(0, allEffects)
-        child.spell()
-        child.status.pos = proj.status.pos
-        child.status.velocity = proj.status.velocity
-        MagicManager.add(child)
     }
 }

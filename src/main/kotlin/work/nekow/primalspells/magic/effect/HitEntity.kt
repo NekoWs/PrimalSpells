@@ -11,8 +11,7 @@ class HitEntity(
     private val pierce: Boolean = false
 ) : BaseEffect() {
     override fun onTick() {
-        val m = magic ?: return
-        if (!m.alive) return
+        if (!projectile.alive) return
 
         val level = caster.level() as? ServerLevel ?: return
 
@@ -21,7 +20,7 @@ class HitEntity(
         level.getEntities(null, aabb) { it != caster && filter(it) }.forEach { entity ->
             if (!pierce && entity in status.hitEntities) return@forEach
             status.hitEntities.add(entity)
-            m.hitEntity(entity)
+            projectile.hitEntity(entity)
         }
     }
 }

@@ -6,8 +6,7 @@ import org.joml.Vector3f
 
 class Move(val scaler: Float = 1F, val ignoreBlocks: Boolean = false) : BaseEffect() {
     override fun onTick() {
-        val m = magic ?: return
-        if (!m.alive) return
+        if (!projectile.alive) return
 
         val newPos = Vector3f(status.velocity).mul(scaler).add(status.pos)
 
@@ -18,8 +17,8 @@ class Move(val scaler: Float = 1F, val ignoreBlocks: Boolean = false) : BaseEffe
                 val state = level.getBlockState(blockPos)
                 if (!state.getCollisionShape(level, blockPos).isEmpty) {
                     status.pos = newPos
-                    m.hitBlock(newPos)
-                    m.alive = false
+                    projectile.hitBlock(newPos)
+                    projectile.alive = false
                     return
                 }
             }

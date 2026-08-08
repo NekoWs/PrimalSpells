@@ -25,8 +25,8 @@ abstract class Magic {
 
     open fun spell() {
         effects.forEach {
-            it.magic = this
             it.caster = caster
+            it.wand = wand
             it.onActive()
         }
         onSpell()
@@ -53,8 +53,8 @@ abstract class Magic {
         target.maxAge = maxAge
         target.effects.clear()
         target.effects += effects
-        target.caster = caster
-        target.wand = wand
+//        target.caster = caster
+//        target.wand = wand
         if (this is TriggerSpell && target is TriggerSpell) {
             target.payload = this.payload
         }

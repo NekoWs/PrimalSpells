@@ -5,11 +5,7 @@ import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.PrimalSpells.Companion.debug
-import work.nekow.primalspells.magic.Magic
-import work.nekow.primalspells.magic.MagicManager
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.TriggerSpell
-import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.*
 import kotlin.math.min
 
 class Wand(var id: String) {
@@ -26,9 +22,10 @@ class Wand(var id: String) {
     val discardPile = arrayListOf<Magic>()
 
     data class Status(
-        var mana: Double = 0.0,
+        var mana: Double = 10000.0,
         var delay: Int = 0,
-        var recharge: Int = 0
+        var recharge: Int = 0,
+        var failedReason: ArrayList<String> = arrayListOf()
     )
     var status: Status = Status()
 
@@ -37,44 +34,62 @@ class Wand(var id: String) {
         hand.clear()
         discardPile.clear()
         drawPile.addAll(innate + magics)
-        drawPile.shuffle()
+//        drawPile.shuffle()
     }
 
     fun spell(caster: Entity) {
+        status.failedReason.clear()
         draw(cast)
-        caster.debug("Hand: ${hand.joinToString { it.javaClass.simpleName }}")
         castHand(caster, hand)
-        discard()
+        if (status.failedReason.isNotEmpty()) {
+            caster.debug(status.failedReason.joinToString { it })
+        }
     }
 
     /**
      * 施放手牌中的法术
      */
     private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
-        val effects = arrayListOf<BaseEffect>()
-        for (magic in hand) {
-            if (status.mana < magic.mana) continue
-            status.mana -= magic.mana
-            val clone = magic.clone()
-
-            if (clone is TriggerSpell) {
-                draw(clone.triggerCast)
-                for (it in hand) {
-                    if (status.mana < it.mana) continue
-                    status.mana -= it.mana
-                    clone.payload.add(it)
+        val magics = arrayListOf<Magic>()
+        magics += hand
+        caster.debug("Magics: ${hand.joinToString { it.javaClass.simpleName }}")
+        discard()
+        val effects = magics.filterIsInstance<Revise>()
+            .flatMap {
+                magics.remove(it)
+                if (consumeMana(it)) it.effects
+                else emptyList()
+            }
+        for (projectile in magics.filterIsInstance<Projectile>()) {
+            if (!consumeMana(projectile)) continue
+            val p = projectile.clone()
+            if (p is TriggerSpell) {
+                draw(p.triggerCast, false)
+                hand.forEach {
+                    if (consumeMana(it)) p.payload.add(it)
                 }
                 discard()
             }
-            if (clone is Projectile) {
-                clone.effects.addAll(effects)
-                clone.caster = caster
-                clone.spell()
-                MagicManager.add(clone)
-                continue
-            }
-            effects.addAll(magic.effects)
+            p.effects.addAll(effects)
+            p.caster = caster
+            p.wand = this
+            p.position = caster.eyePosition
+                .toVector3f()
+                .sub(0F, 0.2F, 0F)
+            p.velocity = caster.lookAngle.toVector3f()
+            p.spell()
+            caster.debug("Projectile: ${p::class.simpleName}")
+            MagicManager.add(p)
         }
+    }
+
+    fun consumeMana(magic: Magic): Boolean {
+        if (status.mana < magic.mana) {
+            status.failedReason += "Mana(${status.mana}) < ${magic.mana}"
+            return false
+        }
+        status.mana -= magic.mana
+        return true
     }
 
     private fun discard() {
@@ -86,7 +101,7 @@ class Wand(var id: String) {
     /**
      * 抓指定数量的牌
      */
-    fun draw(budget: Int): Int {
+    fun draw(budget: Int, wrapping: Boolean = true): Int {
         var remaining = budget
         var drawn = 0
         while (remaining > 0 && drawPile.isNotEmpty()) {
@@ -95,13 +110,16 @@ class Wand(var id: String) {
             remaining += magic.cast - 1
             drawn++
         }
+        if (wrapping && remaining > 0) {
+            // TODO: 回绕
+        }
         return drawn
     }
 
     fun reshuffle() {
         drawPile += discardPile
         discardPile.clear()
-        drawPile.shuffle()
+//        drawPile.shuffle()
     }
 
     private fun reshuffleIfNeeded() {

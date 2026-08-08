@@ -6,8 +6,6 @@ import work.nekow.primalspells.magic.effect.Trajectory
 class TriggerFireball: Projectile(), TriggerSpell {
     override val id = "trigger_fireball"
 
-    override fun clone() = TriggerFireball().also { copyTo(it) }
-
     override var triggerCast = 1
     override var payload = arrayListOf<Magic>()
 

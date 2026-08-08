@@ -78,7 +78,6 @@ class Wand(var id: String) {
                 .sub(0F, 0.2F, 0F)
             p.velocity = caster.lookAngle.toVector3f()
             p.spell()
-            caster.debug("Projectile: ${p::class.simpleName}")
             MagicManager.add(p)
         }
     }

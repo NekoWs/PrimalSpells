@@ -15,8 +15,6 @@ class Fireball: Projectile() {
 
     }
 
-    override fun clone() = Fireball().also { copyTo(it) }
-
     companion object {
         init {
             register("fireball") { Fireball() }

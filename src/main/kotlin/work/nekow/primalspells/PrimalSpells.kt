@@ -33,5 +33,9 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
             if (this !is Player) return
             this.sendSystemMessage(Component.literal(string.format(*args)))
         }
+        fun Entity.overlay(string: String, vararg args: Any) {
+            if (this !is Player) return
+            this.sendOverlayMessage(Component.literal(string.format(*args)))
+        }
     }
 }

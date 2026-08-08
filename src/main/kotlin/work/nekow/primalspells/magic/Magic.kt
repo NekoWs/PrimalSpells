@@ -36,23 +36,7 @@ abstract class Magic {
     }
     open fun onSpell() { }
 
-    /** 将当前法术的属性复制到目标。先清空 targets 的 effects 再复制，避免与 init {} 重复。 */
-    protected fun copyTo(target: Magic) {
-        target.cast = cast
-        target.mana = mana
-        target.delay = delay
-        target.recharge = recharge
-        target.maxAge = maxAge
-        target.effects.clear()
-        target.effects += effects
-//        target.caster = caster
-//        target.wand = wand
-        if (this is TriggerSpell && target is TriggerSpell) {
-            target.payload = this.payload
-        }
-    }
-
-    abstract fun clone(): Magic
+    open fun clone(): Magic = create(id)!!
 
     companion object {
         private val registry = mutableMapOf<String, () -> Magic>()

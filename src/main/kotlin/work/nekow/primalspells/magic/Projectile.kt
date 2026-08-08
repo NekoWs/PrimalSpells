@@ -34,8 +34,7 @@ abstract class Projectile: Magic() {
         effects.forEach { it.onHitBlock(pos) }
     }
 
-    override fun onSpell() {
-    }
+    override fun onSpell() { }
 
-    abstract override fun clone(): Projectile
+    override fun clone(): Projectile = super.clone() as Projectile
 }

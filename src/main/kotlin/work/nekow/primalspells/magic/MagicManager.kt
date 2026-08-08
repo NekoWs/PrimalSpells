@@ -2,9 +2,10 @@ package work.nekow.primalspells.magic
 
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
+import work.nekow.primalspells.PrimalSpells.Companion.overlay
 
 object MagicManager {
-    val magics = arrayListOf<Projectile>()
+    val projectiles = arrayListOf<Projectile>()
     private val pendingAdd = arrayListOf<Projectile>()
 
     fun add(projectile: Projectile) {
@@ -12,10 +13,15 @@ object MagicManager {
     }
 
     fun tick() {
-        magics.addAll(pendingAdd)
+        projectiles.addAll(pendingAdd)
         pendingAdd.clear()
 
-        val iter = magics.iterator()
+        if (projectiles.isNotEmpty()) {
+            val first = projectiles.first()
+            first.caster.overlay("Projectiles Count: ${projectiles.size}")
+        }
+
+        val iter = projectiles.iterator()
         while (iter.hasNext()) {
             val it = iter.next()
             if (!it.alive) {

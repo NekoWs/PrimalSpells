@@ -1,7 +1,6 @@
 package work.nekow.primalspells.magic
 
 import net.minecraft.world.entity.Entity
-import org.joml.Vector3f
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.wand.Wand
 
@@ -32,13 +31,6 @@ abstract class Magic {
         onSpell()
     }
 
-    fun hitEntity(target: Entity) {
-        effects.forEach { it.onHitEntity(target) }
-    }
-
-    fun hitBlock(pos: Vector3f) {
-        effects.forEach { it.onHitBlock(pos) }
-    }
     fun tick() {
         effects.forEach { it.onTick() }
     }

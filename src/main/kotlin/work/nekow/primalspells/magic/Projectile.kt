@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic
 
+import net.minecraft.world.entity.Entity
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.effect.Move
 import work.nekow.primalspells.magic.effect.Position
@@ -23,6 +24,14 @@ abstract class Projectile: Magic() {
             it.status = status
         }
         super.spell()
+    }
+
+    fun hitEntity(target: Entity) {
+        effects.forEach { it.onHitEntity(target) }
+    }
+
+    fun hitBlock(pos: Vector3f) {
+        effects.forEach { it.onHitBlock(pos) }
     }
 
     override fun onSpell() {

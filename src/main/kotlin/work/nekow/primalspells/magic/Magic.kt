@@ -38,9 +38,13 @@ abstract class Magic {
     open fun onSpell() { }
 
     open fun initLore() {
-        lore += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
-        if (delay > 0) lore += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
-        if (recharge > 0) lore += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
+        val base = arrayListOf<LoreEntry>()
+        base += LoreEntry(Lore.DESCRIPTION, emptyArray())
+        base += LoreEntry(Lore.BR, emptyArray())
+        base += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
+        if (delay > 0) base += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
+        if (recharge > 0) base += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
+        lore.addAll(0, base)
     }
 
     open fun clone(): Magic = MagicManager.create(id)!!

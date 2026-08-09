@@ -1,6 +1,8 @@
 package work.nekow.primalspells.utils
 
 enum class Lore(val key: String) {
+    DESCRIPTION("lore.primalspells.desc"),
+    BR(""),
     MANA("lore.primalspells.mana"),
     DELAY("lore.primalspells.delay"),
     RECHARGE("lore.primalspells.recharge"),

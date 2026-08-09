@@ -18,5 +18,10 @@
   "lore.primalspells.recharge": "充能时间：%st",
   "lore.primalspells.cast": "抽取数量：%s",
   "lore.primalspells.damage": "伤害：%s",
-  "lore.primalspells.max_age": "持续时间：%st"
+  "lore.primalspells.max_age": "持续时间：%st",
+  "lore.primalspells.fireball.desc": "一个缓速移动的火球。",
+  "lore.primalspells.trigger_fireball.desc": "一个缓速移动的火球，命中后施放另一法术。",
+  "lore.primalspells.damage.desc": "增加投射物的伤害。",
+  "lore.primalspells.bounce.desc": "让投射物可以弹跳",
+  "lore.primalspells.gravity.desc": "使投射物随重力下坠。"
 }

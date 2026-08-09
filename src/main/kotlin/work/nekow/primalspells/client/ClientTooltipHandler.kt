@@ -12,6 +12,7 @@ import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.magic.MagicManager
+import work.nekow.primalspells.utils.Lore
 
 object ClientTooltipHandler {
 
@@ -81,9 +82,7 @@ object ClientTooltipHandler {
         val id = ModItems.MAGICS.entries.firstOrNull { it.value.get() == event.itemStack.item }?.key ?: return
         val magic = MagicManager.create(id) ?: return
         for ((type, args) in magic.lore) {
-            event.tooltipElements.add(Either.left(
-                Component.translatable(type.key, *args).withStyle(ChatFormatting.GRAY)
-            ))
+            addLoreLine(event, type, args, id)
         }
     }
 
@@ -99,9 +98,16 @@ object ClientTooltipHandler {
             ))
         }
         for ((type, args) in magic.lore) {
-            event.tooltipElements.add(Either.left(
-                Component.translatable(type.key, *args).withStyle(ChatFormatting.GRAY)
-            ))
+            addLoreLine(event, type, args, spellId)
         }
+    }
+
+    private fun addLoreLine(event: RenderTooltipEvent.GatherComponents, type: Lore, args: Array<out Any>, spellId: String) {
+        val comp = when (type) {
+            Lore.BR -> Component.literal("").withStyle(ChatFormatting.DARK_GRAY)
+            Lore.DESCRIPTION -> Component.translatable("lore.primalspells.$spellId.desc").withStyle(ChatFormatting.GRAY)
+            else -> Component.translatable(type.key, *args).withStyle(ChatFormatting.GRAY)
+        }
+        event.tooltipElements.add(Either.left(comp))
     }
 }

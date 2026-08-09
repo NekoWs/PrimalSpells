@@ -18,5 +18,10 @@
   "lore.primalspells.recharge": "Recharge: %st",
   "lore.primalspells.cast": "Draws: %s",
   "lore.primalspells.damage": "Damage: %s",
-  "lore.primalspells.max_age": "Lifetime: %st"
+  "lore.primalspells.max_age": "Lifetime: %st",
+  "lore.primalspells.fireball.desc": "A slow-moving fireball.",
+  "lore.primalspells.trigger_fireball.desc": "A slow-moving fireball that casts another spell on hit.",
+  "lore.primalspells.damage.desc": "Increases projectile damage.",
+  "lore.primalspells.bounce.desc": "Allows projectiles to bounce.",
+  "lore.primalspells.gravity.desc": "Makes projectiles affected by gravity."
 }

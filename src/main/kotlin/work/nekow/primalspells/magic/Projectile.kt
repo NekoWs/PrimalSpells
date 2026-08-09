@@ -5,8 +5,8 @@ import org.joml.Vector3f
 import work.nekow.primalspells.magic.effect.Move
 import work.nekow.primalspells.magic.effect.Position
 import work.nekow.primalspells.magic.effect.Velocity
-import work.nekow.primalspells.magic.lore.Lore
-import work.nekow.primalspells.magic.lore.LoreEntry
+import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.utils.LoreEntry
 
 abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()

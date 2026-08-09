@@ -1,8 +1,8 @@
 package work.nekow.primalspells.magic
 
 import work.nekow.primalspells.magic.effect.BaseEffect
-import work.nekow.primalspells.magic.lore.Lore
-import work.nekow.primalspells.magic.lore.LoreEntry
+import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.utils.LoreEntry
 
 class Damage: Revise() {
     override val id = "damage"

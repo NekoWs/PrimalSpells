@@ -1,4 +1,4 @@
-package work.nekow.primalspells.magic.lore
+package work.nekow.primalspells.utils
 
 enum class Lore(val key: String) {
     MANA("lore.primalspells.mana"),

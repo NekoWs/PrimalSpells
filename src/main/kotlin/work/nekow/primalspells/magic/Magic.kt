@@ -2,8 +2,8 @@ package work.nekow.primalspells.magic
 
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.magic.effect.BaseEffect
-import work.nekow.primalspells.magic.lore.Lore
-import work.nekow.primalspells.magic.lore.LoreEntry
+import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.utils.LoreEntry
 import work.nekow.primalspells.wand.Wand
 
 abstract class Magic {

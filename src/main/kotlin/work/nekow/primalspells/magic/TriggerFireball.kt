@@ -4,6 +4,7 @@ import net.minecraft.core.particles.ParticleTypes
 import work.nekow.primalspells.magic.effect.HitEntity
 import work.nekow.primalspells.magic.effect.Hurt
 import work.nekow.primalspells.magic.effect.Trajectory
+import work.nekow.primalspells.magic.effect.Trigger
 
 class TriggerFireball: Projectile(), TriggerSpell {
     override val id = "trigger_fireball"
@@ -20,5 +21,6 @@ class TriggerFireball: Projectile(), TriggerSpell {
         effects += Trajectory(ParticleTypes.FLAME)
         effects += HitEntity(0.2)
         effects += Hurt()
+        effects += Trigger()
     }
 }

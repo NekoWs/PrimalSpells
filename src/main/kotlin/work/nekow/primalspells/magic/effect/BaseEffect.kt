@@ -4,6 +4,7 @@ import net.minecraft.world.entity.Entity
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.MagicStatus
 import work.nekow.primalspells.magic.Projectile
+import work.nekow.primalspells.utils.HitResult
 import work.nekow.primalspells.wand.Wand
 
 open class BaseEffect {
@@ -16,4 +17,5 @@ open class BaseEffect {
     open fun onActive() { }
     open fun onHitEntity(target: Entity) { }
     open fun onHitBlock(pos: Vector3f) { }
+    open fun onHit(result: HitResult) { }
 }

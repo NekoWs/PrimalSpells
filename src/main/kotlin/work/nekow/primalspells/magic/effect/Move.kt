@@ -2,7 +2,10 @@ package work.nekow.primalspells.magic.effect
 
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.phys.AABB
 import org.joml.Vector3f
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
 
@@ -20,7 +23,8 @@ class Move(val scaler: Float = 1F, val ignoreBlocks: Boolean = false) : BaseEffe
                 if (distance > 0f) {
                     val stepVec = Vector3f(movement).div(distance)
                     val stepSize = 1F / 16
-                    val steps = maxOf(1, (distance / stepSize).toInt())
+                    val steps = maxOf(1, ceil(distance / stepSize).toInt())
+                    var prevPos = Vector3f(status.pos)
                     for (i in 1..steps) {
                         val t = min(i * stepSize, distance)
                         val checkPos = Vector3f(stepVec).mul(t).add(status.pos)
@@ -35,22 +39,59 @@ class Move(val scaler: Float = 1F, val ignoreBlocks: Boolean = false) : BaseEffe
                             val rx = (checkPos.x - blockPos.x).toDouble()
                             val ry = (checkPos.y - blockPos.y).toDouble()
                             val rz = (checkPos.z - blockPos.z).toDouble()
-                            val hit = shape.toAabbs().any { aabb ->
+                            val hitAabb = shape.toAabbs().firstOrNull { aabb ->
                                 rx in aabb.minX..aabb.maxX &&
                                 ry in aabb.minY..aabb.maxY &&
                                 rz in aabb.minZ..aabb.maxZ
                             }
-                            if (hit) {
+                            if (hitAabb != null) {
+                                val prx = (prevPos.x - blockPos.x).toDouble()
+                                val pry = (prevPos.y - blockPos.y).toDouble()
+                                val prz = (prevPos.z - blockPos.z).toDouble()
+                                val faceNormal = computeFaceNormal(prx, pry, prz, rx, ry, rz, hitAabb)
                                 status.pos = checkPos
-                                projectile.hitBlock(checkPos)
+                                projectile.hitBlock(checkPos, faceNormal)
                                 projectile.alive = false
                                 return
                             }
                         }
+                        prevPos = Vector3f(checkPos)
                     }
                 }
             }
         }
         status.pos = newPos
+    }
+
+    private fun computeFaceNormal(
+        prevX: Double, prevY: Double, prevZ: Double,
+        curX: Double, curY: Double, curZ: Double,
+        aabb: AABB
+    ): Vector3f {
+        val dx = curX - prevX
+        val dy = curY - prevY
+        val dz = curZ - prevZ
+
+        fun entryT(prev: Double, dir: Double, lo: Double, hi: Double): Double {
+            if (dir == 0.0) return -1.0
+            val tLo = (lo - prev) / dir
+            val tHi = (hi - prev) / dir
+            val tIn = minOf(tLo, tHi)
+            return if (tIn in 1e-6..1.0) tIn else -1.0
+        }
+
+        val tx = entryT(prevX, dx, aabb.minX, aabb.maxX)
+        val ty = entryT(prevY, dy, aabb.minY, aabb.maxY)
+        val tz = entryT(prevZ, dz, aabb.minZ, aabb.maxZ)
+
+        val maxT = maxOf(tx, ty, tz)
+        val eps = 1e-5
+        val nx = if (abs(tx - maxT) <= eps && tx > 0) (if (dx > 0) -1f else 1f) else 0f
+        val ny = if (abs(ty - maxT) <= eps && ty > 0) (if (dy > 0) -1f else 1f) else 0f
+        val nz = if (abs(tz - maxT) <= eps && tz > 0) (if (dz > 0) -1f else 1f) else 0f
+
+        val normal = Vector3f(nx, ny, nz)
+        if (normal.lengthSquared() > 0f) normal.normalize()
+        return normal
     }
 }

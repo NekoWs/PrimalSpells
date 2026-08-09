@@ -17,15 +17,30 @@ object WandHudRenderer {
     @JvmField
     var stats: SyncWandStatsPayload? = null
 
+    private var lastGameTime: Long = 0
+    private var delayPersistTicks: Int = 0
+    private var rechargePersistTicks: Int = 0
+    private const val PERSIST_DURATION: Int = 5
+
     @JvmStatic
     @SubscribeEvent
     fun onRenderHud(event: RenderGuiLayerEvent.Post) {
         if (event.name != VanillaGuiLayers.CROSSHAIR) return
         val s = stats ?: return
 
+        val gameTime = Minecraft.getInstance().level?.gameTime ?: 0
+        if (gameTime != lastGameTime) {
+            lastGameTime = gameTime
+            if (delayPersistTicks > 0) delayPersistTicks--
+            if (rechargePersistTicks > 0) rechargePersistTicks--
+        }
+
+        if (s.currentDelay > 0) delayPersistTicks = PERSIST_DURATION
+        if (s.currentRecharge > 0) rechargePersistTicks = PERSIST_DURATION
+
         val showMana = s.maxMana > 0 && s.currentMana < s.maxMana
-        val showDelay = s.currentDelay > 0
-        val showRecharge = s.currentRecharge > 0
+        val showDelay = s.currentDelay > 0 || delayPersistTicks > 0
+        val showRecharge = s.currentRecharge > 0 || rechargePersistTicks > 0
         if (!showMana && !showDelay && !showRecharge) return
 
         val g = event.guiGraphics
@@ -42,13 +57,13 @@ object WandHudRenderer {
             y += bh + gap
         }
         if (showDelay) {
-            drawBar(g, cx - bw / 2, y, bw, bh,
-                1 - (s.currentDelay.toFloat() / s.lastDelay).coerceIn(0f, 1f), 0xFF_FF_AA_00.toInt())
-            y += bh + gap
-        }
-        if (showRecharge) {
-            drawBar(g, cx - bw / 2, y, bw, bh,
-                1 - (s.currentRecharge.toFloat() / s.lastRecharge).coerceIn(0f, 1f), 0xFF_33_55_CC.toInt())
+            val progress = if (s.currentDelay > 0)
+                1 - (s.currentDelay.toFloat() / s.lastDelay).coerceIn(0f, 1f) else 1f
+            drawBar(g, cx - bw / 2, y, bw, bh, progress, 0xFF_FF_AA_00.toInt())
+        } else if (showRecharge) {
+            val progress = if (s.currentRecharge > 0)
+                1 - (s.currentRecharge.toFloat() / s.lastRecharge).coerceIn(0f, 1f) else 1f
+            drawBar(g, cx - bw / 2, y, bw, bh, progress, 0xFF_33_55_CC.toInt())
         }
     }
 

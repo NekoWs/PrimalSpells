@@ -11,7 +11,7 @@ import work.nekow.primalspells.item.WandItem;
 @Mixin(AbstractContainerScreen.class)
 public class AbstractContainerScreenMixin {
     @Inject(method = "showTooltipWithItemInHand", at = @At("RETURN"), cancellable = true)
-    private void primalspells_showWandTooltip(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
-        if (stack.getItem() instanceof WandItem) cir.setReturnValue(true);
+    private void primalspells_showWandTooltip(ItemStack item, CallbackInfoReturnable<Boolean> cir) {
+        if (item.getItem() instanceof WandItem) cir.setReturnValue(true);
     }
 }

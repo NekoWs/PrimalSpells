@@ -8,6 +8,7 @@ import net.neoforged.fml.common.EventBusSubscriber
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers
 import work.nekow.primalspells.PrimalSpells
+import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import kotlin.math.roundToInt
 
@@ -15,7 +16,22 @@ import kotlin.math.roundToInt
 object WandHudRenderer {
 
     @JvmField
-    var stats: SyncWandStatsPayload? = null
+    val statsMap: MutableMap<String, SyncWandStatsPayload> = hashMapOf()
+
+    fun getStats(wandId: String): SyncWandStatsPayload? = statsMap[wandId]
+
+    fun putStats(payload: SyncWandStatsPayload) {
+        statsMap[payload.wandId] = payload
+    }
+
+    private fun getHeldWandStats(): SyncWandStatsPayload? {
+        val player = Minecraft.getInstance().player ?: return null
+        for (hand in listOf(player.mainHandItem, player.offhandItem)) {
+            val wandId = hand.get(ModItems.WAND_ID)?.wandId ?: continue
+            return statsMap[wandId]
+        }
+        return null
+    }
 
     private var lastGameTime: Long = 0
     private var delayPersistTicks: Int = 0
@@ -34,7 +50,7 @@ object WandHudRenderer {
     @SubscribeEvent
     fun onRenderHud(event: RenderGuiLayerEvent.Post) {
         if (event.name != VanillaGuiLayers.CROSSHAIR) return
-        val s = stats ?: return
+        val s = getHeldWandStats() ?: return
 
         val gameTime = Minecraft.getInstance().level?.gameTime ?: 0
         if (gameTime != lastGameTime) {

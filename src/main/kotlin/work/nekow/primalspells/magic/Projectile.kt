@@ -25,11 +25,12 @@ abstract class Projectile: Magic() {
     lateinit var position: Vector3f
     lateinit var velocity: Vector3f
     var dragCoeff: Float = 0.02f
+    var speed: Float = 1f
 
     override fun spell() {
         effects += Position(position)
         effects += Move(dragCoeff)
-        effects += Velocity(velocity)
+        effects += Velocity(velocity.mul(speed))
 
         effects.forEach {
             it.projectile = this

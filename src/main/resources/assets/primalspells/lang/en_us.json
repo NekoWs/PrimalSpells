@@ -11,6 +11,7 @@
   "tooltip.primalspells.delay": "Delay: %s\u00a0",
   "tooltip.primalspells.recharge": "Recharge: %s\u00a0",
   "tooltip.primalspells.cast": "Cast: %s",
+  "tooltip.primalspells.charge": "Charge: %s/s",
   "lore.primalspells.mana": "Mana Cost: %s",
   "lore.primalspells.delay": "Cast Delay: %st",
   "lore.primalspells.recharge": "Recharge: %st",

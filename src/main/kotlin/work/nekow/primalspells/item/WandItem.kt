@@ -26,6 +26,29 @@ class WandItem(properties: Properties) : Item(properties) {
 
     companion object {
         private val lastCastWand: MutableMap<UUID, WandID> = hashMapOf()
+
+        /** 从物品栈获取关联的法杖对象。 */
+        fun getWand(stack: ItemStack): Wand? {
+            val id = stack.get(ModItems.WAND_ID) ?: return null
+            return WandManager[id, null]
+        }
+
+        /** 通过自定义网络包向客户端同步法杖属性。 */
+        fun syncStats(stack: ItemStack, player: ServerPlayer) {
+            val wand = getWand(stack) ?: return
+            val wandId = stack.get(ModItems.WAND_ID)?.wandId ?: return
+            PacketDistributor.sendToPlayer(player, SyncWandStatsPayload(
+                wandId,
+                wand.status.mana,
+                wand.mana,
+                wand.status.delay,
+                wand.status.recharge,
+                wand.cast,
+                wand.status.lastDelay,
+                wand.status.lastRecharge,
+                wand.charge
+            ))
+        }
     }
 
     /** 每 tick 同步法术列表，仅对最后一次施放的法杖发送属性包到客户端。 */
@@ -35,7 +58,7 @@ class WandItem(properties: Properties) : Item(properties) {
         if (owner is ServerPlayer) {
             val wandId = stack.get(ModItems.WAND_ID)
             if (wandId == lastCastWand[owner.uuid]) {
-                sendStatsPacket(stack, owner)
+                syncStats(stack, owner)
             }
         }
     }
@@ -151,31 +174,11 @@ class WandItem(properties: Properties) : Item(properties) {
         return stack.getOrDefault(ModItems.WAND_SELECTED_SLOT, 0).coerceIn(0, size - 1)
     }
 
-    /** 从物品栈获取关联的法杖对象。 */
-    private fun getWand(stack: ItemStack): Wand? {
-        val id = stack.get(ModItems.WAND_ID) ?: return null
-        return WandManager[id, null]
-    }
-
     /** tick 时仅同步法术列表，不同步属性以避免持有法杖时持续触发拾取动画。 */
     private fun tickSync(stack: ItemStack) {
         val wand = getWand(stack) ?: return
         val size = maxOf(wand.size, wand.magics.size)
         val ids = (0 until size).map { i -> wand.magics.getOrNull(i)?.id ?: "" }
         if (stack.get(ModItems.WAND_SPELLS.get()) != ids) stack.set(ModItems.WAND_SPELLS, ids)
-    }
-
-    /** 通过自定义网络包向客户端同步法杖属性，避免物品组件更新触发拾取动画。 */
-    private fun sendStatsPacket(stack: ItemStack, player: ServerPlayer) {
-        val wand = getWand(stack) ?: return
-        PacketDistributor.sendToPlayer(player, SyncWandStatsPayload(
-            wand.status.mana,
-            wand.mana,
-            wand.status.delay,
-            wand.status.recharge,
-            wand.cast,
-            wand.status.lastDelay,
-            wand.status.lastRecharge
-        ))
     }
 }

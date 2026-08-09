@@ -23,7 +23,7 @@ object ClientTooltipHandler {
             return
         }
         if (Minecraft.getInstance().hasShiftDown()) {
-            addStatLines(event)
+            addStatLines(event, wandId)
         }
         event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
     }
@@ -53,8 +53,8 @@ object ClientTooltipHandler {
     }
 
     /** 向提示框添加法杖属性行（魔力、延迟、充能、施放数），仅在 Shift 按下时调用。 */
-    private fun addStatLines(event: RenderTooltipEvent.GatherComponents) {
-        val s = WandHudRenderer.stats ?: return
+    private fun addStatLines(event: RenderTooltipEvent.GatherComponents, wandId: String) {
+        val s = WandHudRenderer.getStats(wandId) ?: return
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.mana",
                 "%.1f".format(s.currentMana), "%.1f".format(s.maxMana)).withStyle(ChatFormatting.BLUE)
@@ -69,6 +69,10 @@ object ClientTooltipHandler {
         ))
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.cast", s.cast).withStyle(ChatFormatting.WHITE)
+        ))
+        event.tooltipElements.add(Either.left(
+            Component.translatable("tooltip.primalspells.charge",
+                "%.1f".format(s.charge)).withStyle(ChatFormatting.BLUE)
         ))
     }
 

@@ -13,13 +13,13 @@ class Wand(var id: String) {
 
     val magics = arrayListOf<Magic?>()
     /** 法力最大值 **/
-    var mana: Double = 100.0
+    var mana: Double = 300.0
     /** 施放延迟 **/
     var delay: Int = 0
     /** 充能时间 **/
     var recharge: Int = 0
     /** 充能速度 (charge/s) **/
-    var charge: Double = 10.0
+    var charge: Double = 100.0
     /** 施放数 **/
     var cast = 1
     /** 容量 **/
@@ -93,8 +93,8 @@ class Wand(var id: String) {
             p.effects.addAll(effects)
             p.caster = caster
             p.wand = this
-            p.position = caster.eyePosition.toVector3f().sub(0F, 0.2F, 0F)
-            p.velocity = caster.lookAngle.toVector3f()
+            p.position = caster.eyePosition.toVector3f().sub(0F, 0.1F, 0F)
+            p.velocity = caster.lookAngle.toVector3f().normalize()
             p.spell()
             status.recharge += p.recharge
             status.delay += p.delay

@@ -34,7 +34,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 SyncWandStatsPayload.ID,
                 SyncWandStatsPayload.STREAM_CODEC
             ) { payload, _ ->
-                WandHudRenderer.stats = payload
+                WandHudRenderer.putStats(payload)
             }
         }
     }

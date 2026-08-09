@@ -7,6 +7,7 @@ import net.minecraft.resources.Identifier
 import work.nekow.primalspells.PrimalSpells
 
 data class SyncWandStatsPayload(
+    val wandId: String,
     val currentMana: Double,
     val maxMana: Double,
     val currentDelay: Int,
@@ -14,6 +15,7 @@ data class SyncWandStatsPayload(
     val cast: Int,
     val lastDelay: Int,
     val lastRecharge: Int,
+    val charge: Double,
 ) : CustomPacketPayload {
 
     companion object {
@@ -23,15 +25,18 @@ data class SyncWandStatsPayload(
         val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, SyncWandStatsPayload> =
             object : StreamCodec<RegistryFriendlyByteBuf, SyncWandStatsPayload> {
                 override fun decode(buf: RegistryFriendlyByteBuf) = SyncWandStatsPayload(
+                    buf.readUtf(),
                     buf.readDouble(),
                     buf.readDouble(),
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
-                    buf.readVarInt()
+                    buf.readVarInt(),
+                    buf.readDouble()
                 )
                 override fun encode(buf: RegistryFriendlyByteBuf, p: SyncWandStatsPayload) {
+                    buf.writeUtf(p.wandId)
                     buf.writeDouble(p.currentMana)
                     buf.writeDouble(p.maxMana)
                     buf.writeVarInt(p.currentDelay)
@@ -39,6 +44,7 @@ data class SyncWandStatsPayload(
                     buf.writeVarInt(p.cast)
                     buf.writeVarInt(p.lastDelay)
                     buf.writeVarInt(p.lastRecharge)
+                    buf.writeDouble(p.charge)
                 }
             }
     }

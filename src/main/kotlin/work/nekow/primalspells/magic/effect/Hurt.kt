@@ -5,7 +5,6 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.ModDamageTypes
-import work.nekow.primalspells.PrimalSpells.Companion.debug
 
 class Hurt(private val amount: Double = 0.0) : BaseEffect() {
     override fun onHitEntity(target: Entity) {
@@ -20,6 +19,5 @@ class Hurt(private val amount: Double = 0.0) : BaseEffect() {
         target.invulnerableTime = 0
         target.hurtServer(level, source, dmg.toFloat())
         target.invulnerableTime = invulnerableTime
-        caster.debug("Damaged ${target::class.simpleName}: $dmg")
     }
 }

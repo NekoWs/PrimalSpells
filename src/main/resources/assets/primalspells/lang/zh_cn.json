@@ -11,6 +11,7 @@
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
   "tooltip.primalspells.recharge": "充能时间：%s\u00a0",
   "tooltip.primalspells.cast": "施放数：%s",
+  "tooltip.primalspells.charge": "充能速度：%s/s",
   "lore.primalspells.mana": "法力消耗：%s",
   "lore.primalspells.delay": "施放延迟：%st",
   "lore.primalspells.recharge": "充能时间：%st",

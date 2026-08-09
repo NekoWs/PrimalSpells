@@ -43,6 +43,7 @@ object MagicManager {
         register("damage") { Damage() }
         register("gravity") { Gravity() }
         register("bounce") { Bounce() }
+        register("age_monitor") { AgeMonitor() }
     }
 
     @SubscribeEvent

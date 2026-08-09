@@ -9,11 +9,14 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
 
-class Move(val scaler: Float = 1F, val ignoreBlocks: Boolean = false) : BaseEffect() {
+class Move(val dragCoeff: Float = 0.01F, val ignoreBlocks: Boolean = false) : BaseEffect() {
     override fun onTick() {
         if (!projectile.alive) return
 
-        val movement = Vector3f(status.velocity).mul(scaler)
+        val speed = status.velocity.length()
+        val scale = 1 / (1 + dragCoeff * speed)
+        val movement = Vector3f(status.velocity).mul(scale)
+        status.velocity = Vector3f(movement)
         val newPos = Vector3f(movement).add(status.pos)
 
         if (!ignoreBlocks) {

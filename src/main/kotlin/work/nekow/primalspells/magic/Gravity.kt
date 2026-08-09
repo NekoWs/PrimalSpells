@@ -8,7 +8,7 @@ class Gravity: Revise() {
     init {
         effects += object: BaseEffect() {
             override fun onTick() {
-                status.velocity.y -= 0.02F
+                status.velocity.y -= 0.03F
             }
         }
     }

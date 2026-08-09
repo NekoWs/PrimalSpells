@@ -12,7 +12,7 @@ class Fireball: Projectile() {
         mana = 3.0
         delay = 1
         recharge = 1
-        maxAge = 100
+        maxAge = 200
         status.damage = 1.0
         effects += Trajectory(ParticleTypes.END_ROD)
         effects += HitEntity(0.2)

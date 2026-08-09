@@ -20,23 +20,25 @@ abstract class Projectile: Magic() {
 
     var maxBounces: Int = 0
     var maxHitTargets: Int = 1
+    var bounceScaler: Vector3f = Vector3f(0.9f, 0.9f, 0.9f)
 
     lateinit var position: Vector3f
     lateinit var velocity: Vector3f
 
     override fun spell() {
         effects += Position(position)
-        effects += Move()
-        effects += Velocity(velocity)
+        effects += Move(0.05f)
+        effects += Velocity(velocity.mul(1.5F))
 
         effects.forEach {
             it.projectile = this
             it.status = status
         }
 
+        super.spell()
+
         status.bounces = maxBounces
         status.hitTargets = 0
-        super.spell()
     }
 
     fun hitEntity(entity: Entity) {
@@ -57,12 +59,17 @@ abstract class Projectile: Magic() {
 
     fun hitBlock(pos: Vector3f, faceNormal: Vector3f) {
         val rebound = Vector3f(status.velocity).normalize().reflect(faceNormal)
-        val castPos = Vector3f(faceNormal).mul(0.5f).add(pos)
+        val castPos = Vector3f(faceNormal).mul(0.01f).add(pos)
         val result = HitResult(HitType.BLOCK, castPos, rebound)
 
         if (status.bounces > 0) {
             status.bounces--
-            status.velocity.reflect(faceNormal)
+            val speed = status.velocity.length()
+            status.velocity
+                .normalize()
+                .reflect(faceNormal)
+                .mul(speed)
+                .mul(bounceScaler.x, bounceScaler.y, bounceScaler.z)
             status.pos = castPos
         } else {
             alive = false

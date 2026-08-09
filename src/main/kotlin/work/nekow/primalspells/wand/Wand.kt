@@ -4,7 +4,6 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
-import work.nekow.primalspells.PrimalSpells.Companion.debug
 import work.nekow.primalspells.magic.*
 import kotlin.math.min
 

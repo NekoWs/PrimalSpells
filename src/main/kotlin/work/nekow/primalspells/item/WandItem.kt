@@ -61,11 +61,11 @@ class WandItem(properties: Properties) : Item(properties) {
     }
 
     /** 从法杖当前选中格取出法术到光标，若选中格为空则阻止拿起法杖。 */
-    private fun removeToCursor(stack: ItemStack, wand: Wand, carried: SlotAccess): Boolean {
+    private fun removeToCursor(stack: ItemStack, wand: Wand, carried: SlotAccess) {
         val target = selectedSlot(stack, wand)
-        val magic = clearMagic(wand, stack, target) ?: return true
+        val magic = clearMagic(wand, stack, target) ?: return
         carried.set(makeStack(magic))
-        return true
+        return
     }
 
     /** 将槽位中的法术添加到法杖当前选中格（法杖在光标时），若已占则交换回槽位。 */
@@ -113,7 +113,7 @@ class WandItem(properties: Properties) : Item(properties) {
     /** 根据法术对象创建对应的 ItemStack。 */
     private fun makeStack(magic: work.nekow.primalspells.magic.Magic): ItemStack {
         val item = ModItems.MAGICS[magic.id]?.get() ?: return ItemStack.EMPTY
-        return ItemStack(item as Item)
+        return ItemStack(item)
     }
 
     /** 从物品栈的 WAND_SELECTED_SLOT 组件读取当前选中格索引，限制在有效范围内。 */

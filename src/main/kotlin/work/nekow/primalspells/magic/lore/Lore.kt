@@ -10,8 +10,6 @@ enum class Lore(val key: String) {
     companion object {
         fun formatDouble(value: Double): String =
             if (value == value.toLong().toDouble()) value.toLong().toString() else "%.1f".format(value)
-
-        fun formatTicks(ticks: Int): String = "%.1f".format(ticks / 20.0)
     }
 }
 

@@ -15,8 +15,6 @@ class Damage: Revise() {
                 projectile.status.damage += 2
             }
         }
-        lore += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
-        lore += LoreEntry(Lore.DELAY, arrayOf(Lore.formatTicks(delay)))
         lore += LoreEntry(Lore.DAMAGE, arrayOf("+2"))
     }
 }

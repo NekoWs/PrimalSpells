@@ -11,7 +11,7 @@ object MagicManager {
         registry[id] = factory
     }
 
-    fun create(id: String): Magic? = registry[id]?.invoke()
+    fun create(id: String): Magic? = registry[id]?.invoke()?.also { it.initLore() }
 
     val projectiles = arrayListOf<Projectile>()
     private val pendingAdd = arrayListOf<Projectile>()

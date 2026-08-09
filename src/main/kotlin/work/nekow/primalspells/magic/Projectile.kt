@@ -5,6 +5,8 @@ import org.joml.Vector3f
 import work.nekow.primalspells.magic.effect.Move
 import work.nekow.primalspells.magic.effect.Position
 import work.nekow.primalspells.magic.effect.Velocity
+import work.nekow.primalspells.magic.lore.Lore
+import work.nekow.primalspells.magic.lore.LoreEntry
 
 abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
@@ -43,6 +45,11 @@ abstract class Projectile: Magic() {
     open fun onHitBlock(pos: Vector3f) { }
 
     override fun onSpell() { }
+
+    override fun initLore() {
+        super.initLore()
+        if (status.damage > 0) lore += LoreEntry(Lore.DAMAGE, arrayOf(Lore.formatDouble(status.damage)))
+    }
 
     override fun clone(): Projectile = super.clone() as Projectile
 }

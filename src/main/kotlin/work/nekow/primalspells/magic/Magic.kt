@@ -2,6 +2,7 @@ package work.nekow.primalspells.magic
 
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.lore.Lore
 import work.nekow.primalspells.magic.lore.LoreEntry
 import work.nekow.primalspells.wand.Wand
 
@@ -35,6 +36,12 @@ abstract class Magic {
         effects.forEach { it.onTick() }
     }
     open fun onSpell() { }
+
+    open fun initLore() {
+        if (mana > 0) lore += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
+        if (delay > 0) lore += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
+        if (recharge > 0) lore += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
+    }
 
     open fun clone(): Magic = MagicManager.create(id)!!
 }

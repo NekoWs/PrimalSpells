@@ -2,6 +2,7 @@ package work.nekow.primalspells.magic
 
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.lore.LoreEntry
 import work.nekow.primalspells.wand.Wand
 
 abstract class Magic {
@@ -19,6 +20,7 @@ abstract class Magic {
     var delay: Int = 0
     var recharge: Int = 0
     var effects = arrayListOf<BaseEffect>()
+    var lore = arrayListOf<LoreEntry>()
 
     open fun spell() {
         effects.forEach {

@@ -11,13 +11,17 @@ import net.neoforged.neoforge.client.event.RenderTooltipEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.WandItem
+import work.nekow.primalspells.magic.MagicManager
 
 object ClientTooltipHandler {
 
     /** 法杖悬停时添加法术槽位提示框组件，按下 Shift 时额外显示法杖属性。 */
     @SubscribeEvent
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
-        val (wandId, spells) = getWandData(event.itemStack) ?: return
+        val (wandId, spells) = getWandData(event.itemStack) ?: run {
+            addSpellLore(event)
+            return
+        }
         if (Minecraft.getInstance().hasShiftDown()) {
             addStatLines(event)
         }
@@ -66,5 +70,15 @@ object ClientTooltipHandler {
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.cast", s.cast).withStyle(ChatFormatting.WHITE)
         ))
+    }
+
+    private fun addSpellLore(event: RenderTooltipEvent.GatherComponents) {
+        val id = ModItems.MAGICS.entries.firstOrNull { it.value.get() == event.itemStack.item }?.key ?: return
+        val magic = MagicManager.create(id) ?: return
+        for (entry in magic.lore) {
+            event.tooltipElements.add(Either.left(
+                Component.translatable(entry.type.key, *entry.args).withStyle(ChatFormatting.GRAY)
+            ))
+        }
     }
 }

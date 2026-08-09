@@ -4,8 +4,16 @@
   "tooltip.primalspells.wand_id": "Wand ID: %s",
   "tooltip.primalspells.wand_id.ungenerated": "Ungenerated",
   "item.primalspells.fireball": "Fireball",
+  "item.primalspells.trigger_fireball": "Trigger Fireball",
+  "item.primalspells.damage": "Damage",
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Delay: %s\u00a0",
   "tooltip.primalspells.recharge": "Recharge: %s\u00a0",
-  "tooltip.primalspells.cast": "Cast: %s"
+  "tooltip.primalspells.cast": "Cast: %s",
+  "lore.primalspells.mana": "Mana Cost: %s",
+  "lore.primalspells.delay": "Cast Delay: %st",
+  "lore.primalspells.recharge": "Recharge: %st",
+  "lore.primalspells.cast": "Draws: %s",
+  "lore.primalspells.damage": "Damage: %s",
+  "lore.primalspells.max_age": "Lifetime: %st"
 }

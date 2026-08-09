@@ -4,8 +4,16 @@
   "tooltip.primalspells.wand_id": "法杖ID：%s",
   "tooltip.primalspells.wand_id.ungenerated": "未生成",
   "item.primalspells.fireball": "火球",
+  "item.primalspells.trigger_fireball": "触发火球",
+  "item.primalspells.damage": "伤害强化",
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
   "tooltip.primalspells.recharge": "充能时间：%s\u00a0",
-  "tooltip.primalspells.cast": "施放数：%s"
+  "tooltip.primalspells.cast": "施放数：%s",
+  "lore.primalspells.mana": "法力消耗：%s",
+  "lore.primalspells.delay": "施放延迟：%st",
+  "lore.primalspells.recharge": "充能时间：%st",
+  "lore.primalspells.cast": "抽取数量：%s",
+  "lore.primalspells.damage": "伤害：%s",
+  "lore.primalspells.max_age": "持续时间：%st"
 }

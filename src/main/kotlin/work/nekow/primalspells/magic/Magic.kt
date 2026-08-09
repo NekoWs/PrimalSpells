@@ -38,7 +38,7 @@ abstract class Magic {
     open fun onSpell() { }
 
     open fun initLore() {
-        if (mana > 0) lore += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
+        lore += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
         if (delay > 0) lore += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
         if (recharge > 0) lore += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
     }

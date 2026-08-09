@@ -26,6 +26,7 @@ object ClientTooltipHandler {
             addStatLines(event, wandId)
         }
         event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
+        addSelectedSpellLines(event, spells, wandId)
     }
 
     /** 悬停法杖时滚轮切换选中格，并同步到 WAND_SELECTED_SLOT 组件。 */
@@ -79,9 +80,27 @@ object ClientTooltipHandler {
     private fun addSpellLore(event: RenderTooltipEvent.GatherComponents) {
         val id = ModItems.MAGICS.entries.firstOrNull { it.value.get() == event.itemStack.item }?.key ?: return
         val magic = MagicManager.create(id) ?: return
-        for (entry in magic.lore) {
+        for ((type, args) in magic.lore) {
             event.tooltipElements.add(Either.left(
-                Component.translatable(entry.type.key, *entry.args).withStyle(ChatFormatting.GRAY)
+                Component.translatable(type.key, *args).withStyle(ChatFormatting.GRAY)
+            ))
+        }
+    }
+
+    private fun addSelectedSpellLines(event: RenderTooltipEvent.GatherComponents, spells: List<String>, wandId: String) {
+        val selected = WandTooltipTracker.getSelectedSlot(wandId)
+        val spellId = spells.getOrNull(selected) ?: return
+        if (spellId.isEmpty()) return
+        val magic = MagicManager.create(spellId) ?: return
+        val item = ModItems.MAGICS[spellId]?.get()
+        if (item != null) {
+            event.tooltipElements.add(Either.left(
+                Component.translatable(item.descriptionId).withStyle(ChatFormatting.WHITE)
+            ))
+        }
+        for ((type, args) in magic.lore) {
+            event.tooltipElements.add(Either.left(
+                Component.translatable(type.key, *args).withStyle(ChatFormatting.GRAY)
             ))
         }
     }

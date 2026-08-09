@@ -7,6 +7,7 @@
   "item.primalspells.trigger_fireball": "Trigger Fireball",
   "item.primalspells.damage": "Damage",
   "item.primalspells.bounce": "Bounce",
+  "item.primalspells.gravity": "Gravity",
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Delay: %s\u00a0",
   "tooltip.primalspells.recharge": "Recharge: %s\u00a0",

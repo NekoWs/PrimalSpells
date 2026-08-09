@@ -14,14 +14,12 @@ import work.nekow.primalspells.item.WandItem
 
 object ClientTooltipHandler {
 
-    /** 法杖悬停时添加法术槽位提示框组件。 */
+    /** 法杖悬停时添加法术槽位提示框组件，按下 Shift 时额外显示法杖属性。 */
     @SubscribeEvent
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
         val (wandId, spells) = getWandData(event.itemStack) ?: return
         if (Minecraft.getInstance().hasShiftDown()) {
-            event.tooltipElements.add(Either.left(
-                Component.translatable("tooltip.primalspells.wand_id", wandId).withStyle(ChatFormatting.GRAY)
-            ))
+            addStatLines(event, event.itemStack)
         }
         event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
     }
@@ -48,5 +46,26 @@ object ClientTooltipHandler {
         if (spells.isEmpty()) return null
         val wandId = stack.get(ModItems.WAND_ID.get())?.wandId ?: return null
         return wandId to spells
+    }
+
+    /** 向提示框添加法杖属性行（魔力、延迟、充能、施放数），仅在 Shift 按下时调用。 */
+    private fun addStatLines(event: RenderTooltipEvent.GatherComponents, stack: ItemStack) {
+        val stats = stack.get(ModItems.WAND_STATS.get()) ?: return
+        event.tooltipElements.add(Either.left(
+            Component.translatable("tooltip.primalspells.mana", "%.1f".format(stats.mana), "%.1f".format(stats.maxMana))
+                .withStyle(ChatFormatting.BLUE)
+        ))
+        event.tooltipElements.add(Either.left(
+            Component.translatable("tooltip.primalspells.delay", stats.delay)
+                .withStyle(ChatFormatting.GOLD)
+        ))
+        event.tooltipElements.add(Either.left(
+            Component.translatable("tooltip.primalspells.recharge", stats.recharge)
+                .withStyle(ChatFormatting.DARK_BLUE)
+        ))
+        event.tooltipElements.add(Either.left(
+            Component.translatable("tooltip.primalspells.cast", stats.cast)
+                .withStyle(ChatFormatting.WHITE)
+        ))
     }
 }

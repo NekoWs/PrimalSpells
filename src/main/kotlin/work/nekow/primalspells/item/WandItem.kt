@@ -10,6 +10,7 @@ import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import work.nekow.primalspells.PrimalSpells.Companion.debug
+import work.nekow.primalspells.item.component.WandStats
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
@@ -28,9 +29,6 @@ class WandItem(properties: Properties) : Item(properties) {
         if (msg.isNotEmpty()) {
             msg.forEach { caster.debug(it) }
         }
-        caster.debug("Hand: ${wand.hand.joinToString { it::class.simpleName.toString() }}")
-        caster.debug("Discard: ${wand.discardPile.joinToString { it::class.simpleName.toString() }}")
-        caster.debug("Draw: ${wand.drawPile.joinToString { it::class.simpleName.toString() }}")
     }
 
     override fun overrideOtherStackedOnMe(
@@ -134,11 +132,12 @@ class WandItem(properties: Properties) : Item(properties) {
         return WandManager[id, null]
     }
 
-    /** 将法杖的法术列表同步到物品栈的 WAND_SPELLS 组件上。 */
+    /** 将法杖的法术列表与属性同步到物品栈。 */
     private fun syncSpells(stack: ItemStack) {
         val wand = getWand(stack) ?: return
         val size = maxOf(wand.size, wand.magics.size)
         val ids = (0 until size).map { i -> wand.magics.getOrNull(i)?.id ?: "" }
         stack.set(ModItems.WAND_SPELLS, ids)
+        stack.set(ModItems.WAND_STATS, WandStats(wand.status.mana, wand.mana, wand.delay, wand.recharge, wand.cast))
     }
 }

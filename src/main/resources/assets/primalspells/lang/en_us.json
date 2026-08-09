@@ -3,5 +3,9 @@
   "item.primalspells.wand": "Primal Wand",
   "tooltip.primalspells.wand_id": "Wand ID: %s",
   "tooltip.primalspells.wand_id.ungenerated": "Ungenerated",
-  "item.primalspells.fireball": "Fireball"
+  "item.primalspells.fireball": "Fireball",
+  "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
+  "tooltip.primalspells.delay": "Delay: %s",
+  "tooltip.primalspells.recharge": "Recharge: %s",
+  "tooltip.primalspells.cast": "Cast: %s"
 }

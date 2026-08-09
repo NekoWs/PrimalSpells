@@ -10,10 +10,10 @@ import kotlin.math.min
 class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
     val magics = arrayListOf<Magic?>()
-    var mana: Double = 0.0
+    var mana: Double = 100.0
     var delay: Int = 0
     var recharge: Int = 0
-    var charge: Double = 0.0
+    var charge: Double = 10.0
     var cast = 1
     var size: Int = 9
 
@@ -22,7 +22,7 @@ class Wand(var id: String) {
     val discardPile = arrayListOf<Magic>()
 
     data class Status(
-        var mana: Double = 10000.0,
+        var mana: Double = 0.0,
         var delay: Int = 0,
         var recharge: Int = 0,
         var failedReason: ArrayList<String> = arrayListOf()
@@ -131,7 +131,7 @@ class Wand(var id: String) {
     fun tick() {
         if (status.delay > 0) status.delay--
         if (status.recharge > 0) status.recharge--
-        if (status.mana < mana) status.mana = min(mana, status.mana + charge)
+        if (status.mana < mana) status.mana = min(mana, status.mana + charge / 20)
     }
 
     fun saveTag(): CompoundTag {

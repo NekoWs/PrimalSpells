@@ -3,5 +3,9 @@
   "item.primalspells.wand": "原初法杖",
   "tooltip.primalspells.wand_id": "法杖ID：%s",
   "tooltip.primalspells.wand_id.ungenerated": "未生成",
-  "item.primalspells.fireball": "火球"
+  "item.primalspells.fireball": "火球",
+  "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
+  "tooltip.primalspells.delay": "施放延迟：%s",
+  "tooltip.primalspells.recharge": "充能时间：%s",
+  "tooltip.primalspells.cast": "施放数：%s"
 }

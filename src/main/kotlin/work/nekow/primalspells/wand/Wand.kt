@@ -16,6 +16,7 @@ class Wand(var id: String) {
     var recharge: Int = 0
     var charge: Double = 0.0
     var cast = 1
+    var size: Int = 0
 
     val drawPile = arrayListOf<Magic>()
     val hand = arrayListOf<Magic>()
@@ -139,6 +140,7 @@ class Wand(var id: String) {
         tag.putInt("recharge", recharge)
         tag.putDouble("charge", charge)
         tag.putInt("cast", cast)
+        tag.putInt("size", size)
         tag.putDouble("status_mana", status.mana)
         tag.putInt("status_delay", status.delay)
         tag.putInt("status_recharge", status.recharge)
@@ -159,6 +161,7 @@ class Wand(var id: String) {
             wand.recharge = tag.getIntOr("recharge", 0)
             wand.charge = tag.getDoubleOr("charge", 0.0)
             wand.cast = tag.getIntOr("cast", 1)
+            wand.size = tag.getIntOr("size", 0)
             wand.status.mana = tag.getDoubleOr("status_mana", 0.0)
             wand.status.delay = tag.getIntOr("status_delay", 0)
             wand.status.recharge = tag.getIntOr("status_recharge", 0)

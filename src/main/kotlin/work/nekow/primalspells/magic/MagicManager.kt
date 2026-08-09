@@ -6,7 +6,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.PrimalSpells.Companion.overlay
 
 object MagicManager {
-    private val registry = mutableMapOf<String, () -> Magic>()
+    val registry = mutableMapOf<String, () -> Magic>()
 
     fun register(id: String, factory: () -> Magic) {
         registry[id] = factory

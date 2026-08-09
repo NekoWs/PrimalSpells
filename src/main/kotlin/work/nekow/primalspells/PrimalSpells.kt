@@ -17,12 +17,12 @@ import work.nekow.primalspells.wand.WandManager
 @Mod(PrimalSpells.MODID)
 class PrimalSpells(bus: IEventBus, container: ModContainer) {
     init {
-        ModItems.COMPONENTS.register(bus)
-        ModItems.ITEMS.register(bus)
-        ModItems.TABS.register(bus)
         NeoForge.EVENT_BUS.register(WandEventHandler)
         NeoForge.EVENT_BUS.register(MagicManager)
         NeoForge.EVENT_BUS.register(WandManager)
+        ModItems.COMPONENTS.register(bus)
+        ModItems.ITEMS.register(bus)
+        ModItems.TABS.register(bus)
     }
 
     companion object {

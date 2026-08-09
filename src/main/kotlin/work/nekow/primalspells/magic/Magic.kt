@@ -37,7 +37,4 @@ abstract class Magic {
     open fun onSpell() { }
 
     open fun clone(): Magic = MagicManager.create(id)!!
-
-    companion object {
-    }
 }

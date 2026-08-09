@@ -35,7 +35,8 @@ class WandItem(properties: Properties) : Item(properties) {
         if (action != ClickAction.SECONDARY) return false
         val wand = getWand(self) ?: return false
         if (!other.isEmpty) return addToCursor(self, wand, other.item, carried)
-        return removeToCursor(self, wand, carried)
+        removeToCursor(self, wand, carried)
+        return true
     }
 
     override fun overrideStackedOnOther(

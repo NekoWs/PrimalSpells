@@ -39,6 +39,14 @@ class Wand(var id: String) {
 
     fun spell(caster: Entity) {
         status.failedReason.clear()
+        if (status.delay > 0) {
+            status.failedReason.add("Delay ${status.delay}")
+            return
+        }
+        if (status.recharge > 0) {
+            status.failedReason.add("Recharge ${status.recharge}")
+            return
+        }
         draw(cast)
         castHand(caster, hand)
     }
@@ -50,6 +58,8 @@ class Wand(var id: String) {
         val effects = magics.filterIsInstance<Revise>()
             .flatMap {
                 magics.remove(it)
+                status.recharge += it.recharge
+                status.delay += it.delay
                 if (consumeMana(it)) it.effects
                 else emptyList()
             }
@@ -59,7 +69,11 @@ class Wand(var id: String) {
             if (p is TriggerSpell) {
                 draw(p.triggerCast, false)
                 hand.forEach {
-                    if (consumeMana(it)) p.payload.add(it)
+                    if (consumeMana(it)) {
+                        p.payload.add(it)
+                        p.recharge += it.recharge
+                        p.delay += it.delay
+                    }
                 }
                 discard()
             }
@@ -69,6 +83,8 @@ class Wand(var id: String) {
             p.position = caster.eyePosition.toVector3f().sub(0F, 0.2F, 0F)
             p.velocity = caster.lookAngle.toVector3f()
             p.spell()
+            status.recharge += p.recharge
+            status.delay += p.delay
             MagicManager.add(p)
         }
     }
@@ -85,30 +101,31 @@ class Wand(var id: String) {
     private fun discard() {
         discardPile += hand
         hand.clear()
-        reshuffleIfNeeded()
+        reloadIfNeeded()
     }
 
-    fun draw(budget: Int, wrapping: Boolean = true): Int {
+    fun drawFrom(budget: Int, pile: ArrayList<Magic>): Pair<Int, ArrayList<Magic>> {
         var remaining = budget
-        var drawn = 0
-        while (remaining > 0 && drawPile.isNotEmpty()) {
-            val magic = drawPile.removeFirst()
-            hand += magic
+        val result = arrayListOf<Magic>()
+        while (remaining > 0 && pile.isNotEmpty()) {
+            val magic = pile.removeFirst()
+            result += magic
             remaining += magic.cast - 1
-            drawn++
         }
+        return Pair(remaining, result)
+    }
+
+    fun draw(budget: Int, wrapping: Boolean = true) {
+        val (remaining, result) = drawFrom(budget, drawPile)
+        hand += result
         if (wrapping && remaining > 0) {
+            val pile = drawFrom(remaining, discardPile)
+            hand += pile.second
         }
-        return drawn
     }
 
-    fun reshuffle() {
-        drawPile += discardPile
-        discardPile.clear()
-    }
-
-    private fun reshuffleIfNeeded() {
-        if (drawPile.isEmpty() && discardPile.isNotEmpty()) reshuffle()
+    private fun reloadIfNeeded() {
+        if (drawPile.isEmpty() && discardPile.isNotEmpty()) load()
     }
 
     fun tick() {

@@ -9,6 +9,7 @@ import net.minecraft.world.inventory.ClickAction
 import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
+import work.nekow.primalspells.PrimalSpells.Companion.debug
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
@@ -23,6 +24,13 @@ class WandItem(properties: Properties) : Item(properties) {
     fun spell(caster: Entity, stack: ItemStack) {
         val wand = getWand(stack) ?: return
         wand.spell(caster)
+        val msg = wand.status.failedReason
+        if (msg.isNotEmpty()) {
+            msg.forEach { caster.debug(it) }
+        }
+        caster.debug("Hand: ${wand.hand.joinToString { it::class.simpleName.toString() }}")
+        caster.debug("Discard: ${wand.discardPile.joinToString { it::class.simpleName.toString() }}")
+        caster.debug("Draw: ${wand.drawPile.joinToString { it::class.simpleName.toString() }}")
     }
 
     override fun overrideOtherStackedOnMe(

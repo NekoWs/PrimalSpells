@@ -3,7 +3,6 @@ package work.nekow.primalspells.magic
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
-import work.nekow.primalspells.PrimalSpells.Companion.overlay
 
 object MagicManager {
     val registry = mutableMapOf<String, () -> Magic>()
@@ -25,11 +24,6 @@ object MagicManager {
         projectiles.addAll(pendingAdd)
         pendingAdd.clear()
 
-        if (projectiles.isNotEmpty()) {
-            val first = projectiles.first()
-            first.caster.overlay("Projectiles Count: ${projectiles.size}")
-        }
-
         val iter = projectiles.iterator()
         while (iter.hasNext()) {
             val it = iter.next()
@@ -46,6 +40,7 @@ object MagicManager {
     init {
         register("fireball") { Fireball() }
         register("trigger_fireball") { TriggerFireball() }
+        register("damage") { Damage() }
     }
 
     @SubscribeEvent

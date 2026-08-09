@@ -11,6 +11,9 @@ abstract class Projectile: Magic() {
 
     override var cast: Int = 0
 
+    var maxAge: Int = 0
+    var alive: Boolean = true
+
     lateinit var position: Vector3f
     lateinit var velocity: Vector3f
 

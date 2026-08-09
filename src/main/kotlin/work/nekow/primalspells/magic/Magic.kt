@@ -19,8 +19,6 @@ abstract class Magic {
     var delay: Int = 0
     var recharge: Int = 0
     var effects = arrayListOf<BaseEffect>()
-    var maxAge: Int = 0
-    var alive: Boolean = true
 
     open fun spell() {
         effects.forEach {

@@ -19,7 +19,7 @@ object ClientTooltipHandler {
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
         val (wandId, spells) = getWandData(event.itemStack) ?: return
         if (Minecraft.getInstance().hasShiftDown()) {
-            addStatLines(event, event.itemStack)
+            addStatLines(event)
         }
         event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
     }
@@ -49,7 +49,7 @@ object ClientTooltipHandler {
     }
 
     /** 向提示框添加法杖属性行（魔力、延迟、充能、施放数），仅在 Shift 按下时调用。 */
-    private fun addStatLines(event: RenderTooltipEvent.GatherComponents, stack: ItemStack) {
+    private fun addStatLines(event: RenderTooltipEvent.GatherComponents) {
         val s = WandHudRenderer.stats ?: return
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.mana",

@@ -34,7 +34,7 @@ object WandHudRenderer {
         val cy = window.guiScaledHeight / 2 + 12
         val bw = 22
         val bh = 2
-        val gap = 2
+        val gap = 1
 
         var y = cy
         if (showMana) {

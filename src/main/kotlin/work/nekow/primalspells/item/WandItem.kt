@@ -33,7 +33,6 @@ class WandItem(properties: Properties) : Item(properties) {
 
     /** 按住右键时持续施法，每 tick 触发一次 spell。 */
     override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResult {
-        val stack = player.getItemInHand(hand)
         if (!level.isClientSide) {
             player.startUsingItem(hand)
         }
@@ -114,7 +113,7 @@ class WandItem(properties: Properties) : Item(properties) {
         while (wand.magics.size <= target) wand.magics.add(null)
         val existing = wand.magics.getOrNull(target)
         wand.magics[target] = MagicManager.create(id)!!
-        wand.load(); syncSpells(stack)
+        wand.load(); tickSync(stack)
         return existing
     }
 
@@ -122,7 +121,7 @@ class WandItem(properties: Properties) : Item(properties) {
     private fun clearMagic(wand: Wand, stack: ItemStack, target: Int): work.nekow.primalspells.magic.Magic? {
         val magic = wand.magics.getOrNull(target) ?: return null
         wand.magics[target] = null
-        wand.load(); syncSpells(stack)
+        wand.load(); tickSync(stack)
         return magic
     }
 
@@ -146,14 +145,6 @@ class WandItem(properties: Properties) : Item(properties) {
     private fun getWand(stack: ItemStack): Wand? {
         val id = stack.get(ModItems.WAND_ID) ?: return null
         return WandManager[id, null]
-    }
-
-    /** 将法杖的法术列表同步到物品栈，仅在值变化时写入。 */
-    private fun syncSpells(stack: ItemStack) {
-        val wand = getWand(stack) ?: return
-        val size = maxOf(wand.size, wand.magics.size)
-        val ids = (0 until size).map { i -> wand.magics.getOrNull(i)?.id ?: "" }
-        if (stack.get(ModItems.WAND_SPELLS.get()) != ids) stack.set(ModItems.WAND_SPELLS, ids)
     }
 
     /** tick 时仅同步法术列表，不同步属性以避免持有法杖时持续触发拾取动画。 */

@@ -1,34 +1,51 @@
 package work.nekow.primalspells.item
 
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.SlotAccess
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.inventory.ClickAction
 import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
-import work.nekow.primalspells.PrimalSpells.Companion.debug
-import work.nekow.primalspells.item.component.WandStats
+import net.minecraft.world.level.Level
+import net.neoforged.neoforge.network.PacketDistributor
 import work.nekow.primalspells.magic.MagicManager
+import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
 
 class WandItem(properties: Properties) : Item(properties) {
 
+    /** 每 tick 同步法术列表，若法杖在主手且 owner 是玩家则发送属性包到客户端。 */
     override fun inventoryTick(stack: ItemStack, level: ServerLevel, owner: Entity, slot: EquipmentSlot?) {
         if (!stack.has(ModItems.WAND_ID)) WandManager.createWand(stack)
-        syncSpells(stack)
+        tickSync(stack)
+        if ((slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) && owner is ServerPlayer) {
+            sendStatsPacket(stack, owner)
+        }
     }
 
-    fun spell(caster: Entity, stack: ItemStack) {
-        val wand = getWand(stack) ?: return
-        wand.spell(caster)
-        val msg = wand.status.failedReason
-        if (msg.isNotEmpty()) {
-            msg.forEach { caster.debug(it) }
+    /** 按住右键时持续施法，每 tick 触发一次 spell。 */
+    override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResult {
+        val stack = player.getItemInHand(hand)
+        if (!level.isClientSide) {
+            player.startUsingItem(hand)
         }
+        return InteractionResult.CONSUME
+    }
+
+    override fun getUseDuration(stack: ItemStack, entity: LivingEntity) = 72000
+
+    override fun onUseTick(level: Level, entity: LivingEntity, stack: ItemStack, remainingUseDuration: Int) {
+        if (level.isClientSide) return
+        if (entity !is Player) return
+        getWand(stack)?.spell(entity)
     }
 
     override fun overrideOtherStackedOnMe(
@@ -69,7 +86,6 @@ class WandItem(properties: Properties) : Item(properties) {
         val target = selectedSlot(stack, wand)
         val magic = clearMagic(wand, stack, target) ?: return
         carried.set(makeStack(magic))
-        return
     }
 
     /** 将槽位中的法术添加到法杖当前选中格（法杖在光标时），若已占则交换回槽位。 */
@@ -132,12 +148,31 @@ class WandItem(properties: Properties) : Item(properties) {
         return WandManager[id, null]
     }
 
-    /** 将法杖的法术列表与属性同步到物品栈。 */
+    /** 将法杖的法术列表同步到物品栈，仅在值变化时写入。 */
     private fun syncSpells(stack: ItemStack) {
         val wand = getWand(stack) ?: return
         val size = maxOf(wand.size, wand.magics.size)
         val ids = (0 until size).map { i -> wand.magics.getOrNull(i)?.id ?: "" }
-        stack.set(ModItems.WAND_SPELLS, ids)
-        stack.set(ModItems.WAND_STATS, WandStats(wand.status.mana, wand.mana, wand.delay, wand.recharge, wand.cast))
+        if (stack.get(ModItems.WAND_SPELLS.get()) != ids) stack.set(ModItems.WAND_SPELLS, ids)
+    }
+
+    /** tick 时仅同步法术列表，不同步属性以避免持有法杖时持续触发拾取动画。 */
+    private fun tickSync(stack: ItemStack) {
+        val wand = getWand(stack) ?: return
+        val size = maxOf(wand.size, wand.magics.size)
+        val ids = (0 until size).map { i -> wand.magics.getOrNull(i)?.id ?: "" }
+        if (stack.get(ModItems.WAND_SPELLS.get()) != ids) stack.set(ModItems.WAND_SPELLS, ids)
+    }
+
+    /** 通过自定义网络包向客户端同步法杖属性，避免物品组件更新触发拾取动画。 */
+    private fun sendStatsPacket(stack: ItemStack, player: ServerPlayer) {
+        val wand = getWand(stack) ?: return
+        PacketDistributor.sendToPlayer(player, SyncWandStatsPayload(
+            wand.status.mana,
+            wand.mana,
+            wand.status.delay,
+            wand.status.recharge,
+            wand.cast
+        ))
     }
 }

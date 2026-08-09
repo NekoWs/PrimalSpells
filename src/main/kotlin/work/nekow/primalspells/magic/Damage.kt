@@ -7,7 +7,7 @@ class Damage: Revise() {
 
     init {
         mana = 5.0
-        delay = 1
+        delay = 2
         effects += object: BaseEffect() {
             override fun onActive() {
                 projectile.status.damage += 2

@@ -14,7 +14,6 @@ import net.neoforged.neoforge.registries.DeferredRegister
 import work.nekow.primalspells.PrimalSpells
 import work.nekow.primalspells.item.component.WandID.Companion.TYPE
 import work.nekow.primalspells.magic.MagicManager
-import work.nekow.primalspells.item.component.WandStats.Companion.TYPE as WAND_STATS_TYPE
 
 class ModItems {
     companion object {
@@ -54,8 +53,6 @@ class ModItems {
                 .cacheEncoding()
                 .build()
         }
-
-        val WAND_STATS = COMPONENTS.register("wand_stats") { _ -> WAND_STATS_TYPE }
 
         val WAND = ITEMS.registerItem("wand") { props ->
             WandItem(props.stacksTo(1))

@@ -50,22 +50,21 @@ object ClientTooltipHandler {
 
     /** 向提示框添加法杖属性行（魔力、延迟、充能、施放数），仅在 Shift 按下时调用。 */
     private fun addStatLines(event: RenderTooltipEvent.GatherComponents, stack: ItemStack) {
-        val stats = stack.get(ModItems.WAND_STATS.get()) ?: return
+        val s = WandHudRenderer.stats ?: return
         event.tooltipElements.add(Either.left(
-            Component.translatable("tooltip.primalspells.mana", "%.1f".format(stats.mana), "%.1f".format(stats.maxMana))
-                .withStyle(ChatFormatting.BLUE)
+            Component.translatable("tooltip.primalspells.mana",
+                "%.1f".format(s.currentMana), "%.1f".format(s.maxMana)).withStyle(ChatFormatting.BLUE)
         ))
         event.tooltipElements.add(Either.left(
-            Component.translatable("tooltip.primalspells.delay", stats.delay)
-                .withStyle(ChatFormatting.GOLD)
+            Component.translatable("tooltip.primalspells.delay",
+                s.currentDelay).withStyle(ChatFormatting.GOLD)
         ))
         event.tooltipElements.add(Either.left(
-            Component.translatable("tooltip.primalspells.recharge", stats.recharge)
-                .withStyle(ChatFormatting.DARK_BLUE)
+            Component.translatable("tooltip.primalspells.recharge",
+                s.currentRecharge).withStyle(ChatFormatting.DARK_BLUE)
         ))
         event.tooltipElements.add(Either.left(
-            Component.translatable("tooltip.primalspells.cast", stats.cast)
-                .withStyle(ChatFormatting.WHITE)
+            Component.translatable("tooltip.primalspells.cast", s.cast).withStyle(ChatFormatting.WHITE)
         ))
     }
 }

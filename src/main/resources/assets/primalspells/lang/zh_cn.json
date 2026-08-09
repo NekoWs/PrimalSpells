@@ -5,7 +5,7 @@
   "tooltip.primalspells.wand_id.ungenerated": "未生成",
   "item.primalspells.fireball": "火球",
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
-  "tooltip.primalspells.delay": "施放延迟：%s",
-  "tooltip.primalspells.recharge": "充能时间：%s",
+  "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
+  "tooltip.primalspells.recharge": "充能时间：%s\u00a0",
   "tooltip.primalspells.cast": "施放数：%s"
 }

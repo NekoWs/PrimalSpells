@@ -8,13 +8,21 @@ import work.nekow.primalspells.magic.*
 import kotlin.math.min
 
 class Wand(var id: String) {
+    /** 始终施放 **/
     val innate = arrayListOf<Magic>()
+
     val magics = arrayListOf<Magic?>()
+    /** 法力最大值 **/
     var mana: Double = 100.0
+    /** 施放延迟 **/
     var delay: Int = 0
+    /** 充能时间 **/
     var recharge: Int = 0
+    /** 充能速度 (charge/s) **/
     var charge: Double = 10.0
+    /** 施放数 **/
     var cast = 1
+    /** 容量 **/
     var size: Int = 9
 
     val drawPile = arrayListOf<Magic>()
@@ -37,18 +45,21 @@ class Wand(var id: String) {
         magics.filterNotNull().forEach { drawPile.add(it) }
     }
 
-    fun spell(caster: Entity) {
+    fun spell(caster: Entity): Boolean {
         status.failedReason.clear()
         if (status.delay > 0) {
-            status.failedReason.add("Delay ${status.delay}")
-            return
+            status.failedReason.add("Delay ${status.delay}/${delay}")
+            return false
         }
         if (status.recharge > 0) {
-            status.failedReason.add("Recharge ${status.recharge}")
-            return
+            status.failedReason.add("Recharge ${status.recharge}/${recharge}")
+            return false
         }
+        status.delay = 0
+        status.recharge = 0
         draw(cast)
         castHand(caster, hand)
+        return true
     }
 
     private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
@@ -125,7 +136,10 @@ class Wand(var id: String) {
     }
 
     private fun reloadIfNeeded() {
-        if (drawPile.isEmpty() && discardPile.isNotEmpty()) load()
+        if (drawPile.isEmpty() && discardPile.isNotEmpty()) {
+            status.recharge += recharge
+            load()
+        }
     }
 
     fun tick() {

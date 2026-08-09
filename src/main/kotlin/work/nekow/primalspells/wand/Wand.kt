@@ -10,13 +10,13 @@ import kotlin.math.min
 
 class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
-    val magics = arrayListOf<Magic>()
+    val magics = arrayListOf<Magic?>()
     var mana: Double = 0.0
     var delay: Int = 0
     var recharge: Int = 0
     var charge: Double = 0.0
     var cast = 1
-    var size: Int = 0
+    var size: Int = 9
 
     val drawPile = arrayListOf<Magic>()
     val hand = arrayListOf<Magic>()
@@ -34,26 +34,19 @@ class Wand(var id: String) {
         drawPile.clear()
         hand.clear()
         discardPile.clear()
-        drawPile.addAll(innate + magics)
-//        drawPile.shuffle()
+        drawPile.addAll(innate)
+        magics.filterNotNull().forEach { drawPile.add(it) }
     }
 
     fun spell(caster: Entity) {
         status.failedReason.clear()
         draw(cast)
         castHand(caster, hand)
-        if (status.failedReason.isNotEmpty()) {
-            caster.debug(status.failedReason.joinToString { it })
-        }
     }
 
-    /**
-     * 施放手牌中的法术
-     */
     private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
         val magics = arrayListOf<Magic>()
         magics += hand
-        caster.debug("Magics: ${hand.joinToString { it.javaClass.simpleName }}")
         discard()
         val effects = magics.filterIsInstance<Revise>()
             .flatMap {
@@ -74,9 +67,7 @@ class Wand(var id: String) {
             p.effects.addAll(effects)
             p.caster = caster
             p.wand = this
-            p.position = caster.eyePosition
-                .toVector3f()
-                .sub(0F, 0.2F, 0F)
+            p.position = caster.eyePosition.toVector3f().sub(0F, 0.2F, 0F)
             p.velocity = caster.lookAngle.toVector3f()
             p.spell()
             MagicManager.add(p)
@@ -98,9 +89,6 @@ class Wand(var id: String) {
         reshuffleIfNeeded()
     }
 
-    /**
-     * 抓指定数量的牌
-     */
     fun draw(budget: Int, wrapping: Boolean = true): Int {
         var remaining = budget
         var drawn = 0
@@ -111,7 +99,6 @@ class Wand(var id: String) {
             drawn++
         }
         if (wrapping && remaining > 0) {
-            // TODO: 回绕
         }
         return drawn
     }
@@ -119,7 +106,6 @@ class Wand(var id: String) {
     fun reshuffle() {
         drawPile += discardPile
         discardPile.clear()
-//        drawPile.shuffle()
     }
 
     private fun reshuffleIfNeeded() {
@@ -148,7 +134,7 @@ class Wand(var id: String) {
         innate.forEach { innateList.add(StringTag.valueOf(it.id)) }
         tag.put("innate", innateList)
         val magicsList = ListTag()
-        magics.forEach { magicsList.add(StringTag.valueOf(it.id)) }
+        magics.forEach { if (it != null) magicsList.add(StringTag.valueOf(it.id)) }
         tag.put("magics", magicsList)
         return tag
     }
@@ -161,7 +147,7 @@ class Wand(var id: String) {
             wand.recharge = tag.getIntOr("recharge", 0)
             wand.charge = tag.getDoubleOr("charge", 0.0)
             wand.cast = tag.getIntOr("cast", 1)
-            wand.size = tag.getIntOr("size", 0)
+            wand.size = tag.getIntOr("size", 9)
             wand.status.mana = tag.getDoubleOr("status_mana", 0.0)
             wand.status.delay = tag.getIntOr("status_delay", 0)
             wand.status.recharge = tag.getIntOr("status_recharge", 0)

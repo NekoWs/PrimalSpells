@@ -3,6 +3,9 @@
   "package": "work.nekow.primalspells.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [],
+  "client": [
+    "AbstractContainerScreenMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },

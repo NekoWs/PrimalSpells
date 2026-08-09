@@ -15,7 +15,6 @@ import work.nekow.primalspells.item.WandItem
 object ClientTooltipHandler {
 
     /** 法杖悬停时添加法术槽位提示框组件。 */
-    @JvmStatic
     @SubscribeEvent
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
         val (wandId, spells) = getWandData(event.itemStack) ?: return
@@ -28,7 +27,6 @@ object ClientTooltipHandler {
     }
 
     /** 悬停法杖时滚轮切换选中格，并同步到 WAND_SELECTED_SLOT 组件。 */
-    @JvmStatic
     @SubscribeEvent
     fun onMouseScrolled(event: ScreenEvent.MouseScrolled.Pre) {
         val screen = event.screen

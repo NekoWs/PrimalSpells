@@ -51,7 +51,6 @@ class Move(val scaler: Float = 1F, val ignoreBlocks: Boolean = false) : BaseEffe
                                 val faceNormal = computeFaceNormal(prx, pry, prz, rx, ry, rz, hitAabb)
                                 status.pos = checkPos
                                 projectile.hitBlock(checkPos, faceNormal)
-                                projectile.alive = false
                                 return
                             }
                         }

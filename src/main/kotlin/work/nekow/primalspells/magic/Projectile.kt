@@ -18,6 +18,9 @@ abstract class Projectile: Magic() {
     var maxAge: Int = 0
     var alive: Boolean = true
 
+    var maxBounces: Int = 0
+    var maxHitTargets: Int = 1
+
     lateinit var position: Vector3f
     lateinit var velocity: Vector3f
 
@@ -30,6 +33,9 @@ abstract class Projectile: Magic() {
             it.projectile = this
             it.status = status
         }
+
+        status.bounces = maxBounces
+        status.hitTargets = 0
         super.spell()
     }
 
@@ -37,6 +43,12 @@ abstract class Projectile: Magic() {
         val impactNormal = Vector3f(status.pos).sub(entity.position().toVector3f()).normalize()
         val rebound = Vector3f(status.velocity).normalize().reflect(impactNormal)
         val result = HitResult(HitType.ENTITY, Vector3f(status.pos), rebound, entity)
+
+        status.hitTargets++
+        if (maxHitTargets > 0 && status.hitTargets >= maxHitTargets) {
+            alive = false
+        }
+
         effects.forEach { it.onHitEntity(entity) }
         effects.forEach { it.onHit(result) }
         onHitEntity(entity)
@@ -47,6 +59,15 @@ abstract class Projectile: Magic() {
         val rebound = Vector3f(status.velocity).normalize().reflect(faceNormal)
         val castPos = Vector3f(faceNormal).mul(0.5f).add(pos)
         val result = HitResult(HitType.BLOCK, castPos, rebound)
+
+        if (status.bounces > 0) {
+            status.bounces--
+            status.velocity.reflect(faceNormal)
+            status.pos = castPos
+        } else {
+            alive = false
+        }
+
         effects.forEach { it.onHitBlock(pos) }
         effects.forEach { it.onHit(result) }
         onHitBlock(pos)

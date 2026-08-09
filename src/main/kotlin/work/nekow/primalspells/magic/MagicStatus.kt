@@ -8,5 +8,7 @@ data class MagicStatus(
     var velocity: Vector3f = Vector3f(),
     var damage: Double = 0.0,
     var age: Int = 0,
+    var bounces: Int = 0,
+    var hitTargets: Int = 0,
     val hitEntities: MutableSet<Entity> = mutableSetOf()
 )

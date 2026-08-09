@@ -2,5 +2,6 @@
   "itemGroup.primalspells": "原初法术",
   "item.primalspells.wand": "原初法杖",
   "tooltip.primalspells.wand_id": "法杖ID：%s",
-  "tooltip.primalspells.wand_id.ungenerated": "未生成"
+  "tooltip.primalspells.wand_id.ungenerated": "未生成",
+  "item.primalspells.fireball": "火球"
 }

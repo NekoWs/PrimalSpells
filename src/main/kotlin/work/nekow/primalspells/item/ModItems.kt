@@ -3,6 +3,7 @@ package work.nekow.primalspells.item
 import net.minecraft.core.registries.Registries
 import net.minecraft.network.chat.Component
 import net.minecraft.world.item.CreativeModeTab
+import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.neoforged.neoforge.registries.DeferredRegister
 import work.nekow.primalspells.PrimalSpells
@@ -22,6 +23,7 @@ class ModItems {
                 .icon { ItemStack(WAND.get()) }
                 .displayItems { _, output ->
                     output.accept(WAND.get())
+                    output.accept(FIREBALL.get())
                 }
                 .build()
         }
@@ -30,6 +32,10 @@ class ModItems {
 
         val WAND = ITEMS.registerItem("wand") { props ->
             WandItem(props.stacksTo(1))
+        }
+
+        val FIREBALL = ITEMS.registerItem("fireball") { props ->
+            Item(props.stacksTo(1))
         }
     }
 }

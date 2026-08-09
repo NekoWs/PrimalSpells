@@ -16,10 +16,4 @@ class TriggerFireball: Projectile(), TriggerSpell {
         maxAge = 100
         effects += Trajectory(ParticleTypes.FLAME)
     }
-
-    companion object {
-        init {
-            register("trigger_fireball") { TriggerFireball() }
-        }
-    }
 }

@@ -7,6 +7,7 @@ import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.saveddata.SavedData
 import net.minecraft.world.level.saveddata.SavedDataType
+import work.nekow.primalspells.PrimalSpells
 
 class WandSavedData : SavedData() {
     val wandTags = mutableMapOf<String, CompoundTag>()
@@ -25,7 +26,7 @@ class WandSavedData : SavedData() {
     }
 
     companion object {
-        private val ID = Identifier.fromNamespaceAndPath("primalspells", "wands")
+        private val ID = Identifier.fromNamespaceAndPath(PrimalSpells.MODID, "wands")
 
         val CODEC: Codec<WandSavedData> = CompoundTag.CODEC.xmap(
             { tag -> fromTag(tag) },

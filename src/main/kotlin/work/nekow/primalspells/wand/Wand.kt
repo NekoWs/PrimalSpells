@@ -163,12 +163,12 @@ class Wand(var id: String) {
             wand.status.delay = tag.getIntOr("status_delay", 0)
             wand.status.recharge = tag.getIntOr("status_recharge", 0)
             tag.getListOrEmpty("innate").forEach {
-                Magic.create((it as StringTag).asString().get())?.let { m -> wand.innate += m }
+                MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.innate += m }
             }
             tag.getListOrEmpty("magics").forEach {
-                Magic.create((it as StringTag).asString().get())?.let { m -> wand.magics += m }
+                MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.magics += m }
             }
-            return wand
+            return wand.also { wand.load() }
         }
     }
 }

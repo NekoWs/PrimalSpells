@@ -26,13 +26,18 @@ abstract class Projectile: Magic() {
         super.spell()
     }
 
-    fun hitEntity(target: Entity) {
-        effects.forEach { it.onHitEntity(target) }
+    fun hitEntity(entity: Entity) {
+        effects.forEach { it.onHitEntity(entity) }
+        onHitEntity(entity)
     }
 
     fun hitBlock(pos: Vector3f) {
         effects.forEach { it.onHitBlock(pos) }
+        onHitBlock(pos)
     }
+
+    open fun onHitEntity(entity: Entity) { }
+    open fun onHitBlock(pos: Vector3f) { }
 
     override fun onSpell() { }
 

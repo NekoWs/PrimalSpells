@@ -36,15 +36,8 @@ abstract class Magic {
     }
     open fun onSpell() { }
 
-    open fun clone(): Magic = create(id)!!
+    open fun clone(): Magic = MagicManager.create(id)!!
 
     companion object {
-        private val registry = mutableMapOf<String, () -> Magic>()
-
-        fun register(id: String, factory: () -> Magic) {
-            registry[id] = factory
-        }
-
-        fun create(id: String): Magic? = registry[id]?.invoke()
     }
 }

@@ -73,7 +73,7 @@ class Wand(var id: String) {
                 magics.remove(it)
                 status.recharge += it.recharge
                 status.delay += it.delay
-                if (consumeMana(it)) it.effects
+                if (consumeMana(it)) it.effects()
                 else emptyList()
             }
         for (projectile in magics.filterIsInstance<Projectile>()) {

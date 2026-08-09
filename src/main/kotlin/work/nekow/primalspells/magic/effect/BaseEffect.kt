@@ -7,7 +7,7 @@ import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.utils.HitResult
 import work.nekow.primalspells.wand.Wand
 
-open class BaseEffect {
+open class BaseEffect : Cloneable {
     lateinit var caster: Entity
     lateinit var wand: Wand
     lateinit var status: MagicStatus
@@ -18,4 +18,6 @@ open class BaseEffect {
     open fun onHitEntity(target: Entity) { }
     open fun onHitBlock(pos: Vector3f) { }
     open fun onHit(result: HitResult) { }
+
+    public override fun clone(): BaseEffect = super.clone() as BaseEffect
 }

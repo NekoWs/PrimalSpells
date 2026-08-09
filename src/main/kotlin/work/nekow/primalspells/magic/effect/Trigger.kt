@@ -13,7 +13,7 @@ class Trigger : BaseEffect() {
         val effects = payload.filterIsInstance<Revise>()
             .flatMap {
                 payload.remove(it)
-                it.effects
+                it.effects()
             }
         for (magic in payload) {
             if (magic !is Projectile) continue

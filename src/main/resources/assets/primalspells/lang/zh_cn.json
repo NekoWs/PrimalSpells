@@ -6,6 +6,7 @@
   "item.primalspells.fireball": "火球",
   "item.primalspells.trigger_fireball": "触发火球",
   "item.primalspells.damage": "伤害强化",
+  "item.primalspells.bounce": "弹跳",
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
   "tooltip.primalspells.recharge": "充能时间：%s\u00a0",

@@ -42,6 +42,7 @@ object MagicManager {
         register("trigger_fireball") { TriggerFireball() }
         register("damage") { Damage() }
         register("gravity") { Gravity() }
+        register("bounce") { Bounce() }
     }
 
     @SubscribeEvent

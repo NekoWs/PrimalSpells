@@ -13,11 +13,11 @@ class TriggerFireball: Projectile(), TriggerSpell {
     override var payload = arrayListOf<Magic>()
 
     init {
-        mana = 3.0
-        delay = 2
+        mana = 5.0
+        delay = 1
         recharge = 1
         maxAge = 100
-        status.damage = 5.0
+        status.damage = 1.0
         effects += Trajectory(ParticleTypes.FLAME)
         effects += HitEntity(0.2)
         effects += Hurt()

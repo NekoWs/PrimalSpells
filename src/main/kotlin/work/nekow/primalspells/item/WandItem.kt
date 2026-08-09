@@ -15,19 +15,28 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.neoforged.neoforge.network.PacketDistributor
+import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
+import java.util.*
 
 class WandItem(properties: Properties) : Item(properties) {
 
-    /** 每 tick 同步法术列表，若法杖在主手且 owner 是玩家则发送属性包到客户端。 */
+    companion object {
+        private val lastCastWand: MutableMap<UUID, WandID> = hashMapOf()
+    }
+
+    /** 每 tick 同步法术列表，仅对最后一次施放的法杖发送属性包到客户端。 */
     override fun inventoryTick(stack: ItemStack, level: ServerLevel, owner: Entity, slot: EquipmentSlot?) {
         if (!stack.has(ModItems.WAND_ID)) WandManager.createWand(stack)
         tickSync(stack)
-        if ((slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) && owner is ServerPlayer) {
-            sendStatsPacket(stack, owner)
+        if (owner is ServerPlayer) {
+            val wandId = stack.get(ModItems.WAND_ID)
+            if (wandId == lastCastWand[owner.uuid]) {
+                sendStatsPacket(stack, owner)
+            }
         }
     }
 
@@ -44,6 +53,7 @@ class WandItem(properties: Properties) : Item(properties) {
     override fun onUseTick(level: Level, entity: LivingEntity, stack: ItemStack, remainingUseDuration: Int) {
         if (level.isClientSide) return
         if (entity !is Player) return
+        stack.get(ModItems.WAND_ID)?.let { lastCastWand[entity.uuid] = it }
         getWand(stack)?.spell(entity)
     }
 

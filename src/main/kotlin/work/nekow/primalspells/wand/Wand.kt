@@ -5,6 +5,7 @@ import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.magic.*
+import work.nekow.primalspells.magic.Revise
 import kotlin.math.min
 
 class Wand(var id: String) {

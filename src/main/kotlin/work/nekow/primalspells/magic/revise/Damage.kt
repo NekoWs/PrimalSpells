@@ -1,5 +1,6 @@
-package work.nekow.primalspells.magic
+package work.nekow.primalspells.magic.revise
 
+import work.nekow.primalspells.magic.Revise
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.utils.Lore
 import work.nekow.primalspells.utils.LoreEntry

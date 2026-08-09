@@ -1,6 +1,9 @@
-package work.nekow.primalspells.magic
+package work.nekow.primalspells.magic.projectile
 
 import net.minecraft.core.particles.ParticleTypes
+import work.nekow.primalspells.magic.Magic
+import work.nekow.primalspells.magic.Projectile
+import work.nekow.primalspells.magic.TriggerSpell
 import work.nekow.primalspells.magic.effect.HitEntity
 import work.nekow.primalspells.magic.effect.Hurt
 import work.nekow.primalspells.magic.effect.Trajectory

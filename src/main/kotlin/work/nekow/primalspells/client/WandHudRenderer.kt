@@ -22,8 +22,13 @@ object WandHudRenderer {
     private var rechargePersistTicks: Int = 0
     private var manaPersistTicks: Int = 0
 
+    private var displayDelayProgress: Float = 0f
+    private var displayRechargeProgress: Float = 0f
+    private var displayManaProgress: Float = 1f
+
     private const val HOLD_DURATION: Int = 10
     private const val FADE_DURATION: Int = 5
+    private const val SMOOTH_FACTOR: Float = 0.25f
 
     @JvmStatic
     @SubscribeEvent
@@ -44,6 +49,18 @@ object WandHudRenderer {
         if (s.currentRecharge > 0) rechargePersistTicks = resetTarget
         if (s.maxMana > 0 && s.currentMana < s.maxMana) manaPersistTicks = resetTarget
 
+        val targetDelay = if (s.currentDelay > 0) {
+            1f - (s.currentDelay.toFloat() / s.lastDelay).coerceIn(0f, 1f)
+        } else 1f
+        val targetRecharge = if (s.currentRecharge > 0) {
+            1f - (s.currentRecharge.toFloat() / s.lastRecharge).coerceIn(0f, 1f)
+        } else 1f
+        val targetMana = if (s.maxMana > 0) (s.currentMana / s.maxMana).toFloat() else 1f
+
+        displayDelayProgress += (targetDelay - displayDelayProgress) * SMOOTH_FACTOR
+        displayRechargeProgress += (targetRecharge - displayRechargeProgress) * SMOOTH_FACTOR
+        displayManaProgress += (targetMana - displayManaProgress) * SMOOTH_FACTOR
+
         val showMana = s.maxMana > 0 && manaPersistTicks > 0
         val showDelay = s.currentDelay > 0 || delayPersistTicks > 0
         val showRecharge = s.currentRecharge > 0 || rechargePersistTicks > 0
@@ -60,21 +77,17 @@ object WandHudRenderer {
         if (showMana) {
             val alpha = fadeAlpha(s.currentMana < s.maxMana, manaPersistTicks)
             drawBar(g, cx - bw / 2, cy, bw, bh,
-                (s.currentMana / s.maxMana).toFloat(),
+                displayManaProgress,
                 alphaColor(0xFF_33_99_FF.toInt(), alpha), alpha)
         }
         val yOff = cy + bh + gap
         if (showDelay) {
-            val progress = if (s.currentDelay > 0)
-                1 - (s.currentDelay.toFloat() / s.lastDelay).coerceIn(0f, 1f) else 1f
             val alpha = fadeAlpha(s.currentDelay > 0, delayPersistTicks)
-            drawBar(g, cx - bw / 2, yOff, bw, bh, progress,
+            drawBar(g, cx - bw / 2, yOff, bw, bh, displayDelayProgress,
                 alphaColor(0xFF_FF_AA_00.toInt(), alpha), alpha)
         } else if (showRecharge) {
-            val progress = if (s.currentRecharge > 0)
-                1 - (s.currentRecharge.toFloat() / s.lastRecharge).coerceIn(0f, 1f) else 1f
             val alpha = fadeAlpha(s.currentRecharge > 0, rechargePersistTicks)
-            drawBar(g, cx - bw / 2, yOff, bw, bh, progress,
+            drawBar(g, cx - bw / 2, yOff, bw, bh, displayRechargeProgress,
                 alphaColor(0xFF_33_55_CC.toInt(), alpha), alpha)
         }
     }

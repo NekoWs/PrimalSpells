@@ -26,6 +26,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         ModItems.COMPONENTS.register(bus)
         ModItems.ITEMS.register(bus)
         ModItems.TABS.register(bus)
+        ModDamageTypes.DAMAGE_TYPES.register(bus)
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
             val registrar = event.registrar("1.0.0")

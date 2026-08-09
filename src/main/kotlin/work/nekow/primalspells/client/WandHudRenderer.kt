@@ -43,12 +43,12 @@ object WandHudRenderer {
         }
         if (showDelay) {
             drawBar(g, cx - bw / 2, y, bw, bh,
-                (s.currentDelay.toFloat() / 20).coerceIn(0f, 1f), 0xFF_FF_AA_00.toInt())
+                1 - (s.currentDelay.toFloat() / s.lastDelay).coerceIn(0f, 1f), 0xFF_FF_AA_00.toInt())
             y += bh + gap
         }
         if (showRecharge) {
             drawBar(g, cx - bw / 2, y, bw, bh,
-                (s.currentRecharge.toFloat() / 20).coerceIn(0f, 1f), 0xFF_33_55_CC.toInt())
+                1 - (s.currentRecharge.toFloat() / s.lastRecharge).coerceIn(0f, 1f), 0xFF_33_55_CC.toInt())
         }
     }
 

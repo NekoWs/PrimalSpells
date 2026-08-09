@@ -11,7 +11,9 @@ data class SyncWandStatsPayload(
     val maxMana: Double,
     val currentDelay: Int,
     val currentRecharge: Int,
-    val cast: Int
+    val cast: Int,
+    val lastDelay: Int,
+    val lastRecharge: Int,
 ) : CustomPacketPayload {
 
     companion object {
@@ -25,6 +27,8 @@ data class SyncWandStatsPayload(
                     buf.readDouble(),
                     buf.readVarInt(),
                     buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
                     buf.readVarInt()
                 )
                 override fun encode(buf: RegistryFriendlyByteBuf, p: SyncWandStatsPayload) {
@@ -33,6 +37,8 @@ data class SyncWandStatsPayload(
                     buf.writeVarInt(p.currentDelay)
                     buf.writeVarInt(p.currentRecharge)
                     buf.writeVarInt(p.cast)
+                    buf.writeVarInt(p.lastDelay)
+                    buf.writeVarInt(p.lastRecharge)
                 }
             }
     }

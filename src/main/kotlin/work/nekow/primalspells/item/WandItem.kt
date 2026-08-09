@@ -163,7 +163,9 @@ class WandItem(properties: Properties) : Item(properties) {
             wand.mana,
             wand.status.delay,
             wand.status.recharge,
-            wand.cast
+            wand.cast,
+            wand.status.lastDelay,
+            wand.status.lastRecharge
         ))
     }
 }

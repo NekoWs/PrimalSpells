@@ -33,6 +33,8 @@ class Wand(var id: String) {
         var mana: Double = 0.0,
         var delay: Int = 0,
         var recharge: Int = 0,
+        var lastDelay: Int = 0,
+        var lastRecharge: Int = 0,
         var failedReason: ArrayList<String> = arrayListOf()
     )
     var status: Status = Status()
@@ -96,6 +98,9 @@ class Wand(var id: String) {
             p.spell()
             status.recharge += p.recharge
             status.delay += p.delay
+
+            status.lastDelay = status.delay
+            status.lastRecharge = status.recharge
             MagicManager.add(p)
         }
     }

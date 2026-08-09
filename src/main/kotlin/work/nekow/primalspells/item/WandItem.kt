@@ -9,7 +9,6 @@ import net.minecraft.world.inventory.ClickAction
 import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
-import work.nekow.primalspells.magic.Fireball
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
@@ -23,9 +22,7 @@ class WandItem(properties: Properties) : Item(properties) {
 
     fun spell(caster: Entity, stack: ItemStack) {
         val wand = getWand(stack) ?: return
-        if (caster.isShiftKeyDown) {
-            wand.magics.add(Fireball()); wand.load(); syncSpells(stack)
-        } else wand.spell(caster)
+        wand.spell(caster)
     }
 
     override fun overrideOtherStackedOnMe(

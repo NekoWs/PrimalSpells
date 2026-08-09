@@ -2,8 +2,10 @@ package work.nekow.primalspells.client
 
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.resources.Identifier
+import net.minecraft.world.inventory.tooltip.TooltipComponent
 import net.minecraft.world.item.ItemStack
 import work.nekow.primalspells.item.ModItems
 
@@ -11,12 +13,12 @@ import work.nekow.primalspells.item.ModItems
 class WandSpellTooltip(
     val spells: List<String>,
     val wandId: String
-) : net.minecraft.world.inventory.tooltip.TooltipComponent
+): TooltipComponent
 
 /** 法杖法术槽位提示框渲染器。 */
 class ClientWandSpellTooltip(
     private val tooltip: WandSpellTooltip
-) : net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent {
+): ClientTooltipComponent {
 
     override fun getHeight(font: Font) =
         ((tooltip.spells.size + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW).coerceAtLeast(1) * SLOT_SIZE + 4

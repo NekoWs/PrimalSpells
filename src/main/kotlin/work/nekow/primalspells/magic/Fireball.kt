@@ -16,7 +16,7 @@ class Fireball: Projectile() {
         maxAge = 100
         status.damage = 5.0
         effects += Trajectory(ParticleTypes.END_ROD)
-        effects += HitEntity(1.0)
+        effects += HitEntity(0.2)
         effects += Hurt()
     }
 

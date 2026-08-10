@@ -5,11 +5,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.magic.projectile.Fireball
 import work.nekow.primalspells.magic.projectile.TriggerFireball
-import work.nekow.primalspells.magic.revise.Bounce
-import work.nekow.primalspells.magic.revise.Damage
-import work.nekow.primalspells.magic.revise.DoubleCast
-import work.nekow.primalspells.magic.revise.Gravity
-import work.nekow.primalspells.magic.revise.SpeedUp
+import work.nekow.primalspells.magic.revise.*
 
 object MagicManager {
     val registry = mutableMapOf<String, () -> Magic>()
@@ -35,6 +31,7 @@ object MagicManager {
         while (iter.hasNext()) {
             val it = iter.next()
             if (!it.alive) {
+                it.die()
                 iter.remove()
                 continue
             }

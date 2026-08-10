@@ -42,7 +42,14 @@ abstract class Magic {
     fun tick() {
         effects.forEach { it.onTick() }
     }
+
+    fun die() {
+        effects.forEach { it.onDie() }
+        onDie()
+    }
+
     open fun onSpell() { }
+    open fun onDie() { }
 
     open fun initLore() {
         val base = arrayListOf<LoreEntry>()

@@ -18,6 +18,7 @@ open class BaseEffect : Cloneable {
     open fun onHitEntity(target: Entity) { }
     open fun onHitBlock(pos: Vector3f) { }
     open fun onHit(result: HitResult) { }
+    open fun onDie() { }
 
     public override fun clone(): BaseEffect = super.clone() as BaseEffect
 }

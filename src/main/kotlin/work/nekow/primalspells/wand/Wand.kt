@@ -4,7 +4,6 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
-import work.nekow.primalspells.PrimalSpells.Companion.debug
 import work.nekow.primalspells.magic.*
 import kotlin.math.min
 
@@ -76,7 +75,6 @@ class Wand(var id: String) {
         magics += hand
         discard()
 
-        val link = arrayListOf<String>()
         val effects = magics.filterIsInstance<Revise>()
             .flatMap {
                 magics.remove(it)
@@ -112,13 +110,13 @@ class Wand(var id: String) {
             status.lastDelay = status.delay
             status.lastRecharge = status.recharge
             MagicManager.add(p)
-
-            link += renderTriggers(p)
         }
-        caster.debug("Link: ${link.joinToString(separator = " → ") { it }}")
     }
 
-    fun renderTriggers(p: Magic): String {
+    /**
+     * 以文本形式显示触发法术内容
+     */
+    internal fun renderTriggers(p: Magic): String {
         fun className(any: Any): String = any::class.simpleName.toString()
         if (p !is TriggerSpell) return className(p)
         return "${className(p)}(${p.payload.map { renderTriggers(it) }.joinToString(separator = " → ") { it }})"

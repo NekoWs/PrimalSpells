@@ -23,7 +23,6 @@ class Trigger : BaseEffect() {
             magic.position = result.pos
             magic.velocity = result.normal
             magic.spell()
-            caster.debug("Triggered: ${wand.renderTriggers(magic)}")
             MagicManager.add(magic)
         }
     }

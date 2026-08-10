@@ -49,6 +49,7 @@ object MagicManager {
         register("bounce") { Bounce() }
         register("double_cast") { DoubleCast() }
         register("speed_up") { SpeedUp() }
+        register("lifetime_up") { LifeTimeUp() }
     }
 
     @SubscribeEvent

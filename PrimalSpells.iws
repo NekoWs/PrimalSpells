@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="将双重施放移动到 revise 包下">
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/SpeedUp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PrimalSpells.ipr" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.ipr" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/LifeTimeUp.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/utils/Lore.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/utils/Lore.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
@@ -108,6 +106,21 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Emikosama&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/NekoWs/PrimalSpells&quot;,
+    &quot;accountId&quot;: &quot;7ba4993b-cef1-4572-8f9e-7e58e768b799&quot;
+  }
+}</component>
+  <component name="KotlinCodeInsightWorkspaceSettings">
+    <option name="optimizeImportsOnTheFly" value="true" />
+  </component>
   <component name="ModuleEditorState">
     <option name="LAST_EDITED_MODULE_NAME" />
     <option name="LAST_EDITED_TAB_NAME" />
@@ -123,6 +136,7 @@
     </entry>
   </component>
   <component name="ProjectLevelVcsManager">
+    <OptionsSetting value="false" id="Update" />
     <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="ProjectReloadState">
@@ -132,21 +146,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Gradle.PrimalSpells [runClient].executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
-    "kotlin-language-version-configured": "true",
-    "node.js.detected.package.jshint": "true",
-    "node.js.selected.package.jshint": "",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Gradle.PrimalSpells [runClient].executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
       <recent name="work.nekow.primalspells.magic.revise" />
@@ -370,7 +384,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="将双重施放移动到 revise 包下" />
-    <option name="LAST_COMMIT_MESSAGE" value="将双重施放移动到 revise 包下" />
+    <MESSAGE value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
+    <option name="LAST_COMMIT_MESSAGE" value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

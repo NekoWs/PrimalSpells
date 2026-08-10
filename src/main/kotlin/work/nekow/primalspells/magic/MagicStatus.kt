@@ -10,5 +10,6 @@ data class MagicStatus(
     var age: Int = 0,
     var bounces: Int = 0,
     var hitTargets: Int = 0,
+    var atBlock: Boolean = false,
     val hitEntities: MutableSet<Entity> = mutableSetOf()
 )

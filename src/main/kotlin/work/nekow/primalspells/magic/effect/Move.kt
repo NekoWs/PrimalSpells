@@ -13,7 +13,8 @@ import kotlin.math.min
 class Move(
     val dragCoeff: Float = 0.01F,
     val ignoreBlocks: Boolean = false,
-    val hitRadius: Double = 0.0
+    val hitRadius: Double = 0.0,
+    val throughBlocks: Boolean = false,
 ) : BaseEffect() {
     override fun onTick() {
         if (!projectile.alive) return
@@ -74,9 +75,15 @@ class Move(
                                     val pry = (prevPos.y - blockPos.y).toDouble()
                                     val prz = (prevPos.z - blockPos.z).toDouble()
                                     val faceNormal = computeFaceNormal(prx, pry, prz, rx, ry, rz, hitAabb)
-                                    status.pos = checkPos
-                                    projectile.hitBlock(checkPos, faceNormal)
+                                    if (throughBlocks) {
+                                        status.atBlock = true
+                                    } else {
+                                        status.pos = checkPos
+                                        projectile.hitBlock(checkPos, faceNormal)
+                                    }
                                     return
+                                } else {
+                                    status.atBlock = false
                                 }
                             }
                         }

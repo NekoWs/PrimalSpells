@@ -11,7 +11,7 @@
   "item.primalspells.double_cast": "Double Cast",
   "item.primalspells.speed_boost": "Speed Boost",
   "item.primalspells.extended_lifetime": "Extended Lifetime",
-  "item.primalspells.piercing": "穿刺",
+  "item.primalspells.piercing": "Piercing",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -38,7 +38,7 @@
   "lore.primalspells.gravity.desc": "Makes the spell affected by gravity.",
   "lore.primalspells.speed_boost.desc": "Increases the spell's initial velocity.",
   "lore.primalspells.extended_lifetime.desc": "Extends the spell's lifetime.",
-  "lore.primalspells.piercing.desc": "使法术可以穿透敌人",
+  "lore.primalspells.piercing.desc": "Allows the spell to pierce through enemies.",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell"

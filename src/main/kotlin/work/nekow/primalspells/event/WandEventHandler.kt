@@ -13,6 +13,11 @@ import work.nekow.primalspells.item.WandItem
 
 object WandEventHandler {
     @SubscribeEvent
+    fun onEntityInteract(event: PlayerInteractEvent.EntityInteract) {
+        if (event.itemStack.item is WandItem) event.isCanceled = true
+    }
+
+    @SubscribeEvent
     fun onRightClickBlock(event: PlayerInteractEvent.RightClickBlock) {
         if (event.itemStack.item is WandItem) event.isCanceled = true
     }

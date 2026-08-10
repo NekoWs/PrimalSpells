@@ -27,13 +27,17 @@ class WandItem(properties: Properties) : Item(properties) {
     companion object {
         private val lastCastWand: MutableMap<UUID, WandID> = hashMapOf()
 
-        /** 从物品栈获取关联的法杖对象。 */
         fun getWand(stack: ItemStack): Wand? {
             val id = stack.get(ModItems.WAND_ID) ?: return null
             return WandManager[id, null]
         }
 
-        /** 通过自定义网络包向客户端同步法杖属性。 */
+        /**
+         * 通过网络包将法杖属性同步到指定玩家客户端。
+         *
+         * @param stack  法杖物品栈
+         * @param player 目标玩家
+         */
         fun syncStats(stack: ItemStack, player: ServerPlayer) {
             val wand = getWand(stack) ?: return
             val wandId = stack.get(ModItems.WAND_ID)?.wandId ?: return
@@ -51,7 +55,6 @@ class WandItem(properties: Properties) : Item(properties) {
         }
     }
 
-    /** 每 tick 同步法术列表，仅对最后一次施放的法杖发送属性包到客户端。 */
     override fun inventoryTick(stack: ItemStack, level: ServerLevel, owner: Entity, slot: EquipmentSlot?) {
         if (!stack.has(ModItems.WAND_ID)) WandManager.createWand(stack)
         tickSync(stack)
@@ -63,7 +66,6 @@ class WandItem(properties: Properties) : Item(properties) {
         }
     }
 
-    /** 按住右键时持续施法，每 tick 触发一次 spell。 */
     override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResult {
         if (!level.isClientSide) {
             player.startUsingItem(hand)
@@ -102,7 +104,6 @@ class WandItem(properties: Properties) : Item(properties) {
         return false
     }
 
-    /** 将光标中的法术添加到法杖当前选中格，若已占则交换回光标。 */
     private fun addToCursor(
         stack: ItemStack, wand: Wand, carriedItem: Item, carried: SlotAccess
     ): Boolean {
@@ -113,14 +114,12 @@ class WandItem(properties: Properties) : Item(properties) {
         return true
     }
 
-    /** 从法杖当前选中格取出法术到光标，若选中格为空则阻止拿起法杖。 */
     private fun removeToCursor(stack: ItemStack, wand: Wand, carried: SlotAccess) {
         val target = selectedSlot(stack, wand)
         val magic = clearMagic(wand, stack, target) ?: return
         carried.set(makeStack(magic))
     }
 
-    /** 将槽位中的法术添加到法杖当前选中格（法杖在光标时），若已占则交换回槽位。 */
     private fun addFromSlot(
         stack: ItemStack, wand: Wand, slot: Slot, player: Player
     ): Boolean {
@@ -131,7 +130,6 @@ class WandItem(properties: Properties) : Item(properties) {
         return true
     }
 
-    /** 从法杖当前选中格取出法术放入目标槽位（法杖在光标时）。 */
     private fun removeToSlot(stack: ItemStack, wand: Wand, slot: Slot): Boolean {
         val target = selectedSlot(stack, wand)
         val magic = clearMagic(wand, stack, target) ?: return false
@@ -141,7 +139,6 @@ class WandItem(properties: Properties) : Item(properties) {
         return false
     }
 
-    /** 将法术放入法杖指定格（若格在列表范围外则用 null 填充），返回该格原有法术（可为 null）。 */
     private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, id: String): work.nekow.primalspells.magic.Magic? {
         while (wand.magics.size <= target) wand.magics.add(null)
         val existing = wand.magics.getOrNull(target)
@@ -150,7 +147,6 @@ class WandItem(properties: Properties) : Item(properties) {
         return existing
     }
 
-    /** 清空法杖指定格，返回被移除的法术，若格为空则返回 null 且不触发同步。 */
     private fun clearMagic(wand: Wand, stack: ItemStack, target: Int): work.nekow.primalspells.magic.Magic? {
         val magic = wand.magics.getOrNull(target) ?: return null
         wand.magics[target] = null
@@ -158,23 +154,26 @@ class WandItem(properties: Properties) : Item(properties) {
         return magic
     }
 
-    /** 从 MOD_MAGICS 中查找与给定物品匹配的条目。 */
     private fun findMagic(item: Item) =
         ModItems.MAGICS.entries.firstOrNull { it.value.get() == item }
 
-    /** 根据法术对象创建对应的 ItemStack。 */
     private fun makeStack(magic: work.nekow.primalspells.magic.Magic): ItemStack {
         val item = ModItems.MAGICS[magic.id]?.get() ?: return ItemStack.EMPTY
         return ItemStack(item)
     }
 
-    /** 从物品栈的 WAND_SELECTED_SLOT 组件读取当前选中格索引，限制在有效范围内。 */
+    /**
+     * 从物品组件读取选中槽位索引并钳制在法杖容量范围内。
+     *
+     * @param stack 法杖物品栈
+     * @param wand  关联的法杖对象
+     * @return 有效范围内的槽位索引
+     */
     private fun selectedSlot(stack: ItemStack, wand: Wand): Int {
         val size = maxOf(wand.size, wand.magics.size.coerceAtLeast(1))
         return stack.getOrDefault(ModItems.WAND_SELECTED_SLOT, 0).coerceIn(0, size - 1)
     }
 
-    /** tick 时仅同步法术列表，不同步属性以避免持有法杖时持续触发拾取动画。 */
     private fun tickSync(stack: ItemStack) {
         val wand = getWand(stack) ?: return
         val size = maxOf(wand.size, wand.magics.size)

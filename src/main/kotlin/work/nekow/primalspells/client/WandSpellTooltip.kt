@@ -9,13 +9,11 @@ import net.minecraft.world.inventory.tooltip.TooltipComponent
 import net.minecraft.world.item.ItemStack
 import work.nekow.primalspells.item.ModItems
 
-/** 传递给客户端的法杖法术提示框数据。 */
 class WandSpellTooltip(
     val spells: List<String>,
     val wandId: String
 ): TooltipComponent
 
-/** 法杖法术槽位提示框渲染器。 */
 class ClientWandSpellTooltip(
     private val tooltip: WandSpellTooltip
 ): ClientTooltipComponent {

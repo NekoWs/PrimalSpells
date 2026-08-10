@@ -5,25 +5,17 @@ import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.magic.*
-import work.nekow.primalspells.magic.Revise
 import kotlin.math.min
 
 class Wand(var id: String) {
-    /** 始终施放 **/
     val innate = arrayListOf<Magic>()
 
     val magics = arrayListOf<Magic?>()
-    /** 法力最大值 **/
     var mana: Double = 300.0
-    /** 施放延迟 **/
     var delay: Int = 0
-    /** 充能时间 **/
     var recharge: Int = 0
-    /** 充能速度 (charge/s) **/
     var charge: Double = 100.0
-    /** 施放数 **/
     var cast = 1
-    /** 容量 **/
     var size: Int = 9
 
     val drawPile = arrayListOf<Magic>()
@@ -48,6 +40,12 @@ class Wand(var id: String) {
         magics.filterNotNull().forEach { drawPile.add(it) }
     }
 
+    /**
+     * 进行一次施法：检查 delay/recharge 是否就绪，然后抽牌并执行。
+     *
+     * @param caster 施法者实体
+     * @return true 如果施法成功，false 如果因 delay/recharge 被阻止
+     */
     fun spell(caster: Entity): Boolean {
         status.failedReason.clear()
         if (status.delay > 0) {
@@ -65,6 +63,13 @@ class Wand(var id: String) {
         return true
     }
 
+    /**
+     * 执行手牌：先将所有 [Revise] 的法术效果提取出来（消耗法力、累加 delay/recharge），
+     * 再依次施放每个 [Projectile]，如果有 [TriggerSpell] 则额外抽牌组装 payload。
+     *
+     * @param caster 施法者实体
+     * @param hand   当前手牌列表（本方法负责清空）
+     */
     private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
         val magics = arrayListOf<Magic>()
         magics += hand
@@ -106,6 +111,12 @@ class Wand(var id: String) {
         }
     }
 
+    /**
+     * 检查并消耗法术所需法力。
+     *
+     * @param magic 要消耗法力的法术
+     * @return true 如果法力足够并已扣除
+     */
     fun consumeMana(magic: Magic): Boolean {
         if (status.mana < magic.mana) {
             status.failedReason += "Mana(${status.mana}) < ${magic.mana}"
@@ -121,6 +132,14 @@ class Wand(var id: String) {
         reloadIfNeeded()
     }
 
+    /**
+     * 从指定牌堆中抽牌，直到预算耗尽或牌堆为空。
+     * 每张法术的 [Magic.cast] 会影响剩余预算（正数增加可抽范围，负数或 0 减少）。
+     *
+     * @param budget 可抽牌的预算值
+     * @param pile   要从中抽取的牌堆
+     * @return Pair(剩余预算, 抽到的法术列表)
+     */
     fun drawFrom(budget: Int, pile: ArrayList<Magic>): Pair<Int, ArrayList<Magic>> {
         var remaining = budget
         val result = arrayListOf<Magic>()
@@ -132,6 +151,12 @@ class Wand(var id: String) {
         return Pair(remaining, result)
     }
 
+    /**
+     * 从抽牌堆抽牌，若预算仍有剩余且允许循环，则从弃牌堆继续抽取。
+     *
+     * @param budget   可抽牌的预算值
+     * @param wrapping 是否在抽牌堆耗尽后循环弃牌堆
+     */
     fun draw(budget: Int, wrapping: Boolean = true) {
         val (remaining, result) = drawFrom(budget, drawPile)
         hand += result
@@ -148,12 +173,20 @@ class Wand(var id: String) {
         }
     }
 
+    /**
+     * 每 tick 维护法杖状态：递减 delay/recharge，按充电速率回复法力。
+     */
     fun tick() {
         if (status.delay > 0) status.delay--
         if (status.recharge > 0) status.recharge--
         if (status.mana < mana) status.mana = min(mana, status.mana + charge / 20)
     }
 
+    /**
+     * 将法杖完整状态序列化为 NBT。
+     *
+     * @return 包含所有属性和法术列表的 CompoundTag
+     */
     fun saveTag(): CompoundTag {
         val tag = CompoundTag()
         tag.putString("id", id)
@@ -176,6 +209,12 @@ class Wand(var id: String) {
     }
 
     companion object {
+        /**
+         * 从 NBT 反序列化重建法杖对象。
+         *
+         * @param tag 包含法杖序列化数据的 CompoundTag
+         * @return 已初始化并 load() 过的 Wand 实例
+         */
         fun fromTag(tag: CompoundTag): Wand {
             val wand = Wand(tag.getStringOr("id", ""))
             wand.mana = tag.getDoubleOr("mana", 0.0)

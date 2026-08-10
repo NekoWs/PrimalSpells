@@ -16,7 +16,6 @@ import work.nekow.primalspells.utils.Lore
 
 object ClientTooltipHandler {
 
-    /** 法杖悬停时添加法术槽位提示框组件，按下 Shift 时额外显示法杖属性。 */
     @SubscribeEvent
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
         val (wandId, spells) = getWandData(event.itemStack) ?: run {
@@ -30,7 +29,6 @@ object ClientTooltipHandler {
         addSelectedSpellLines(event, spells, wandId)
     }
 
-    /** 悬停法杖时滚轮切换选中格，并同步到 WAND_SELECTED_SLOT 组件。 */
     @SubscribeEvent
     fun onMouseScrolled(event: ScreenEvent.MouseScrolled.Pre) {
         val screen = event.screen
@@ -45,7 +43,6 @@ object ClientTooltipHandler {
         event.isCanceled = true
     }
 
-    /** 从物品栈提取法杖 ID 与法术列表，不符合条件返回 null。 */
     private fun getWandData(stack: ItemStack): Pair<String, List<String>>? {
         if (stack.item !is WandItem) return null
         val spells = stack.get(ModItems.WAND_SPELLS.get()) ?: return null
@@ -54,7 +51,6 @@ object ClientTooltipHandler {
         return wandId to spells
     }
 
-    /** 向提示框添加法杖属性行（魔力、延迟、充能、施放数），仅在 Shift 按下时调用。 */
     private fun addStatLines(event: RenderTooltipEvent.GatherComponents, wandId: String) {
         val s = WandHudRenderer.getStats(wandId) ?: return
         event.tooltipElements.add(Either.left(

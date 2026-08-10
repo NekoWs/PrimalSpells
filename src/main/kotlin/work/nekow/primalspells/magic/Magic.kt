@@ -12,9 +12,6 @@ abstract class Magic {
     lateinit var caster: Entity
     lateinit var wand: Wand
 
-    /**
-     * 法术提供的抽卡次数
-     */
     open var cast: Int = 1
 
     var mana: Double = 0.0

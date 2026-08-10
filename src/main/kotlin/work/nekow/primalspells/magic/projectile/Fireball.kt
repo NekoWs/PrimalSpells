@@ -17,5 +17,6 @@ class Fireball: Projectile() {
         hitRadius = 0.2
         effects += Trajectory(ParticleTypes.END_ROD)
         effects += Hurt()
+        speed = 0.5f
     }
 }

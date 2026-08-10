@@ -52,6 +52,7 @@ object MagicManager {
         register { ExtendedLifetime() }
         register { SpeedGetter() }
         register { Laser() }
+        register { Piercing() }
     }
 
     @SubscribeEvent

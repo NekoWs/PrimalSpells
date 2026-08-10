@@ -4,10 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增 LifeTimeUp 修正。修改部分翻译项。">
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/Laser.kt" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增 Laser 法术。">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/Piercing.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Move.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Move.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/Fireball.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/Fireball.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
@@ -387,7 +389,8 @@
     <MESSAGE value="将双重施放移动到 revise 包下" />
     <MESSAGE value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
     <MESSAGE value="新增 LifeTimeUp 修正。修改部分翻译项。" />
-    <option name="LAST_COMMIT_MESSAGE" value="新增 LifeTimeUp 修正。修改部分翻译项。" />
+    <MESSAGE value="新增 Laser 法术。" />
+    <option name="LAST_COMMIT_MESSAGE" value="新增 Laser 法术。" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

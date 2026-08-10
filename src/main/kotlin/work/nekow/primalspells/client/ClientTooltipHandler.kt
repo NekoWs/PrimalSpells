@@ -19,8 +19,12 @@ object ClientTooltipHandler {
             addSpellLore(event)
             return
         }
-        if (Minecraft.getInstance().hasShiftDown()) {
+        if (Minecraft.getInstance().hasAltDown()) {
             addStatLines(event, wandId)
+        } else {
+            event.tooltipElements.add(Either.left(
+                Component.translatable("tooltip.primalspells.hold_alt").withStyle(ChatFormatting.DARK_GRAY)
+            ))
         }
         event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
         addSelectedSpellLines(event, spells, wandId)

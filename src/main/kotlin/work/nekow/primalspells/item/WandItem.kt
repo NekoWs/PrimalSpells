@@ -93,17 +93,6 @@ class WandItem(properties: Properties) : Item(properties) {
         return true
     }
 
-    override fun overrideStackedOnOther(
-        self: ItemStack, slot: Slot, action: ClickAction, player: Player
-    ): Boolean {
-        val wand = getWand(self) ?: return false
-        if (action == ClickAction.PRIMARY && !slot.item.isEmpty)
-            return addFromSlot(self, wand, slot, player)
-        if (action == ClickAction.SECONDARY)
-            return removeToSlot(self, wand, slot)
-        return false
-    }
-
     private fun addToCursor(
         stack: ItemStack, wand: Wand, carriedItem: Item, carried: SlotAccess
     ): Boolean {
@@ -118,25 +107,6 @@ class WandItem(properties: Properties) : Item(properties) {
         val target = selectedSlot(stack, wand)
         val magic = clearMagic(wand, stack, target) ?: return
         carried.set(makeStack(magic))
-    }
-
-    private fun addFromSlot(
-        stack: ItemStack, wand: Wand, slot: Slot, player: Player
-    ): Boolean {
-        val entry = findMagic(slot.item.item) ?: return false
-        val target = selectedSlot(stack, wand)
-        val existing = placeMagic(wand, stack, target, entry.key)
-        if (existing != null) slot.set(makeStack(existing)) else slot.safeTake(1, 1, player)
-        return true
-    }
-
-    private fun removeToSlot(stack: ItemStack, wand: Wand, slot: Slot): Boolean {
-        val target = selectedSlot(stack, wand)
-        val magic = clearMagic(wand, stack, target) ?: return false
-        val result = makeStack(magic)
-        if (!slot.hasItem()) { slot.set(result); return true }
-        if (!slot.safeInsert(result).isEmpty) return true
-        return false
     }
 
     private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, id: String): work.nekow.primalspells.magic.Magic? {

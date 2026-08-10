@@ -3,13 +3,18 @@ package work.nekow.primalspells.magic.effect
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
 
-class Move(val dragCoeff: Float = 0.01F, val ignoreBlocks: Boolean = false) : BaseEffect() {
+class Move(
+    val dragCoeff: Float = 0.01F,
+    val ignoreBlocks: Boolean = false,
+    val hitRadius: Double = 0.0
+) : BaseEffect() {
     override fun onTick() {
         if (!projectile.alive) return
 
@@ -19,7 +24,10 @@ class Move(val dragCoeff: Float = 0.01F, val ignoreBlocks: Boolean = false) : Ba
         status.velocity = Vector3f(movement)
         val newPos = Vector3f(movement).add(status.pos)
 
-        if (!ignoreBlocks) {
+        val checkBlocks = !ignoreBlocks
+        val checkEntities = hitRadius > 0.0
+
+        if (checkBlocks || checkEntities) {
             val level = caster.level()
             if (level is ServerLevel) {
                 val distance = movement.length()
@@ -31,30 +39,45 @@ class Move(val dragCoeff: Float = 0.01F, val ignoreBlocks: Boolean = false) : Ba
                     for (i in 1..steps) {
                         val t = min(i * stepSize, distance)
                         val checkPos = Vector3f(stepVec).mul(t).add(status.pos)
-                        val blockPos = BlockPos(
-                            floor(checkPos.x).toInt(),
-                            floor(checkPos.y).toInt(),
-                            floor(checkPos.z).toInt()
-                        )
-                        val state = level.getBlockState(blockPos)
-                        val shape = state.getCollisionShape(level, blockPos)
-                        if (!shape.isEmpty) {
-                            val rx = (checkPos.x - blockPos.x).toDouble()
-                            val ry = (checkPos.y - blockPos.y).toDouble()
-                            val rz = (checkPos.z - blockPos.z).toDouble()
-                            val hitAabb = shape.toAabbs().firstOrNull { aabb ->
-                                rx in aabb.minX..aabb.maxX &&
-                                ry in aabb.minY..aabb.maxY &&
-                                rz in aabb.minZ..aabb.maxZ
-                            }
-                            if (hitAabb != null) {
-                                val prx = (prevPos.x - blockPos.x).toDouble()
-                                val pry = (prevPos.y - blockPos.y).toDouble()
-                                val prz = (prevPos.z - blockPos.z).toDouble()
-                                val faceNormal = computeFaceNormal(prx, pry, prz, rx, ry, rz, hitAabb)
+
+                        if (checkEntities) {
+                            val center = Vec3(checkPos.x.toDouble(), checkPos.y.toDouble(), checkPos.z.toDouble())
+                            val aabb = AABB.ofSize(center, hitRadius * 2.0, hitRadius * 2.0, hitRadius * 2.0)
+                            level.getEntities(null, aabb) { it != caster }.forEach { entity ->
+                                if (entity in status.hitEntities) return@forEach
+                                status.hitEntities.add(entity)
                                 status.pos = checkPos
-                                projectile.hitBlock(checkPos, faceNormal)
-                                return
+                                projectile.hitEntity(entity)
+                            }
+                            if (!projectile.alive) return
+                        }
+
+                        if (checkBlocks) {
+                            val blockPos = BlockPos(
+                                floor(checkPos.x).toInt(),
+                                floor(checkPos.y).toInt(),
+                                floor(checkPos.z).toInt()
+                            )
+                            val state = level.getBlockState(blockPos)
+                            val shape = state.getCollisionShape(level, blockPos)
+                            if (!shape.isEmpty) {
+                                val rx = (checkPos.x - blockPos.x).toDouble()
+                                val ry = (checkPos.y - blockPos.y).toDouble()
+                                val rz = (checkPos.z - blockPos.z).toDouble()
+                                val hitAabb = shape.toAabbs().firstOrNull { aabb ->
+                                    rx in aabb.minX..aabb.maxX &&
+                                    ry in aabb.minY..aabb.maxY &&
+                                    rz in aabb.minZ..aabb.maxZ
+                                }
+                                if (hitAabb != null) {
+                                    val prx = (prevPos.x - blockPos.x).toDouble()
+                                    val pry = (prevPos.y - blockPos.y).toDouble()
+                                    val prz = (prevPos.z - blockPos.z).toDouble()
+                                    val faceNormal = computeFaceNormal(prx, pry, prz, rx, ry, rz, hitAabb)
+                                    status.pos = checkPos
+                                    projectile.hitBlock(checkPos, faceNormal)
+                                    return
+                                }
                             }
                         }
                         prevPos = Vector3f(checkPos)

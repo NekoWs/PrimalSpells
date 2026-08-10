@@ -4,7 +4,6 @@ import net.minecraft.core.particles.ParticleTypes
 import work.nekow.primalspells.magic.Magic
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.TriggerSpell
-import work.nekow.primalspells.magic.effect.HitEntity
 import work.nekow.primalspells.magic.effect.Hurt
 import work.nekow.primalspells.magic.effect.Trajectory
 import work.nekow.primalspells.magic.effect.Trigger
@@ -21,8 +20,8 @@ class TriggerFireball: Projectile(), TriggerSpell {
         recharge = 1
         maxAge = 200
         status.damage = 1.0
+        hitRadius = 0.2
         effects += Trajectory(ParticleTypes.FLAME)
-        effects += HitEntity(0.2)
         effects += Hurt()
         effects += Trigger()
     }

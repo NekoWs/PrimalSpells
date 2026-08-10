@@ -12,6 +12,9 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.primalspells.ModDamageTypes
+import kotlin.math.acos
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -95,11 +98,11 @@ class Explosion(
             for (i in 0 until particleCount) {
                 // 球体内均匀随机采样
                 val theta = level.random.nextDouble() * Math.PI * 2.0
-                val phi = Math.acos(2.0 * level.random.nextDouble() - 1.0)
+                val phi = acos(2.0 * level.random.nextDouble() - 1.0)
                 val dist = level.random.nextDouble() * r
-                val px = x + Math.sin(phi) * Math.cos(theta) * dist
-                val py = y + Math.sin(phi) * Math.sin(theta) * dist
-                val pz = z + Math.cos(phi) * dist
+                val px = x + sin(phi) * cos(theta) * dist
+                val py = y + sin(phi) * sin(theta) * dist
+                val pz = z + cos(phi) * dist
 
                 level.sendParticles(
                     ParticleTypes.EXPLOSION,

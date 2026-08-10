@@ -75,20 +75,25 @@ class Wand(var id: String) {
         magics += hand
         discard()
 
-        val effects = magics.filterIsInstance<Revise>()
-            .flatMap {
-                magics.remove(it)
+        val revises = magics.filterIsInstance<Revise>().toList()
+        revises.forEach { magics.remove(it) }
+        val validRevises = revises.filter {
+            if (consumeMana(it)) {
                 status.recharge += it.recharge
                 status.delay += it.delay
-                if (consumeMana(it)) it.effects()
-                else emptyList()
+                true
+            } else {
+                false
             }
+        }
+
         for (projectile in magics.filterIsInstance<Projectile>()) {
             if (!consumeMana(projectile)) continue
             val p = projectile.clone()
             if (p is TriggerSpell) {
                 loadPayload(p)
             }
+            val effects = validRevises.flatMap { it.effects() }
             p.effects += effects
             p.caster = caster
             p.wand = this

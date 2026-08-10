@@ -10,8 +10,8 @@ import work.nekow.primalspells.magic.revise.*
 object MagicManager {
     val registry = mutableMapOf<String, () -> Magic>()
 
-    fun register(id: String, factory: () -> Magic) {
-        registry[id] = factory
+    fun register(factory: () -> Magic) {
+        registry[factory().id] = factory
     }
 
     fun create(id: String): Magic? = registry[id]?.invoke()?.also { it.initLore() }
@@ -42,14 +42,14 @@ object MagicManager {
     }
 
     init {
-        register("fireball") { Fireball() }
-        register("trigger_fireball") { TriggerFireball() }
-        register("damage_boost") { DamageBoost() }
-        register("gravity") { Gravity() }
-        register("bounce") { Bounce() }
-        register("double_cast") { DoubleCast() }
-        register("speed_boost") { SpeedBoost() }
-        register("extended_lifetime") { ExtendedLifetime() }
+        register { Fireball() }
+        register { TriggerFireball() }
+        register { DamageBoost() }
+        register { Gravity() }
+        register { Bounce() }
+        register { DoubleCast() }
+        register { SpeedBoost() }
+        register { ExtendedLifetime() }
     }
 
     @SubscribeEvent

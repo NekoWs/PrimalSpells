@@ -87,18 +87,9 @@ class Wand(var id: String) {
             if (!consumeMana(projectile)) continue
             val p = projectile.clone()
             if (p is TriggerSpell) {
-//                draw(p.triggerCast, false)
-//                hand.forEach {
-//                    if (consumeMana(it)) {
-//                        p.payload.add(it)
-//                        p.recharge += it.recharge
-//                        p.delay += it.delay
-//                    }
-//                }
-//                discard()
                 loadPayload(p)
             }
-            p.effects.addAll(effects)
+            p.effects += effects
             p.caster = caster
             p.wand = this
             p.position = caster.eyePosition.toVector3f().sub(0F, 0.1F, 0F)
@@ -116,10 +107,11 @@ class Wand(var id: String) {
     /**
      * 以文本形式显示触发法术内容
      */
-    internal fun renderTriggers(p: Magic): String {
-        fun className(any: Any): String = any::class.simpleName.toString()
-        if (p !is TriggerSpell) return className(p)
-        return "${className(p)}(${p.payload.map { renderTriggers(it) }.joinToString(separator = " → ") { it }})"
+    internal fun renderTriggers(p: Magic, effects: Boolean = false): String {
+        fun toString(magic: Magic): String =
+            "${magic::class.simpleName.toString()}[${magic.effects.joinToString(",") { it::class.simpleName.toString() }}]"
+        if (p !is TriggerSpell) return toString(p)
+        return "${toString(p)}(${p.payload.map { renderTriggers(it) }.joinToString(separator = " + ") { it }})"
     }
 
     private fun loadPayload(projectile: Projectile): Projectile {

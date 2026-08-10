@@ -11,12 +11,12 @@ class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
 
     val magics = arrayListOf<Magic?>()
-    var mana: Double = 300.0
+    var mana: Double = 3000.0
     var delay: Int = 0
     var recharge: Int = 0
-    var charge: Double = 100.0
+    var charge: Double = 1000.0
     var cast = 1
-    var size: Int = 9
+    var size: Int = 18
 
     val drawPile = arrayListOf<Magic>()
     val hand = arrayListOf<Magic>()

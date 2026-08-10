@@ -4,16 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="添加 BounceExplosion 修正。为每个物品绘制了贴图。">
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Bounce.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Tracking.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/BounceDuplicate.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/Homing.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/MoreBounce.kt" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增effect: Bounce 和 Tracking。新增 BounceExplosion 和 BounceDuplicate 修正。为追踪类增加筛选实体配置">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualAccelerate.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualDecelerate.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/RandomPath.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/ReciprocateRevise.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/SineWaveRevise.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/Bounce.kt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/BounceExplosion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/BounceExplosion.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/wand/Wand.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/wand/Wand.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
@@ -397,7 +396,8 @@
     <MESSAGE value="新增 Laser 法术。" />
     <MESSAGE value="修改翻译" />
     <MESSAGE value="添加 BounceExplosion 修正。为每个物品绘制了贴图。" />
-    <option name="LAST_COMMIT_MESSAGE" value="添加 BounceExplosion 修正。为每个物品绘制了贴图。" />
+    <MESSAGE value="新增effect: Bounce 和 Tracking。新增 BounceExplosion 和 BounceDuplicate 修正。为追踪类增加筛选实体配置" />
+    <option name="LAST_COMMIT_MESSAGE" value="新增effect: Bounce 和 Tracking。新增 BounceExplosion 和 BounceDuplicate 修正。为追踪类增加筛选实体配置" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

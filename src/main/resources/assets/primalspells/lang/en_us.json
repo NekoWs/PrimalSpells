@@ -15,6 +15,11 @@
   "item.primalspells.bounce_explosion": "Bounce Explosion",
   "item.primalspells.homing": "Homing",
   "item.primalspells.bounce_duplicate": "Bounce Duplicate",
+  "item.primalspells.gradual_accelerate": "Gradual Accelerate",
+  "item.primalspells.gradual_decelerate": "Gradual Decelerate",
+  "item.primalspells.random_path": "Random Path",
+  "item.primalspells.reciprocate": "Reciprocate",
+  "item.primalspells.sine_wave": "Sine Wave",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -45,6 +50,11 @@
   "lore.primalspells.bounce_explosion.desc": "Causes the spell to explode on each bounce.",
   "lore.primalspells.homing.desc": "Causes the spell to track the nearest entity.",
   "lore.primalspells.bounce_duplicate.desc": "Duplicates the spell on each bounce.",
+  "lore.primalspells.gradual_accelerate.desc": "Starts slow and gradually accelerates.",
+  "lore.primalspells.gradual_decelerate.desc": "Starts fast and gradually decelerates.",
+  "lore.primalspells.random_path.desc": "Makes the spell move in random directions.",
+  "lore.primalspells.reciprocate.desc": "The spell reverses direction periodically.",
+  "lore.primalspells.sine_wave.desc": "Makes the spell follow a sine wave path.",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell"

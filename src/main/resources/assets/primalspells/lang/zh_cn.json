@@ -15,6 +15,11 @@
   "item.primalspells.bounce_explosion": "弹跳爆炸",
   "item.primalspells.homing": "追踪",
   "item.primalspells.bounce_duplicate": "弹跳复制",
+  "item.primalspells.gradual_accelerate": "逐渐加速",
+  "item.primalspells.gradual_decelerate": "逐渐减速",
+  "item.primalspells.random_path": "随机路径",
+  "item.primalspells.reciprocate": "往复运动",
+  "item.primalspells.sine_wave": "三角函数",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
@@ -45,6 +50,11 @@
   "lore.primalspells.bounce_explosion.desc": "使法术在每次弹跳时爆炸。",
   "lore.primalspells.homing.desc": "使法术追踪最近的实体。",
   "lore.primalspells.bounce_duplicate.desc": "使法术在每次弹跳时生成复制体。",
+  "lore.primalspells.gradual_accelerate.desc": "初始缓慢，后逐渐加速。",
+  "lore.primalspells.gradual_decelerate.desc": "初始快速，后逐渐减速。",
+  "lore.primalspells.random_path.desc": "使法术随机改变方向。",
+  "lore.primalspells.reciprocate.desc": "使法术周期性反向运动。",
+  "lore.primalspells.sine_wave.desc": "使法术沿正弦波路径运动。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"

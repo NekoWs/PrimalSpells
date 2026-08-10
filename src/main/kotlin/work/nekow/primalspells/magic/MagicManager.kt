@@ -56,6 +56,11 @@ object MagicManager {
         register { BounceExplosion() }
         register { Homing() }
         register { BounceDuplicate() }
+        register { GradualAccelerate() }
+        register { GradualDecelerate() }
+        register { RandomPath() }
+        register { ReciprocateRevise() }
+        register { SineWaveRevise() }
     }
 
     @SubscribeEvent

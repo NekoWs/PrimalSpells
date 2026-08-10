@@ -27,6 +27,8 @@
   "item.primalspells.cluster_bomb": "Cluster Bomb",
   "item.primalspells.explosion_remove": "Explosion Remove",
   "item.primalspells.explosion_projectile": "Explosion Projectile",
+  "item.primalspells.small_explosion": "Small Explosion",
+  "item.primalspells.large_explosion": "Large Explosion",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -69,6 +71,8 @@
   "lore.primalspells.cluster_bomb.desc": "Spawns explosion bullets on bounce.",
   "lore.primalspells.explosion_remove.desc": "Removes all explosion effects.",
   "lore.primalspells.explosion_projectile.desc": "Periodically fires explosive projectiles.",
+  "lore.primalspells.small_explosion.desc": "A small stationary explosion.",
+  "lore.primalspells.large_explosion.desc": "A large stationary explosion.",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell"

@@ -13,8 +13,8 @@ data class MagicStatus(
     var atBlock: Boolean = false,
     val hitEntities: MutableSet<Entity> = mutableSetOf(),
 
-    /** 爆炸伤害加成（额外伤害值） */
-    var explosionDamage: Double = 0.0,
+    /** 爆炸中心最大伤害（距离衰减, 默认与 TNT 爆炸伤害相当） */
+    var explosionDamage: Double = 5.0,
 
     /** 爆炸半径（传递给原版 explode 方法） */
     var explosionRadius: Float = 2.0f,

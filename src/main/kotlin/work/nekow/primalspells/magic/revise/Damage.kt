@@ -3,7 +3,6 @@ package work.nekow.primalspells.magic.revise
 import work.nekow.primalspells.magic.Revise
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.utils.Lore
-import work.nekow.primalspells.utils.LoreEntry
 
 class Damage: Revise() {
     override val id = "damage"
@@ -16,6 +15,6 @@ class Damage: Revise() {
                 projectile.status.damage += 2
             }
         }
-        lore += LoreEntry(Lore.DAMAGE, arrayOf("+2"))
+        lore(Lore.DAMAGE, "+2")
     }
 }

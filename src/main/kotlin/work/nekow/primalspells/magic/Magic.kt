@@ -20,6 +20,16 @@ abstract class Magic {
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()
 
+    /**
+     * 快捷添加提示
+     *
+     * @param lore 提示类型
+     * @param args 参数
+     */
+    fun lore(lore: Lore, vararg args: Any) {
+        this.lore += LoreEntry(lore, args)
+    }
+
     open fun spell() {
         effects.reversed().forEach {
             it.caster = caster

@@ -49,6 +49,7 @@ object MagicManager {
         register { DoubleCast() }
         register { SpeedBoost() }
         register { ExtendedLifetime() }
+        register { SpeedGetter() }
     }
 
     @SubscribeEvent

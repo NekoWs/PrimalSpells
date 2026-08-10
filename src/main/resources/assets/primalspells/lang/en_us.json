@@ -15,6 +15,7 @@
   "tooltip.primalspells.recharge": "Recharge: %s\u00a0",
   "tooltip.primalspells.cast": "Cast: %s",
   "tooltip.primalspells.charge": "Charge: %s/s",
+  "tooltip.primalspells.hold_alt": "Hold [Alt] to view wand stats",
   "lore.primalspells.mana": "Mana Cost: %s",
   "lore.primalspells.delay": "Cast Delay: %st",
   "lore.primalspells.recharge": "Recharge: %st",

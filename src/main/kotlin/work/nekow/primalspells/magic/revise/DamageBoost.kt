@@ -4,16 +4,17 @@ import work.nekow.primalspells.magic.Revise
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.utils.Lore
 
-class SpeedUp: Revise() {
-    override val id = "speed_up"
+class DamageBoost: Revise() {
+    override val id = "damage_boost"
 
     init {
-        mana = 3.0
+        mana = 5.0
+        delay = 2
         effects += object: BaseEffect() {
             override fun onActive() {
-                status.velocity.mul(2f)
+                projectile.status.damage += 2
             }
         }
-        lore(Lore.SPEED, 2)
+        lore(Lore.DAMAGE, "+2")
     }
 }

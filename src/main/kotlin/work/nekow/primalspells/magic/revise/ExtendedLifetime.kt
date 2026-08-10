@@ -4,8 +4,8 @@ import work.nekow.primalspells.magic.Revise
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.utils.Lore
 
-class LifeTimeUp : Revise() {
-    override val id = "lifetime_up"
+class ExtendedLifetime : Revise() {
+    override val id = "extended_lifetime"
 
     init {
         mana = 40.0

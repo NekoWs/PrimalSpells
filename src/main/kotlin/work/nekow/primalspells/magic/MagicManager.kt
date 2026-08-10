@@ -44,12 +44,12 @@ object MagicManager {
     init {
         register("fireball") { Fireball() }
         register("trigger_fireball") { TriggerFireball() }
-        register("damage") { Damage() }
+        register("damage_boost") { DamageBoost() }
         register("gravity") { Gravity() }
         register("bounce") { Bounce() }
         register("double_cast") { DoubleCast() }
-        register("speed_up") { SpeedUp() }
-        register("lifetime_up") { LifeTimeUp() }
+        register("speed_boost") { SpeedBoost() }
+        register("extended_lifetime") { ExtendedLifetime() }
     }
 
     @SubscribeEvent

@@ -4,8 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。">
-      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/LifeTimeUp.kt" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增 LifeTimeUp 修正。修改部分翻译项。">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/Laser.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
@@ -104,6 +104,7 @@
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="PUSH_AUTO_UPDATE" value="true" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
@@ -385,7 +386,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="将双重施放移动到 revise 包下" />
     <MESSAGE value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
-    <option name="LAST_COMMIT_MESSAGE" value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
+    <MESSAGE value="新增 LifeTimeUp 修正。修改部分翻译项。" />
+    <option name="LAST_COMMIT_MESSAGE" value="新增 LifeTimeUp 修正。修改部分翻译项。" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

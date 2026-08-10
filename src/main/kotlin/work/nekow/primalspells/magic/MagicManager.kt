@@ -4,6 +4,7 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.magic.projectile.Fireball
+import work.nekow.primalspells.magic.projectile.Laser
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.revise.*
 
@@ -50,6 +51,7 @@ object MagicManager {
         register { SpeedBoost() }
         register { ExtendedLifetime() }
         register { SpeedGetter() }
+        register { Laser() }
     }
 
     @SubscribeEvent

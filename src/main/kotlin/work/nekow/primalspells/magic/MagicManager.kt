@@ -24,9 +24,6 @@ object MagicManager {
     }
 
     fun tick() {
-        projectiles.addAll(pendingAdd)
-        pendingAdd.clear()
-
         val iter = projectiles.iterator()
         while (iter.hasNext()) {
             val it = iter.next()
@@ -37,8 +34,10 @@ object MagicManager {
             }
             it.tick()
             it.status.age++
-            if (it.status.age >= it.maxAge) iter.remove()
+            if (it.status.age >= it.maxAge) it.alive = false
         }
+        projectiles.addAll(pendingAdd)
+        pendingAdd.clear()
     }
 
     init {

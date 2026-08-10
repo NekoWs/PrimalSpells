@@ -17,15 +17,14 @@ class Trigger : BaseEffect() {
                 it.effects()
             }
         payload.filterIsInstance<Projectile>().forEach { magic ->
-            val p = magic.clone()
-            p.effects += effects
-            p.caster = caster
-            p.wand = wand
-            p.position = result.pos
-            p.velocity = result.normal
-            p.spell()
-            caster.debug("Triggered: ${wand.renderTriggers(p)}")
-            MagicManager.add(p)
+            magic.effects += effects
+            magic.caster = caster
+            magic.wand = wand
+            magic.position = result.pos
+            magic.velocity = result.normal
+            magic.spell()
+            caster.debug("Triggered: ${wand.renderTriggers(magic)}")
+            MagicManager.add(magic)
         }
     }
 }

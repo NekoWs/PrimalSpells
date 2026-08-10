@@ -53,6 +53,7 @@ object MagicManager {
         register { SpeedGetter() }
         register { Laser() }
         register { Piercing() }
+        register { BounceExplosion() }
     }
 
     @SubscribeEvent

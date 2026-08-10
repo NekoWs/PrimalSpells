@@ -4,7 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增 Laser 法术。" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="修改翻译">
+      <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -383,7 +388,8 @@
     <MESSAGE value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
     <MESSAGE value="新增 LifeTimeUp 修正。修改部分翻译项。" />
     <MESSAGE value="新增 Laser 法术。" />
-    <option name="LAST_COMMIT_MESSAGE" value="新增 Laser 法术。" />
+    <MESSAGE value="修改翻译" />
+    <option name="LAST_COMMIT_MESSAGE" value="修改翻译" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

@@ -12,6 +12,7 @@
   "item.primalspells.speed_boost": "速度提升",
   "item.primalspells.extended_lifetime": "存在时间延长",
   "item.primalspells.piercing": "穿刺",
+  "item.primalspells.bounce_explosion": "弹跳爆炸",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
@@ -39,6 +40,7 @@
   "lore.primalspells.speed_boost.desc": "提升法术的初速度。",
   "lore.primalspells.extended_lifetime.desc": "延长法术存在时间",
   "lore.primalspells.piercing.desc": "使法术可以穿透敌人",
+  "lore.primalspells.bounce_explosion.desc": "使法术在每次弹跳时爆炸。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"

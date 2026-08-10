@@ -56,8 +56,8 @@ abstract class Magic {
         base += LoreEntry(Lore.DESCRIPTION, emptyArray())
         base += LoreEntry(Lore.BR, emptyArray())
         base += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
-        if (delay > 0) base += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
-        if (recharge > 0) base += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
+        if (delay != 0) base += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
+        if (recharge != 0) base += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
         lore.addAll(0, base)
     }
 

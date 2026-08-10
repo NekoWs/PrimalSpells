@@ -13,6 +13,8 @@
   "item.primalspells.extended_lifetime": "存在时间延长",
   "item.primalspells.piercing": "穿刺",
   "item.primalspells.bounce_explosion": "弹跳爆炸",
+  "item.primalspells.homing": "追踪",
+  "item.primalspells.bounce_duplicate": "弹跳复制",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
@@ -41,6 +43,8 @@
   "lore.primalspells.extended_lifetime.desc": "延长法术存在时间",
   "lore.primalspells.piercing.desc": "使法术可以穿透敌人",
   "lore.primalspells.bounce_explosion.desc": "使法术在每次弹跳时爆炸。",
+  "lore.primalspells.homing.desc": "使法术追踪最近的实体。",
+  "lore.primalspells.bounce_duplicate.desc": "使法术在每次弹跳时生成复制体。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"

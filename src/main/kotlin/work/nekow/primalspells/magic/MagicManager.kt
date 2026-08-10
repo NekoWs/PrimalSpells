@@ -46,7 +46,7 @@ object MagicManager {
         register { TriggerFireball() }
         register { DamageBoost() }
         register { Gravity() }
-        register { Bounce() }
+        register { MoreBounce() }
         register { DoubleCast() }
         register { SpeedBoost() }
         register { ExtendedLifetime() }
@@ -54,6 +54,8 @@ object MagicManager {
         register { Laser() }
         register { Piercing() }
         register { BounceExplosion() }
+        register { Homing() }
+        register { BounceDuplicate() }
     }
 
     @SubscribeEvent

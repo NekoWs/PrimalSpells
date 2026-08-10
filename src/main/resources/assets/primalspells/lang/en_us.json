@@ -13,6 +13,8 @@
   "item.primalspells.extended_lifetime": "Extended Lifetime",
   "item.primalspells.piercing": "Piercing",
   "item.primalspells.bounce_explosion": "Bounce Explosion",
+  "item.primalspells.homing": "Homing",
+  "item.primalspells.bounce_duplicate": "Bounce Duplicate",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -41,6 +43,8 @@
   "lore.primalspells.extended_lifetime.desc": "Extends the spell's lifetime.",
   "lore.primalspells.piercing.desc": "Allows the spell to pierce through enemies.",
   "lore.primalspells.bounce_explosion.desc": "Causes the spell to explode on each bounce.",
+  "lore.primalspells.homing.desc": "Causes the spell to track the nearest entity.",
+  "lore.primalspells.bounce_duplicate.desc": "Duplicates the spell on each bounce.",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell"

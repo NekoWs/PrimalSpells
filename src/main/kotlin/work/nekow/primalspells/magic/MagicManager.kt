@@ -7,7 +7,9 @@ import work.nekow.primalspells.magic.projectile.Fireball
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.revise.Bounce
 import work.nekow.primalspells.magic.revise.Damage
+import work.nekow.primalspells.magic.revise.DoubleCast
 import work.nekow.primalspells.magic.revise.Gravity
+import work.nekow.primalspells.magic.revise.SpeedUp
 
 object MagicManager {
     val registry = mutableMapOf<String, () -> Magic>()
@@ -49,6 +51,7 @@ object MagicManager {
         register("gravity") { Gravity() }
         register("bounce") { Bounce() }
         register("double_cast") { DoubleCast() }
+        register("speed_up") { SpeedUp() }
     }
 
     @SubscribeEvent

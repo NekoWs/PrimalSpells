@@ -21,7 +21,7 @@ abstract class Magic {
     var lore = arrayListOf<LoreEntry>()
 
     open fun spell() {
-        effects.forEach {
+        effects.reversed().forEach {
             it.caster = caster
             it.wand = wand
             it.onActive()

@@ -61,6 +61,13 @@ object MagicManager {
         register { RandomPath() }
         register { ReciprocateRevise() }
         register { SineWaveRevise() }
+        register { ManaInjection() }
+        register { Diffusion() }
+        register { Implosion() }
+        register { Volatile() }
+        register { ClusterBomb() }
+        register { ExplosionRemove() }
+        register { ExplosionProjectile() }
     }
 
     @SubscribeEvent

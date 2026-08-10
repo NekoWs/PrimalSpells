@@ -20,6 +20,13 @@
   "item.primalspells.random_path": "随机路径",
   "item.primalspells.reciprocate": "往复运动",
   "item.primalspells.sine_wave": "三角函数",
+  "item.primalspells.mana_injection": "注入玛那",
+  "item.primalspells.diffusion": "扩散",
+  "item.primalspells.implosion": "聚爆",
+  "item.primalspells.volatile": "易爆",
+  "item.primalspells.cluster_bomb": "集束炸弹",
+  "item.primalspells.explosion_remove": "移除爆炸",
+  "item.primalspells.explosion_projectile": "爆炸投射",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
@@ -55,6 +62,13 @@
   "lore.primalspells.random_path.desc": "使法术随机改变方向。",
   "lore.primalspells.reciprocate.desc": "使法术周期性反向运动。",
   "lore.primalspells.sine_wave.desc": "使法术沿正弦波路径运动。",
+  "lore.primalspells.mana_injection.desc": "施放时恢复 30 法力。",
+  "lore.primalspells.diffusion.desc": "增加爆炸范围，减少爆炸伤害。",
+  "lore.primalspells.implosion.desc": "减少爆炸范围，增加爆炸伤害。",
+  "lore.primalspells.volatile.desc": "增加爆炸伤害。",
+  "lore.primalspells.cluster_bomb.desc": "弹跳时发射多枚爆炸子弹。",
+  "lore.primalspells.explosion_remove.desc": "移除所有爆炸效果。",
+  "lore.primalspells.explosion_projectile.desc": "周期性发射爆炸投射物。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"

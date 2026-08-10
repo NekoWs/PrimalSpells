@@ -20,6 +20,13 @@
   "item.primalspells.random_path": "Random Path",
   "item.primalspells.reciprocate": "Reciprocate",
   "item.primalspells.sine_wave": "Sine Wave",
+  "item.primalspells.mana_injection": "Mana Injection",
+  "item.primalspells.diffusion": "Diffusion",
+  "item.primalspells.implosion": "Implosion",
+  "item.primalspells.volatile": "Volatile",
+  "item.primalspells.cluster_bomb": "Cluster Bomb",
+  "item.primalspells.explosion_remove": "Explosion Remove",
+  "item.primalspells.explosion_projectile": "Explosion Projectile",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -55,6 +62,13 @@
   "lore.primalspells.random_path.desc": "Makes the spell move in random directions.",
   "lore.primalspells.reciprocate.desc": "The spell reverses direction periodically.",
   "lore.primalspells.sine_wave.desc": "Makes the spell follow a sine wave path.",
+  "lore.primalspells.mana_injection.desc": "Restores 30 mana when cast.",
+  "lore.primalspells.diffusion.desc": "Increases explosion radius, reduces damage.",
+  "lore.primalspells.implosion.desc": "Reduces explosion radius, increases damage.",
+  "lore.primalspells.volatile.desc": "Increases explosion damage.",
+  "lore.primalspells.cluster_bomb.desc": "Spawns explosion bullets on bounce.",
+  "lore.primalspells.explosion_remove.desc": "Removes all explosion effects.",
+  "lore.primalspells.explosion_projectile.desc": "Periodically fires explosive projectiles.",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell"

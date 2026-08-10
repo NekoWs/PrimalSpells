@@ -48,6 +48,7 @@ object MagicManager {
         register("damage") { Damage() }
         register("gravity") { Gravity() }
         register("bounce") { Bounce() }
+        register("double_cast") { DoubleCast() }
     }
 
     @SubscribeEvent

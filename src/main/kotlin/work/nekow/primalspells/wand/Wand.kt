@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
+import work.nekow.primalspells.PrimalSpells.Companion.debug
 import work.nekow.primalspells.magic.*
 import kotlin.math.min
 
@@ -74,6 +75,8 @@ class Wand(var id: String) {
         val magics = arrayListOf<Magic>()
         magics += hand
         discard()
+
+        val link = arrayListOf<String>()
         val effects = magics.filterIsInstance<Revise>()
             .flatMap {
                 magics.remove(it)
@@ -86,15 +89,16 @@ class Wand(var id: String) {
             if (!consumeMana(projectile)) continue
             val p = projectile.clone()
             if (p is TriggerSpell) {
-                draw(p.triggerCast, false)
-                hand.forEach {
-                    if (consumeMana(it)) {
-                        p.payload.add(it)
-                        p.recharge += it.recharge
-                        p.delay += it.delay
-                    }
-                }
-                discard()
+//                draw(p.triggerCast, false)
+//                hand.forEach {
+//                    if (consumeMana(it)) {
+//                        p.payload.add(it)
+//                        p.recharge += it.recharge
+//                        p.delay += it.delay
+//                    }
+//                }
+//                discard()
+                loadPayload(p)
             }
             p.effects.addAll(effects)
             p.caster = caster
@@ -108,7 +112,33 @@ class Wand(var id: String) {
             status.lastDelay = status.delay
             status.lastRecharge = status.recharge
             MagicManager.add(p)
+
+            link += renderTriggers(p)
         }
+        caster.debug("Link: ${link.joinToString(separator = " → ") { it }}")
+    }
+
+    fun renderTriggers(p: Magic): String {
+        fun className(any: Any): String = any::class.simpleName.toString()
+        if (p !is TriggerSpell) return className(p)
+        return "${className(p)}(${p.payload.map { renderTriggers(it) }.joinToString(separator = " → ") { it }})"
+    }
+
+    private fun loadPayload(projectile: Projectile): Projectile {
+        if (projectile !is TriggerSpell) return projectile
+        val magics = draw(projectile.triggerCast, false)
+        magics.forEach {
+            val p = it.clone()
+            if (consumeMana(p)) {
+                projectile.payload += if (p is Projectile && p is TriggerSpell) {
+                    loadPayload(p)
+                } else { p }
+                projectile.recharge += p.recharge
+                projectile.delay += p.delay
+            }
+        }
+        discard(magics)
+        return projectile
     }
 
     /**
@@ -124,6 +154,18 @@ class Wand(var id: String) {
         }
         status.mana -= magic.mana
         return true
+    }
+
+    /**
+     * 丢弃指定列表中的法术
+     *
+     * @param magics 法术列表
+     */
+    private fun discard(magics: List<Magic>) {
+        magics.forEach {
+            if (hand.remove(it)) discardPile += it
+        }
+        reloadIfNeeded()
     }
 
     private fun discard() {
@@ -157,13 +199,16 @@ class Wand(var id: String) {
      * @param budget   可抽牌的预算值
      * @param wrapping 是否在抽牌堆耗尽后循环弃牌堆
      */
-    fun draw(budget: Int, wrapping: Boolean = true) {
+    fun draw(budget: Int, wrapping: Boolean = true): ArrayList<Magic> {
+        val res = arrayListOf<Magic>()
         val (remaining, result) = drawFrom(budget, drawPile)
-        hand += result
+        res += result
         if (wrapping && remaining > 0) {
             val pile = drawFrom(remaining, discardPile)
-            hand += pile.second
+            res += pile.second
         }
+        hand += res
+        return res
     }
 
     private fun reloadIfNeeded() {

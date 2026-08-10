@@ -23,6 +23,8 @@
   "lore.primalspells.trigger_fireball.desc": "一个缓速移动的火球，命中后施放另一法术。",
   "lore.primalspells.damage.desc": "增加投射物的伤害。",
   "lore.primalspells.bounce.desc": "让投射物可以弹跳",
+  "item.primalspells.double_cast": "双重施法",
+  "lore.primalspells.double_cast.desc": "从法杖中额外抽取一个法术进行施放。",
   "lore.primalspells.gravity.desc": "使投射物随重力下坠。",
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"

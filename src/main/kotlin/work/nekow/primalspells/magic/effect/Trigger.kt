@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.effect
 
+import work.nekow.primalspells.PrimalSpells.Companion.debug
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.Revise
@@ -15,8 +16,7 @@ class Trigger : BaseEffect() {
                 payload.remove(it)
                 it.effects()
             }
-        for (magic in payload) {
-            if (magic !is Projectile) continue
+        payload.filterIsInstance<Projectile>().forEach { magic ->
             val p = magic.clone()
             p.effects += effects
             p.caster = caster
@@ -24,6 +24,7 @@ class Trigger : BaseEffect() {
             p.position = result.pos
             p.velocity = result.normal
             p.spell()
+            caster.debug("Triggered: ${wand.renderTriggers(p)}")
             MagicManager.add(p)
         }
     }

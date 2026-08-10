@@ -15,6 +15,7 @@ class Move(
     val ignoreBlocks: Boolean = false,
     val hitRadius: Double = 0.0,
     val throughBlocks: Boolean = false,
+    val selfDamage: Boolean = false,
 ) : BaseEffect() {
     override fun onTick() {
         if (!projectile.alive) return
@@ -44,7 +45,7 @@ class Move(
                         if (checkEntities) {
                             val center = Vec3(checkPos.x.toDouble(), checkPos.y.toDouble(), checkPos.z.toDouble())
                             val aabb = AABB.ofSize(center, hitRadius * 2.0, hitRadius * 2.0, hitRadius * 2.0)
-                            level.getEntities(null, aabb) { it != caster }.forEach { entity ->
+                            level.getEntities(null, aabb) { it != caster || selfDamage }.forEach { entity ->
                                 if (entity in status.hitEntities) return@forEach
                                 status.hitEntities.add(entity)
                                 status.pos = checkPos

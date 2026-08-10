@@ -58,6 +58,10 @@ object ClientTooltipHandler {
     }
 
     private fun addSelectedSpellLines(event: RenderTooltipEvent.GatherComponents, spells: List<String>, wandId: String) {
+        val componentSlot = event.itemStack.get(ModItems.WAND_SELECTED_SLOT.get())
+        if (componentSlot != null) {
+            WandTooltipTracker.setSelectedSlot(wandId, componentSlot)
+        }
         val selected = WandTooltipTracker.getSelectedSlot(wandId)
         val spellId = spells.getOrNull(selected) ?: return
         if (spellId.isEmpty()) return

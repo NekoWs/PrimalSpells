@@ -4,12 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/PrimalSpells.iml" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iml" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="将双重施放移动到 revise 包下">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/SpeedUp.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.ipr" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.ipr" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/DoubleCast.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/DoubleCast.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/utils/Lore.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/utils/Lore.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -96,6 +98,13 @@
       </state>
     </system>
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Kotlin Class" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -112,6 +121,9 @@
     <entry key="Project Default">
       <profile-state />
     </entry>
+  </component>
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="ProjectReloadState">
     <option name="STATE" value="0" />
@@ -135,6 +147,11 @@
     "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
+      <recent name="work.nekow.primalspells.magic.revise" />
+    </key>
+  </component>
   <component name="RunManager" selected="Gradle.PrimalSpells [runClient]">
     <configuration default="true" type="Applet" factoryName="Applet">
       <module name="" />
@@ -352,6 +369,8 @@
     <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
+    <MESSAGE value="将双重施放移动到 revise 包下" />
+    <option name="LAST_COMMIT_MESSAGE" value="将双重施放移动到 revise 包下" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

@@ -4,11 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="新增静态投射物：小型爆炸、大型爆炸。重写爆炸逻辑不再使用原版。新增修正：注入玛那，扩散，聚爆，易爆，集束炸弹，移除爆炸，爆炸投射">
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="修复了多重释放投射物时总有一个没有修正的问题">
+      <change beforePath="$PROJECT_DIR$/PrimalSpells.iml" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Explosion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Explosion.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Trigger.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/effect/Trigger.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/wand/Wand.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/wand/Wand.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualAccelerate.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualAccelerate.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualDecelerate.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualDecelerate.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -397,7 +400,8 @@
     <MESSAGE value="新增逐渐加速、逐渐减速、随机路径、往复运动、三角函数五个修正。" />
     <MESSAGE value="补上传资源文件" />
     <MESSAGE value="新增静态投射物：小型爆炸、大型爆炸。重写爆炸逻辑不再使用原版。新增修正：注入玛那，扩散，聚爆，易爆，集束炸弹，移除爆炸，爆炸投射" />
-    <option name="LAST_COMMIT_MESSAGE" value="新增静态投射物：小型爆炸、大型爆炸。重写爆炸逻辑不再使用原版。新增修正：注入玛那，扩散，聚爆，易爆，集束炸弹，移除爆炸，爆炸投射" />
+    <MESSAGE value="修复了多重释放投射物时总有一个没有修正的问题" />
+    <option name="LAST_COMMIT_MESSAGE" value="修复了多重释放投射物时总有一个没有修正的问题" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

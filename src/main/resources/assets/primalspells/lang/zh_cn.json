@@ -29,6 +29,8 @@
   "item.primalspells.explosion_projectile": "爆炸投射",
   "item.primalspells.small_explosion": "小型爆炸",
   "item.primalspells.large_explosion": "大型爆炸",
+  "item.primalspells.self_orbit": "周身环绕",
+  "item.primalspells.sphere_orbit": "球形环绕",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
@@ -73,6 +75,8 @@
   "lore.primalspells.explosion_projectile.desc": "周期性发射爆炸投射物。",
   "lore.primalspells.small_explosion.desc": "一个静止的小型爆炸。",
   "lore.primalspells.large_explosion.desc": "一个静止的大型爆炸。",
+  "lore.primalspells.self_orbit.desc": "在施法者周围水平面做圆周运动。",
+  "lore.primalspells.sphere_orbit.desc": "在施法者周围球面做环绕运动。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"

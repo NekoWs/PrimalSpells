@@ -23,13 +23,18 @@ class GradualDecelerate : Revise() {
 
         effects += object : BaseEffect() {
 
-            /** 施法瞬间的原始速度大小 */
+            /** 施法瞬间的原始速度大小（仅首个实例捕获） */
             private var baseSpeed = 0f
 
             /**
-             * 记录原始速度并提升至最高倍率
+             * 仅首个同类型实例提升初速度并记录原始速度,
+             * 其余实例跳过以避免倍率叠加。
              */
             override fun onActive() {
+                val cls = this::class
+                val instances = projectile.effects.filter { it::class == cls }
+                if (instances.firstOrNull() !== this) return
+
                 baseSpeed = status.velocity.length()
                 if (baseSpeed > 0.001f) {
                     status.velocity.normalize().mul(baseSpeed * maxMul)
@@ -39,13 +44,12 @@ class GradualDecelerate : Revise() {
             /**
              * 每 tick 线性减速
              *
-             * √N 叠加：仅首个同类型实例执行，最低倍率 ÷ √N
+             * √N 叠加：仅首个同类型实例执行, 最低倍率 ÷ √N
              */
             override fun onTick() {
                 if (!projectile.alive) return
                 if (baseSpeed <= 0.001f) return
 
-                // 统计同类型效果实例数，仅首个执行
                 val cls = this::class
                 val instances = projectile.effects.filter { it::class == cls }
                 if (instances.firstOrNull() !== this) return
@@ -53,12 +57,10 @@ class GradualDecelerate : Revise() {
                 val factor = sqrt(instances.size.toDouble()).toFloat()
                 val adjustedMin = minMul / factor
 
-                // 线性插值 t ∈ [0, 1]
                 val t = (status.age.toFloat() / rampTicks).coerceIn(0f, 1f)
                 val currentMul = (maxMul - t * (maxMul - adjustedMin)).coerceAtLeast(0.01f)
                 val desiredSpeed = baseSpeed * currentMul
 
-                // 保持方向，修改速度大小
                 val currentLen = status.velocity.length()
                 if (currentLen > 0.001f) {
                     status.velocity.normalize().mul(desiredSpeed)

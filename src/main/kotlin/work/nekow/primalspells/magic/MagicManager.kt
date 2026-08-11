@@ -72,6 +72,8 @@ object MagicManager {
         register { ExplosionProjectile() }
         register { SmallExplosion() }
         register { LargeExplosion() }
+        register { SelfOrbit() }
+        register { SphereOrbit() }
     }
 
     @SubscribeEvent

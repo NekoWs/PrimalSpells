@@ -14,17 +14,35 @@ import work.nekow.primalspells.PrimalSpells
 object ModEntities {
     val ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE, PrimalSpells.MODID)
 
-    /** 正方体实体（边长为 1） */
+    /** 正方体实体（边长 0.5） */
     val CUBE = ENTITY_TYPES.register("cube") { _ ->
         EntityType.Builder.of(::CubeEntity, MobCategory.MISC)
-            .sized(1f, 1f) // 实体碰撞箱 1×1×1
-            .clientTrackingRange(4) // 客户端追踪范围
-            .updateInterval(20) // 更新间隔（tick）
-            .build(
-                ResourceKey.create(
-                    Registries.ENTITY_TYPE,
-                    Identifier.fromNamespaceAndPath(PrimalSpells.MODID, "cube")
-                )
-            )
+            .sized(0.5f, 0.5f) // 碰撞箱 0.5×0.5×0.5
+            .clientTrackingRange(4)
+            .updateInterval(20)
+            .build(key("cube"))
     }
+
+    /** 球形实体（直径 1.0） */
+    val SPHERE = ENTITY_TYPES.register("sphere") { _ ->
+        EntityType.Builder.of(::SphereEntity, MobCategory.MISC)
+            .sized(1f, 1f) // 碰撞箱 1×1×1
+            .clientTrackingRange(4)
+            .updateInterval(20)
+            .build(key("sphere"))
+    }
+
+    /** 无人机动态实体（边长 0.6） */
+    val DRONE = ENTITY_TYPES.register("drone") { _ ->
+        EntityType.Builder.of(::DroneEntity, MobCategory.MISC)
+            .sized(0.6f, 0.6f) // 碰撞箱 0.6×0.6×0.6
+            .clientTrackingRange(8) // 客户端追踪范围提高到 8 格
+            .updateInterval(3) // 更新间隔缩短到 3 tick，避免移动卡顿
+            .setShouldReceiveVelocityUpdates(true) // 接收速度更新以实现平滑飞行
+            .build(key("drone"))
+    }
+
+    /** 便捷方法：创建实体类型的 ResourceKey */
+    private fun key(name: String): ResourceKey<EntityType<*>> =
+        ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(PrimalSpells.MODID, name))
 }

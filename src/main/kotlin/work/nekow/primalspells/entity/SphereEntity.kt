@@ -4,9 +4,9 @@ import net.minecraft.world.entity.EntityType
 import net.minecraft.world.level.Level
 
 /**
- * 正方体实体 —— 边长为 0.5 格，静态无 AI。
+ * 球形实体 —— 直径为 1 格，静态无 AI。
  */
-class CubeEntity(
-    entityType: EntityType<out CubeEntity>,
+class SphereEntity(
+    entityType: EntityType<out SphereEntity>,
     level: Level
 ) : StaticEntity(entityType, level)

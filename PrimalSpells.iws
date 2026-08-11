@@ -4,25 +4,25 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="补提交">
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/large_explosion.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/self_orbit.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/small_explosion.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/sphere_orbit.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/large_explosion.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/self_orbit.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/small_explosion.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/sphere_orbit.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/large_explosion.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/self_orbit.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/small_explosion.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/sphere_orbit.png" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="补上传">
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/DroneAttackGoal.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/DroneEntity.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/DroneFollowOwnerGoal.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/DroneHeightGoal.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/SphereEntity.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/StaticEntity.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/drone_swarm.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/drone_swarm.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/entity/cube_entity.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/entity/drone_entity.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/entity/sphere_entity.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/drone_swarm.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/PrimalSpells.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/PrimalSpells.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/client/PrimalSpellsClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/client/PrimalSpellsClient.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/LargeExplosion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/s_projectile/LargeExplosion.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/SmallExplosion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/s_projectile/SmallExplosion.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/CubeEntity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/CubeEntity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/ModEntities.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/entity/ModEntities.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/DroneSwarm.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/DroneSwarm.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
@@ -403,6 +403,17 @@
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="将双重施放移动到 revise 包下" />
     <MESSAGE value="新增 SpeedUp 修正。更改 Magic 中激活 effect 的顺序。" />
@@ -417,7 +428,9 @@
     <MESSAGE value="修复了多重释放投射物时总有一个没有修正的问题" />
     <MESSAGE value="新增环绕修正和球形环绕修正。修复了逐渐加速和逐渐减速修正多个叠加速度不符合预期的问题。" />
     <MESSAGE value="补提交" />
-    <option name="LAST_COMMIT_MESSAGE" value="补提交" />
+    <MESSAGE value="新增自定义实体。新增无人机群投射物。&#10;已知问题：实体碰撞箱有位置偏移" />
+    <MESSAGE value="补上传" />
+    <option name="LAST_COMMIT_MESSAGE" value="补上传" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

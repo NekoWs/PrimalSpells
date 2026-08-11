@@ -84,5 +84,7 @@
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell",
 
-  "entity.primalspells.cube": "Drone Cube"
+  "entity.primalspells.cube": "Drone Cube",
+  "entity.primalspells.sphere": "Energy Sphere",
+  "entity.primalspells.drone": "Combat Drone"
 }

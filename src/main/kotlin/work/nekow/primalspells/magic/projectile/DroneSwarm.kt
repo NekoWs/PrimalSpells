@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.EntitySpawnReason
+import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.ModEntities
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.Trajectory
@@ -12,7 +13,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 无人机群投射物 —— 静态投射物，施放后在施法者周围召唤 5 个正方体实体。
+ * 无人机群投射物 —— 静态投射物，施放后在施法者周围召唤 5 个无人机实体（DroneEntity）。
  * 存活 1 tick 后死亡，仅用于触发召唤效果。
  */
 class DroneSwarm : Projectile() {
@@ -31,7 +32,7 @@ class DroneSwarm : Projectile() {
     }
 
     /**
-     * 施放后立即在施法者周围生成 5 个正方体实体（CubeEntity）。
+     * 施放后立即在施法者周围生成 5 个无人机实体（DroneEntity）。
      */
     override fun onSpell() {
         val level = caster.level() as? ServerLevel ?: return
@@ -48,15 +49,20 @@ class DroneSwarm : Projectile() {
 
             // 生成目标位置（与施法者同 Y 高度）
             val spawnX = center.x + offsetX
-            val spawnY = center.y
+            val spawnY = center.y + 0.25 // 偏移修正：使碰撞箱底部与地面持平
             val spawnZ = center.z + offsetZ
 
-            // 通过 EntityType.spawn 创建实体并直接加入世界
-            ModEntities.CUBE.get().spawn(
+            // 通过 EntityType.spawn 创建无人机实体并加入世界
+            val entity = ModEntities.DRONE.get().spawn(
                 level, // 服务端世界
-                BlockPos.containing(spawnX, spawnY, spawnZ), // 生成位置
+                BlockPos.containing(spawnX, spawnY, spawnZ), // 生成所在方块
                 EntitySpawnReason.MOB_SUMMONED // 生成原因
             )
+            // 覆盖默认位置为精确坐标，并绑定施法者 UUID 以排除友军伤害
+            if (entity != null) {
+                entity.setPos(spawnX, spawnY, spawnZ)
+                entity.owner = caster.uuid // 记录施法者，攻击时不误伤
+            }
         }
 
         // 生成施法粒子效果

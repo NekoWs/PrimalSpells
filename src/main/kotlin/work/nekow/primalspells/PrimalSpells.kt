@@ -10,7 +10,9 @@ import net.neoforged.fml.common.Mod
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.slf4j.Logger
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent
 import work.nekow.primalspells.client.WandHudRenderer
+import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.ModEntities
 import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.item.ModItems
@@ -29,6 +31,11 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         ModItems.TABS.register(bus)
         ModDamageTypes.DAMAGE_TYPES.register(bus)
         ModEntities.ENTITY_TYPES.register(bus)
+
+        // 注册无人机实体属性
+        bus.addListener<EntityAttributeCreationEvent> { event ->
+            event.put(ModEntities.DRONE.get(), DroneEntity.createAttributes().build())
+        }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
             val registrar = event.registrar("1.0.0")

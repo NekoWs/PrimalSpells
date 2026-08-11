@@ -3,10 +3,11 @@ package work.nekow.primalspells.magic
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
+import work.nekow.primalspells.magic.projectile.DroneSwarm
 import work.nekow.primalspells.magic.projectile.Fireball
-import work.nekow.primalspells.magic.projectile.LargeExplosion
+import work.nekow.primalspells.magic.projectile.s_projectile.LargeExplosion
 import work.nekow.primalspells.magic.projectile.Laser
-import work.nekow.primalspells.magic.projectile.SmallExplosion
+import work.nekow.primalspells.magic.projectile.s_projectile.SmallExplosion
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.revise.*
 
@@ -46,6 +47,7 @@ object MagicManager {
     init {
         register { Fireball() }
         register { TriggerFireball() }
+        register { DroneSwarm() }
         register { DamageBoost() }
         register { Gravity() }
         register { MoreBounce() }

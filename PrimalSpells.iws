@@ -4,12 +4,25 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="修复了多重释放投射物时总有一个没有修正的问题">
-      <change beforePath="$PROJECT_DIR$/PrimalSpells.iml" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iml" afterDir="false" />
+    <list default="true" id="ccb3ffa6-05f4-4c67-ab28-30c0e8750fa7" name="更改" comment="补提交">
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/large_explosion.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/self_orbit.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/small_explosion.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/items/sphere_orbit.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/large_explosion.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/self_orbit.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/small_explosion.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/models/item/sphere_orbit.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/large_explosion.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/self_orbit.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/small_explosion.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/textures/item/sphere_orbit.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PrimalSpells.iws" beforeDir="false" afterPath="$PROJECT_DIR$/PrimalSpells.iws" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/PrimalSpells.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/PrimalSpells.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/client/PrimalSpellsClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/client/PrimalSpellsClient.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/MagicManager.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualAccelerate.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualAccelerate.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualDecelerate.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/revise/GradualDecelerate.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/LargeExplosion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/s_projectile/LargeExplosion.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/SmallExplosion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/kotlin/work/nekow/primalspells/magic/projectile/s_projectile/SmallExplosion.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/en_us.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/primalspells/lang/zh_cn.json" afterDir="false" />
     </list>
@@ -170,6 +183,7 @@
 }</component>
   <component name="RecentsManager">
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
+      <recent name="work.nekow.primalspells.magic.projectile.s_projectile" />
       <recent name="work.nekow.primalspells.magic.revise" />
     </key>
   </component>
@@ -401,7 +415,9 @@
     <MESSAGE value="补上传资源文件" />
     <MESSAGE value="新增静态投射物：小型爆炸、大型爆炸。重写爆炸逻辑不再使用原版。新增修正：注入玛那，扩散，聚爆，易爆，集束炸弹，移除爆炸，爆炸投射" />
     <MESSAGE value="修复了多重释放投射物时总有一个没有修正的问题" />
-    <option name="LAST_COMMIT_MESSAGE" value="修复了多重释放投射物时总有一个没有修正的问题" />
+    <MESSAGE value="新增环绕修正和球形环绕修正。修复了逐渐加速和逐渐减速修正多个叠加速度不符合预期的问题。" />
+    <MESSAGE value="补提交" />
+    <option name="LAST_COMMIT_MESSAGE" value="补提交" />
     <option name="MAKE_NEW_CHANGELIST_ACTIVE" value="true" />
   </component>
 </project>

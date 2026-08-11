@@ -4,9 +4,13 @@ import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.ModContainer
 import net.neoforged.fml.common.Mod
+import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent
 import net.neoforged.neoforge.common.NeoForge
 import work.nekow.primalspells.PrimalSpells
+import work.nekow.primalspells.client.entity.CubeEntityModel
+import work.nekow.primalspells.client.entity.CubeEntityRenderer
+import work.nekow.primalspells.entity.ModEntities
 
 @Mod(value = PrimalSpells.MODID, dist = [Dist.CLIENT])
 class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
@@ -15,6 +19,16 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
 
         bus.addListener<RegisterClientTooltipComponentFactoriesEvent> { event ->
             event.register(WandSpellTooltip::class.java, ::ClientWandSpellTooltip)
+        }
+
+        // 注册实体渲染器
+        bus.addListener<EntityRenderersEvent.RegisterRenderers> { event ->
+            event.registerEntityRenderer(ModEntities.CUBE.get(), ::CubeEntityRenderer)
+        }
+
+        // 注册实体模型层定义
+        bus.addListener<EntityRenderersEvent.RegisterLayerDefinitions> { event ->
+            event.registerLayerDefinition(CubeEntityRenderer.CUBE_LAYER, CubeEntityModel::createBodyLayer)
         }
     }
 }

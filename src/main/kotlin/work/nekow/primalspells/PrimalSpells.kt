@@ -11,6 +11,7 @@ import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.slf4j.Logger
 import work.nekow.primalspells.client.WandHudRenderer
+import work.nekow.primalspells.entity.ModEntities
 import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.magic.MagicManager
@@ -27,6 +28,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         ModItems.ITEMS.register(bus)
         ModItems.TABS.register(bus)
         ModDamageTypes.DAMAGE_TYPES.register(bus)
+        ModEntities.ENTITY_TYPES.register(bus)
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
             val registrar = event.registrar("1.0.0")

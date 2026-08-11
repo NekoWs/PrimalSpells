@@ -32,6 +32,8 @@
   "item.primalspells.self_orbit": "周身环绕",
   "item.primalspells.sphere_orbit": "球形环绕",
 
+  "item.primalspells.drone_swarm": "无人机群",
+
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
   "tooltip.primalspells.recharge": "充能时间：%s\u00a0",
@@ -77,7 +79,10 @@
   "lore.primalspells.large_explosion.desc": "一个静止的大型爆炸。",
   "lore.primalspells.self_orbit.desc": "在施法者周围水平面做圆周运动。",
   "lore.primalspells.sphere_orbit.desc": "在施法者周围球面做环绕运动。",
+  "lore.primalspells.drone_swarm.desc": "在施法者周围召唤 5 架无人机方块。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
-  "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀"
+  "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀",
+
+  "entity.primalspells.cube": "无人机方块"
 }

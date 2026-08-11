@@ -35,10 +35,10 @@ object ModEntities {
     /** 无人机动态实体（边长 0.6） */
     val DRONE = ENTITY_TYPES.register("drone") { _ ->
         EntityType.Builder.of(::DroneEntity, MobCategory.MISC)
-            .sized(0.6f, 0.6f) // 碰撞箱 0.6×0.6×0.6
-            .clientTrackingRange(8) // 客户端追踪范围提高到 8 格
-            .updateInterval(3) // 更新间隔缩短到 3 tick，避免移动卡顿
-            .setShouldReceiveVelocityUpdates(true) // 接收速度更新以实现平滑飞行
+            .sized(0.6f, 0.6f)
+            .clientTrackingRange(8)
+            .updateInterval(3)
+            .setShouldReceiveVelocityUpdates(true)
             .build(key("drone"))
     }
 

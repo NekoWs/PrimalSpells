@@ -23,56 +23,34 @@ import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.wand.Wand
 import java.util.*
+import kotlin.math.atan2
 import kotlin.math.min
 
-/**
- * 无人机动态实体 —— 拥有 AI，可漂浮、移动、攻击。
- *
- * 移动具有平滑加速曲线和随机路径偏移（0.2 倍噪音），降低机械感。
- * 无人机之间自动保持最小距离，减少碰撞箱性能消耗。
- */
 class DroneEntity(
     entityType: EntityType<out DroneEntity>,
     level: Level
 ) : PathfinderMob(entityType, level), RangedAttackMob {
 
-    /** 内存缓存的施法者 UUID，实际持久化在 persistentData 中 */
-    private var cachedOwner: UUID? = null
-
-    /**
-     * 施法者 UUID 属性 —— 读取时优先从 persistentData 恢复，
-     * 写入时同步更新内存缓存和 persistentData。
-     */
     var owner: UUID?
         get() {
-            if (cachedOwner == null) {
+            if (_owner == null) {
                 val s = persistentData.getString("OwnerUUID").orElse("")
-                if (s.isNotEmpty()) {
-                    cachedOwner = UUID.fromString(s)
-                }
+                if (s.isNotEmpty()) _owner = UUID.fromString(s)
             }
-            return cachedOwner
+            return _owner
         }
         set(value) {
-            cachedOwner = value
-            if (value != null) {
-                persistentData.putString("OwnerUUID", value.toString())
-            } else {
-                persistentData.remove("OwnerUUID")
-            }
+            _owner = value
+            if (value != null) persistentData.putString("OwnerUUID", value.toString())
+            else persistentData.remove("OwnerUUID")
         }
+    private var _owner: UUID? = null
 
-    /** 攻击冷却计时器 */
     var attackCooldown = 0
-
-    /** 移动持续时间（tick），用于加速曲线 */
     private var moveAge = 0
-
-    /** 速度曲线所需的 ramp 周期数 */
     private val rampTicks = 15
-
-    /** 施放法术所需的虚拟法杖 */
     private val droneWand = Wand("drone_attack")
+    private var tickCount = 0
 
     init {
         this.setNoGravity(true)
@@ -100,15 +78,28 @@ class DroneEntity(
 
     override fun tick() {
         super.tick()
-
+        tickCount++
         if (attackCooldown > 0) attackCooldown--
 
-        // 有寻路目标时累积移动计数，否则重置
-        moveAge = if (navigation.path != null) min(moveAge + 1, rampTicks) else 0
+        if (tickCount % 3 == 0) {
+            moveAge = if (navigation.path != null) min(moveAge + 3, rampTicks) else 0
+        }
+        applySpeedCurve()
+        if (tickCount % 5 == 0) applySeparation()
+        if (tickCount % 3 == 0) applyPathNoise()
+        faceMovement() // 朝移动方向转向，战斗时由攻击目标覆盖
+    }
 
-        applySpeedCurve() // 平滑加速/减速
-        applySeparation() // 无人机间距保持
-        applyPathNoise() // 随机路径偏移
+    /** 非战斗时朝移动方向转向 */
+    private fun faceMovement() {
+        if (target != null) return // 战斗中不干预
+        val d = deltaMovement
+        val horizSq = d.x * d.x + d.z * d.z
+        if (horizSq > 0.0001) {
+            yRot = Math.toDegrees(atan2(d.z, d.x)).toFloat() - 90f
+            yHeadRot = yRot
+            yBodyRot = yRot
+        }
     }
 
     override fun performRangedAttack(target: LivingEntity, distanceFactor: Float) {
@@ -118,10 +109,10 @@ class DroneEntity(
         val fireball = MagicManager.create("fireball") as? Projectile ?: return
         fireball.caster = this
         fireball.wand = droneWand
-        val eyePos = this.eyePosition
-        fireball.position = Vector3f(eyePos.x.toFloat(), eyePos.y.toFloat(), eyePos.z.toFloat())
-        val targetCenter = target.position().add(0.0, target.bbHeight / 2.0, 0.0)
-        val dir = targetCenter.subtract(eyePos).normalize()
+        val eye = eyePosition
+        fireball.position = Vector3f(eye.x.toFloat(), eye.y.toFloat(), eye.z.toFloat())
+        val center = target.position().add(0.0, target.bbHeight / 2.0, 0.0)
+        val dir = center.subtract(eye).normalize()
         fireball.velocity = Vector3f(dir.x.toFloat(), dir.y.toFloat(), dir.z.toFloat())
         fireball.spell()
         MagicManager.add(fireball)
@@ -132,71 +123,50 @@ class DroneEntity(
         return super.hurtServer(level, source, amount)
     }
 
-    // ──────────────── 移动优化 ────────────────
-
-    /**
-     * 速度曲线：开始移动时最慢（0.3x），中间逐渐加速至全速（1.0x），
-     * 接近目标或停止时缓慢减速，使移动不再单一线性。
-     */
     private fun applySpeedCurve() {
-        val d = deltaMovement
-        if (d.lengthSqr() < 1e-6) return // 未移动则不处理
-
-        // 使用 ease-in-out 三次函数：f(t) = 3t² - 2t³，t ∈ [0, 1]
+        val dx = deltaMovement.x; val dy = deltaMovement.y; val dz = deltaMovement.z
+        val lenSq = dx * dx + dy * dy + dz * dz
+        if (lenSq < 1e-12) return
         val t = moveAge.toFloat() / rampTicks
-        val factor = if (t <= 0f) 0.3f // 刚起步
-        else if (t >= 1f) 1.0f // 全速
-        else 0.3f + 0.7f * (3f * t * t - 2f * t * t * t) // 平滑过渡
-
-        deltaMovement = d.scale(factor.toDouble())
+        val factor = when {
+            t <= 0f -> 0.3
+            t >= 1f -> 1.0
+            else -> 0.3 + 0.7 * (3.0 * t * t - 2.0 * t * t * t)
+        }
+        if (kotlin.math.abs(factor - 1.0) < 0.001) return
+        deltaMovement = Vec3(dx * factor, dy * factor, dz * factor)
     }
 
-    /**
-     * 无人机分离：在 1.5 格范围内互相排斥，
-     * 保持随机最小距离（1.0～1.5 格），减少碰撞箱计算。
-     */
     private fun applySeparation() {
         val nearby = level().getEntitiesOfClass(
-            DroneEntity::class.java,
-            boundingBox.inflate(1.5),
-        ) { it !== this }
+            DroneEntity::class.java, boundingBox.inflate(2.0),
+        ) { it !== this && it.id < this.id }
         if (nearby.isEmpty()) return
-
-        var push = Vec3.ZERO
+        var px = 0.0; var py = 0.0; var pz = 0.0
+        val mx = x; val my = y; val mz = z
         for (other in nearby) {
-            val diff = position().subtract(other.position())
-            val dist = diff.length()
-            if (dist < 1.5 && dist > 0.01) {
-                // 距离越近推力越大
-                val strength = 0.05 / (dist * dist)
-                push = push.add(diff.normalize().scale(strength))
+            val dx = mx - other.x; val dy = my - other.y; val dz = mz - other.z
+            val distSq = dx * dx + dy * dy + dz * dz
+            if (distSq in 0.0001..4.0) {
+                val invDist = 1.0 / kotlin.math.sqrt(distSq)
+                val force = 0.025 * invDist
+                px += dx * invDist * force; py += dy * invDist * force; pz += dz * invDist * force
             }
         }
-        // 限制总推力，避免瞬移
-        if (push.lengthSqr() > 0.04) push = push.normalize().scale(0.2)
-        addDeltaMovement(push)
+        val len = px * px + py * py + pz * pz
+        if (len > 0.04) { val s = 0.2 / kotlin.math.sqrt(len); px *= s; py *= s; pz *= s }
+        addDeltaMovement(Vec3(px, py, pz))
     }
 
-    /**
-     * 随机路径偏移：给当前速度叠加 0.2 倍的随机方向噪音，
-     * 模拟非精确寻路，运动更自然。
-     */
     private fun applyPathNoise() {
-        val d = deltaMovement
-        if (d.lengthSqr() < 1e-6) return
-
+        val dx = deltaMovement.x; val dy = deltaMovement.y; val dz = deltaMovement.z
+        if (dx * dx + dy * dy + dz * dz < 0.0025) return
         val r = random
-        val noise = Vec3(
-            (r.nextDouble() - 0.5) * 0.04, // X 噪音 ±0.02
-            (r.nextDouble() - 0.5) * 0.04, // Y 噪音 ±0.02
-            (r.nextDouble() - 0.5) * 0.04  // Z 噪音 ±0.02
+        deltaMovement = Vec3(
+            dx + (r.nextDouble() - 0.5) * 0.008,
+            dy + (r.nextDouble() - 0.5) * 0.008,
+            dz + (r.nextDouble() - 0.5) * 0.008
         )
-        // 仅当移动速度大于噪音阈值时叠加
-        val speed = d.length()
-        if (speed > 0.05) {
-            val noiseScaled = noise.scale(0.2) // 0.2 倍噪音强度
-            deltaMovement = d.add(noiseScaled)
-        }
     }
 
     companion object {
@@ -211,14 +181,9 @@ class DroneEntity(
     }
 }
 
-/**
- * 无人机漫游目标 —— 在当前位置附近随机飞行。
- */
 class DroneRandomStrollGoal(
     mob: PathfinderMob,
     speedModifier: Double
 ) : RandomStrollGoal(mob, speedModifier, 10) {
-    override fun canUse(): Boolean {
-        return mob.target == null && super.canUse()
-    }
+    override fun canUse(): Boolean = mob.target == null && super.canUse()
 }

@@ -4,10 +4,13 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.magic.projectile.DroneSwarm
+import work.nekow.primalspells.magic.projectile.DelayedCastProjectile
 import work.nekow.primalspells.magic.projectile.Fireball
 import work.nekow.primalspells.magic.projectile.s_projectile.LargeExplosion
 import work.nekow.primalspells.magic.projectile.Laser
 import work.nekow.primalspells.magic.projectile.s_projectile.SmallExplosion
+import work.nekow.primalspells.magic.projectile.s_projectile.GravityFieldProjectile
+import work.nekow.primalspells.magic.projectile.s_projectile.BlackHoleProjectile
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.revise.*
 
@@ -47,6 +50,7 @@ object MagicManager {
     init {
         register { Fireball() }
         register { TriggerFireball() }
+        register { DelayedCastProjectile() }
         register { DroneSwarm() }
         register { DamageBoost() }
         register { Gravity() }
@@ -74,6 +78,8 @@ object MagicManager {
         register { ExplosionProjectile() }
         register { SmallExplosion() }
         register { LargeExplosion() }
+        register { GravityFieldProjectile() }
+        register { BlackHoleProjectile() }
         register { SelfOrbit() }
         register { SphereOrbit() }
     }

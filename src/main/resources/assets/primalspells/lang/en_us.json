@@ -26,6 +26,7 @@
   "item.primalspells.volatile": "Volatile",
   "item.primalspells.cluster_bomb": "Cluster Bomb",
   "item.primalspells.explosion_remove": "Explosion Remove",
+  "item.primalspells.delayed_cast": "Delayed Cast",
   "item.primalspells.explosion_projectile": "Explosion Projectile",
   "item.primalspells.small_explosion": "Small Explosion",
   "item.primalspells.large_explosion": "Large Explosion",
@@ -33,6 +34,8 @@
   "item.primalspells.sphere_orbit": "Sphere Orbit",
 
   "item.primalspells.drone_swarm": "Drone Swarm",
+  "item.primalspells.gravity_field": "Gravity Field",
+  "item.primalspells.black_hole": "Black Hole",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -74,12 +77,15 @@
   "lore.primalspells.volatile.desc": "Increases explosion damage.",
   "lore.primalspells.cluster_bomb.desc": "Spawns explosion bullets on bounce.",
   "lore.primalspells.explosion_remove.desc": "Removes all explosion effects.",
+  "lore.primalspells.delayed_cast.desc": "Holds the next spell, casting it when the projectile expires.",
   "lore.primalspells.explosion_projectile.desc": "Periodically fires explosive projectiles.",
   "lore.primalspells.small_explosion.desc": "A small stationary explosion.",
   "lore.primalspells.large_explosion.desc": "A large stationary explosion.",
   "lore.primalspells.self_orbit.desc": "Orbits around the caster on a horizontal plane.",
   "lore.primalspells.sphere_orbit.desc": "Orbits around the caster on a sphere surface.",
-  "lore.primalspells.drone_swarm.desc": "Summons 5 drone cubes around the caster.",
+  "lore.primalspells.drone_swarm.desc": "Summons 5 combat drones around the caster.",
+  "lore.primalspells.gravity_field.desc": "Creates a field that slows entities within its radius.",
+  "lore.primalspells.black_hole.desc": "Sucks entities toward its center and applies slowness.",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell",

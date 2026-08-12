@@ -2,6 +2,7 @@
   "itemGroup.primalspells": "Primal Spells",
 
   "item.primalspells.wand": "Primal Wand",
+  "item.primalspells.spell_pouch": "Spell Pouch",
   "item.primalspells.fireball": "Fireball",
   "item.primalspells.trigger_fireball": "Trigger Fireball",
   "item.primalspells.laser": "laser",
@@ -36,6 +37,9 @@
   "item.primalspells.drone_swarm": "Drone Swarm",
   "item.primalspells.gravity_field": "Gravity Field",
   "item.primalspells.black_hole": "Black Hole",
+
+  "block.primalspells.wand_editing_table": "Wand Editing Table",
+  "gui.primalspells.close": "Close",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",

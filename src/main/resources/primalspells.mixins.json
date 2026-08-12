@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [],
   "client": [
-    "AbstractContainerScreenMixin"
+    "AbstractContainerScreenMixin",
+    "AbstractContainerScreenInvokerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

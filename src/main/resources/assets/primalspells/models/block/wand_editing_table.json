@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "primalspells:block/wand_editing_table",
+    "north": "primalspells:block/wand_editing_table",
+    "south": "primalspells:block/wand_editing_table",
+    "east": "primalspells:block/wand_editing_table",
+    "west": "primalspells:block/wand_editing_table",
+    "up": "primalspells:block/wand_editing_table",
+    "down": "primalspells:block/wand_editing_table"
+  }
+}

@@ -50,7 +50,7 @@ class DroneEntity(
     private var moveAge = 0
     private val rampTicks = 15
     private val droneWand = Wand("drone_attack")
-    private var tickCount = 0
+    private var localTickCounter = 0
 
     init {
         this.setNoGravity(true)
@@ -78,15 +78,15 @@ class DroneEntity(
 
     override fun tick() {
         super.tick()
-        tickCount++
+        localTickCounter++
         if (attackCooldown > 0) attackCooldown--
 
-        if (tickCount % 3 == 0) {
+        if (localTickCounter % 3 == 0) {
             moveAge = if (navigation.path != null) min(moveAge + 3, rampTicks) else 0
         }
         applySpeedCurve()
-        if (tickCount % 5 == 0) applySeparation()
-        if (tickCount % 3 == 0) applyPathNoise()
+        if (localTickCounter % 5 == 0) applySeparation()
+        if (localTickCounter % 3 == 0) applyPathNoise()
         faceMovement() // 朝移动方向转向，战斗时由攻击目标覆盖
     }
 

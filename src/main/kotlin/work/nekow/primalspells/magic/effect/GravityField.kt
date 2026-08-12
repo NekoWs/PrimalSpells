@@ -38,8 +38,7 @@ class GravityField : BaseEffect() {
         val aabb = AABB.ofSize(net.minecraft.world.phys.Vec3(cx, cy, cz), radius * 2.0, radius * 2.0, radius * 2.0)
 
         // 迟缓 IV（amplifier=3），包含施法者自身
-        val effect = MobEffectInstance(MobEffects.SLOWNESS, 10, 3, false, false)
-        for (entity in level.getEntitiesOfClass(LivingEntity::class.java, aabb) { it.isAlive && it.canBeAffected(effect) }) {
+        for (entity in level.getEntitiesOfClass(LivingEntity::class.java, aabb) { it.isAlive }) {
             entity.addEffect(MobEffectInstance(MobEffects.SLOWNESS, 10, 3, false, false), caster)
         }
     }

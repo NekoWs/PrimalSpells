@@ -2,6 +2,7 @@
   "itemGroup.primalspells": "原初法术",
 
   "item.primalspells.wand": "原初法杖",
+  "item.primalspells.spell_pouch": "法术小包",
   "item.primalspells.fireball": "火球",
   "item.primalspells.trigger_fireball": "触发火球",
   "item.primalspells.laser": "激光",
@@ -36,6 +37,9 @@
   "item.primalspells.drone_swarm": "无人机群",
   "item.primalspells.gravity_field": "重力场",
   "item.primalspells.black_hole": "黑洞",
+
+  "block.primalspells.wand_editing_table": "法杖编辑台",
+  "gui.primalspells.close": "关闭",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",

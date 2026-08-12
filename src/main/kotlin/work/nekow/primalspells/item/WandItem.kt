@@ -50,7 +50,8 @@ class WandItem(properties: Properties) : Item(properties) {
                 wand.cast,
                 wand.status.lastDelay,
                 wand.status.lastRecharge,
-                wand.charge
+                wand.charge,
+                wand.size
             ))
         }
     }

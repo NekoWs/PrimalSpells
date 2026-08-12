@@ -1,0 +1,22 @@
+<div style="width:220;height:190;background:#1a1a1e;border-color:#4a4a55" title="法杖编辑台">
+    <label style="left:0;top:10;width:100%;text-align:center;color:white">法杖法术编辑</label>
+
+    <div style="left:8;top:24;width:204;height:66;background:#26262b;border-color:#3d3d42">
+        <label style="left:6;top:4;color:gray">法术槽位（slot 标签）：</label>
+        <slot src="primalspells:wand" style="left:6;top:16"/>
+        <slot src="primalspells:fireball" count="3" style="left:28;top:16"/>
+        <slot style="left:50;top:16"/>
+        <slot style="left:72;top:16"/>
+        <label style="left:96;top:18;color:#55aaff">槽位 = slot</label>
+    </div>
+
+    <div style="left:8;top:96;width:204;height:52;background:#26262b;border-color:#3d3d42">
+        <label style="left:6;top:4;color:gray">图片（img 标签）：</label>
+        <img src="primalspells:textures/item/wand.png" style="left:6;top:16;width:24;height:24"/>
+        <img src="primalspells:textures/item/fireball.png" style="left:36;top:16;width:24;height:24"/>
+        <label style="left:70;top:20;color:#888888">拖标题栏移动窗口</label>
+    </div>
+
+    <button style="left:8;top:158;width:98;height:20" onclick="test">测试</button>
+    <button style="left:114;top:158;width:98;height:20;hover-background:#5a5a63" onclick="close">关闭</button>
+</div>

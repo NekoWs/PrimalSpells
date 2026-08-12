@@ -37,9 +37,8 @@ class BlackHole : BaseEffect() {
         cooldown = 5
 
         val aabb = AABB.ofSize(center, radius * 2.0, radius * 2.0, radius * 2.0)
-        val effect = MobEffectInstance(MobEffects.SLOWNESS, 10, 0, false, false)
 
-        for (entity in level.getEntitiesOfClass(LivingEntity::class.java, aabb) { it.isAlive && it.canBeAffected(effect) }) {
+        for (entity in level.getEntitiesOfClass(LivingEntity::class.java, aabb) { it.isAlive }) {
             entity.addEffect(MobEffectInstance(MobEffects.SLOWNESS, 10, 0, false, false), caster)
             val dir = center.subtract(entity.position()).normalize()
             val dist = entity.position().distanceTo(center)

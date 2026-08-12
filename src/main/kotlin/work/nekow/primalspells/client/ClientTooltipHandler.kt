@@ -8,6 +8,7 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.RenderTooltipEvent
 import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.item.ModItems
+import work.nekow.primalspells.item.SpellPouchItem
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.utils.Lore
 
@@ -15,6 +16,14 @@ object ClientTooltipHandler {
 
     @SubscribeEvent
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
+        // 法术小包：附加上容器内法术的收纳袋式网格
+        if (event.itemStack.item is SpellPouchItem) {
+            val spells = SpellPouchItem.getSpells(event.itemStack)
+            if (spells.isNotEmpty()) {
+                event.tooltipElements.add(Either.right(PouchTooltip(spells)))
+            }
+            return
+        }
         val (wandId, spells) = WandEventHandler.getWandData(event.itemStack) ?: run {
             addSpellLore(event)
             return

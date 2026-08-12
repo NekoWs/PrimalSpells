@@ -12,10 +12,13 @@ import work.nekow.primalspells.ui.UiScreen
 abstract class UiElement(
     val x: Int,
     val y: Int,
-    val width: Int,
-    val height: Int,
+    var width: Int,
+    var height: Int,
 ) {
     var visible: Boolean = true
+
+    /** HTML id 标识（从 html 的 id 属性解析，供代码按 id 查找/更新元素） */
+    open val id: String? = null
 
     /** 判断坐标是否落在元件范围内 */
     fun contains(mx: Double, my: Double): Boolean =

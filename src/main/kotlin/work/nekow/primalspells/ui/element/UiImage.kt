@@ -15,6 +15,7 @@ class UiImage(
     height: Int,
     val texture: Identifier,
     val color: Int = -1,
+    override val id: String? = null,
 ) : UiElement(x, y, width, height) {
 
     override fun render(screen: UiScreen?, graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {

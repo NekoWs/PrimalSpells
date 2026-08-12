@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>PrimalSpells UI Checker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  background: #101014; color: #ddd; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  background: #1c1c22; border-bottom: 1px solid #33333b; flex: none;
+}
+.btn {
+  display: inline-block; padding: 6px 14px; background: #2b2b30; border: 1px solid #4e4e55;
+  border-radius: 3px; color: #ddd; cursor: pointer; font-size: 13px; user-select: none;
+}
+.btn:hover { background: #404046; }
+.btn.primary { background: #2f4f6f; border-color: #3f6f9f; }
+.btn.primary:hover { background: #3a5f8f; }
+.btn:disabled { opacity: .45; cursor: default; }
+.file-name { font-size: 12px; color: #888; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zoom-row { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: #888; }
+#stage {
+  flex: 1; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center;
+  background-image: radial-gradient(circle, #1a1a1f 1px, transparent 1px); background-size: 20px 20px;
+}
+.hint { color: #555; font-size: 14px; text-align: center; padding: 20px; }
+#viewport { padding: 30px; }
+#mcUi { transform-origin: center; }
+.error-msg { color: #ff6b6b; font-size: 13px; padding: 12px; background: #2a1515; border: 1px solid #5a2a2a; max-width: 70vw; }
+#stage.dragging::after {
+  content: '\677e\u5f00\u4ee5\u52a0\u8f7d HTML \u6587\u4ef6';
+  position: fixed; inset: 0; background: rgba(40, 70, 110, .4); z-index: 9;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: #fff; letter-spacing: 2px; pointer-events: none;
+}
+
+/* ---------- MC UI 模拟 ---------- */
+.mc-window { background: #1a1a1e; border: 1px solid #4e4e5a; box-shadow: 0 6px 28px rgba(0,0,0,.55); }
+.mc-titlebar { height: 16px; background: #2a2a32; border-bottom: 1px solid #555560; color: #fff; font-size: 9px; line-height: 15px; padding: 0 8px; white-space: nowrap; display: flex; justify-content: space-between; }
+.mc-dots { color: #b0b0b8; }
+.mc-content { position: relative; }
+.mc-content > * { position: absolute; }
+
+.mc-panel { background: #1a1a1e; border: 1px solid #3d3d42; position: relative; }
+.mc-panel.mc-flex { display: flex; }
+.mc-label { color: #e0e0e0; font-size: 9px; line-height: 9px; white-space: nowrap; }
+.mc-button {
+  background: #2b2b30; border: 1px solid #4e4e55; color: #c8c8c8; font-size: 9px;
+  display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 9px; padding: 0 4px;
+}
+.mc-button:hover { background: #404046; color: #fff; }
+.mc-button.disabled { opacity: .5; }
+.mc-slot {
+  border: 1px solid #4e4e5a; background: rgba(255,255,255,.03); position: relative;
+  display: flex; align-items: center; justify-content: center; font-size: 8px; color: #aaa; overflow: hidden;
+}
+.mc-slot:hover { border-color: #8fc9ff; }
+.mc-slot .ico { width: 10px; height: 10px; flex: none; border-radius: 1px; }
+.mc-slot .count { position: absolute; right: 1px; bottom: 0; color: #fff; font-size: 7px; text-shadow: 1px 1px #000; line-height: 8px; }
+.mc-progress { background: #2a2a32; overflow: hidden; }
+.mc-progress > i { display: block; height: 100%; background: #3399ff; }
+.mc-checkbox { display: flex; align-items: center; gap: 4px; font-size: 9px; white-space: nowrap; color: #e0e0e0; cursor: pointer; }
+.mc-checkbox .box { width: 9px; height: 9px; border: 1px solid #4e4e55; background: #2b2b30; flex: none; line-height: 8px; text-align: center; }
+.mc-checkbox.on .box { background: #2f6f3f; border-color: #3f7f4f; color: #7fff7f; font-size: 8px; }
+.mc-hr { background: #4a4a55; }
+.mc-img { background: #26262b; border: 1px solid #3d3d42; display: flex; align-items: center; justify-content: center; color: #666; font-size: 8px; overflow: hidden; padding: 0 2px; white-space: nowrap; }
+.mc-gridph { border: 1px dashed #4a4a55; background: rgba(74,74,85,.15); display: flex; align-items: center; justify-content: center; color: #6a6a75; font-size: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <label class="btn">选择 HTML 文件<input type="file" id="fileInput" accept=".html,.htm,text/html" style="display:none"/></label>
+  <span class="file-name" id="fileName">未选择文件</span>
+  <button class="btn primary" id="checkBtn" disabled>开始检查</button>
+  <span class="zoom-row">缩放 <input type="range" id="zoom" min="40" max="200" value="100"/>
+    <span id="zoomVal">100%</span></span>
+</header>
+<main id="stage">
+  <div id="hint" class="hint">选择 HTML 文件后点击「开始检查」<br/>页面中心将显示该 UI 在游戏内的效果</div>
+  <div id="viewport" style="display:none"><div id="mcUi"></div></div>
+</main>
+<script>
+'use strict';
+// ================= 极简 HTML 解析器（与游戏 HtmlUiParser 一致） =================
+function parseHtml(src) {
+  const roots = [], stack = [];
+  let i = 0;
+  while (i < src.length) {
+    const lt = src.indexOf('<', i);
+    if (lt === -1) { if (stack.length) stack[stack.length - 1].text += src.slice(i); break; }
+    if (stack.length) stack[stack.length - 1].text += src.slice(i, lt);
+    const gt = src.indexOf('>', lt);
+    if (gt === -1) break;
+    const content = src.slice(lt + 1, gt).trim();
+    i = gt + 1;
+    if (content.startsWith('!') || content.startsWith('?')) continue;
+    if (content.startsWith('/')) {
+      const name = content.slice(1).trim();
+      if (stack.length && stack[stack.length - 1].tag === name) {
+        const closed = stack.pop();
+        (stack.length ? stack[stack.length - 1].children : roots).push(closed);
+      }
+      continue;
+    }
+    if (content.endsWith('/')) {
+      const [name, attrs] = splitTag(content.slice(0, -1));
+      const node = { tag: name, attrs, children: [], text: '' };
+      (stack.length ? stack[stack.length - 1].children : roots).push(node);
+      continue;
+    }
+    const [name, attrs] = splitTag(content);
+    if (name) stack.push({ tag: name, attrs, children: [], text: '' });
+  }
+  while (stack.length) roots.push(stack.pop());
+  return roots;
+}
+function splitTag(content) {
+  const sp = content.search(/\s/);
+  const name = sp === -1 ? content : content.slice(0, sp);
+  const attrs = {};
+  const rest = sp === -1 ? '' : content.slice(sp + 1);
+  const re = /([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let m;
+  while ((m = re.exec(rest))) attrs[m[1]] = m[2] !== undefined ? m[2] : m[3];
+  return [name, attrs];
+}
+function parseStyle(s) {
+  const map = {};
+  (s || '').split(';').forEach(kv => {
+    const idx = kv.indexOf(':');
+    if (idx > 0) map[kv.slice(0, idx).trim()] = kv.slice(idx + 1).trim();
+  });
+  return map;
+}
+// 尺寸：px / % / auto
+function dim(style, key, parent) {
+  const v = style[key];
+  if (v == null) return null;
+  const t = v.trim();
+  if (t === 'auto') return 'auto';
+  if (t.endsWith('%')) return parent * parseFloat(t) / 100;
+  const n = parseFloat(t);
+  return isNaN(n) ? null : n;
+}
+// 颜色：命名色 / #hex / rgb() / rgba()
+const NAMED = { white:'#ffffff', black:'#000000', gray:'#808080', lightgray:'#c0c0c0', darkgray:'#404040',
+  red:'#ff5555', green:'#55ff55', blue:'#5555ff', yellow:'#ffff55', orange:'#ffaa00', purple:'#aa55ff',
+  cyan:'#55ffff', transparent:'transparent' };
+function colorOf(style, key, fallback) {
+  let t = (style[key] || '').trim().toLowerCase();
+  if (!t) return fallback;
+  if (NAMED[t]) return NAMED[t];
+  if (t.startsWith('#')) return t;
+  if (t.startsWith('rgb')) {
+    const inner = t.slice(t.indexOf('(') + 1, t.lastIndexOf(')'));
+    const parts = inner.split(',').map(x => x.trim());
+    if (parts.length >= 3) {
+      let a = 1;
+      if (parts[3] !== undefined) {
+        if (parts[3].endsWith('%')) a = parseFloat(parts[3]) / 100;
+        else a = parseFloat(parts[3]) <= 1 ? parseFloat(parts[3]) : parseFloat(parts[3]) / 255;
+      }
+      return 'rgba(' + parts.slice(0, 3).join(',') + ',' + a + ')';
+    }
+  }
+  return fallback;
+}
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function findFirstDiv(node) {
+  if (node.tag === 'div') return node;
+  for (const c of node.children) { const r = findFirstDiv(c); if (r) return r; }
+  return null;
+}
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+// 物品名称 → 固定色块
+function itemColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return 'hsl(' + (h % 360) + ', 55%, 45%)';
+}
+
+// ================= 渲染：DOM 构建 =================
+const DEF_FONT = 9; // MC 默认字号 9px
+
+function applyPos(e, style, parentW, parentH) {
+  const left = dim(style, 'left', parentW), top = dim(style, 'top', parentH);
+  const width = dim(style, 'width', parentW), height = dim(style, 'height', parentH);
+  if (left !== null) e.style.left = left + 'px';
+  if (top !== null) e.style.top = top + 'px';
+  if (width !== null && width !== 'auto') e.style.width = width + 'px';
+  if (height !== null && height !== 'auto') e.style.height = height + 'px';
+  return { left, top, width, height };
+}
+
+function defaultFlexSize(node) {
+  let w = null, h = null;
+  switch (node.tag) {
+    case 'slot': w = 18; h = 18; break;
+    case 'button': case 'a': w = 60; h = 20; break;
+    case 'checkbox': h = 12; break;
+    case 'progress': h = 4; break;
+    case 'hr': h = 1; break;
+    case 'label': case 'span': case 'p': h = 9; break;
+    case 'spell-grid': w = 160; h = 40; break;
+    default: break; // div 等：auto 尺寸（渲染后按内容回填）
+  }
+  return [w, h];
+}
+
+function fontSizeOf(node, style) {
+  if (style['font-size']) {
+    const v = parseFloat(style['font-size']);
+    if (!isNaN(v) && v > 0) return v;
+  }
+  switch (node.tag) { case 'h1': return DEF_FONT * 2; case 'h2': return DEF_FONT * 1.5; case 'h3': return DEF_FONT * 1.2; }
+  return DEF_FONT;
+}
+
+function contentExtent(container) {
+  let w = 0, h = 0;
+  for (const c of container.children) {
+    if (c.style.display === 'none') continue;
+    w = Math.max(w, c.offsetLeft + c.offsetWidth);
+    h = Math.max(h, c.offsetTop + c.offsetHeight);
+  }
+  return [w, h];
+}
+
+function renderNode(node, parentEl, parentW, parentH, inFlex) {
+  const style = parseStyle(node.attrs.style);
+  let e = null;
+  const flexDir = style.display === 'flex' ? (style['flex-direction'] === 'row' ? 'row' : 'column') : null;
+
+  switch (node.tag) {
+    case 'div': {
+      e = el('div', 'mc-panel' + (flexDir ? ' mc-flex' : ''));
+      if (flexDir === 'row') e.style.flexDirection = 'row';
+      if (flexDir === 'column') e.style.flexDirection = 'column';
+      if (flexDir) {
+        e.style.gap = (parseFloat(style.gap) || 2) + 'px';
+        e.style.padding = (parseFloat(style.padding) || 0) + 'px';
+        if (style['align-items'] === 'center') e.style.alignItems = 'center';
+      }
+      e.style.background = colorOf(style, 'background', '#1a1a1e');
+      e.style.borderColor = colorOf(style, 'border-color', '#3d3d42');
+      const bgImg = style['background-image'];
+      if (bgImg) e.style.backgroundImage = 'url("' + esc(bgImg.replace(/^url\(|\)$/g, '')) + '")';
+      node.children.forEach(c => renderNode(c, e, parentW, parentH, flexDir !== null));
+      break;
+    }
+    case 'img': {
+      const src = node.attrs.src || '?';
+      e = el('div', 'mc-img');
+      e.textContent = src.split('/').pop();
+      const bw = dim(style, 'width', parentW), bh = dim(style, 'height', parentH);
+      if (!bw || bw === 'auto') e.style.width = '24px';
+      if (!bh || bh === 'auto') e.style.height = '24px';
+      break;
+    }
+    case 'slot': {
+      e = el('div', 'mc-slot');
+      e.style.width = '18px'; e.style.height = '18px';
+      const src = node.attrs.src;
+      if (src) {
+        const name = src.split(':').pop();
+        const ico = el('div', 'ico');
+        ico.style.background = itemColor(name);
+        e.appendChild(ico);
+        if (node.attrs.count && node.attrs.count !== '1') {
+          const c = el('span', 'count', node.attrs.count);
+          e.appendChild(c);
+        }
+      }
+      break;
+    }
+    case 'spell-grid': {
+      e = el('div', 'mc-gridph', 'spell-grid');
+      const bw = dim(style, 'width', parentW), bh = dim(style, 'height', parentH);
+      if (bw && bw !== 'auto') e.style.width = bw + 'px'; else e.style.width = '160px';
+      if (bh && bh !== 'auto') e.style.height = bh + 'px'; else e.style.height = '40px';
+      break;
+    }
+    case 'button': case 'a': {
+      e = el('div', 'mc-button' + (node.attrs.enabled === 'false' ? ' disabled' : ''));
+      e.textContent = node.text.trim();
+      e.style.fontSize = fontSizeOf(node, style) + 'px';
+      e.style.color = colorOf(style, 'color', '#c8c8c8');
+      e.style.background = colorOf(style, 'background', '#2b2b30');
+      e.style.borderColor = colorOf(style, 'border-color', '#4e4e55');
+      break;
+    }
+    case 'label': case 'span': case 'p': case 'h1': case 'h2': case 'h3': {
+      e = el('div', 'mc-label');
+      e.textContent = node.text.trim();
+      const fs = fontSizeOf(node, style);
+      e.style.fontSize = fs + 'px';
+      e.style.lineHeight = fs + 'px';
+      e.style.color = colorOf(style, 'color', '#e0e0e0');
+      if (style['text-align'] === 'center') e.style.textAlign = 'center';
+      if (style['text-align'] === 'right') e.style.textAlign = 'right';
+      if (node.attrs.id) e.dataset.id = node.attrs.id;
+      break;
+    }
+    case 'hr': {
+      e = el('div', 'mc-hr');
+      e.style.background = colorOf(style, 'color', colorOf(style, 'border-color', '#4a4a55'));
+      break;
+    }
+    case 'progress': {
+      e = el('div', 'mc-progress');
+      e.style.background = colorOf(style, 'background', '#2a2a32');
+      const val = parseFloat(node.attrs.value) || 0;
+      const max = parseFloat(node.attrs.max) || 100;
+      const fill = el('i');
+      fill.style.width = Math.max(0, Math.min(100, val / max * 100)) + '%';
+      fill.style.background = colorOf(style, 'color', '#3399ff');
+      e.appendChild(fill);
+      break;
+    }
+    case 'checkbox': {
+      e = el('div', 'mc-checkbox' + (node.attrs.checked === 'true' ? ' on' : ''));
+      const box = el('span', 'box');
+      if (node.attrs.checked === 'true') box.textContent = '\u2713';
+      e.appendChild(box);
+      const label = el('span', null, node.text.trim());
+      e.appendChild(label);
+      break;
+    }
+    case 'br': return null;
+    case 'html': case 'head': case 'body': case 'meta': case 'link': case 'style': case 'script': case 'title': {
+      node.children.forEach(c => renderNode(c, parentEl, parentW, parentH, inFlex));
+      return null;
+    }
+    default:
+      return null;
+  }
+
+  // 绝对定位 / flex item 尺寸
+  if (inFlex) {
+    const hasL = dim(style, 'left', parentW) !== null, hasT = dim(style, 'top', parentH) !== null;
+    if (!(hasL || hasT)) {
+      // flex item：默认尺寸
+      const [dw, dh] = defaultFlexSize(node);
+      if (node.tag === 'progress' || node.tag === 'hr') {
+        // column：占满交叉轴（CSS flex item 默认 stretch），无需设置宽度
+        if (flexDirParent(parentEl) === 'row') e.style.height = dh + 'px';
+      } else {
+        if (dw) e.style.width = dw + 'px';
+        if (dh) e.style.height = dh + 'px';
+      }
+    } else {
+      e.style.position = 'absolute';
+      applyPos(e, style, parentW, parentH);
+    }
+  } else {
+    e.style.position = 'absolute';
+    applyPos(e, style, parentW, parentH);
+    // progress / hr 未声明宽度：拉伸到父容器右缘（等价于游戏内 parentW - left）
+    if ((node.tag === 'progress' || node.tag === 'hr') && dim(style, 'width', parentW) == null) {
+      e.style.right = '0px';
+    }
+  }
+  if (node.attrs.hidden !== undefined) e.style.display = 'none';
+
+  parentEl.appendChild(e);
+
+  // auto 尺寸：按子元素边界回填（div/窗口内容）
+  if (node.tag === 'div') {
+    const [cw, ch] = contentExtent(e);
+    const w = dim(style, 'width', parentW), h = dim(style, 'height', parentH);
+    if (w === 'auto' || w === null) e.style.width = cw + 'px';
+    if (h === 'auto' || h === null) e.style.height = ch + 'px';
+  }
+  return e;
+}
+function flexDirParent(parentEl) {
+  return parentEl.style.flexDirection || 'column';
+}
+
+// ================= 主流程 =================
+const fileInput = document.getElementById('fileInput');
+const fileNameEl = document.getElementById('fileName');
+const checkBtn = document.getElementById('checkBtn');
+const stage = document.getElementById('stage');
+const hint = document.getElementById('hint');
+const viewport = document.getElementById('viewport');
+const mcUi = document.getElementById('mcUi');
+const zoom = document.getElementById('zoom');
+const zoomVal = document.getElementById('zoomVal');
+
+let selectedText = null, selectedName = null;
+
+// 读取文件内容（autoRender=true 时立即渲染）
+function loadFile(file, autoRender) {
+  selectedName = file.name;
+  fileNameEl.textContent = file.name;
+  checkBtn.disabled = false;
+  const reader = new FileReader();
+  reader.onload = () => {
+    selectedText = reader.result;
+    if (autoRender) renderCurrent();
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files && fileInput.files[0];
+  if (f) loadFile(f, false);
+});
+
+zoom.addEventListener('input', () => {
+  zoomVal.textContent = zoom.value + '%';
+  mcUi.style.transform = 'scale(' + (zoom.value / 100) + ')';
+});
+
+// 渲染当前文件（点击「开始检查」或拖入文件后调用）
+function renderCurrent() {
+  if (!selectedText) return;
+  stage.querySelectorAll('.error-msg').forEach(x => x.remove());
+  hint.style.display = 'none';
+  viewport.style.display = 'block';
+  mcUi.innerHTML = '';
+  try {
+    const roots = parseHtml(selectedText);
+    let winNode = null;
+    for (const r of roots) { winNode = findFirstDiv(r); if (winNode) break; }
+    if (!winNode) throw new Error('未找到窗口 div（<div>）节点');
+    const style = parseStyle(winNode.attrs.style);
+    const title = winNode.attrs.title || '窗口';
+
+    const win = el('div', 'mc-window');
+    const tb = el('div', 'mc-titlebar');
+    tb.innerHTML = '<span>' + esc(title) + '</span><span class="mc-dots">\u2014 \u25a1 \u00d7</span>';
+    const content = el('div', 'mc-content');
+    win.appendChild(tb);
+    win.appendChild(content);
+    mcUi.appendChild(win);
+
+    const screenW = stage.clientWidth, screenH = stage.clientHeight;
+    winNode.children.forEach(c => renderNode(c, content, screenW, screenH, false));
+
+    // 窗口 auto 尺寸：按内容回填
+    const [cw, ch] = contentExtent(content);
+    const w = dim(style, 'width', screenW), h = dim(style, 'height', screenH);
+    content.style.width = (w && w !== 'auto' ? w : cw) + 'px';
+    content.style.height = (h && h !== 'auto' ? h : ch) + 'px';
+    win.style.width = content.style.width;
+  } catch (err) {
+    viewport.style.display = 'none';
+    hint.style.display = 'block';
+    hint.innerHTML = '';
+    hint.appendChild(el('div', 'error-msg', '解析失败：' + err.message));
+  }
+}
+
+checkBtn.addEventListener('click', renderCurrent);
+
+// ================= 拖入文件加载 =================
+let dragDepth = 0;
+
+document.addEventListener('dragenter', e => {
+  e.preventDefault();
+  if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1) {
+    dragDepth++;
+    stage.classList.add('dragging');
+  }
+});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('dragleave', e => {
+  e.preventDefault();
+  dragDepth--;
+  if (dragDepth <= 0) {
+    dragDepth = 0;
+    stage.classList.remove('dragging');
+  }
+});
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dragDepth = 0;
+  stage.classList.remove('dragging');
+  const files = e.dataTransfer ? e.dataTransfer.files : null;
+  if (!files || !files.length) return;
+  const f = Array.prototype.find.call(files, x => /\.html?$/i.test(x.name) || x.type === 'text/html');
+  if (!f) {
+    hint.style.display = 'block';
+    hint.innerHTML = '';
+    hint.appendChild(el('div', 'error-msg', '请拖入 .html 文件'));
+    return;
+  }
+  loadFile(f, true); // 拖入即加载并渲染
+});
+</script>
+</body>
+</html>

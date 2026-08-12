@@ -146,9 +146,30 @@ object FloatingWindowManager {
         }
     }
 
-    /** 惰性创建浮窗：启动早期注册表未绑定时返回 null，待游戏就绪后自动重试 */
+    /** 惰性创建浮窗：启动早期注册表未绑定时返回 null，待游戏就绪后自动重试；HTML 源文件变化时整体重建（热更新） */
     private fun ensureWindow(): WandInfoWindow? {
-        if (info != null) return info
+        val existing = info
+        if (existing != null) {
+            if (existing.htmlModified()) {
+                val old = existing
+                info = null
+                val rebuilt = try {
+                    WandInfoWindow.create()
+                } catch (e: Exception) {
+                    PrimalSpells.LOGGER.debug("重建法杖信息悬浮窗失败（HTML 或注册表问题），保留旧窗口", e)
+                    null
+                } ?: return old
+                rebuilt.window.onCloseRequest = { userClosed = true }
+                // 保留窗口位置与显示状态
+                rebuilt.window.x = old.window.x
+                rebuilt.window.y = old.window.y
+                rebuilt.window.visible = old.window.visible
+                rebuilt.window.minimized = old.window.minimized
+                rebuilt.trackedWandId = old.trackedWandId
+                info = rebuilt
+            }
+            return info
+        }
         return try {
             WandInfoWindow.create().also { w ->
                 info = w

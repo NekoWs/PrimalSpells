@@ -10,16 +10,23 @@ import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.network.EditWandPayload
 import work.nekow.primalspells.ui.FloatingWindow
+import work.nekow.primalspells.ui.HtmlUiLoader
 import work.nekow.primalspells.ui.common.ContainerWindowBase
+import work.nekow.primalspells.ui.common.SpellGridPlaceholder
 import work.nekow.primalspells.ui.common.SpellSlotGrid
+import work.nekow.primalspells.ui.element.UiElement
 import work.nekow.primalspells.ui.element.UiLabel
 import work.nekow.primalspells.ui.element.UiSlot
+import work.nekow.primalspells.ui.element.UiWindow
+import work.nekow.primalspells.ui.slot.SlotDragController
 
 /**
  * 法杖信息悬浮窗：显示当前追踪法杖的基础信息（蓝量、容量、充能等）与法术槽位。
  *
+ * 窗口骨架由 HTML 描述（`assets/primalspells/html/wand_info.html`），
+ * 通过 [HtmlUiLoader.loadWindowedFile] 解析；动态部分（槽位网格、信息文本）
+ * 按元素 `id` 查找并更新。
  * 追踪规则：鼠标悬停背包中的法杖时追踪该法杖；移开后保持显示上一次悬停的法杖。
- * 法术槽位按法杖容量动态生成（每行 8 格）。
  * 交互（交换/装卸）通过 [ContainerWindowBase] 复用，同步走 [EditWandPayload]。
  */
 class WandInfoWindow private constructor(
@@ -33,7 +40,10 @@ class WandInfoWindow private constructor(
 ) : ContainerWindowBase(window, grid) {
 
     /** 当前追踪的法杖 id（上一次悬停的），每次刷新从容器重新获取最新引用 */
-    private var trackedWandId: String? = null
+    internal var trackedWandId: String? = null
+
+    /** HTML 源文件是否在最近一次加载后被修改（外部检测后应重建窗口） */
+    fun htmlModified(): Boolean = HtmlUiLoader.isModified(FILE_NAME)
 
     /** 本次刷新解析到的法杖物品（供编杖操作使用） */
     private var currentStack: ItemStack? = null
@@ -46,37 +56,54 @@ class WandInfoWindow private constructor(
     private var lastCapacityText: String? = null
 
     companion object {
-        const val WIDTH = 176
-        const val SLOTS_PER_ROW = 8
-        const val SLOT_TOP = 66
         const val MAX_SLOTS = 32
+
+        /** HTML 源文件名（`assets/primalspells/html/` 下） */
+        const val FILE_NAME = "wand_info.html"
 
         /** 槽位区底部留白（动态窗口高度 = 槽位区 + 留白） */
         const val BOTTOM_PADDING = 6
 
         /** 按槽位数计算窗口内容区高度（槽位 18px + 2px 间距/行） */
-        fun contentHeight(slotCount: Int): Int {
+        fun contentHeight(slotTop: Int, slotCount: Int): Int {
             val need = slotCount.coerceIn(0, MAX_SLOTS)
-            val rows = (need + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW
-            return SLOT_TOP + rows * (SpellSlotGrid.SLOT_SIZE + SpellSlotGrid.SLOT_GAP) - SpellSlotGrid.SLOT_GAP + BOTTOM_PADDING
+            val rows = (need + GRID_PER_ROW - 1) / GRID_PER_ROW
+            return slotTop + rows * (SpellSlotGrid.SLOT_SIZE + SpellSlotGrid.SLOT_GAP) - SpellSlotGrid.SLOT_GAP + BOTTOM_PADDING
         }
 
+        /** HTML 中 spell-grid 的每行槽位数（与 wand_info.html 的 per-row 一致） */
+        const val GRID_PER_ROW = 8
+
         fun create(): WandInfoWindow {
-            val wandSlot = UiSlot(8, 8)
-            val manaLabel = UiLabel(Component.literal(""), 34, 10, color = 0xFF_55_AA_FF.toInt())
-            val capacityLabel = UiLabel(Component.literal(""), 34, 22)
-            val chargeLabel = UiLabel(Component.literal(""), 34, 34)
-            val castLabel = UiLabel(Component.literal(""), 34, 46)
+            val ui = HtmlUiLoader.loadWindowedFile("wand_info.html")
+
+            fun <T : UiElement> byId(clazz: Class<T>, id: String): T? =
+                ui.elements.filterIsInstance(clazz).firstOrNull { it.id == id }
+
+            val wandSlot = byId(UiSlot::class.java, "wand")
+                ?: UiSlot(8, 8, id = "wand")
+            val manaLabel = byId(UiLabel::class.java, "mana")
+                ?: UiLabel(Component.literal("蓝量：-- / --"), 34, 10, color = 0xFF_55_AA_FF.toInt(), id = "mana")
+            val capacityLabel = byId(UiLabel::class.java, "capacity")
+                ?: UiLabel(Component.literal("容量：-- 格"), 34, 22, id = "capacity")
+            val chargeLabel = byId(UiLabel::class.java, "charge")
+                ?: UiLabel(Component.literal("充能：--"), 34, 34, id = "charge")
+            val castLabel = byId(UiLabel::class.java, "cast")
+                ?: UiLabel(Component.literal("施放数：--"), 34, 46, id = "cast")
+
             val grid = SpellSlotGrid(emptyList())
             val window = FloatingWindow(
-                Component.literal("法杖信息"),
-                listOf(wandSlot, manaLabel, capacityLabel, chargeLabel, castLabel),
-                WIDTH, contentHeight(0),
+                ui.title ?: Component.literal("法杖信息"),
+                ui.elements,
+                ui.windowWidth, contentHeight(GRID_TOP_FALLBACK, 0),
             )
             val info = WandInfoWindow(window, wandSlot, manaLabel, capacityLabel, chargeLabel, castLabel, grid)
             info.rebuildSlots(0)
             return info
         }
+
+        /** HTML 中未找到 spell-grid 时的回退起始 Y */
+        private const val GRID_TOP_FALLBACK = 66
     }
 
     /** 当前追踪的法杖物品（最新引用） */
@@ -99,12 +126,22 @@ class WandInfoWindow private constructor(
     /** 按容量重建槽位网格与窗口高度（动态布局：窗口高度随槽位数增长） */
     private fun rebuildSlots(count: Int) {
         val need = count.coerceIn(0, MAX_SLOTS)
+        val placeholder = window.content.filterIsInstance<SpellGridPlaceholder>().firstOrNull()
+        val gridTop = placeholder?.y ?: GRID_TOP_FALLBACK
+        val perRow = placeholder?.perRow ?: GRID_PER_ROW
+
+        // 窗口高度与背景面板高度随容量同步（HTML 中 div 高度为 0 也 OK）
+        window.windowHeight = contentHeight(gridTop, need)
+        window.content.filterIsInstance<UiWindow>().forEach { it.height = window.windowHeight }
+
         if (grid.slots.size == need) return
-        grid = SpellSlotGrid.create(need, 8, SLOT_TOP, SLOTS_PER_ROW)
-        window.content = listOf(wandSlot, manaLabel, capacityLabel, chargeLabel, castLabel) + grid.slots
-        window.windowHeight = contentHeight(need)
+        grid = SpellSlotGrid.create(need, placeholder?.x ?: 8, gridTop, perRow)
+        // 将 HTML 中的 spell-grid 占位替换为实际槽位
+        window.content = window.content.flatMap { el ->
+            if (el === placeholder) grid.slots else listOf(el)
+        }
         // 槽位对象已重建，重置拖拽控制器（基类交换回调引用 var grid，自动指向新网格）
-        window.slotDrag = work.nekow.primalspells.ui.slot.SlotDragController()
+        window.slotDrag = SlotDragController()
     }
 
     /** 每帧刷新数据与槽位内容 */

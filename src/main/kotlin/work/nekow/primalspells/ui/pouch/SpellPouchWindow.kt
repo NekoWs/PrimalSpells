@@ -7,14 +7,18 @@ import net.minecraft.world.item.ItemStack
 import work.nekow.primalspells.item.SpellPouchItem
 import work.nekow.primalspells.network.EditPouchPayload
 import work.nekow.primalspells.ui.FloatingWindow
+import work.nekow.primalspells.ui.HtmlUiLoader
 import work.nekow.primalspells.ui.common.ContainerWindowBase
+import work.nekow.primalspells.ui.common.SpellGridPlaceholder
 import work.nekow.primalspells.ui.common.SpellSlotGrid
-import work.nekow.primalspells.ui.element.UiLabel
 
 /**
  * 法术小包浮窗：显示小包容器内的法术物品，支持完整交互
  * （槽位交换、背包拖入、拖出卸载）。
  * 交互与窗口逻辑通过 [ContainerWindowBase] 复用，同步走 [EditPouchPayload]。
+ *
+ * 窗口骨架由 HTML 描述（`assets/primalspells/html/pouch.html`），
+ * 槽位网格通过 `<spell-grid>` 占位替换为实际槽位。
  *
  * 小包定位：记录 [pouchId]（物品组件），每次刷新在玩家背包中按 ID 查找。
  * 不记录菜单槽位索引——容器菜单（背包 / 小包 UI）切换会使索引失效。
@@ -30,20 +34,27 @@ class SpellPouchWindow private constructor(
     /** 当前打开的小包（客户端引用，随容器同步更新） */
     var pouchStack: ItemStack? = null
 
+    /** HTML 源文件是否在最近一次加载后被修改（外部检测后应重建窗口） */
+    fun htmlModified(): Boolean = HtmlUiLoader.isModified(FILE_NAME)
+
     companion object {
         const val SLOT_COUNT = 16
-        const val SLOTS_PER_ROW = 8
-        const val SLOT_TOP = 14
+
+        /** HTML 源文件名（`assets/primalspells/html/` 下） */
+        const val FILE_NAME = "pouch.html"
 
         fun create(): SpellPouchWindow {
-            val grid = SpellSlotGrid.create(SLOT_COUNT, 8, SLOT_TOP, SLOTS_PER_ROW)
-            val rows = (SLOT_COUNT + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW
-            val title = UiLabel(Component.literal("法术小包"), 8, 4, color = 0xFF_FF_FF_FF.toInt())
+            val ui = HtmlUiLoader.loadWindowedFile("pouch.html")
+            val placeholder = ui.elements.filterIsInstance<SpellGridPlaceholder>().first()
+            val grid = SpellSlotGrid.create(SLOT_COUNT, placeholder.x, placeholder.y, placeholder.perRow)
+            // 将 HTML 中的 spell-grid 占位替换为实际槽位
+            val content = ui.elements.flatMap { el ->
+                if (el === placeholder) grid.slots else listOf(el)
+            }
             val window = FloatingWindow(
-                Component.literal("法术小包"),
-                listOf(title) + grid.slots,
-                SLOTS_PER_ROW * (SpellSlotGrid.SLOT_SIZE + SpellSlotGrid.SLOT_GAP) + 16,
-                SLOT_TOP + rows * (SpellSlotGrid.SLOT_SIZE + SpellSlotGrid.SLOT_GAP) + 6,
+                ui.title ?: Component.literal("法术小包"),
+                content,
+                ui.windowWidth, ui.windowHeight,
             )
             return SpellPouchWindow(window, grid)
         }

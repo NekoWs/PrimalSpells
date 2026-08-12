@@ -27,6 +27,7 @@ class UiSlot(
     val hoverHighlight: Boolean = true,
     val borderColor: Int = 0xFF_4E_4E_5A.toInt(),
     val hoverBorderColor: Int = 0xFF_8F_C9_FF.toInt(),
+    override val id: String? = null,
 ) : UiElement(x, y, width, height) {
 
     var onClick: ((UiScreen?, Int) -> Boolean)? = null

@@ -18,6 +18,7 @@ class UiWindow(
     val borderColor: Int = 0xFF_3D_3D_42.toInt(),
     val titleColor: Int = 0xFF_FF_FF_FF.toInt(),
     val image: Identifier? = null,
+    override val id: String? = null,
 ) : UiElement(x, y, width, height) {
 
     override fun render(screen: UiScreen?, graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {

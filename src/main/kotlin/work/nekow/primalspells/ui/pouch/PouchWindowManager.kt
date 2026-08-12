@@ -141,7 +141,29 @@ object PouchWindowManager {
     }
 
     private fun ensureWindow(): SpellPouchWindow? {
-        if (pouch != null) return pouch
+        val existing = pouch
+        if (existing != null) {
+            if (existing.htmlModified()) {
+                val old = existing
+                pouch = null
+                val rebuilt = try {
+                    SpellPouchWindow.create()
+                } catch (e: Exception) {
+                    PrimalSpells.LOGGER.debug("重建法术小包浮窗失败（HTML 或注册表问题），保留旧窗口", e)
+                    null
+                } ?: return old
+                rebuilt.window.onCloseRequest = { close() }
+                // 保留窗口位置、显示状态与小包定位信息
+                rebuilt.window.x = old.window.x
+                rebuilt.window.y = old.window.y
+                rebuilt.window.visible = old.window.visible
+                rebuilt.window.minimized = old.window.minimized
+                rebuilt.pouchId = old.pouchId
+                rebuilt.pouchStack = old.pouchStack
+                pouch = rebuilt
+            }
+            return pouch
+        }
         return try {
             SpellPouchWindow.create().also { w ->
                 pouch = w

@@ -23,6 +23,8 @@ class UiButton(
     val textColor: Int = 0xFF_C8_C8_C8.toInt(),
     val hoverTextColor: Int = 0xFF_FF_FF_FF.toInt(),
     val align: TextAlign = TextAlign.CENTER,
+    val fontScale: Float = 1f,
+    override val id: String? = null,
 ) : UiElement(x, y, width, height) {
 
     override fun render(screen: UiScreen?, graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
@@ -44,11 +46,24 @@ class UiButton(
             hovered -> hoverTextColor
             else -> textColor
         }
-        val ty = y + (height - font.lineHeight) / 2
-        when (align) {
-            TextAlign.LEFT -> graphics.text(font, text, x + 6, ty, color)
-            TextAlign.CENTER -> graphics.centeredText(font, text, x + width / 2, ty, color)
-            TextAlign.RIGHT -> graphics.text(font, text, x + width - 6 - font.width(text), ty, color)
+        val lineH = (font.lineHeight * fontScale).toInt()
+        val ty = y + (height - lineH) / 2
+        if (fontScale == 1f) {
+            when (align) {
+                TextAlign.LEFT -> graphics.text(font, text, x + 6, ty, color)
+                TextAlign.CENTER -> graphics.centeredText(font, text, x + width / 2, ty, color)
+                TextAlign.RIGHT -> graphics.text(font, text, x + width - 6 - font.width(text), ty, color)
+            }
+        } else {
+            graphics.pose().pushMatrix()
+            graphics.pose().translate(x.toFloat(), ty.toFloat())
+            graphics.pose().scale(fontScale, fontScale)
+            when (align) {
+                TextAlign.LEFT -> graphics.text(font, text, 6, 0, color)
+                TextAlign.CENTER -> graphics.centeredText(font, text, (width / fontScale / 2).toInt(), 0, color)
+                TextAlign.RIGHT -> graphics.text(font, text, (width / fontScale).toInt() - 6 - font.width(text), 0, color)
+            }
+            graphics.pose().popMatrix()
         }
     }
 

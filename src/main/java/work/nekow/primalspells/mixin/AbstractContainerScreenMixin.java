@@ -8,7 +8,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import work.nekow.primalspells.item.WandItem;
-import work.nekow.primalspells.ui.FloatingWindowManager;
+import work.nekow.nekoui.FloatingWindowManager;
+import work.nekow.nekoui.pouch.PouchWindowManager;
 
 @Mixin(AbstractContainerScreen.class)
 public class AbstractContainerScreenMixin {
@@ -19,12 +20,13 @@ public class AbstractContainerScreenMixin {
 
     /**
      * 悬浮窗覆盖区域内屏蔽槽位悬停：
-     * 鼠标位于悬浮窗矩形内时视为无悬停槽位，使下方容器的槽位高亮与 tooltip 不再响应。
+     * 鼠标位于法杖窗或小包窗矩形内时视为无悬停槽位，使下方容器的槽位高亮与 tooltip 不再响应。
      * 不修改鼠标坐标本身，携带物品的渲染不受影响。
      */
     @Inject(method = "getHoveredSlot", at = @At("HEAD"), cancellable = true)
     private void primalspells_blockHoveredSlot(double x, double y, CallbackInfoReturnable<Slot> cir) {
-        if (FloatingWindowManager.isPointInsideCurrentWindow((int) x, (int) y)) {
+        if (FloatingWindowManager.isPointInsideCurrentWindow((int) x, (int) y) ||
+            PouchWindowManager.isPointInsideWindow((int) x, (int) y)) {
             cir.setReturnValue(null);
         }
     }

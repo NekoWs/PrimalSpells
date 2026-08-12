@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"/>
@@ -43,10 +43,9 @@ header {
 .mc-titlebar { height: 16px; background: #2a2a32; border-bottom: 1px solid #555560; color: #fff; font-size: 9px; line-height: 15px; padding: 0 8px; white-space: nowrap; display: flex; justify-content: space-between; }
 .mc-dots { color: #b0b0b8; }
 .mc-content { position: relative; }
-.mc-content > * { position: absolute; }
 
-.mc-panel { background: #1a1a1e; border: 1px solid #3d3d42; position: relative; }
-.mc-panel.mc-flex { display: flex; }
+.mc-panel { background: #1a1a1e; border: 1px solid #3d3d42; position: relative; overflow: hidden; }
+.mc-panel-title { position: absolute; left: 8px; top: 5px; color: #ffffff; font-size: 9px; line-height: 9px; white-space: nowrap; }
 .mc-label { color: #e0e0e0; font-size: 9px; line-height: 9px; white-space: nowrap; }
 .mc-button {
   background: #2b2b30; border: 1px solid #4e4e55; color: #c8c8c8; font-size: 9px;
@@ -63,12 +62,15 @@ header {
 .mc-slot .count { position: absolute; right: 1px; bottom: 0; color: #fff; font-size: 7px; text-shadow: 1px 1px #000; line-height: 8px; }
 .mc-progress { background: #2a2a32; overflow: hidden; }
 .mc-progress > i { display: block; height: 100%; background: #3399ff; }
+.mc-progress.animated > i { animation: mc-progress-flow 1s ease-in-out infinite alternate; }
+@keyframes mc-progress-flow { from { width: 0%; } to { width: 100%; } }
 .mc-checkbox { display: flex; align-items: center; gap: 4px; font-size: 9px; white-space: nowrap; color: #e0e0e0; cursor: pointer; }
 .mc-checkbox .box { width: 9px; height: 9px; border: 1px solid #4e4e55; background: #2b2b30; flex: none; line-height: 8px; text-align: center; }
 .mc-checkbox.on .box { background: #2f6f3f; border-color: #3f7f4f; color: #7fff7f; font-size: 8px; }
 .mc-hr { background: #4a4a55; }
 .mc-img { background: #26262b; border: 1px solid #3d3d42; display: flex; align-items: center; justify-content: center; color: #666; font-size: 8px; overflow: hidden; padding: 0 2px; white-space: nowrap; }
 .mc-gridph { border: 1px dashed #4a4a55; background: rgba(74,74,85,.15); display: flex; align-items: center; justify-content: center; color: #6a6a75; font-size: 8px; }
+.mc-placeholder { border: 1px dashed #5a4a4a; color: #a07070; font-size: 8px; display: flex; align-items: center; justify-content: center; }
 </style>
 </head>
 <body>
@@ -177,6 +179,26 @@ function findFirstDiv(node) {
   for (const c of node.children) { const r = findFirstDiv(c); if (r) return r; }
   return null;
 }
+// 收集所有 <style> 节点内容
+function collectStyles(roots) {
+  const out = [];
+  (function walk(nodes) {
+    for (const n of nodes) {
+      if (n.tag === 'style') out.push(n.text);
+      walk(n.children);
+    }
+  })(roots);
+  return out;
+}
+// 每条声明追加 !important（覆盖内联样式，匹配游戏内"类规则优先于内联"的语义）
+function forceImportant(css) {
+  return css.replace(/([\w-]+\s*:\s*[^;{}]+);/g, '$1 !important;');
+}
+// 元素 class 属性 → DOM class
+function clsOf(node) {
+  const c = node.attrs.class;
+  return c ? ' ' + c.split(/\s+/).filter(Boolean).join(' ') : '';
+}
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -190,110 +212,137 @@ function itemColor(name) {
   return 'hsl(' + (h % 360) + ', 55%, 45%)';
 }
 
-// ================= 渲染：DOM 构建 =================
+// ================= 布局引擎（与游戏 HtmlUiParser 逻辑一致：估算尺寸 + 绝对定位） =================
 const DEF_FONT = 9; // MC 默认字号 9px
 
-function applyPos(e, style, parentW, parentH) {
-  const left = dim(style, 'left', parentW), top = dim(style, 'top', parentH);
-  const width = dim(style, 'width', parentW), height = dim(style, 'height', parentH);
-  if (left !== null) e.style.left = left + 'px';
-  if (top !== null) e.style.top = top + 'px';
-  if (width !== null && width !== 'auto') e.style.width = width + 'px';
-  if (height !== null && height !== 'auto') e.style.height = height + 'px';
-  return { left, top, width, height };
-}
-
-function defaultFlexSize(node) {
-  let w = null, h = null;
-  switch (node.tag) {
-    case 'slot': w = 18; h = 18; break;
-    case 'button': case 'a': w = 60; h = 20; break;
-    case 'checkbox': h = 12; break;
-    case 'progress': h = 4; break;
-    case 'hr': h = 1; break;
-    case 'label': case 'span': case 'p': h = 9; break;
-    case 'spell-grid': w = 160; h = 40; break;
-    default: break; // div 等：auto 尺寸（渲染后按内容回填）
+function fontWidthOf(text) {
+  // 近似 MC 字体宽度：ASCII 5px，CJK 9px（像素）
+  let w = 0;
+  for (const ch of text) {
+    const c = ch.codePointAt(0);
+    w += (c < 0x80) ? 5 : 9;
   }
-  return [w, h];
+  return w;
 }
-
 function fontSizeOf(node, style) {
   if (style['font-size']) {
     const v = parseFloat(style['font-size']);
     if (!isNaN(v) && v > 0) return v;
   }
-  switch (node.tag) { case 'h1': return DEF_FONT * 2; case 'h2': return DEF_FONT * 1.5; case 'h3': return DEF_FONT * 1.2; }
+  switch (node.tag) {
+    case 'h1': return DEF_FONT * 2;
+    case 'h2': return DEF_FONT * 1.5;
+    case 'h3': return DEF_FONT * 1.2;
+  }
   return DEF_FONT;
 }
-
-function contentExtent(container) {
-  let w = 0, h = 0;
-  for (const c of container.children) {
-    if (c.style.display === 'none') continue;
-    w = Math.max(w, c.offsetLeft + c.offsetWidth);
-    h = Math.max(h, c.offsetTop + c.offsetHeight);
-  }
-  return [w, h];
+function flexDirOf(style) {
+  return style.display === 'flex' ? (style['flex-direction'] === 'row' ? 'row' : 'column') : null;
+}
+function hasPos(style, parentW, parentH) {
+  return dim(style, 'left', parentW) != null || dim(style, 'top', parentH) != null;
 }
 
-function renderNode(node, parentEl, parentW, parentH, inFlex) {
+// 未声明宽度时的估算宽度（div 由布局递归计算，返回 0 表示占满/内容自适应）
+function estimateWidth(node, parentW) {
   const style = parseStyle(node.attrs.style);
-  let e = null;
-  const flexDir = style.display === 'flex' ? (style['flex-direction'] === 'row' ? 'row' : 'column') : null;
+  const w = dim(style, 'width', parentW);
+  if (w !== null && w !== 'auto') return w;
+  switch (node.tag) {
+    case 'label': case 'span': case 'p': case 'h1': case 'h2': case 'h3':
+      return Math.round(fontWidthOf(node.text) * fontSizeOf(node, style) / DEF_FONT);
+    case 'checkbox': return fontWidthOf(node.text) + 16;
+    case 'slot': return 18;
+    case 'button': case 'a': return 60;
+    case 'img': { const v = dim(style, 'width', parentW); return (v !== null && v !== 'auto') ? v : 24; }
+    case 'spell-grid': { const v = dim(style, 'width', parentW); return (v !== null && v !== 'auto') ? v : 160; }
+    case 'progress': case 'hr': case 'div': return 0; // 占满/内容自适应
+    default: return 18;
+  }
+}
 
+// 未声明高度时的估算高度（div 递归内容高度，与渲染结果一致）
+function estimateHeight(node, parentW, parentH) {
+  const style = parseStyle(node.attrs.style);
+  const h = dim(style, 'height', parentH);
+  if (h !== null && h !== 'auto') return h;
+  switch (node.tag) {
+    case 'label': case 'span': case 'p': case 'h1': case 'h2': case 'h3': return Math.round(fontSizeOf(node, style));
+    case 'slot': return 18;
+    case 'button': case 'a': return 20;
+    case 'checkbox': return 12;
+    case 'progress': return 4;
+    case 'hr': return 1;
+    case 'img': { const v = dim(style, 'height', parentH); return (v !== null && v !== 'auto') ? v : 24; }
+    case 'spell-grid': { const v = dim(style, 'height', parentH); return (v !== null && v !== 'auto') ? v : 40; }
+    case 'div': {
+      const flexDir = flexDirOf(style);
+      const padding = dim(style, 'padding', parentW) || 0;
+      let inner = 0;
+      if (flexDir) {
+        const gap = dim(style, 'gap', parentW) || 2;
+        if (flexDir === 'column') {
+          const autos = node.children.filter(c => !hasPos(parseStyle(c.attrs.style), parentW, parentH));
+          inner = autos.reduce((s, c) => s + estimateHeight(c, parentW, parentH), 0)
+            + gap * Math.max(0, autos.length - 1);
+        } else {
+          inner = node.children.reduce((m, c) => Math.max(m, estimateHeight(c, parentW, parentH)), 0);
+        }
+      } else {
+        inner = node.children.reduce((m, c) => {
+          const cs = parseStyle(c.attrs.style);
+          return Math.max(m, (dim(cs, 'top', parentH) || 0) + estimateHeight(c, parentW, parentH));
+        }, 0);
+      }
+      return inner + padding * 2;
+    }
+    default: return 18;
+  }
+}
+
+// 创建元素并设置视觉样式（不含定位与尺寸）
+function buildNode(node, isWindowRoot) {
+  const style = parseStyle(node.attrs.style);
+  const cls = clsOf(node);
+  let e = null;
   switch (node.tag) {
     case 'div': {
-      e = el('div', 'mc-panel' + (flexDir ? ' mc-flex' : ''));
-      if (flexDir === 'row') e.style.flexDirection = 'row';
-      if (flexDir === 'column') e.style.flexDirection = 'column';
-      if (flexDir) {
-        e.style.gap = (parseFloat(style.gap) || 2) + 'px';
-        e.style.padding = (parseFloat(style.padding) || 0) + 'px';
-        if (style['align-items'] === 'center') e.style.alignItems = 'center';
-      }
+      e = el('div', 'mc-panel' + cls);
       e.style.background = colorOf(style, 'background', '#1a1a1e');
       e.style.borderColor = colorOf(style, 'border-color', '#3d3d42');
       const bgImg = style['background-image'];
       if (bgImg) e.style.backgroundImage = 'url("' + esc(bgImg.replace(/^url\(|\)$/g, '')) + '")';
-      node.children.forEach(c => renderNode(c, e, parentW, parentH, flexDir !== null));
+      // 窗口根 div 的 title 只作为窗口标题（顶栏），不生成正文区面板标题（见 code_log #24）
+      if (node.attrs.title && !isWindowRoot) {
+        const t = el('div', 'mc-panel-title', node.attrs.title);
+        e.appendChild(t);
+      }
       break;
     }
     case 'img': {
       const src = node.attrs.src || '?';
-      e = el('div', 'mc-img');
-      e.textContent = src.split('/').pop();
-      const bw = dim(style, 'width', parentW), bh = dim(style, 'height', parentH);
-      if (!bw || bw === 'auto') e.style.width = '24px';
-      if (!bh || bh === 'auto') e.style.height = '24px';
+      e = el('div', 'mc-img' + cls, src.split('/').pop());
       break;
     }
     case 'slot': {
-      e = el('div', 'mc-slot');
-      e.style.width = '18px'; e.style.height = '18px';
+      e = el('div', 'mc-slot' + cls);
       const src = node.attrs.src;
       if (src) {
-        const name = src.split(':').pop();
         const ico = el('div', 'ico');
-        ico.style.background = itemColor(name);
+        ico.style.background = itemColor(src.split(':').pop());
         e.appendChild(ico);
         if (node.attrs.count && node.attrs.count !== '1') {
-          const c = el('span', 'count', node.attrs.count);
-          e.appendChild(c);
+          e.appendChild(el('span', 'count', node.attrs.count));
         }
       }
       break;
     }
     case 'spell-grid': {
-      e = el('div', 'mc-gridph', 'spell-grid');
-      const bw = dim(style, 'width', parentW), bh = dim(style, 'height', parentH);
-      if (bw && bw !== 'auto') e.style.width = bw + 'px'; else e.style.width = '160px';
-      if (bh && bh !== 'auto') e.style.height = bh + 'px'; else e.style.height = '40px';
+      e = el('div', 'mc-gridph' + cls, 'spell-grid');
       break;
     }
     case 'button': case 'a': {
-      e = el('div', 'mc-button' + (node.attrs.enabled === 'false' ? ' disabled' : ''));
-      e.textContent = node.text.trim();
+      e = el('div', 'mc-button' + (node.attrs.enabled === 'false' ? ' disabled' : '') + cls, node.text.trim());
       e.style.fontSize = fontSizeOf(node, style) + 'px';
       e.style.color = colorOf(style, 'color', '#c8c8c8');
       e.style.background = colorOf(style, 'background', '#2b2b30');
@@ -301,8 +350,7 @@ function renderNode(node, parentEl, parentW, parentH, inFlex) {
       break;
     }
     case 'label': case 'span': case 'p': case 'h1': case 'h2': case 'h3': {
-      e = el('div', 'mc-label');
-      e.textContent = node.text.trim();
+      e = el('div', 'mc-label' + cls, node.text.trim());
       const fs = fontSizeOf(node, style);
       e.style.fontSize = fs + 'px';
       e.style.lineHeight = fs + 'px';
@@ -313,12 +361,13 @@ function renderNode(node, parentEl, parentW, parentH, inFlex) {
       break;
     }
     case 'hr': {
-      e = el('div', 'mc-hr');
+      e = el('div', 'mc-hr' + cls);
       e.style.background = colorOf(style, 'color', colorOf(style, 'border-color', '#4a4a55'));
       break;
     }
     case 'progress': {
-      e = el('div', 'mc-progress');
+      e = el('div', 'mc-progress' + (node.attrs.animated === 'true' ? ' animated' : '') + cls);
+      if (node.attrs.id) e.dataset.id = node.attrs.id;
       e.style.background = colorOf(style, 'background', '#2a2a32');
       const val = parseFloat(node.attrs.value) || 0;
       const max = parseFloat(node.attrs.max) || 100;
@@ -329,64 +378,119 @@ function renderNode(node, parentEl, parentW, parentH, inFlex) {
       break;
     }
     case 'checkbox': {
-      e = el('div', 'mc-checkbox' + (node.attrs.checked === 'true' ? ' on' : ''));
+      e = el('div', 'mc-checkbox' + (node.attrs.checked === 'true' ? ' on' : '') + cls);
       const box = el('span', 'box');
       if (node.attrs.checked === 'true') box.textContent = '\u2713';
       e.appendChild(box);
-      const label = el('span', null, node.text.trim());
-      e.appendChild(label);
+      e.appendChild(el('span', null, node.text.trim()));
+      // target 关联：勾选切换目标进度条动画（与游戏 checkbox target 一致）
+      if (node.attrs.target) {
+        e.dataset.target = node.attrs.target;
+        e.style.cursor = 'pointer';
+        e.addEventListener('click', () => {
+          e.classList.toggle('on');
+          e.querySelector('.box').textContent = e.classList.contains('on') ? '\u2713' : '';
+          const target = document.querySelector('.mc-progress[data-id="' + e.dataset.target + '"]');
+          if (target) target.classList.toggle('animated', e.classList.contains('on'));
+        });
+      }
       break;
     }
-    case 'br': return null;
-    case 'html': case 'head': case 'body': case 'meta': case 'link': case 'style': case 'script': case 'title': {
-      node.children.forEach(c => renderNode(c, parentEl, parentW, parentH, inFlex));
-      return null;
-    }
-    default:
-      return null;
-  }
-
-  // 绝对定位 / flex item 尺寸
-  if (inFlex) {
-    const hasL = dim(style, 'left', parentW) !== null, hasT = dim(style, 'top', parentH) !== null;
-    if (!(hasL || hasT)) {
-      // flex item：默认尺寸
-      const [dw, dh] = defaultFlexSize(node);
-      if (node.tag === 'progress' || node.tag === 'hr') {
-        // column：占满交叉轴（CSS flex item 默认 stretch），无需设置宽度
-        if (flexDirParent(parentEl) === 'row') e.style.height = dh + 'px';
-      } else {
-        if (dw) e.style.width = dw + 'px';
-        if (dh) e.style.height = dh + 'px';
-      }
-    } else {
-      e.style.position = 'absolute';
-      applyPos(e, style, parentW, parentH);
-    }
-  } else {
-    e.style.position = 'absolute';
-    applyPos(e, style, parentW, parentH);
-    // progress / hr 未声明宽度：拉伸到父容器右缘（等价于游戏内 parentW - left）
-    if ((node.tag === 'progress' || node.tag === 'hr') && dim(style, 'width', parentW) == null) {
-      e.style.right = '0px';
+    default: {
+      e = el('div', 'mc-placeholder' + cls, '<' + node.tag + '>');
+      break;
     }
   }
   if (node.attrs.hidden !== undefined) e.style.display = 'none';
-
-  parentEl.appendChild(e);
-
-  // auto 尺寸：按子元素边界回填（div/窗口内容）
-  if (node.tag === 'div') {
-    const [cw, ch] = contentExtent(e);
-    const w = dim(style, 'width', parentW), h = dim(style, 'height', parentH);
-    if (w === 'auto' || w === null) e.style.width = cw + 'px';
-    if (h === 'auto' || h === null) e.style.height = ch + 'px';
-  }
   return e;
 }
-function flexDirParent(parentEl) {
-  return parentEl.style.flexDirection || 'column';
+
+/**
+ * 递归布局：计算节点位置与尺寸并设置为绝对定位。
+ * @param node 节点
+ * @param parentEl 父 DOM（position:relative）
+ * @param x y 相对父内容区（padding 盒内）的坐标
+ * @param parentW parentH 父内容区尺寸（百分比解析用）
+ * @return 布局后的 DOM 元素（style.width/height 已设置）
+ */
+function layoutNode(node, parentEl, x, y, parentW, parentH, isWindowRoot) {
+  const style = parseStyle(node.attrs.style);
+  const flexDir = flexDirOf(style);
+  const e = buildNode(node, isWindowRoot);
+  e.style.position = 'absolute';
+  e.style.left = x + 'px';
+  e.style.top = y + 'px';
+  let w, h;
+
+  if (flexDir) {
+    const padding = dim(style, 'padding', parentW) || 0;
+    const gap = dim(style, 'gap', parentW) || 2;
+    const alignCenter = style['align-items'] === 'center';
+    // 容器尺寸（auto 时按子元素估算；声明了尺寸的元素也计入，避免按钮等溢出）
+    const declW = dim(style, 'width', parentW);
+    const declH = dim(style, 'height', parentH);
+    const naturalW = node.children.reduce((m, c) => Math.max(m, estimateWidth(c, parentW)), 0);
+    const naturalH = node.children.reduce((m, c) => Math.max(m, estimateHeight(c, parentW, parentH)), 0);
+    const containerW = (declW && declW !== 'auto') ? declW : Math.max(naturalW + padding * 2, 0);
+    const containerH = (declH && declH !== 'auto') ? declH : Math.max(naturalH + padding * 2, 0);
+    const crossW = Math.max(containerW - padding * 2, 0);
+    const crossH = Math.max(containerH - padding * 2, 0);
+
+    let cursorX = padding, cursorY = padding;
+    for (const c of node.children) {
+      const cs = parseStyle(c.attrs.style);
+      const auto = !hasPos(cs, parentW, parentH);
+      const cw0 = dim(cs, 'width', parentW);
+      const ch0 = dim(cs, 'height', parentH);
+      const cw = (cw0 && cw0 !== 'auto') ? cw0 : (estimateWidth(c, parentW) || (flexDir === 'column' ? crossW : 18));
+      const ch = (ch0 && ch0 !== 'auto') ? ch0 : estimateHeight(c, parentW, parentH);
+      const cx = !auto ? null : (flexDir === 'row' ? cursorX : (alignCenter ? padding + (crossW - cw) / 2 : padding));
+      const cy = !auto ? null : (flexDir === 'column' ? cursorY : (alignCenter ? padding + (crossH - ch) / 2 : padding));
+      const childEl = layoutNode(c, e,
+        (cx != null ? cx : (dim(cs, 'left', parentW) || 0)),
+        (cy != null ? cy : (dim(cs, 'top', parentH) || 0)),
+        parentW, parentH);
+      if (c.tag === 'div') {
+        // div 面板尺寸由自身内容决定（与游戏一致：面板只包住内容，不强加 crossW 占满）
+      } else {
+        childEl.style.width = cw + 'px';
+        childEl.style.height = ch + 'px';
+      }
+      if (flexDir === 'column') cursorY += ch + gap; else cursorX += cw + gap;
+    }
+    w = (declW && declW !== 'auto') ? declW : (flexDir === 'row' ? cursorX + padding : containerW);
+    h = (declH && declH !== 'auto') ? declH : (flexDir === 'column' ? cursorY + padding : containerH);
+  } else {
+    // 绝对定位子元素
+    for (const c of node.children) {
+      const cs = parseStyle(c.attrs.style);
+      layoutNode(c, e,
+        dim(cs, 'left', parentW) || 0,
+        dim(cs, 'top', parentH) || 0,
+        parentW, parentH);
+    }
+    const dw = dim(style, 'width', parentW);
+    const dh = dim(style, 'height', parentH);
+    if (node.tag === 'progress' || node.tag === 'hr') {
+      // 未声明宽度：占满父内容区（等价游戏内 parentW - left）
+      w = (dw && dw !== 'auto') ? dw : Math.max(parentW - x, 0);
+      h = (dh && dh !== 'auto') ? dh : (node.tag === 'hr' ? 1 : 4);
+    } else {
+      w = (dw && dw !== 'auto') ? dw : Math.max(Array.from(e.children).reduce((m, c) => Math.max(m, c.offsetLeft + c.offsetWidth), 0), 0);
+      h = (dh && dh !== 'auto') ? dh : Math.max(Array.from(e.children).reduce((m, c) => Math.max(m, c.offsetTop + c.offsetHeight), 0), 0);
+      // 叶子元素（label/slot 等）按估算尺寸
+      if (e.children.length === 0) {
+        w = (dw && dw !== 'auto') ? dw : estimateWidth(node, parentW);
+        h = (dh && dh !== 'auto') ? dh : estimateHeight(node, parentW, parentH);
+      }
+    }
+  }
+  e.style.width = w + 'px';
+  e.style.height = h + 'px';
+  parentEl.appendChild(e);
+  return e;
 }
+
 
 // ================= 主流程 =================
 const fileInput = document.getElementById('fileInput');
@@ -433,6 +537,14 @@ function renderCurrent() {
   mcUi.innerHTML = '';
   try {
     const roots = parseHtml(selectedText);
+    // 注入用户 <style> 内容（类规则，:hover 等由浏览器原生处理）
+    let styleEl = document.getElementById('uc-injected-css');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'uc-injected-css';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = collectStyles(roots).map(forceImportant).join('\n');
     let winNode = null;
     for (const r of roots) { winNode = findFirstDiv(r); if (winNode) break; }
     if (!winNode) throw new Error('未找到窗口 div（<div>）节点');
@@ -448,14 +560,13 @@ function renderCurrent() {
     mcUi.appendChild(win);
 
     const screenW = stage.clientWidth, screenH = stage.clientHeight;
-    winNode.children.forEach(c => renderNode(c, content, screenW, screenH, false));
-
-    // 窗口 auto 尺寸：按内容回填
-    const [cw, ch] = contentExtent(content);
-    const w = dim(style, 'width', screenW), h = dim(style, 'height', screenH);
-    content.style.width = (w && w !== 'auto' ? w : cw) + 'px';
-    content.style.height = (h && h !== 'auto' ? h : ch) + 'px';
-    win.style.width = content.style.width;
+    // 窗口本体 = 第一个 div，布局到内容区（0,0）
+    const rootEl = layoutNode(winNode, content, 0, 0, screenW, screenH, true);
+    const rw = parseFloat(rootEl.style.width) || 0;
+    const rh = parseFloat(rootEl.style.height) || 0;
+    content.style.width = rw + 'px';
+    content.style.height = rh + 'px';
+    win.style.width = rw + 'px';
   } catch (err) {
     viewport.style.display = 'none';
     hint.style.display = 'block';

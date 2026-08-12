@@ -38,3 +38,11 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+### Local tooling / junk ###
+.shelf/
+.kotlin/
+net/
+opencode.json
+package-lock.json
+test_img/

@@ -1,4 +1,4 @@
-package work.nekow.primalspells.block
+﻿package work.nekow.primalspells.block
 
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
@@ -8,7 +8,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.BlockHitResult
-import work.nekow.primalspells.ui.UiScreen
+import work.nekow.nekoui.UiScreen
 
 class WandEditingTableBlock(properties: Properties) : Block(properties) {
 

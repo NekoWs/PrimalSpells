@@ -1,4 +1,4 @@
-package work.nekow.primalspells.client
+﻿package work.nekow.primalspells.client
 
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.IEventBus
@@ -17,9 +17,9 @@ import work.nekow.primalspells.client.entity.DroneEntityRenderer
 import work.nekow.primalspells.client.entity.SphereEntityModel
 import work.nekow.primalspells.client.entity.SphereEntityRenderer
 import work.nekow.primalspells.entity.ModEntities
-import work.nekow.primalspells.ui.FloatingWindowManager
-import work.nekow.primalspells.ui.UiReloadHandler
-import work.nekow.primalspells.ui.pouch.PouchWindowManager
+import work.nekow.nekoui.FloatingWindowManager
+import work.nekow.nekoui.UiReloadHandler
+import work.nekow.nekoui.pouch.PouchWindowManager
 
 @Mod(value = PrimalSpells.MODID, dist = [Dist.CLIENT])
 class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {

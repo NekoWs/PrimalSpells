@@ -1,4 +1,4 @@
-package work.nekow.primalspells.client
+﻿package work.nekow.primalspells.client
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
@@ -9,8 +9,8 @@ import net.minecraft.world.inventory.Slot
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.primalspells.mixin.AbstractContainerScreenInvokerMixin
-import work.nekow.primalspells.ui.FloatingWindowManager
-import work.nekow.primalspells.ui.pouch.PouchWindowManager
+import work.nekow.nekoui.FloatingWindowManager
+import work.nekow.nekoui.pouch.PouchWindowManager
 
 /**
  * 原版容器拖放交换：在背包/箱子等容器内 **按住 Ctrl + 左键** 拖动槽位物品到另一槽位，松开即交换。

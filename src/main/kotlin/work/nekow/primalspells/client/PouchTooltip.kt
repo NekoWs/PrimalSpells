@@ -14,29 +14,28 @@ class PouchTooltip(
     val spells: List<String>
 ) : TooltipComponent
 
-/** 法术小包 tooltip 渲染：收纳袋式槽位网格 */
+/** 法术小包 tooltip 渲染：收纳袋式槽位网格（固定 16 格容量，空槽留空） */
 class ClientPouchTooltip(
     private val tooltip: PouchTooltip
 ) : ClientTooltipComponent {
 
     override fun getHeight(font: Font): Int {
-        val rows = (tooltip.spells.size + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW
-        return rows.coerceAtLeast(1) * SLOT_SIZE + 4
+        val rows = (SLOT_COUNT + SLOTS_PER_ROW - 1) / SLOTS_PER_ROW
+        return rows * SLOT_SIZE + 4
     }
 
-    override fun getWidth(font: Font): Int =
-        tooltip.spells.size.coerceAtMost(SLOTS_PER_ROW) * SLOT_SIZE + 4
+    override fun getWidth(font: Font): Int = SLOTS_PER_ROW * SLOT_SIZE + 4
 
     override fun showTooltipWithItemInHand() = true
 
     override fun extractImage(font: Font, x: Int, y: Int, w: Int, h: Int, graphics: GuiGraphicsExtractor) {
-        for (i in tooltip.spells.indices) {
+        for (i in 0 until SLOT_COUNT) {
             val sx = x + 2 + (i % SLOTS_PER_ROW) * SLOT_SIZE
             val sy = y + 2 + (i / SLOTS_PER_ROW) * SLOT_SIZE
             graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_BG, sx, sy, SLOT_SIZE, SLOT_SIZE)
-            val spellId = tooltip.spells[i]
+            val spellId = tooltip.spells.getOrNull(i).orEmpty()
             if (spellId.isNotEmpty()) {
-                val item = ModItems.MAGICS[spellId]?.get() ?: continue
+                val item = ModItems.spellItem(spellId) ?: continue
                 val stack = ItemStack(item)
                 graphics.item(stack, sx + 1, sy + 1)
                 graphics.itemDecorations(font, stack, sx + 1, sy + 1)
@@ -45,8 +44,10 @@ class ClientPouchTooltip(
     }
 
     companion object {
+        /** 小包固定容量（与 SpellPouchWindow.SLOT_COUNT 一致） */
+        const val SLOT_COUNT = 16
+        const val SLOTS_PER_ROW = 8
         const val SLOT_SIZE = 18
-        const val SLOTS_PER_ROW = 9
         val SLOT_BG: Identifier = Identifier.withDefaultNamespace("container/bundle/slot_background")
     }
 }

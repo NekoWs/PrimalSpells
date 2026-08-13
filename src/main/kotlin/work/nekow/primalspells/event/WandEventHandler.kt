@@ -10,6 +10,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
 import work.nekow.primalspells.client.WandTooltipTracker
 import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.WandItem
+import work.nekow.primalspells.network.SelectWandSlotPayload
 
 object WandEventHandler {
     @SubscribeEvent
@@ -44,7 +45,9 @@ object WandEventHandler {
         val direction = if (event.scrollDeltaY > 0) -1 else 1
         val newSlot = (current + direction).mod(spells.size)
         WandTooltipTracker.setSelectedSlot(wandId, newSlot)
+        // 客户端本地更新（tooltip 即时显示）+ 服务端同步（右键装卸按该槽位）
         slot.item.set(ModItems.WAND_SELECTED_SLOT.get(), newSlot)
+        SelectWandSlotPayload(wandId, newSlot).send()
         event.isCanceled = true
     }
 

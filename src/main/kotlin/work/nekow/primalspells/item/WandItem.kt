@@ -97,9 +97,9 @@ class WandItem(properties: Properties) : Item(properties) {
     private fun addToCursor(
         stack: ItemStack, wand: Wand, carriedItem: Item, carried: SlotAccess
     ): Boolean {
-        val entry = findMagic(carriedItem) ?: return false
+        val spellId = findMagic(carriedItem) ?: return false
         val target = selectedSlot(stack, wand)
-        val existing = placeMagic(wand, stack, target, entry.key)
+        val existing = placeMagic(wand, stack, target, spellId)
         if (existing != null) carried.set(makeStack(existing)) else carried.set(ItemStack.EMPTY)
         return true
     }
@@ -125,11 +125,10 @@ class WandItem(properties: Properties) : Item(properties) {
         return magic
     }
 
-    private fun findMagic(item: Item) =
-        ModItems.MAGICS.entries.firstOrNull { it.value.get() == item }
+    private fun findMagic(item: Item) = ModItems.spellIdOf(item)
 
     private fun makeStack(magic: work.nekow.primalspells.magic.Magic): ItemStack {
-        val item = ModItems.MAGICS[magic.id]?.get() ?: return ItemStack.EMPTY
+        val item = ModItems.spellItem(magic.id) ?: return ItemStack.EMPTY
         return ItemStack(item)
     }
 

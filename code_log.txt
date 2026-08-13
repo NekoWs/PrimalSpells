@@ -180,8 +180,122 @@ PrimalSpells 开发日志（截至 2026-08-13）
       extractSlotHighlightBack/Front 为 private 难以重写，暂不处理。
     - 【教训】26.2 物品图标不居中：要「居中凹区+完整描边」必须同时改贴图（凹区
       +1）和屏幕渲染（图标 +1），二者缺一会重新产生 1px 偏移。
+29. 【已提交】整理并提交 git：nekoui UI 框架封装 + HTML 转换器完善 + 小包格子
+    修复，一并提交（98afc59）。同时 .gitignore 新增 .shelf/.kotlin/net/
+    opencode.json/package-lock.json/test_img 等本地垃圾。
+30. 【已实现】新增投射物「传送魔弹」(teleport, TeleportProjectile)：
+    - 效果：命中实体/方块或自然消亡（maxAge）时，把施法者传送到该位置。
+    - 命中方块取 faceNormal*0.01 偏移点（避免卡进方块）；teleported 标志防重复。
+    - 传送用 Entity.teleportTo(ServerLevel, x, y, z, Set<Relative>, yaw, pitch,
+      resetCamera=true)，26.2 新 API（Set<Relative> 空集即可）。
+31. 【已实现】新增修正「量子纠缠」(quantum_entanglement, QuantumEntanglement)：
+    - 效果：把下一个投射物复制两份，复制体环绕主投射物做正弦（sin）运动，
+      主+复制体互为纠缠，任一死亡则全部死亡。
+    - 实现：修正效果 onActive 时 projectile.clone() 两次（clone() 给基础投射物
+      不带修正），每个复制体挂 OrbitEffect（每 tick 设 pos=主位置+sin 偏移、
+      velocity 置 0 避免 Move 叠加位移），主与复制体共享 EntanglementLink，
+      LinkEffect/OrbitEffect 每 tick propagateDeath()（任一 !alive → 全部 alive=false）。
+    - 已知：复制体 velocity=0，仅视觉环绕、不独立碰撞伤害（主投射物负责伤害）。
+    - 资源：items/models/textures/lang 已同步（teleport / quantum_entanglement）。
+32. 【教训】PowerShell 5.1 下 gen_item_textures.ps1 的 FC 函数名与内置别名
+    `fc`(Format-Custom) 冲突，别名优先级高于函数 → FC 调用全部静默失败、贴图
+    缺填充圆。已重命名 FC → FillCircle。另发现已提交贴图与当前脚本生成结果
+    不一致（旧贴图为更早脚本版本产物），本次仅新增 teleport/quantum_entanglement
+    两张，未改动其余 34 张。
+33. 【已修复】触发火球在无后续法术时重新抽取自身（用户反馈）：
+    - 根因：Wand.castHand 开头就 discard() → reloadIfNeeded() 把 drawPile 整副
+      重置（load() 从 innate+magics 重建），随后 loadPayload 的 draw() 从重置后
+      的牌堆抽取，把刚施放的触发火球（含自身）又抽回来当 payload。
+    - 修复：castHand 的 discard() 移到 for 循环之后；discard(magics)（payload
+      弃牌）移除 reloadIfNeeded()。这样 payload 抽取发生在牌堆重置之前，
+      单张触发火球时 payload 为空（等效普通火球）。
+34. 【已修复】创造模式下从浮窗拖出法术应删除而非放回背包（用户反馈）：
+    - ContainerWindowBase.tryRemoveToContainer 回退分支：创造模式
+      （player.abilities.instabuild）且未落到具体容器槽（target<0）时，
+      改为 syncRemove(..., silent=true) 直接删除（不发放物品）。
+35. 【已优化】悬浮窗与物品处理代码：
+    - ModItems 新增 spellItem(id) / spellIdOf(item) 两个查询助手，
+      消除 ContainerWindowBase / PrimalSpells 里重复的 MAGICS 遍历。
+    - PrimalSpells 抽出 placeOrGive(player, targetSlot, item) 助手，
+      EditPouchPayload / EditWandPayload 的 ACTION_REMOVE 目标槽放置/交换/回退
+      逻辑（约 40 行重复）合并为一处。
+    - findPouch/clearCarriedSpell 等全限定名改 import + 助手。
+36. 【已修复】悬浮窗渲染层级 + 小包窗显示/关闭行为（用户反馈 4 项）：
+    - 问题 1「浮窗盖在鼠标所持物品上方」：浮窗原在 ScreenEvent.Render.Post
+      （整屏渲染后）绘制，因此盖在拖拽物品与 tooltip 之上。
+      修复：容器屏幕（AbstractContainerScreen）改在
+      ContainerScreenEvent.Render.Foreground 绘制——该事件在槽位之后、拖拽物品与
+      tooltip 之前触发；但它在 extractContents 内、pose 已 translate 到菜单原点，
+      需先 pushMatrix + translate(-getLeftPos, -getTopPos) 重置回屏幕坐标。
+      非容器屏幕（编辑台等，无拖拽物品）仍用 ScreenEvent.Render.Post；
+      Post 处理器对 AbstractContainerScreen 直接 return 避免与 Foreground 重复。
+    - 问题 2「指向其他物品时小包窗消失」：删除 PouchWindowManager 里
+      「悬停容器槽位即隐藏」的分支。
+    - 问题 3「关闭 UI 时小包窗未消失」：删除小包窗 HUD 层渲染（onRenderGuiLayer），
+      新增 onScreenClose 同步隐藏。
+     - 问题 4「悬浮查看法杖法术槽位不更新」：
+       根因 rebuildSlots 首次重建时把 HTML spell-grid 占位符替换为槽位后，
+       占位符从 window.content 移除；后续槽位数变化再次重建时找不到占位符，
+       window.content 仍是旧槽位（grid 已指向新网格，但渲染的 content 未更新）。
+       修复：缓存占位符坐标（x/y/perRow），重建用 replaceSlots 按旧槽位实例替换。
+37. 【已实现】删除槽位交换动画，保留原版瞬时交换（用户要求）：
+    - 删除 SlotSwapAnimation 类；SlotDragController 移除动画状态（animation/tick/
+      isAnimating/hasAnimationFor/renderAnimatedSlot/isPickedUp），released 仅记录
+      lastSwap 交换意图，无飞行动画。
+    - FloatingWindow 移除动画分支渲染；UiSlot 的 drawBackground/drawItem 仅内部使用。
+38. 【已重构】悬浮窗法术槽位 spell-grid 同步逻辑（用户要求换新方法）：
+    - 根因：旧 SpellSlotGrid 每次槽位数变化都整体重建网格并替换 window.content，
+      占位符替换/旧槽位追踪脆弱，导致"更改法术时槽位消失"。
+    - 新设计：SpellSlotGrid 改为「可变槽位的 UiElement」（内部 slots 列表），
+      网格对象固定；setCount 只增删内部槽位（已有槽位对象不变；槽位数变化时重置
+      lastSpells 强制下次 refresh 重填），refresh 仅更新 slot.stack。
+      构建时由占位符确定坐标后整体替换为网格，之后不再动 window.content。
+    - FloatingWindow 通过新增 SlotProvider 接口（spell-grid 实现）统一收集槽位
+      （allSlots），拖拽/tooltip 与具体网格解耦。
+    - ContainerWindowBase 新增 slotIndexAt 复用「屏幕坐标→槽位索引」，消除重复计算。
+39. 【已优化】清理死代码、降低耦合（用户要求整体优化）：
+    - 删除未用成员：FloatingWindow.collapsedHeight、SlotDragController.isPickedUp、
+      renderCarried 的 font 参数、ContainerWindowBase.allWindows、
+      SpellPouchWindow.placeAtRight 的 screenH 参数。
+    - 修正过时注释（FloatingWindow/UiSlot 文档）。
+40. 【已修复】物品交互复查（用户反馈仍有问题）：
+    - 法杖滚轮选择槽位不同步（真实 bug）：onMouseScrolled 原在客户端直接
+      slot.item.set(WAND_SELECTED_SLOT)，但物品组件仅服务端权威、客户端修改不
+      同步，导致右键装卸（WandItem.selectedSlot）仍读旧槽位。修复：新增
+      SelectWandSlotPayload（客户端→服务端），滚轮本地更新 tooltip + 发包让服务端
+      写组件（同步回客户端）。
+    - 复用封装：WandItem.findMagic/makeStack、ClientTooltipHandler、WandSpellTooltip、
+      PouchTooltip 全部改用 ModItems.spellItem/spellIdOf 助手，消除 MAGICS 遍历重复。
+41. 【已重构】悬浮窗基础类拆分 + 四项交互修复（用户要求统一解决反复出现的问题）：
+    - 【为什么会反复出现】法杖窗与小包窗各自重复实现"按 ID 定位物品→读组件→
+      刷新 UI→物品丢失处理"，细节各不相同（缓存引用/空 ID 兜底/丢失处理不一），
+      每修一处另一处又出新问题。根源：没有统一的"追踪物品的浮窗"抽象。
+    - 【基础类】新增 TrackedContainerWindow（nekoui/common/）：
+      * 每次 refresh 都重新按 ID 定位（手持/副手/背包），绝不缓存 ItemStack 引用
+      * 定位不到 → onLost()（默认隐藏窗口+清除 ID，子类可覆盖）
+      * 网格统一 updateGrid（先 setCount 后 refresh，槽位数变化自动重填）
+      * 子类只实现 idOf/matches/spellsOf/slotCountOf + onContentChanged/onLost
+    - WandInfoWindow / SpellPouchWindow 改为继承该基类，删除各自重复的
+      findWandById/locatePouch/pouchStack/rebuildSlots 等逻辑。
+    - 修复 1「小包浮窗不同步」：基类 relocate 覆盖副手；matchesId 空 ID 兜底
+      （匹配第一个小包并补上服务端分配的 ID）。
+    - 修复 2「小包 tooltip 槽位数量不对」：ClientPouchTooltip 改为固定 16 格
+      （2 行×8，与浮窗一致），空槽留空。
+    - 修复 3「拖到创造栏回到快捷栏」：创造模式一律 silent 删除（客户端），
+      placeOrGive 服务端兜底（instabuild 直接丢弃），不再受目标槽检测影响。
+    - 修复 4「丢弃小包后浮窗不关闭」：基类 onLost 统一隐藏窗口。
+    - 【修正】上一轮误删 PouchEventHandler 的 pouchSlot/extraData —— 客户端
+      ModMenus 菜单工厂按该索引取物品引用，必须保留（已恢复）。
+42. 【已提交】用户反馈"基本修复了"，本轮改动全部提交（含 1~41 各次改动）。
+    - 遗留问题（下次继续）：
+      * 法术小包物品栏（tooltip/容器 UI）未显示出内部存储的法术：
+        建议按法杖的方式重构存储——服务端权威对象（类似 WandManager 的
+        PouchManager 存 Magic 列表）+ 物品组件派生同步（如 tickSync），
+        当前仅靠 SPELL_POUCH_CONTENTS 组件单向写入，链路不完整。
+      * 悬浮窗中往外拖拽物品仍有概率消失：待查（疑似拖拽释放与同步的
+        竞态，或 placeOrGive/giveOrCarry 在特定菜单状态下的回退路径）。
 
------------------------------------------------------------
+----------------------------------------------------------
 三、26.2 易踩坑技术点（务必记住）
 -----------------------------------------------------------
 - 26.2 API 勘误（与 1.21.x 的差异）：
@@ -192,6 +306,13 @@ PrimalSpells 开发日志（截至 2026-08-13）
   * AbstractContainerScreen：getLeftPos()/getTopPos()（NeoForge getter）、
     getHoveredSlot()（NeoForge getter）；getGuiLeft()/getGuiTop()/getSlotUnderMouse()
     已 deprecated（委托新方法）
+  * 传送：Entity.teleportTo(ServerLevel, x, y, z, Set<Relative>, yaw, pitch,
+    resetCamera)；简单版 teleportTo(double,double,double) 只是 snapTo 不给客户端
+    发包，玩家必须用带 ServerLevel 的版本。Set<Relative> 用 emptySet()。
+  * SoundEvents 常量类型混杂：老的是 SoundEvent（如 ENDERMAN_TELEPORT），
+    新的是 Holder.Reference<SoundEvent>（如 GENERIC_EXPLODE 需 .value()）。
+  * PowerShell 5.1：脚本函数名不能撞内置别名（FC→Format-Custom），别名优先级
+    高于函数；且 .ps1 含中文注释必须 UTF-8 BOM 或纯 ASCII，否则误读吞代码行。
 - javap 验证类时注意 ~/.gradle/caches/neoformruntime/ 可能混有其他项目版本
   （如 1.21.1）的残留 jar，26.2 正确产物在 build/neoForm/neoFormJoined26.2-1/。
 - 物品模型：assets/<ns>/items/<name>.json（ItemModelDefinition）引用
@@ -222,10 +343,14 @@ PrimalSpells 开发日志（截至 2026-08-13）
 - 小包悬浮窗（PouchWindowManager）：
   * 已有 UI 时右键容器槽位小包 → 悬浮窗（拦截原版拾取）；
   * 手持右键小包 → 服务端容器 UI（PouchEventHandler.openMenu + extraData）。
-  * 渲染双通道：有 Screen 用 ScreenEvent.Render.Post，无 Screen 用 HUD 层。
+  * 渲染：容器屏幕用 ContainerScreenEvent.Render.Foreground（低于拖拽物品/tooltip，
+    pose 需重置），非容器屏幕用 ScreenEvent.Render.Post；UI 关闭时同步隐藏。
 - 槽位拖拽（SlotDragController，数据权威化）：
-  * 拾起（渲染层隐藏 picked）、拖拽跟手、交换动画（纯视觉缓入缓出）、
+  * 拾起（渲染层隐藏 picked）、拖拽跟手、松开放到目标槽产生交换意图（原版瞬时交换）；
     槽位 stack 永远以服务端同步为准，拖动过程不修改数据。
+- 法术槽位网格（SpellSlotGrid，可变槽位的 UiElement）：
+  * 网格对象固定，setCount 只增删内部槽位，refresh 按法术列表更新 stack；
+    构建时由 spell-grid 占位符确定坐标后整体替换，之后不再改动 window.content。
 - 投放决策（ContainerWindowBase.tryRemoveToContainer）三级：
   跨浮窗(acceptExternalSpell) > 容器槽位(坐标定位放置/交换) > 背包回退。
   拖动内容 = ctrl.carriedStack()（拾起瞬间权威快照，源槽数据未被破坏）。
@@ -233,6 +358,9 @@ PrimalSpells 开发日志（截至 2026-08-13）
 -----------------------------------------------------------
 五、待办 / 已知问题（下次继续）
 -----------------------------------------------------------
+- 【未解决·下次】法术小包物品栏未显示出内部存储的法术：
+  建议按法杖方式重构存储（服务端权威对象 + 组件派生同步），见修复历史 42。
+- 【未解决·下次】悬浮窗中往外拖拽物品仍有概率消失：待查竞态/回退路径，见 42。
 - 【待验证·最高优先】小包容器界面格子偏移 ~2px（见修复历史 26/27/28）：
   已定位根因为 DrawSlot 填充互相覆盖导致内凹区锯齿状 17x17，并重写脚本使内凹
   区干净 16x16 与图标完全重合；后续又按用户反馈补全四边描边（凹区居中 +1，
@@ -247,7 +375,6 @@ PrimalSpells 开发日志（截至 2026-08-13）
   不含副手），若需要可补副手槽。
 - 已知：跨浮窗拖到目标"有物品"槽 → 目标服务端 ADD 交换逻辑会把原法术
   放入玩家光标（而非换回源窗）。可接受或后续优化。
-- 小包悬浮窗在无 Screen（游戏世界）时无输入事件，交互不可用（只读显示）。
 - 小包容器 UI quickMoveStack 为简单实现。
 - 贴图生成脚本在 C:\Users\Lty12\AppData\Local\Temp\opencode\
   （gen_item_textures.ps1 / gen_extra_textures.ps1 / gen_pouch_gui.ps1），

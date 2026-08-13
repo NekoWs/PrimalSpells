@@ -26,6 +26,13 @@ class ModItems {
 
         val MAGICS = hashMapOf<String, DeferredItem<Item>>()
 
+        /** 根据法术 id 获取对应物品（未注册返回 null） */
+        fun spellItem(id: String): Item? = MAGICS[id]?.get()
+
+        /** 根据物品获取对应法术 id（非魔法物品返回 null） */
+        fun spellIdOf(item: Item): String? =
+            MAGICS.entries.firstOrNull { it.value.get() == item }?.key
+
         val PRIMAL_SPELLS_TAB = TABS.register("primalspells") { _ ->
             CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.primalspells"))

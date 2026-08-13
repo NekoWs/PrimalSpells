@@ -11,8 +11,7 @@ import work.nekow.nekoui.UiScreen
  * 物品槽位：槽位背景 + 可选物品图标（16×16 居中）。
  * 宽高默认 18×18（原版槽位大小）。
  *
- * 渲染分两层：[drawBackground]（背景/边框/悬停高亮）与 [drawItem]（物品图标），
- * 供拖动控制器组合渲染（拾起隐藏物品、动画期间只画背景+飞行物品）。
+ * 渲染分两层：[drawBackground]（背景/边框/悬停高亮）与 [drawItem]（物品图标）。
  *
  * 数据约定：槽位 [stack] 永远来自服务端同步的权威内容（见 SpellSlotGrid.refresh），
  * 拖动过程不修改它；拾起状态仅通过 [picked] 标志在渲染层隐藏物品。

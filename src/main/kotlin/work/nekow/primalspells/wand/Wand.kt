@@ -73,7 +73,6 @@ class Wand(var id: String) {
     private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
         val magics = arrayListOf<Magic>()
         magics += hand
-        discard()
 
         val revises = magics.filterIsInstance<Revise>().toList()
         revises.forEach { magics.remove(it) }
@@ -107,6 +106,10 @@ class Wand(var id: String) {
             status.lastRecharge = status.recharge
             MagicManager.add(p)
         }
+
+        // 手牌在 payload 抽取完成后统一丢弃：过早 discard 会触发 reload，
+        // 导致触发法术（TriggerSpell）重新抽到刚施放的牌（含自身）。
+        discard()
     }
 
     /**
@@ -160,7 +163,6 @@ class Wand(var id: String) {
         magics.forEach {
             if (hand.remove(it)) discardPile += it
         }
-        reloadIfNeeded()
     }
 
     private fun discard() {

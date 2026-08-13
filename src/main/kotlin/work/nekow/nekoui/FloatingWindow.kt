@@ -6,12 +6,13 @@ import net.minecraft.network.chat.Component
 import work.nekow.nekoui.element.UiElement
 import work.nekow.nekoui.element.UiSlot
 import work.nekow.nekoui.slot.SlotDragController
+import work.nekow.nekoui.slot.SlotProvider
 
 /**
  * 悬浮窗口：独立于任何 [UiScreen] 存在，可在任意画面（HUD 层）渲染的窗口。
  * 支持拖动标题栏、最小化 / 最大化 / 关闭（关闭 = 隐藏）。
  *
- * 最小化时渲染为"标题栏 + 紧凑内容"（[collapsedContent]）。
+ * 最小化时仅渲染窄顶栏。
  * 窗口区域内的点击一律消费（不穿透到下层 UI）。
  */
 class FloatingWindow(
@@ -45,9 +46,6 @@ class FloatingWindow(
     private var restoreH = 0
     private var screenW = 0
     private var screenH = 0
-
-    /** 最小化形态占用的内容高度 */
-    private val collapsedHeight: Int get() = 0
 
     /** 当前窗口宽度（最小化时为窄顶栏宽，右侧对齐） */
     fun currentWidth(): Int = if (minimized) MINIMIZED_WIDTH else windowWidth
@@ -98,8 +96,6 @@ class FloatingWindow(
         this.screenH = screenH
         val font = Minecraft.getInstance().font
         val ctrl = slotDrag
-        ctrl?.tick()
-
         // 最小化：仅渲染窄顶栏（右侧对齐），无内容区
         val width = currentWidth()
         val left = x + windowWidth - width
@@ -126,13 +122,23 @@ class FloatingWindow(
         renderContent(graphics, font, content, mouseX, mouseY, ctrl)
 
         // 悬停槽位时显示物品信息（tooltip 渲染在一切之上）
-        val hoveredSlot = content.filterIsInstance<UiSlot>().firstOrNull {
+        val hoveredSlot = allSlots().firstOrNull {
             it.visible && it.contains((mouseX - x).toDouble(), (mouseY - y - TITLE_BAR_HEIGHT).toDouble())
         }
         if (hoveredSlot != null && !hoveredSlot.stack.isEmpty) {
             graphics.setTooltipForNextFrame(font, hoveredSlot.stack, mouseX, mouseY)
         }
     }
+
+    /** 收集内容区所有可交互槽位（含独立 UiSlot 与槽位网格） */
+    private fun allSlots(): List<UiSlot> =
+        content.flatMap { el ->
+            when (el) {
+                is UiSlot -> listOf(el)
+                is SlotProvider -> el.slots()
+                else -> emptyList()
+            }
+        }
 
     private fun renderContent(
         graphics: GuiGraphicsExtractor,
@@ -147,15 +153,9 @@ class FloatingWindow(
         val rx = mouseX - x
         val ry = mouseY - y - TITLE_BAR_HEIGHT
         list.forEach { el ->
-            if (el is UiSlot && ctrl != null && ctrl.hasAnimationFor(el)) {
-                // 动画期间：先画槽位背景，再画飞行中的物品（槽位数据仍以服务端同步为准）
-                el.drawBackground(graphics, rx, ry)
-                ctrl.renderAnimatedSlot(graphics, font, el)
-            } else {
-                el.render(null, graphics, rx, ry, 0f)
-            }
+            el.render(null, graphics, rx, ry, 0f)
         }
-        ctrl?.renderCarried(graphics, font)
+        ctrl?.renderCarried(graphics)
         graphics.pose().popMatrix()
     }
 
@@ -199,7 +199,7 @@ class FloatingWindow(
         val ry = my - y - TITLE_BAR_HEIGHT
         val ctrl = slotDrag
         if (ctrl != null) {
-            val slot = content.filterIsInstance<UiSlot>().firstOrNull { it.contains(rx.toDouble(), ry.toDouble()) }
+            val slot = allSlots().firstOrNull { it.contains(rx.toDouble(), ry.toDouble()) }
             if (ctrl.pressed(slot, button)) return true
         }
         for (el in content.asReversed()) {
@@ -228,7 +228,7 @@ class FloatingWindow(
         }
         val ctrl = slotDrag ?: return
         ctrl.released(
-            content.filterIsInstance<UiSlot>(),
+            allSlots(),
             mx - x, my - y - TITLE_BAR_HEIGHT
         )
         val swap = ctrl.lastSwap

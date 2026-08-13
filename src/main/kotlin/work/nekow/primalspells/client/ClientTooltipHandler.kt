@@ -63,7 +63,7 @@ object ClientTooltipHandler {
     }
 
     private fun addSpellLore(event: RenderTooltipEvent.GatherComponents) {
-        val id = ModItems.MAGICS.entries.firstOrNull { it.value.get() == event.itemStack.item }?.key ?: return
+        val id = ModItems.spellIdOf(event.itemStack.item) ?: return
         val magic = MagicManager.create(id) ?: return
         for ((type, args) in magic.lore) {
             addLoreLine(event, type, args, id)
@@ -79,7 +79,7 @@ object ClientTooltipHandler {
         val spellId = spells.getOrNull(selected) ?: return
         if (spellId.isEmpty()) return
         val magic = MagicManager.create(spellId) ?: return
-        val item = ModItems.MAGICS[spellId]?.get()
+        val item = ModItems.spellItem(spellId)
         if (item != null) {
             event.tooltipElements.add(Either.left(
                 Component.translatable(item.descriptionId).withStyle(ChatFormatting.WHITE)

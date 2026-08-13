@@ -37,7 +37,7 @@ class ClientWandSpellTooltip(
             }
             val spellId = tooltip.spells.getOrElse(i) { "" }
             if (spellId.isNotEmpty()) {
-                val item = ModItems.MAGICS[spellId]?.get() ?: continue
+                val item = ModItems.spellItem(spellId) ?: continue
                 val stack = ItemStack(item)
                 graphics.item(stack, sx + 1, sy + 1)
                 graphics.itemDecorations(font, stack, sx + 1, sy + 1)

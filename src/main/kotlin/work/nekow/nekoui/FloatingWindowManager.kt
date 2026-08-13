@@ -1,9 +1,11 @@
 ﻿package work.nekow.nekoui
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.client.event.ContainerScreenEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.nekoui.NekoUi
 import work.nekow.primalspells.item.WandItem
@@ -44,22 +46,39 @@ object FloatingWindowManager {
         return mx >= b[0] && mx < b[2] && my >= b[1] && my < b[3]
     }
 
+    /**
+     * 容器屏幕（背包/箱子等）在 Foreground 事件渲染：位于槽位之上、拖拽物品与 tooltip 之下。
+     * Foreground 事件在 extractContents 内触发，pose 已平移到菜单原点，需先重置回屏幕坐标。
+     */
+    @SubscribeEvent
+    fun onRenderContainerForeground(event: ContainerScreenEvent.Render.Foreground) {
+        val screen = event.containerScreen
+        if (!screen.isInGameUi()) return
+        val graphics = event.guiGraphics
+        graphics.pose().pushMatrix()
+        graphics.pose().translate(-screen.getLeftPos().toFloat(), -screen.getTopPos().toFloat())
+        renderWindow(graphics, event.mouseX, event.mouseY, screen)
+        graphics.pose().popMatrix()
+    }
+
+    /** 非容器屏幕（编辑台等无拖拽物品）在 Post 事件渲染（容器屏幕已由 Foreground 处理，避免重复） */
     @SubscribeEvent
     fun onRenderScreenPost(event: ScreenEvent.Render.Post) {
-        // 仅在游戏内 UI（背包/容器/编辑台等）打开时显示
+        if (event.screen is AbstractContainerScreen<*>) return
         if (!event.screen.isInGameUi()) return
-        val m = Minecraft.getInstance()
+        renderWindow(event.guiGraphics, event.mouseX.toInt(), event.mouseY.toInt(), event.screen)
+    }
 
+    private fun renderWindow(graphics: GuiGraphicsExtractor, mx: Int, my: Int, screen: Screen) {
+        val m = Minecraft.getInstance()
         val info = ensureWindow() ?: return
         val win = info.window
         val screenW = m.window.guiScaledWidth
         val screenH = m.window.guiScaledHeight
-        val mx = event.mouseX.toInt()
-        val my = event.mouseY.toInt()
 
         // 用户已关闭：悬停物品栏法杖时重新显示
         if (userClosed) {
-            if (isHoveringWandInInventory(event.screen, mx, my)) {
+            if (isHoveringWandInInventory(screen, mx, my)) {
                 userClosed = false
                 win.visible = true
                 win.minimized = false
@@ -75,14 +94,14 @@ object FloatingWindowManager {
         }
 
         // 最小化时悬停物品栏法杖 → 展开（移出不会自动收起）
-        if (win.minimized && isHoveringWandInInventory(event.screen, mx, my)) {
+        if (win.minimized && isHoveringWandInInventory(screen, mx, my)) {
             win.minimized = false
         }
 
-        info.refresh(m.player, event.screen)
+        info.refresh(m.player, screen)
         // 记录当前窗口矩形（供下方 UI 悬停屏蔽使用）
         lastBounds = win.windowRect()
-        win.render(event.guiGraphics, mx, my, screenW, screenH)
+        win.render(graphics, mx, my, screenW, screenH)
     }
 
     @SubscribeEvent
@@ -165,7 +184,7 @@ object FloatingWindowManager {
                 rebuilt.window.y = old.window.y
                 rebuilt.window.visible = old.window.visible
                 rebuilt.window.minimized = old.window.minimized
-                rebuilt.trackedWandId = old.trackedWandId
+                rebuilt.trackedId = old.trackedId
                 info = rebuilt
             }
             return info

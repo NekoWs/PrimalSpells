@@ -1,5 +1,6 @@
 ﻿package work.nekow.nekoui.common
 
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.entity.player.Player
@@ -22,7 +23,7 @@ import work.nekow.nekoui.slot.SlotDragController
  */
 abstract class ContainerWindowBase(
     val window: FloatingWindow,
-    protected var grid: SpellSlotGrid,
+    protected val grid: SpellSlotGrid,
 ) {
     init {
         window.slotDrag = SlotDragController()
@@ -46,19 +47,24 @@ abstract class ContainerWindowBase(
     /** 子类刷新数据（每帧调用） */
     open fun refresh(player: Player?, screen: Screen?) {}
 
+    /** 窗口内容区坐标 → 网格槽位索引（无则 -1） */
+    private fun slotIndexAt(screenMx: Int, screenMy: Int): Int {
+        val rx = screenMx - window.x
+        val ry = screenMy - window.y - FloatingWindow.TITLE_BAR_HEIGHT
+        return grid.slotIndexAt(rx, ry)
+    }
+
     /** 背包拾起的法术拖入空槽（ADD） */
     fun tryAddFromCarried(mx: Int, my: Int, player: Player?): Boolean {
         if (player == null || window.minimized) return false
         val carried = player.containerMenu.carried
         if (carried.isEmpty) return false
-        val entry = ModItems.MAGICS.entries.firstOrNull { it.value.get() == carried.item } ?: return false
+        val spellId = ModItems.spellIdOf(carried.item) ?: return false
 
-        val rx = mx - window.x
-        val ry = my - window.y - FloatingWindow.TITLE_BAR_HEIGHT
-        val index = grid.slots.indexOfFirst { it.contains(rx.toDouble(), ry.toDouble()) }
+        val index = slotIndexAt(mx, my)
         if (index < 0) return false
 
-        syncAdd(index, entry.key)
+        syncAdd(index, spellId)
         player.containerMenu.setCarried(ItemStack.EMPTY)
         return true
     }
@@ -80,7 +86,7 @@ abstract class ContainerWindowBase(
 
         // 拖动内容：拾起瞬间的权威快照（源槽位数据从未被修改，两者等价）
         val carried = ctrl.carriedStack()
-        val spellId = spellIdOf(carried) ?: return false
+        val spellId = ModItems.spellIdOf(carried.item) ?: return false
 
         // 1) 跨浮窗移动
         for (other in otherWindows()) {
@@ -103,8 +109,9 @@ abstract class ContainerWindowBase(
             if (slot != null) target = slot.index
         }
 
-        // 3) 回退背包（服务端处理放置/交换/回退，背包满回退光标）
-        syncRemove(index, target, false)
+        // 3) 回退：创造模式直接删除（不再放回背包/快捷栏）；生存模式按目标槽放置/交换/回退背包
+        val creative = Minecraft.getInstance().player?.abilities?.instabuild == true
+        syncRemove(index, target, creative)
         ctrl.cancel()
         return true
     }
@@ -115,17 +122,11 @@ abstract class ContainerWindowBase(
      */
     fun acceptExternalSpell(spellId: String, mx: Int, my: Int): Boolean {
         if (!window.visible || window.minimized) return false
-        val rx = mx - window.x
-        val ry = my - window.y - FloatingWindow.TITLE_BAR_HEIGHT
-        val index = grid.slots.indexOfFirst { it.contains(rx.toDouble(), ry.toDouble()) }
+        val index = slotIndexAt(mx, my)
         if (index < 0) return false
         syncAdd(index, spellId)
         return true
     }
-
-    /** 从槽位物品解析法术 id */
-    private fun spellIdOf(stack: ItemStack): String? =
-        ModItems.MAGICS.entries.firstOrNull { it.value.get() == stack.item }?.key
 
     companion object {
         private val windows = mutableListOf<ContainerWindowBase>()
@@ -134,11 +135,8 @@ abstract class ContainerWindowBase(
         fun register(w: ContainerWindowBase) {
             if (w !in windows) windows += w
         }
-
-        /** 当前所有已注册的容器浮窗 */
-        fun allWindows(): List<ContainerWindowBase> = windows.toList()
     }
 
     private fun otherWindows(): List<ContainerWindowBase> =
-        Companion.windows.filter { it !== this }
+        windows.filter { it !== this }
 }

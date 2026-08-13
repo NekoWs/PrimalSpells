@@ -21,9 +21,12 @@ import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.event.PouchEventHandler
 import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.ModMenus
+import work.nekow.primalspells.item.SpellPouchItem
+import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.network.EditPouchPayload
 import work.nekow.primalspells.network.EditWandPayload
+import work.nekow.primalspells.network.SelectWandSlotPayload
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.wand.WandManager
@@ -57,6 +60,20 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 WandHudRenderer.putStats(payload)
             }
             registrar.playToServer(
+                SelectWandSlotPayload.ID,
+                SelectWandSlotPayload.STREAM_CODEC
+            ) { payload, context ->
+                val player = context.player() as? ServerPlayer ?: return@playToServer
+                val inv = player.inventory
+                for (i in 0 until inv.containerSize) {
+                    val st = inv.getItem(i)
+                    if (st.item is WandItem && st.get(ModItems.WAND_ID)?.wandId == payload.wandId) {
+                        st.set(ModItems.WAND_SELECTED_SLOT.get(), payload.slot)
+                        break
+                    }
+                }
+            }
+            registrar.playToServer(
                 EditPouchPayload.ID,
                 EditPouchPayload.STREAM_CODEC
             ) { payload, context ->
@@ -77,17 +94,16 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                             save(list)
                             // 消费玩家光标中对应的法术物品，避免复制
                             clearCarriedSpell(player, payload.spellId)
-                        } else {
-                            // 目标槽已有法术：交换（原法术物品进入玩家光标）
-                            val old = list[payload.slotA]
-                            list[payload.slotA] = payload.spellId
-                            save(list)
-                            clearCarriedSpell(player, payload.spellId)
-                            val oldItem = work.nekow.primalspells.item.ModItems.MAGICS[old]?.get()
-                            if (oldItem != null) {
-                                player.containerMenu.setCarried(ItemStack(oldItem))
-                            }
+                    } else {
+                        // 目标槽已有法术：交换（原法术物品进入玩家光标）
+                        val old = list[payload.slotA]
+                        list[payload.slotA] = payload.spellId
+                        save(list)
+                        clearCarriedSpell(player, payload.spellId)
+                        ModItems.spellItem(old)?.let {
+                            player.containerMenu.setCarried(ItemStack(it))
                         }
+                    }
                     }
                     EditPouchPayload.ACTION_SWAP -> {
                         val list = spells()
@@ -104,31 +120,9 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                             val id = list[payload.slotA]
                             list[payload.slotA] = ""
                             save(list)
-                            // 跨浮窗移动：不发放物品
+                            // 跨浮窗移动 / 创造模式删除：不发放物品
                             if (payload.silent) return@playToServer
-                            val item = work.nekow.primalspells.item.ModItems.MAGICS[id]?.get()
-                            if (item != null) {
-                                val menu = player.containerMenu
-                                val targetStack = if (payload.slotB in 0 until menu.slots.size)
-                                    menu.getSlot(payload.slotB).item else ItemStack.EMPTY
-                                when {
-                                    // 目标槽是小包等非空容器物品：回退放入玩家背包
-                                    !targetStack.isEmpty &&
-                                        targetStack.item is work.nekow.primalspells.item.SpellPouchItem ->
-                                        giveOrCarry(player, ItemStack(item))
-                                    // 目标槽为空：放置
-                                    targetStack.isEmpty && payload.slotB in 0 until menu.slots.size ->
-                                        menu.getSlot(payload.slotB).set(ItemStack(item))
-                                    // 目标槽有物品：交换（原物品给玩家）
-                                    payload.slotB in 0 until menu.slots.size -> {
-                                        val slot = menu.getSlot(payload.slotB)
-                                        giveOrCarry(player, slot.item)
-                                        slot.set(ItemStack(item))
-                                    }
-                                    else -> giveOrCarry(player, ItemStack(item))
-                                }
-                            }
-                        }
+                            ModItems.spellItem(id)?.let { placeOrGive(player, payload.slotB, ItemStack(it)) }                        }
                     }
                 }
             }
@@ -153,12 +147,12 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                         } else {
                             // 目标槽已有法术：交换（原法术物品进入玩家光标）
                             val old = wand.magics[index]
-                            val oldItem = work.nekow.primalspells.item.ModItems.MAGICS[old!!.id]?.get()
+                            val oldItem = ModItems.spellItem(old!!.id)
                             wand.magics[index] = MagicManager.create(payload.spellId)!!
                             wand.load()
                             clearCarriedSpell(player, payload.spellId)
-                            if (oldItem != null) {
-                                player.containerMenu.setCarried(ItemStack(oldItem))
+                            oldItem?.let {
+                                player.containerMenu.setCarried(ItemStack(it))
                             }
                         }
                     }
@@ -180,31 +174,9 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                             if (magic != null) {
                                 wand.magics[index] = null
                                 wand.load()
-                                // 跨浮窗移动：不发放物品
+                                // 跨浮窗移动 / 创造模式删除：不发放物品
                                 if (payload.silent) return@playToServer
-                                val item = work.nekow.primalspells.item.ModItems.MAGICS[magic.id]?.get()
-                                if (item != null) {
-                                    val menu = player.containerMenu
-                                    val target = payload.slotB
-                                    val targetStack = if (target in 0 until menu.slots.size)
-                                        menu.getSlot(target).item else ItemStack.EMPTY
-                                    when {
-                                        // 目标槽是小包等容器物品：回退放入玩家背包，避免覆盖
-                                        !targetStack.isEmpty &&
-                                            targetStack.item is work.nekow.primalspells.item.SpellPouchItem ->
-                                            giveOrCarry(player, ItemStack(item))
-                                        // 目标槽为空：放置
-                                        targetStack.isEmpty && target in 0 until menu.slots.size ->
-                                            menu.getSlot(target).set(ItemStack(item))
-                                        // 目标槽有物品：交换（原物品给玩家）
-                                        target in 0 until menu.slots.size -> {
-                                            val slot = menu.getSlot(target)
-                                            giveOrCarry(player, slot.item)
-                                            slot.set(ItemStack(item))
-                                        }
-                                        else -> giveOrCarry(player, ItemStack(item))
-                                    }
-                                }
+                                ModItems.spellItem(magic.id)?.let { placeOrGive(player, payload.slotB, ItemStack(it)) }
                             }
                         }
                     }
@@ -217,7 +189,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
     private fun clearCarriedSpell(player: ServerPlayer, spellId: String) {
         val carried = player.containerMenu.carried
         if (carried.isEmpty) return
-        val item = work.nekow.primalspells.item.ModItems.MAGICS[spellId]?.get() ?: return
+        val item = ModItems.spellItem(spellId) ?: return
         if (carried.item == item) {
             player.containerMenu.setCarried(ItemStack.EMPTY)
         }
@@ -233,16 +205,41 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         var fallback: ItemStack? = null
         for (i in 0 until inv.containerSize) {
             val st = inv.getItem(i)
-            if (st.isEmpty || st.item !is work.nekow.primalspells.item.SpellPouchItem) continue
-            val id = work.nekow.primalspells.item.SpellPouchItem.getPouchId(st)
+            if (st.isEmpty || st.item !is SpellPouchItem) continue
+            val id = SpellPouchItem.getPouchId(st)
             if (id == pouchId) return st
             if (id == null && fallback == null) fallback = st
         }
         if (pouchId.isEmpty() && fallback != null) {
-            work.nekow.primalspells.item.SpellPouchItem.ensurePouchId(fallback)
+            SpellPouchItem.ensurePouchId(fallback)
             return fallback
         }
         return null
+    }
+
+    /** 将物品放入目标容器槽：空槽放置 / 有物品槽交换 / 小包槽或越界回退背包 */
+    private fun placeOrGive(player: ServerPlayer, targetSlot: Int, item: ItemStack) {
+        // 创造模式兜底：直接丢弃（客户端已发 silent，此处防客户端能力状态延迟导致的回退）
+        if (player.abilities.instabuild) return
+        val menu = player.containerMenu
+        val inRange = targetSlot in 0 until menu.slots.size
+        val targetStack = if (inRange) menu.getSlot(targetSlot).item else ItemStack.EMPTY
+        when {
+            // 目标槽是小包等容器物品：回退放入玩家背包，避免覆盖
+            !targetStack.isEmpty && targetStack.item is SpellPouchItem ->
+                giveOrCarry(player, item)
+            // 目标槽为空：放置
+            targetStack.isEmpty && inRange ->
+                menu.getSlot(targetSlot).set(item)
+            // 目标槽有物品：交换（原物品给玩家）
+            inRange -> {
+                val slot = menu.getSlot(targetSlot)
+                giveOrCarry(player, slot.item)
+                slot.set(item)
+            }
+            // 越界：回退背包
+            else -> giveOrCarry(player, item)
+        }
     }
 
     /** 优先放入玩家背包；背包满时回退到光标，确保物品不丢失 */

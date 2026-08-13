@@ -26,7 +26,8 @@ object PouchEventHandler {
         // 服务端生成小包唯一 id（供浮窗等按 id 定位，组件随物品同步）
         SpellPouchItem.ensurePouchId(stack)
 
-        // 定位小包在玩家容器中的槽位索引
+        // 定位小包在玩家容器中的槽位索引（客户端 ModMenus 按此索引取物品引用；
+        // 手持物品与选中快捷栏槽位是同一 ItemStack，用 isSameItemSameComponents 匹配）
         val menu = player.containerMenu
         val pouchSlot = (0 until menu.slots.size).firstOrNull { i ->
             val s = menu.getSlot(i).item

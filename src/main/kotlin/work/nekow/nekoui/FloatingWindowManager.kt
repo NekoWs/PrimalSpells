@@ -16,13 +16,14 @@ import work.nekow.nekoui.wand.WandInfoWindow
  * 悬浮窗口管理器：跟随任意游戏内 UI（背包/容器/编辑台等）显示，位于其他 UI 之上。
  *
  * 行为：
- * - 打开游戏内 UI 时，浮窗以最小化形态（窄顶栏）显示在屏幕右侧空白处
- * - 鼠标悬停在背包（物品栏）中的法杖物品上时，浮窗自动展开
- *   （显示该法杖的蓝量、容量等基础信息）
- * - 移出窗口不会自动最小化；展开状态保持，直到点击 — 按钮或关闭 UI
- * - 点击 × 后消失，直到再次将鼠标悬停在物品栏中的法杖上才重新显示
+ * - 打开游戏内 UI 时，浮窗以最小化形态（窄顶栏）显示（首次显示时定位到屏幕右侧，
+ *   之后保留用户拖动的位置，开关 UI 不重置）
+ * - 用户关闭（×）后，悬停物品栏中的法杖会重新显示浮窗（最小化形态）
+ * - 悬停法杖**不会**自动解除最小化；恢复大小只能通过点击 — 按钮
+ * - 最小化窄顶栏可拖动到屏幕任意位置（含最左侧）
+ * - 窗口尺寸可通过拖动边框（左/右/下边与下角）缩放
  *
- * 交互（拖动 / 最小化 / 最大化 / 关闭 / 槽位拖动交换/放入）通过 Screen 输入事件前置拦截实现，
+ * 交互（拖动 / 缩放 / 最小化 / 关闭 / 槽位拖动交换/放入）通过 Screen 输入事件前置拦截实现，
  * 窗口区域内的点击一律消费，不穿透到下层 UI。
  */
 object FloatingWindowManager {
@@ -31,6 +32,9 @@ object FloatingWindowManager {
 
     /** 用户点击 × 后标记，悬停法杖时解除 */
     private var userClosed = false
+
+    /** 窗口是否已完成首次定位（true 后开关 UI 不再重置位置） */
+    private var positioned = false
 
     /** 当前显示的悬浮窗口（无 UI 打开时为 null） */
     fun current(): FloatingWindow? = info?.window?.takeIf { it.visible }
@@ -76,13 +80,15 @@ object FloatingWindowManager {
         val screenW = m.window.guiScaledWidth
         val screenH = m.window.guiScaledHeight
 
-        // 用户已关闭：悬停物品栏法杖时重新显示
+        // 用户已关闭：悬停物品栏法杖时重新显示（最小化形态，不自动展开）
         if (userClosed) {
             if (isHoveringWandInInventory(screen, mx, my)) {
                 userClosed = false
                 win.visible = true
-                win.minimized = false
+                win.minimized = true
             } else {
+                // 修复：窗口隐藏期间清空边界，避免残留矩形继续截获鼠标/屏蔽悬停
+                lastBounds = null
                 return
             }
         }
@@ -90,13 +96,14 @@ object FloatingWindowManager {
         if (!win.visible) {
             win.visible = true
             win.minimized = true
-            info.placeAtRight(screenW, screenH)
+            if (!positioned) {
+                info.placeAtRight(screenW, screenH)
+                positioned = true
+            }
         }
 
-        // 最小化时悬停物品栏法杖 → 展开（移出不会自动收起）
-        if (win.minimized && isHoveringWandInInventory(screen, mx, my)) {
-            win.minimized = false
-        }
+        // 约束在屏幕内（GUI 尺寸变化后窗口仍可达）
+        win.clampToScreen(screenW, screenH)
 
         info.refresh(m.player, screen)
         // 记录当前窗口矩形（供下方 UI 悬停屏蔽使用）
@@ -132,7 +139,7 @@ object FloatingWindowManager {
     fun onMouseDragged(event: ScreenEvent.MouseDragged.Pre) {
         val win = info?.window ?: return
         if (!win.visible) return
-        val dragging = win.isDragging() || (win.slotDrag?.isDragging() == true)
+        val dragging = win.isDragging() || win.isResizing() || (win.slotDrag?.isDragging() == true)
         if (dragging) {
             win.mouseDragged(event.mouseX.toInt(), event.mouseY.toInt())
             event.isCanceled = true
@@ -148,7 +155,7 @@ object FloatingWindowManager {
         val my = event.mouseY.toInt()
 
         // 1) 浮窗内槽位拖动（拾起/交换/放入/放回/卸载到容器）
-        if (win.isDragging() || win.slotDrag?.isDragging() == true) {
+        if (win.isDragging() || win.isResizing() || win.slotDrag?.isDragging() == true) {
             // 拖到下层容器槽位 → 卸载法术
             if (info.tryRemoveToContainer(mx, my, event.screen)) {
                 event.isCanceled = true

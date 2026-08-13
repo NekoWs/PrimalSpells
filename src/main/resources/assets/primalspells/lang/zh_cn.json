@@ -37,6 +37,8 @@
   "item.primalspells.drone_swarm": "无人机群",
   "item.primalspells.gravity_field": "重力场",
   "item.primalspells.black_hole": "黑洞",
+  "item.primalspells.teleport": "传送魔弹",
+  "item.primalspells.quantum_entanglement": "量子纠缠",
 
   "block.primalspells.wand_editing_table": "法杖编辑台",
   "gui.primalspells.close": "关闭",
@@ -90,6 +92,8 @@
   "lore.primalspells.drone_swarm.desc": "在施法者周围召唤 5 架战斗无人机。",
   "lore.primalspells.gravity_field.desc": "生成一个持续减速范围内实体的力场。",
   "lore.primalspells.black_hole.desc": "将实体拉向中心并施加减速效果。",
+  "lore.primalspells.teleport.desc": "将施法者传送到命中或消亡的位置。",
+  "lore.primalspells.quantum_entanglement.desc": "将下一个投射物复制为两份，环绕主投射物做正弦运动；任一死亡则全部死亡。",
 
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀",

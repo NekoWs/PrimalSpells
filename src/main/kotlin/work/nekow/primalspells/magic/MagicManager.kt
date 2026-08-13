@@ -12,6 +12,7 @@ import work.nekow.primalspells.magic.projectile.s_projectile.SmallExplosion
 import work.nekow.primalspells.magic.projectile.s_projectile.GravityFieldProjectile
 import work.nekow.primalspells.magic.projectile.s_projectile.BlackHoleProjectile
 import work.nekow.primalspells.magic.projectile.TriggerFireball
+import work.nekow.primalspells.magic.projectile.TeleportProjectile
 import work.nekow.primalspells.magic.revise.*
 
 object MagicManager {
@@ -82,6 +83,8 @@ object MagicManager {
         register { BlackHoleProjectile() }
         register { SelfOrbit() }
         register { SphereOrbit() }
+        register { TeleportProjectile() }
+        register { QuantumEntanglement() }
     }
 
     @SubscribeEvent

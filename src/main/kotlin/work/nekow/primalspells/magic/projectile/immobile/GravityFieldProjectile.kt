@@ -1,4 +1,4 @@
-package work.nekow.primalspells.magic.projectile.s_projectile
+package work.nekow.primalspells.magic.projectile.immobile
 
 import net.minecraft.core.particles.ParticleTypes
 import work.nekow.primalspells.magic.Projectile
@@ -7,8 +7,7 @@ import work.nekow.primalspells.magic.effect.Trajectory
 import work.nekow.primalspells.utils.Lore
 
 /**
- * 重力场 —— 静态投射物，存在 200 tick（10 秒），
- * 对直径 5 格球体范围内实体施加减速药水效果。
+ * 重力场，对直径 5 格球体范围内实体施加减速药水效果。
  */
 class GravityFieldProjectile : Projectile() {
 

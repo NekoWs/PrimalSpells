@@ -235,7 +235,7 @@ class Wand(var id: String) {
      */
     fun tick(caster: Entity? = null) {
         if (caster != null) {
-            val gameTime = caster.level().getGameTime()
+            val gameTime = caster.level().gameTime
             if (lastPassiveTick == gameTime) return
             lastPassiveTick = gameTime
             loadedMagics.forEach { magic ->

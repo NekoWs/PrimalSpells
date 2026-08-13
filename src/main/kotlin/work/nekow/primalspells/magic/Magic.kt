@@ -14,8 +14,11 @@ abstract class Magic {
 
     open var cast: Int = 1
 
+    /** 消耗法术值 **/
     var mana: Double = 0.0
+    /** 增加施法延迟 **/
     var delay: Int = 0
+    /** 增加充能时间 **/
     var recharge: Int = 0
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()

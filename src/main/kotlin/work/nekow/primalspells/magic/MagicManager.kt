@@ -6,11 +6,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.magic.projectile.DroneSwarm
 import work.nekow.primalspells.magic.projectile.DelayedCastProjectile
 import work.nekow.primalspells.magic.projectile.Fireball
-import work.nekow.primalspells.magic.projectile.s_projectile.LargeExplosion
+import work.nekow.primalspells.magic.projectile.immobile.LargeExplosion
 import work.nekow.primalspells.magic.projectile.Laser
-import work.nekow.primalspells.magic.projectile.s_projectile.SmallExplosion
-import work.nekow.primalspells.magic.projectile.s_projectile.GravityFieldProjectile
-import work.nekow.primalspells.magic.projectile.s_projectile.BlackHoleProjectile
+import work.nekow.primalspells.magic.projectile.immobile.SmallExplosion
+import work.nekow.primalspells.magic.projectile.immobile.GravityFieldProjectile
+import work.nekow.primalspells.magic.projectile.immobile.BlackHoleProjectile
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.projectile.TeleportProjectile
 import work.nekow.primalspells.magic.revise.*

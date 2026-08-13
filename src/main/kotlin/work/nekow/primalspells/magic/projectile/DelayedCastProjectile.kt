@@ -10,8 +10,7 @@ import work.nekow.primalspells.magic.effect.Trajectory
 import work.nekow.primalspells.utils.Lore
 
 /**
- * 延迟施法投射物 —— 存活 20 tick 后死亡，
- * 死亡时以施法朝向释放 payload 中的法术。
+ * 延迟施法，死亡时以施法朝向释放 payload 中的法术。
  */
 class DelayedCastProjectile : Projectile(), TriggerSpell {
 
@@ -20,7 +19,7 @@ class DelayedCastProjectile : Projectile(), TriggerSpell {
     override var triggerCast = 1
     override var payload = arrayListOf<Magic>()
 
-    /** 施法朝向（单位向量），在 spell() 被 mul(speed=0) 归零前保存 */
+    /** 施法朝向 */
     var spellDirection: Vector3f = Vector3f()
 
     init {
@@ -31,7 +30,7 @@ class DelayedCastProjectile : Projectile(), TriggerSpell {
         speed = 0f
         hitRadius = 0.0
         effects += Trajectory(ParticleTypes.HAPPY_VILLAGER)
-        effects += DelayedTrigger(this) // 传入自身引用以读取 spellDirection
+        effects += DelayedTrigger(this)
     }
 
     override fun spell() {

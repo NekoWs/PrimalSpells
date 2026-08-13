@@ -6,7 +6,7 @@ import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
-import org.joml.Vector3f
+import kotlin.math.acos
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -51,7 +51,7 @@ class GravityField : BaseEffect() {
         val r = 2.5
         val count = 12
         for (i in 0 until count) {
-            val phi = Math.acos(2.0 * level.random.nextDouble() - 1.0) // 球面均匀采样
+            val phi = acos(2.0 * level.random.nextDouble() - 1.0) // 球面均匀采样
             val theta = level.random.nextDouble() * Math.PI * 2.0
             val px = cx + sin(phi) * cos(theta) * r
             val py = cy + sin(phi) * sin(theta) * r

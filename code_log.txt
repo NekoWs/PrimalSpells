@@ -2,505 +2,170 @@
 PrimalSpells 开发日志（截至 2026-08-13）
 ============================================================
 环境：Minecraft 26.2 / NeoForge 26.2.0.25-beta / Kotlin 2.1.20 / Java 25
-说明：本文件用于新对话快速回忆，记录已修复 bug、架构要点、待办与测试指引。
+说明：本文件用于新对话快速回忆，记录架构要点、修复历史、待办与测试指引。
+所有改动均已提交推送。
 
 ------------------------------------------------------------
 一、项目模块总览
 ------------------------------------------------------------
-- item/        WandItem(法杖)、SpellPouchItem(法术小包)、ModItems(注册)、
-               SpellPouchInventory/Menu(容器)、ModMenus(MenuType)
-- wand/        Wand、WandManager、WandSavedData（服务端法杖数据）
-- magic/       法术系统：Magic、Projectile、Revise、TriggerSpell、MagicManager、
-               effect/ 与 projectile/ 下大量法术
-- entity/      实体：Cube/Sphere/Drone + AI Goal
-- ui/          UI 框架（重点）：
+- item/       WandItem(法杖)、SpellPouchItem(法术小包)、ModItems(注册)、
+              SpellPouchInventory/Menu(容器)、ModMenus(MenuType)
+- wand/       Wand、WandManager、WandSavedData（服务端法杖数据）
+- magic/      法术系统：Magic、Projectile、Revise、TriggerSpell、MagicManager、
+              effect/ 与 projectile/ 下大量法术
+- entity/     实体：Cube/Sphere/Drone/TestDummy + AI Goal
+- ui/         UI 框架（重点）：
     - UiScreen/UiBuilder/UiElement(UiWindow/UiButton/UiLabel/UiImage/UiSlot)
     - html/HtmlUiParser（HTML→UI 转换器）、HtmlUiLoader
-    - FloatingWindow（窗口化悬浮窗）、FloatingWindowManager（法杖信息窗）
+    - FloatingWindow + FloatingWindowManager（法杖信息窗）
     - pouch/SpellPouchWindow + PouchWindowManager（小包悬浮窗）
-    - slot/SlotDragController + SlotSwapAnimation（槽位拖拽/交换动画）
-    - common/SpellSlotGrid + ContainerWindowBase（通用容器浮窗基类）
+    - slot/SlotDragController（槽位拖拽，数据权威化）
+    - common/SpellSlotGrid、TrackedContainerWindow、ContainerWindowBase
 - block/       WandEditingTableBlock（法杖编辑台）
-- network/     SyncWandStatsPayload、EditWandPayload、EditPouchPayload
+- network/     SyncWandStatsPayload、EditWandPayload、EditPouchPayload、
+              SelectWandSlotPayload、SyncShieldPayload
 - client/      PrimalSpellsClient、ClientTooltipHandler、WandHudRenderer、
-               SpellPouchScreen、PouchTooltip
-- mixin/       AbstractContainerScreenMixin（getHoveredSlot 屏蔽、tooltip）
+              SpellPouchScreen、PouchTooltip、ShieldHudRenderer
+- mixin/       AbstractContainerScreenMixin、AbstractContainerScreenInvokerMixin
+
+注：UI 文件位于 work.nekow.nekoui 包（NekoUi 常量提供 MODID/LOGGER），
+资源命名空间仍为 primalspells。
 
 ------------------------------------------------------------
-二、关键修复历史（按时间序）
+二、关键修复历史（摘要）
 ------------------------------------------------------------
-1. 编译错误：缺失 client/entity 渲染类 → 按 26.2 新渲染管线
-   （EntityRenderState + SubmitNodeCollector.submitModel）补齐 6 个文件。
-2. DroneEntity tickCount 隐藏父字段、canBeAffected 废弃 → 重命名/移除。
-3. 无人机碰撞箱 0.6x1.6 → 0.35x0.35（对齐模型）。
-4. "Block id not set"：BLOCKS.register 的 lambda 参数是 Identifier，
-   必须 `.setId(ResourceKey.create(Registries.BLOCK, key))` + `.noLootTable()`。
-5. 编辑台"网络协议错误"：MenuType+AbstractContainerMenu+Screen 方案导致
-   ClientboundOpenScreenPacket 问题（RegisterMenuScreensEvent 时机存疑）→
-   改为纯客户端 Screen（Minecraft.getInstance().gui.setScreen）绕开。
-   注：小包容器 UI 恢复用菜单系统（ModMenus + RegisterMenuScreensEvent），
-   目前工作正常，说明当初编辑台协议错误另有隐情（未深究）。
-6. @JvmStatic + NeoForge.EVENT_BUS.register(实例) 冲突崩溃 → 去掉 @JvmStatic。
-7. ModuleClassLoader.getResourceAsStream 在 Windows dev 崩溃
-   （WindowsPathParser 异常）→ 改用 ResourceManager / dev 文件系统读取。
-8. F3+T 热重载无效：dev 环境资源实际从 build/resources/main 加载，
-   改 src 不生效 → HtmlUiLoader 优先读源码目录文件（Path 向上两级找项目根）。
-9. 悬浮窗被 Screen 遮挡：HUD(RenderGuiLayerEvent.Post) 在 Screen 之前渲染 →
-   改用 ScreenEvent.Render.Post（Screen 渲染之后）。
-10. 编辑台背景模糊 → UiScreen.isInGameUi()=true。
-11. 悬浮窗"闪烁/几乎隐藏"：曾用 gameTime 去重（20tps）导致高帧率下每 tick
-    只画一次 → 删除去重；改为 refresh 内容缓存（仅变化时更新）。
-12. 数据不同步（多次）：
-    - WandInfoWindow：缓存 ItemStack 引用，容器同步后引用失效 →
-      改缓存 wandId，每次 refresh 用 findWandById 从 containerMenu 重新查找。
-    - SpellPouchWindow：同样改为 locatePouch() 按 pouchSlotIndex 每帧重取。
-    - 结论原则：浮窗数据永远不要缓存物品引用，每次刷新从容器解析。
-13. 复制物品 bug：ADD 时客户端清了光标但服务端未清 → 服务端 clearCarriedSpell。
-14. REMOVE 物品丢失：目标槽是小包时被覆盖、addItem 失败时物品消失 →
-    小包保护 + giveOrCarry（背包满回退光标）。
-15. 卸载永远回背包：目标槽判定依赖 hoveredSlot（渲染期更新，拖放瞬间陈旧）→
-    用坐标精确定位（Slot.x/y 是相对菜单坐标，需 + getLeftPos()/getTopPos()）。
-16. 【记录错误，已更正】当时以为 getLeftPos 运行时不存在而改用 getGuiLeft。
-    实测 26.2 源码：getLeftPos()/getTopPos() 是 NeoForge 添加的官方 getter，
-    getGuiLeft()/getGuiTop() 是 Mojang 旧 API（deprecated，内部委托 getLeftPos）。
-    两者都能用；"放错格"的真正修复是第 19/20 项的拖放重构与 pouchId。
-    【教训】~/.gradle/caches/neoformruntime/ 下存在其他项目（1.21.1）的残留缓存，
-    javap 前务必确认 jar 来源（26.2 正确产物在 build/neoForm/neoFormJoined26.2-1/）。
-17. 跨浮窗拖动缺失：法杖窗拖到小包窗被当"卸载" → ContainerWindowBase 注册表
-    + acceptExternalSpell + payload 增加 silent（源静默移除）。
-18. 【已废弃】拖出全部回退：carriedStack 快照解析 → 实测不可用，被第 19 项整体重构取代。
-19. 【已实现】拖放系统重构为"数据权威化"：
-    - 核心：槽位 stack 永远来自服务端同步（组件刷新），拖动过程不再修改槽位数据。
-      SlotDragController.pressed 不再清空槽位 → 改为 UiSlot.picked 渲染层隐藏物品；
-      released 只产生交换意图（lastSwap→SWAP 包）+ 纯视觉 SlotSwapAnimation，
-      源槽数据未破坏，天然支持"拖回/空白放回"（无需任何回退逻辑）。
-    - UiSlot 拆分渲染 drawBackground/drawItem，删除 renderOverride。
-    - 跨窗重叠输入：法杖窗与右置小包窗可能重叠（x 相同），小包窗渲染在上层但点击被
-      法杖窗抢占 → FloatingWindowManager.onMousePressed 让位
-      PouchWindowManager.isPointInsideWindow 区域。
-20. 【已实现】小包定位全面改为唯一 ID（修复跨窗复制/消失/不同步 + 放错格）：
-    - 根因 A：pouchSlotIndex（打开浮窗时的菜单槽位索引）在容器菜单切换（背包↔小包 UI）
-      后失效 → locatePouch 找不到小包（浮窗不同步）、EditPouchPayload 服务端
-      menu.getSlot(pouchSlot) 指向错误槽 → 小包端操作全部静默失败
-      （症状：小包→法杖=复制，法杖→小包=消失，小包UI中因菜单未切换而正常）。
-    - 根因 B：法杖→背包放错格（getLeftPos 本身有效，见第 16 项更正；
-      实际随第 19/20 项拖放流程重构解决）。
-    - 修复：
-      * ModItems.POUCH_ID 组件（复用 WandID 编解码），SpellPouchItem.ensurePouchId
-        （服务端手持右键时生成）。
-      * EditPouchPayload.pouchSlot → pouchId；服务端 findPouch 遍历玩家背包按 ID 定位，
-        空 ID 时兜底匹配唯一无 ID 小包并补写 ID。
-      * 客户端 SpellPouchWindow.locatePouch 遍历 player.inventory 按 ID 查找
-        （不再用菜单索引）→ 小包 UI 与浮窗双向同步。
-      * ContainerWindowBase 坐标定位改用 getLeftPos()/getTopPos()（NeoForge 官方 getter）。
-21. 【启动崩溃，已修复】"Adding duplicate value 'primalspells:wand_id' to registry"：
-    POUCH_ID 直接复用了 WandID.TYPE（同一 DataComponentType 实例）注册两次 →
-    必须为每个组件名创建独立 DataComponentType 实例（编解码可复用）。
-22. 【最新】三项体验修复：
-    - 法杖信息窗动态布局：windowHeight 原写死 92，容量 >8 时格子超出窗口 →
-      WandInfoWindow.contentHeight(slotCount) 按槽位数计算窗口高度，
-      重建网格时同步更新 window.windowHeight。
-    - 交换动画按游戏 tick 推进：原 elapsed 每渲染帧 +1（高帧率下 10 帧=瞬移）→
-      改用 Minecraft.getDeltaTracker().getGameTimeDeltaTicks() 累积（帧率无关），
-      时长 10 → 14 tick。
-    - 原版容器拖放交换（ClientContainerDragHandler + mixin @Invoker）：
-      * 26.2 原版交互依赖 clickedSlot/skipNextRelease 内部状态，无法直接复用 →
-        mixin 公开 slotClicked（AbstractContainerScreenInvokerMixin，@Invoker）。
-      * 按下容器槽位（左键、非浮窗、无携带、非 Shift、非双击）→ PICKUP 拾起并取消原版；
-        释放：目标容器槽 → PICKUP 放下/交换；空白 → 放回原槽；浮窗区域 → 交给
-        悬浮窗 tryAddFromCarried；ScreenEvent.Closing 清空拖动状态。
-      * 排除双击（250ms 同槽 → 原版拾取全部）与 Shift（保留快速移动）。
-23. 【最新】容器拖放交换三项修正（用户实测反馈）：
-    - 交换物品被拾取：单次 PICKUP 目标槽会把原物品放进光标 →
-      改为两步 PICKUP（先目标槽再原槽）实现真正互换，双方留在槽位、光标清空。
-    - 单击不能拾起：同槽释放被"放回原槽"接管 →
-      改为同槽释放不取消原版，物品保留在光标 = 原版"单击拾起"语义。
-    - 工作台冲突：CraftingScreen 内整体禁用拖放（与快速填充/合成交互冲突），
-      按下时直接跳过（原版处理一切）。
-    - 【再改】拖放交换改为 **Ctrl+左键** 触发（Minecraft.hasControlDown()）：
-      默认不按 Ctrl 时完全保持原版交互，互不干扰；释放逻辑不变。
-24. 【最新·教训】HTML 根 div 的 title 只能作为窗口标题，禁止再生成正文区面板标题：
-    - 根因：parseWindowed 把 div.title 作为窗口顶栏标题（HtmlUi.title），
-      但 convert 又把同一属性传给 UiWindow（正文区顶部面板标题）→ 双标题。
-      第一次修复：convert 增加 windowRoot 参数，根 div 不再生成面板标题（游戏内已修复）。
-      第二次复发：uichecker 预览端 buildNode 对所有 div 渲染 title 子元素
-      （.mc-panel-title），根 div 再次出现双标题。
-    - 【规则】HTML title 属性用途：
-      * 窗口根 div 的 title → 仅顶栏标题（FloatingWindow/UiScreen 标题栏）
-      * 嵌套 div 的 title → 面板标题（允许）
-      * uichecker 与游戏转换器必须同步遵守，修游戏侧必查预览端、反之亦然。
-25. 【2026-08-13 大会话】HTML 转换器全面完善 + UI 框架封装 nekoui（未推送）：
-    - HTML 转换器新功能：width/height:auto（div 按子元素边界、窗口根支持）、
-      display:flex（row/column + gap + padding + align-items:center）、新标签
-      hr/a/progress/checkbox/spell-grid（progress 支持 animated 循环动画 +
-      value 平滑过渡；checkbox 支持 target="progressId" 联动动画）、CSS 补充
-      #RRGGBBAA/rgb()/rgba()、font-size（label/button 矩阵缩放，h1~h3 自动倍率）、
-      hidden、完整 HTML 文档（html/head/body/meta/style）兼容、全部元素 id 属性、
-      classList.add/remove/toggle + <style> 类选择器（.a/.a:hover/.a.b，运行期动态匹配）。
-    - 浮窗 HTML 化：wand_info.html / pouch.html（spell-grid 占位替换动态网格），
-      HtmlUiLoader.isModified 按文件 mtime 检测热更新（改 HTML 保存即重建浮窗，
-      保留位置/追踪状态）。
-    - uichecker 网页工具（assets/primalspells/html/uichecker/index.html）：
-      浏览器打开 → 文件管理器选择或拖入 HTML → 渲染 MC 内 UI 效果；
-      布局引擎与游戏 Kotlin 逻辑 1:1（estimateWidth/Height 递归估算 + 绝对定位）。
-    - 封装：全部 ui 文件迁入 work.nekow.nekoui（NekoUi 常量对象提供
-      MODID/LOGGER，资源命名空间仍为 primalspells），宿主侧 import 改指。
-    - 修复：双标题（见 24）、label 动态文本被 wrapLines 折行（UiLabel 新增
-      wrap 参数，仅显式声明 width 才换行）、h2 宽度取整溢出（宽度乘完整 fontScale）、
-      flex 容器估算高度/宽度排除声明尺寸元素导致按钮上溢（naturalH/W 取全部
-      子元素声明值优先）。
-26. 【小包容器界面格子偏移】物品图标相对贴图格子偏左上约 2px，
-    悬停高亮能明显看出错位。排查过程（26.2 源码 + 实际贴图像素）：
-    - 26.2 源码确认物品图标渲染为 16x16 画在 (slot.x, slot.y) 起
-      （GuiRenderer.submitBlitFromItemAtlas，itemState.x()/y()，不再 +1 居中）。
-    - 悬停高亮精灵 24x24 画在 (slot.x-4, slot.y-4)，可见白色区域正好是
-      (slot.x,slot.y)~(slot.x+15,slot.y+15) —— 与物品图标完全一致。
-    - 真正根因：gen_pouch_gui.ps1 的 DrawSlot 填充操作互相覆盖（先铺 18x18
-      SLOT_BG，再画四周边框，最后 16x16 内凹只覆盖到 (x+15,y+15)），导致
-      18x18 底色的暗色在 (x+16, y+1..y+16) 与 (x+1..x+16, y+16) 各漏出 1px，
-      内凹区实际是锯齿状 17x17 → 物品看起来偏左上 ~1~2px。
-27. 【已修复】小包容器格子偏移（接 26）：DrawSlot 重写为两笔——
-    先铺 18x18 外框（BORDER_L），再铺 16x16 内凹（SLOT_BG，左上对齐 (x,y)），
-    内凹区干净 16x16 与 26.2 图标位置完全重合（右/下各 2px 外框）。
-    另发现并修复：edit 工具把 .ps1 存成无 BOM 的 UTF-8，Windows PowerShell 5.1
-    按 GBK 误读中文注释导致某行 FR 被吞 → 脚本内注释全部改纯 ASCII。
-    贴图已重新生成并同步到 build/resources/main。
-    【教训】PowerShell 5.1 脚本含中文注释时必须 UTF-8 BOM 或纯 ASCII，否则
-    注释多字节被误读可能吞掉后续代码行。
-    【待验证】用户需进游戏确认物品图标与凹区/高亮已对齐。
-28. 【已实现】小包格子完整描边（用户反馈：对齐后上/左描边消失）：
-    - 问题：凹区左上对齐 (x,y) 导致槽位只剩右/下 2px 外框，上/左无描边。
-    - 修复（两步）：
-      * 贴图：DrawSlot 改为 18x18 外框（1px 描边四边）+ 内凹 16x16 居中
-        (x+1,y+1)~(x+16,y+16)。
-      * 代码：SpellPouchScreen 重写 renderSlotContents，物品图标 +1 居中
-        （26.2 默认 (slot.x,slot.y) 起不居中），与凹区对齐。
-    - 已知：悬停高亮精灵仍由原版画在 (slot.x-4,slot.y-4)（可见区 offset 0），
-      与居中后的物品/凹区有 1px 偏差（悬停时左上角多 1px 白边，轻微）。
-      extractSlotHighlightBack/Front 为 private 难以重写，暂不处理。
-    - 【教训】26.2 物品图标不居中：要「居中凹区+完整描边」必须同时改贴图（凹区
-      +1）和屏幕渲染（图标 +1），二者缺一会重新产生 1px 偏移。
-29. 【已提交】整理并提交 git：nekoui UI 框架封装 + HTML 转换器完善 + 小包格子
-    修复，一并提交（98afc59）。同时 .gitignore 新增 .shelf/.kotlin/net/
-    opencode.json/package-lock.json/test_img 等本地垃圾。
-30. 【已实现】新增投射物「传送魔弹」(teleport, TeleportProjectile)：
-    - 效果：命中实体/方块或自然消亡（maxAge）时，把施法者传送到该位置。
-    - 命中方块取 faceNormal*0.01 偏移点（避免卡进方块）；teleported 标志防重复。
-    - 传送用 Entity.teleportTo(ServerLevel, x, y, z, Set<Relative>, yaw, pitch,
-      resetCamera=true)，26.2 新 API（Set<Relative> 空集即可）。
-31. 【已实现】新增修正「量子纠缠」(quantum_entanglement, QuantumEntanglement)：
-    - 效果：把下一个投射物复制两份，复制体环绕主投射物做正弦（sin）运动，
-      主+复制体互为纠缠，任一死亡则全部死亡。
-    - 实现：修正效果 onActive 时 projectile.clone() 两次（clone() 给基础投射物
-      不带修正），每个复制体挂 OrbitEffect（每 tick 设 pos=主位置+sin 偏移、
-      velocity 置 0 避免 Move 叠加位移），主与复制体共享 EntanglementLink，
-      LinkEffect/OrbitEffect 每 tick propagateDeath()（任一 !alive → 全部 alive=false）。
-    - 已知：复制体 velocity=0，仅视觉环绕、不独立碰撞伤害（主投射物负责伤害）。
-    - 资源：items/models/textures/lang 已同步（teleport / quantum_entanglement）。
-32. 【教训】PowerShell 5.1 下 gen_item_textures.ps1 的 FC 函数名与内置别名
-    `fc`(Format-Custom) 冲突，别名优先级高于函数 → FC 调用全部静默失败、贴图
-    缺填充圆。已重命名 FC → FillCircle。另发现已提交贴图与当前脚本生成结果
-    不一致（旧贴图为更早脚本版本产物），本次仅新增 teleport/quantum_entanglement
-    两张，未改动其余 34 张。
-33. 【已修复】触发火球在无后续法术时重新抽取自身（用户反馈）：
-    - 根因：Wand.castHand 开头就 discard() → reloadIfNeeded() 把 drawPile 整副
-      重置（load() 从 innate+magics 重建），随后 loadPayload 的 draw() 从重置后
-      的牌堆抽取，把刚施放的触发火球（含自身）又抽回来当 payload。
-    - 修复：castHand 的 discard() 移到 for 循环之后；discard(magics)（payload
-      弃牌）移除 reloadIfNeeded()。这样 payload 抽取发生在牌堆重置之前，
-      单张触发火球时 payload 为空（等效普通火球）。
-34. 【已修复】创造模式下从浮窗拖出法术应删除而非放回背包（用户反馈）：
-    - ContainerWindowBase.tryRemoveToContainer 回退分支：创造模式
-      （player.abilities.instabuild）且未落到具体容器槽（target<0）时，
-      改为 syncRemove(..., silent=true) 直接删除（不发放物品）。
-35. 【已优化】悬浮窗与物品处理代码：
-    - ModItems 新增 spellItem(id) / spellIdOf(item) 两个查询助手，
-      消除 ContainerWindowBase / PrimalSpells 里重复的 MAGICS 遍历。
-    - PrimalSpells 抽出 placeOrGive(player, targetSlot, item) 助手，
-      EditPouchPayload / EditWandPayload 的 ACTION_REMOVE 目标槽放置/交换/回退
-      逻辑（约 40 行重复）合并为一处。
-    - findPouch/clearCarriedSpell 等全限定名改 import + 助手。
-36. 【已修复】悬浮窗渲染层级 + 小包窗显示/关闭行为（用户反馈 4 项）：
-    - 问题 1「浮窗盖在鼠标所持物品上方」：浮窗原在 ScreenEvent.Render.Post
-      （整屏渲染后）绘制，因此盖在拖拽物品与 tooltip 之上。
-      修复：容器屏幕（AbstractContainerScreen）改在
-      ContainerScreenEvent.Render.Foreground 绘制——该事件在槽位之后、拖拽物品与
-      tooltip 之前触发；但它在 extractContents 内、pose 已 translate 到菜单原点，
-      需先 pushMatrix + translate(-getLeftPos, -getTopPos) 重置回屏幕坐标。
-      非容器屏幕（编辑台等，无拖拽物品）仍用 ScreenEvent.Render.Post；
-      Post 处理器对 AbstractContainerScreen 直接 return 避免与 Foreground 重复。
-    - 问题 2「指向其他物品时小包窗消失」：删除 PouchWindowManager 里
-      「悬停容器槽位即隐藏」的分支。
-    - 问题 3「关闭 UI 时小包窗未消失」：删除小包窗 HUD 层渲染（onRenderGuiLayer），
-      新增 onScreenClose 同步隐藏。
-     - 问题 4「悬浮查看法杖法术槽位不更新」：
-       根因 rebuildSlots 首次重建时把 HTML spell-grid 占位符替换为槽位后，
-       占位符从 window.content 移除；后续槽位数变化再次重建时找不到占位符，
-       window.content 仍是旧槽位（grid 已指向新网格，但渲染的 content 未更新）。
-       修复：缓存占位符坐标（x/y/perRow），重建用 replaceSlots 按旧槽位实例替换。
-37. 【已实现】删除槽位交换动画，保留原版瞬时交换（用户要求）：
-    - 删除 SlotSwapAnimation 类；SlotDragController 移除动画状态（animation/tick/
-      isAnimating/hasAnimationFor/renderAnimatedSlot/isPickedUp），released 仅记录
-      lastSwap 交换意图，无飞行动画。
-    - FloatingWindow 移除动画分支渲染；UiSlot 的 drawBackground/drawItem 仅内部使用。
-38. 【已重构】悬浮窗法术槽位 spell-grid 同步逻辑（用户要求换新方法）：
-    - 根因：旧 SpellSlotGrid 每次槽位数变化都整体重建网格并替换 window.content，
-      占位符替换/旧槽位追踪脆弱，导致"更改法术时槽位消失"。
-    - 新设计：SpellSlotGrid 改为「可变槽位的 UiElement」（内部 slots 列表），
-      网格对象固定；setCount 只增删内部槽位（已有槽位对象不变；槽位数变化时重置
-      lastSpells 强制下次 refresh 重填），refresh 仅更新 slot.stack。
-      构建时由占位符确定坐标后整体替换为网格，之后不再动 window.content。
-    - FloatingWindow 通过新增 SlotProvider 接口（spell-grid 实现）统一收集槽位
-      （allSlots），拖拽/tooltip 与具体网格解耦。
-    - ContainerWindowBase 新增 slotIndexAt 复用「屏幕坐标→槽位索引」，消除重复计算。
-39. 【已优化】清理死代码、降低耦合（用户要求整体优化）：
-    - 删除未用成员：FloatingWindow.collapsedHeight、SlotDragController.isPickedUp、
-      renderCarried 的 font 参数、ContainerWindowBase.allWindows、
-      SpellPouchWindow.placeAtRight 的 screenH 参数。
-    - 修正过时注释（FloatingWindow/UiSlot 文档）。
-40. 【已修复】物品交互复查（用户反馈仍有问题）：
-    - 法杖滚轮选择槽位不同步（真实 bug）：onMouseScrolled 原在客户端直接
-      slot.item.set(WAND_SELECTED_SLOT)，但物品组件仅服务端权威、客户端修改不
-      同步，导致右键装卸（WandItem.selectedSlot）仍读旧槽位。修复：新增
-      SelectWandSlotPayload（客户端→服务端），滚轮本地更新 tooltip + 发包让服务端
-      写组件（同步回客户端）。
-    - 复用封装：WandItem.findMagic/makeStack、ClientTooltipHandler、WandSpellTooltip、
-      PouchTooltip 全部改用 ModItems.spellItem/spellIdOf 助手，消除 MAGICS 遍历重复。
-41. 【已重构】悬浮窗基础类拆分 + 四项交互修复（用户要求统一解决反复出现的问题）：
-    - 【为什么会反复出现】法杖窗与小包窗各自重复实现"按 ID 定位物品→读组件→
-      刷新 UI→物品丢失处理"，细节各不相同（缓存引用/空 ID 兜底/丢失处理不一），
-      每修一处另一处又出新问题。根源：没有统一的"追踪物品的浮窗"抽象。
-    - 【基础类】新增 TrackedContainerWindow（nekoui/common/）：
-      * 每次 refresh 都重新按 ID 定位（手持/副手/背包），绝不缓存 ItemStack 引用
-      * 定位不到 → onLost()（默认隐藏窗口+清除 ID，子类可覆盖）
-      * 网格统一 updateGrid（先 setCount 后 refresh，槽位数变化自动重填）
-      * 子类只实现 idOf/matches/spellsOf/slotCountOf + onContentChanged/onLost
-    - WandInfoWindow / SpellPouchWindow 改为继承该基类，删除各自重复的
-      findWandById/locatePouch/pouchStack/rebuildSlots 等逻辑。
-    - 修复 1「小包浮窗不同步」：基类 relocate 覆盖副手；matchesId 空 ID 兜底
-      （匹配第一个小包并补上服务端分配的 ID）。
-    - 修复 2「小包 tooltip 槽位数量不对」：ClientPouchTooltip 改为固定 16 格
-      （2 行×8，与浮窗一致），空槽留空。
-    - 修复 3「拖到创造栏回到快捷栏」：创造模式一律 silent 删除（客户端），
-      placeOrGive 服务端兜底（instabuild 直接丢弃），不再受目标槽检测影响。
-    - 修复 4「丢弃小包后浮窗不关闭」：基类 onLost 统一隐藏窗口。
-    - 【修正】上一轮误删 PouchEventHandler 的 pouchSlot/extraData —— 客户端
-      ModMenus 菜单工厂按该索引取物品引用，必须保留（已恢复）。
-42. 【已提交】用户反馈"基本修复了"，本轮改动全部提交（含 1~41 各次改动）。
-    - 遗留问题（下次继续）：
-      * 法术小包物品栏（tooltip/容器 UI）未显示出内部存储的法术：
-        建议按法杖的方式重构存储——服务端权威对象（类似 WandManager 的
-        PouchManager 存 Magic 列表）+ 物品组件派生同步（如 tickSync），
-        当前仅靠 SPELL_POUCH_CONTENTS 组件单向写入，链路不完整。
-      * 悬浮窗中往外拖拽物品仍有概率消失：待查（疑似拖拽释放与同步的
-        竞态，或 placeOrGive/giveOrCarry 在特定菜单状态下的回退路径）。
-43. 【已实现】被动法术系统（onInventoryTick 机制）+ 首个被动法术「能量盾」：
-    - Magic：新增 open var needInventory（默认 false）+ open fun onInventoryTick()。
-    - Wand：新增 loadedMagics 缓存（load() 时 = innate + magics 实例重建），
-      reloadIfNeeded 改为「drawPile = loadedMagics + 清 discardPile + 保留
-      recharge 累加」（不再调 load()，避免递归；语义与旧 load() 等价）。
-    - Wand.tick(caster: Entity? = null)：caster 非空时对 needInventory 的法术
-      设置 caster/wand 后调 onInventoryTick；法力/delay 维护仍只在 caster 为
-      null（WandManager.tick）时执行，避免双倍结算。
-    - WandItem.inventoryTick：slot == MAINHAND/OFFHAND 时调 getWand(stack).tick(owner)
-      → 被动仅在法杖位于手上时触发（满足需求）。
-    - 【原版坑】主手持物品每 tick 触发两次 inventoryTick（Inventory.tick 选中槽
-      传 MAINHAND + EntityEquipment.tick 主手），Wand 按 caster.level().getGameTime()
-      去重，每游戏 tick 只驱动一次被动。
-    - 【坑】lateinit 属性在子类中无法用 ::isInitialized 检查（backing field 不可达），
-      改为直接访问；MagicManager 中投射物均先设 caster 再 add，保证安全。
-    - EnergyShield（magic/revise/，继承 Revise，effects 为空 = 修正效果无副作用）：
-      参数 maxDurability=100 / regenPerSecond=10/s / breakPauseTicks=200 /
-      bounceCost=5 / shieldRadius=1.5。每 tick：破盾暂停→回复；扫描
-      MagicManager.projectiles，弹开「hitRadius>0、非己方、在玩家 AABB+半径内、
-      正在靠近」的法术（反射 velocity，推向玩家法线方向 0.05 推出），每次扣耐久，
-      归零进入 breakPause。
-    - 判定细节：只弹开正在靠近的弹（velocity·外法线 < 0），避免把已掠过的弹弹回；
-      不弹自身法术（出生点在玩家眼前，否则出生即被弹回）；hitRadius<=0（爆炸点等）
-      不弹。
-    - 已知（v1 接受）：耐久状态存于 Magic 实例，服务端重启后按 id 重建会重置；
-      不弹自身 selfDamage 法术。
-    - 资源：items/models/textures（energy_shield.png 单独生成脚本
-      gen_energy_shield.ps1，未改动其他贴图）/lang（zh+en）/Lore 新增
-      DURABILITY/REGEN/BREAK_PAUSE/BOUNCE_COST 四类。
-44. 【已实现】能量盾粒子效果 + HUD 盾条（用户反馈两项）：
-    - 粒子：护盾激活期间每 tick 在护盾表面（眼睛位置为球心、半径 1.25 的球面）
-      随机生成 6 个 ELECTRIC_SPARK（speed 0.02 外飘）；弹开命中时在投射物位置
-      爆闪 14 个 ELECTRIC_SPARK + 5 个 END_ROD。破盾期间无粒子（视觉可区分）。
-      用 ServerLevel.sendParticles(ParticleOptions, x,y,z, count, xDist,yDist,zDist, speed)。
-    - HUD 盾条（ShieldHudRenderer，RenderGuiLayerEvent.Post + VanillaGuiLayers.PLAYER_HEALTH）：
-      * 位置：心形条底行 y = guiHeight - 39（9px 高），盾条画在 guiHeight - 29
-        （下方 1px 留白），x 与心形条左对齐（guiWidth/2 - 91），宽 80 高 3 + 描边。
-      * 蓝条 = 当前耐久/最大；橙条 = 破盾暂停进度（1 - pauseTicks/breakPauseTicks）。
-      * 仅生存/冒险显示（mc.gameMode.canHurtPlayer()，与心形条条件一致）。
-      * 数据同步：SyncShieldPayload（playToClient，含 wandId/durability/maxDurability/
-        pauseTicks/breakPauseTicks）；EnergyShield.onInventoryTick 末尾 syncClient()
-        按状态变化发包（实例字段 lastSent 去重，注意不能放 companion，多玩家会互踩）。
-        客户端按持有法杖 wandId 从 shieldMap 取数据（与 statsMap 同模式），
-        换杖/放下后无数据自然隐藏。
-    - 【已改】用户反馈 HUD 盾条不显示 → 改为与充能/延迟条同风格渲染在准星下方
-      （VanillaGuiLayers.CROSSHAIR 层，中心对齐，y = guiHeight/2 + 18，宽 60 高 3），
-      并删除 canHurtPlayer 生存限制（充能条创造模式也显示；原实现创造模式必隐藏，
-      疑为主要原因）。
-    - 【教训】本次 EnergyShield 改动被 IDE 打开着的旧缓冲覆盖回滚过一次
-      （用户侧保存覆盖磁盘），重做后已确认磁盘内容 + 编译通过；
-      IDE 有文件打开时需留意冲突。
-    - 26.2 HUD 布局备忘：leftHeight 初始 39；心形条底行 y = guiHeight - leftHeight，
-      多行向上排（yo = yLineBase - row*rowH）；盔甲条在心上 10px
-      （y = guiHeight - leftHeight(49) + 10 - 10）；食物/气泡在右半边同高度带。
-45. 【已实现】测试木桩实体 + 物品（伤害测试靶子）：
-    - TestDummyEntity 继承 ArmorStand（复用原版盔甲架模型/渲染，无需新模型）：
-      * 血量 = int 上限（createAttributes = ArmorStand.createAttributes() +
-        MAX_HEALTH, Int.MAX_VALUE）
-      * hurtServer 重写：amount <= 0 一律 false（治疗归零）；头顶生成伤害数字；
-        任何伤害都不致死（生存/创造皆然，回收见下方【已改】）
-      * heal() 空实现（不接受治疗）；knockback 6 参数版空实现（5 参数版委托 6 参数版，
-        覆盖 6 参数版即可同时拦截，木桩不受击退）
-    - DamageNumber（伤害数字）extends Display.TextDisplay（26.2 重构后所有 setter
-      私有，唯一数据入口是 protected readAdditionalSaveData(ValueInput)）：
-      * 构造 CompoundTag（text 经 ComponentSerialization.CODEC + NbtOps 编码、
-        background=0 透明背景）→ TagValueInput.create(ProblemReporter.DISCARDING,
-        level.registryAccess(), tag) → readAdditionalSaveData
-      * tick 内每 tick +0.05 向上飘动，30 tick 后 discard
-      * 实体类型用原版 EntityTypes.TEXT_DISPLAY（spawn 到客户端自动用原版渲染，
-        无需客户端注册）；text 红色 "-N"（Lore.formatDouble 格式化）
-    - TestDummyItem：放置逻辑照抄 ArmorStandItem.useOn（点击面朝下失败、
-      BlockPlaceContext(context).clickedPos 定位、尺寸碰撞检测、yRot 45° 吸附
-      snapTo、放置音效 ARMOR_STAND_PLACE、消耗 1 个）
-    - 渲染：PrimalSpellsClient 里 ArmorStandRenderer(ctx) 强转
-      EntityRenderer<TestDummyEntity, ArmorStandRenderState> 复用（TestDummy 是
-      ArmorStand 子类，运行时安全，泛型不变需显式转换）
-    - 26.2 备忘补充：EntityType 静态字段在 EntityTypes（复数）类（如
-      EntityTypes.TEXT_DISPLAY/ARMOR_STAND）；Attributes 包为
-      net.minecraft.world.entity.ai.attributes.Attributes；放置实体用
-      Entity.snapTo(x,y,z,yRot,xRot)（moveTo 已不存在？编译报 unresolved）；
-      knockback 签名为 (double,double,double,DamageSource,float[,boolean])；
-      ItemStack(DeferredItem) 有 ItemLike/Holder 二义性需 .get()。
-    - 资源：items/models/textures（gen_test_dummy.ps1）/lang（zh+en 物品+实体名）。
-    - 【已改】伤害数字三连优化（用户反馈）：
-      * 始终面向玩家：billboard=center（NBT "billboard" 字符串，"fixed"/"vertical"/
-        "horizontal"/"center"，readAdditionalSaveData 经 BillboardConstraints.CODEC 读取）
-      * 跳出动画：每 tick 重新 readAdditionalSaveData 更新 transformation——
-        缩放 ease-out 0.35→1.0（先快后慢，12 tick 内完成）+ 向上飘动 0.9 格
-        （ease-out，30 tick 全程）；tag 固定带 interpolation_duration=8 +
-        start_interpolation=0，客户端每次 entityData 同步都会重新锚定平滑插值，
-        弥补 3 tick 的 entityData 同步粒度；上升也从 setPos 改为 transformation
-        translation（translation 属 RENDER_STATE_IDS 全量同步，比移动包平滑）
-      * 明亮红：TextColor.fromRgb(0xFFFF4545) + bold（ChatFormatting.RED 偏暗）；
-        【坑】0xFFFF4545 超出 Int 范围会被 Kotlin 推断为 UInt，const val 需
-        .toInt() 或显式类型；Entity.level 字段 26.2 已私有，访问用 level()
-    - 【已改】木桩回收方式（用户反馈）：删除创造模式击杀回收 → 改为
-      **空手右键回收**（interact 重写：空手 → 掉落木桩物品 + 全部装备后 kill，
-      客户端返回 SUCCESS_SERVER；手持物品 → super.interact 保持盔甲架穿戴行为）；
-      生存/创造下任何伤害都只显示数字，木桩放出来后无法打死，只能空手右键回收。
-      【坑】26.2 Player 在 net.minecraft.world.entity.player.Player 包
+1. 26.2 迁移：按新渲染管线（EntityRenderState + SubmitNodeCollector.submitModel）
+   补齐 entity 渲染类；BLOCKS.register 需 setId(ResourceKey) + noLootTable()。
+2. 编辑台"网络协议错误"：MenuType 方案 → 纯客户端 Screen 绕开；
+   小包容器 UI 恢复用菜单系统且正常（编辑台错误未深究）。
+3. dev 资源加载：ModuleClassLoader 在 Windows dev 崩溃 → ResourceManager/文件系统；
+   HTML 优先读源码目录（Path 向上两级找项目根），改 HTML 保存即热重建浮窗
+   （HtmlUiLoader.isModified 按 mtime 检测，保留位置/追踪状态）。
+4. 浮窗渲染层级：HUD 层在 Screen 之前 → ScreenEvent.Render.Post（Screen 后）；
+   后改容器屏幕用 ContainerScreenEvent.Render.Foreground（低于拖拽物品/tooltip，
+   pose 已 translate 需 pushMatrix + translate(-getLeftPos,-getTopPos) 重置），
+   非容器屏幕仍用 Post（Post 处理器对容器屏幕直接 return 防重复）。
+5. 浮窗闪烁：gameTime 去重在高帧率下每 tick 只画一次 → 删去重，改内容缓存。
+6. 【原则】浮窗数据绝不缓存物品引用，每次 refresh 从容器/背包按 ID 重取
+   （TrackedContainerWindow 基类统一实现：按 ID 定位手持/副手/背包 → 网格
+   updateGrid → 丢失 onLost 隐藏窗口）。
+7. 拖放系统重构"数据权威化"：槽位 stack 永远来自服务端同步，拖动只做渲染层
+   隐藏（UiSlot.picked）+ 释放产生交换意图（lastSwap→SWAP），源槽数据不破坏，
+   天然支持拖回/放空。跨窗拖动经 ContainerWindowBase 注册表 + acceptExternalSpell。
+8. 小包定位全面改为唯一 ID（POUCH_ID 组件，独立 DataComponentType 实例——
+   同一实例注册两次会 "duplicate value" 崩溃）：EditPouchPayload.pouchSlot→pouchId，
+   服务端/客户端均遍历背包按 ID 查找，修复复制/消失/不同步/放错格。
+9. 原版容器拖放交换：mixin @Invoker 公开 slotClicked；Ctrl+左键按下拾起、
+   释放到容器槽两步 PICKUP 互换（先目标槽再原槽，物品留槽光标清空）、
+   同槽释放不取消原版（=单击拾起）、CraftingScreen 内整体禁用。
+10. HTML 转换器：width/height:auto、display:flex、hr/a/progress/checkbox/
+   spell-grid 标签、#RRGGBBAA/rgb()/rgba()、font-size 缩放、hidden、
+   完整 HTML 文档兼容、id/classList + <style> 类选择器（:hover 动态匹配）。
+   【规则】窗口根 div 的 title 仅顶栏标题；嵌套 div 的 title 才是面板标题
+   （uichecker 预览端与游戏转换器必须同步遵守）。
+11. 触发火球无后续法术时重抽自身：castHand 的 discard() 移到 for 循环后，
+   payload 抽取发生在牌堆重置之前。
+12. 被动法术系统（onInventoryTick）+ 能量盾【已验证】：
+   Magic.needInventory + onInventoryTick()；Wand.tick(caster) 驱动
+   （WandItem.inventoryTick 仅 MAINHAND/OFFHAND；主手每 tick 触发两次需按
+   gameTime 去重）；EnergyShield：耐久 100/回复 10/s/破盾暂停 200tick，
+   弹开接近的非己方投射物（反射 velocity + 推出），HUD 盾条在准星下方
+   （SyncShieldPayload 按状态变化去重发包）。
+13. 测试木桩 + 伤害数字【已验证】：TestDummyEntity 继承 ArmorStand
+   （血量 int 上限、伤害只显示数字、空手右键回收）；DamageNumber 继承
+   TextDisplay（数据经 readAdditionalSaveData + TagValueInput），
+   billboard=center 始终面向玩家、跳出动画经 transformation 每 tick 重写 +
+   interpolation_duration=8 平滑、亮红 0xFFFF4545 粗体。
+14. 其他小修：法杖滚轮选槽需走服务端（SelectWandSlotPayload）；创造模式浮窗
+   拖出直接删除；castHand 弃牌顺序；HUD 盾条移至准星下方；伤害数字动画等。
+15. 【已实现】非法杖全部物品贴图重绘为 64x64 名称贴图（把物品名直接写在贴图上）：
+    - 脚本 gen_name_textures.ps1（temp\opencode\）：深蓝圆底 + 分类色描边
+      （投射物橙/修正青/小包紫/木桩灰）+ 白色粗体名称（黑描边，>4 字分两行，
+      字号自适应 52px 宽），名称从 zh_cn.json 读取（脚本纯 ASCII）。
+    - 顺带修复 speed_getter 缺失的 lang 条目（zh+en）与 models/item 模型 json。
+    - 【坑】本机无 "Microsoft YaHei" 英文字体名（仅 "Microsoft YaHei UI"），
+      GDI+ 缺失字体静默回退不可靠 → 必须先用 InstalledFontCollection 确认
+      字体名（可列表写入文件避免控制台 GBK 乱码），再用确定存在的字体。
+    - 已同步 build/resources/main。
 
-----------------------------------------------------------
+------------------------------------------------------------
 三、26.2 易踩坑技术点（务必记住）
------------------------------------------------------------
-- 26.2 API 勘误（与 1.21.x 的差异）：
-  * ClickType → ContainerInput（PICKUP/QUICK_MOVE/SWAP/CLONE/THROW/PICKUP_ALL）
-  * Minecraft.getTimer() → getDeltaTracker()（返回 DeltaTracker）
-  * net.minecraft.Util → net.minecraft.util.Util
-  * Screen.hasShiftDown() 静态方法已移除 → Minecraft.getInstance().hasShiftDown()
-  * AbstractContainerScreen：getLeftPos()/getTopPos()（NeoForge getter）、
-    getHoveredSlot()（NeoForge getter）；getGuiLeft()/getGuiTop()/getSlotUnderMouse()
-    已 deprecated（委托新方法）
-  * 传送：Entity.teleportTo(ServerLevel, x, y, z, Set<Relative>, yaw, pitch,
-    resetCamera)；简单版 teleportTo(double,double,double) 只是 snapTo 不给客户端
-    发包，玩家必须用带 ServerLevel 的版本。Set<Relative> 用 emptySet()。
-  * SoundEvents 常量类型混杂：老的是 SoundEvent（如 ENDERMAN_TELEPORT），
-    新的是 Holder.Reference<SoundEvent>（如 GENERIC_EXPLODE 需 .value()）。
-  * PowerShell 5.1：脚本函数名不能撞内置别名（FC→Format-Custom），别名优先级
-    高于函数；且 .ps1 含中文注释必须 UTF-8 BOM 或纯 ASCII，否则误读吞代码行。
-  * 【物品每 tick 驱动】Item.inventoryTick(stack, level, owner, EquipmentSlot?)：
-    主手持选中槽每 tick 触发两次（Inventory.tick 传 MAINHAND + EntityEquipment.tick
-    传 MAINHAND），副手一次（OFFHAND），背包其他槽传 null。需每 tick 只执行一次的
-    逻辑（被动效果）务必按 level.getGameTime()（LevelAccessor）去重。
-  * 【Kotlin】lateinit 属性的 ::isInitialized 只能在同属主/可达 backing field 的
-    作用域使用，子类跨包访问会编译报错「backing field not accessible」。
-  * JOML Vector3f：normalize()/reflect()/dot() 均为原地修改并返回自身。
-- javap 验证类时注意 ~/.gradle/caches/neoformruntime/ 可能混有其他项目版本
-  （如 1.21.1）的残留 jar，26.2 正确产物在 build/neoForm/neoFormJoined26.2-1/。
-- 物品模型：assets/<ns>/items/<name>.json（ItemModelDefinition）引用
-  models/item/<name>.json。缺 items/*.json 则物品贴图不生效。
-- GUI atlas 只扫描 textures/gui/sprites/；容器背景是直接纹理
-  textures/gui/container/*.png + graphics.blit(RenderPipelines.GUI_TEXTURED,
-  id, x, y, 0f, 0f, imageWidth, imageHeight, 256, 256)（照抄 CraftingScreen）。
+------------------------------------------------------------
+- API 勘误（与 1.21.x 差异）：
+  * ClickType → ContainerInput；Minecraft.getTimer() → getDeltaTracker()
+  * net.minecraft.Util → net.minecraft.util.Util；Player 在
+    net.minecraft.world.entity.player.Player
+  * Screen.hasShiftDown() 移除 → Minecraft.getInstance().hasShiftDown()
+  * AbstractContainerScreen：getLeftPos()/getTopPos()/getHoveredSlot()
+    （NeoForge getter）；getGuiLeft/getGuiTop/getSlotUnderMouse deprecated
+  * 传送：Entity.teleportTo(ServerLevel, x,y,z, Set<Relative>, yaw,pitch,
+    resetCamera)；简单版 teleportTo(x,y,z) 只是 snapTo 不给客户端发包
+  * SoundEvents 常量混杂：老 SoundEvent / 新 Holder.Reference（需 .value()）
+  * EntityType 静态字段在 EntityTypes 类（EntityTypes.TEXT_DISPLAY）；
+    Attributes 包为 net.minecraft.world.entity.ai.attributes.Attributes
+- 物品每 tick 驱动：主手选中槽每 tick 触发两次 inventoryTick（Inventory.tick
+  + EntityEquipment.tick），需按 level.getGameTime() 去重。
+- Kotlin：lateinit 的 ::isInitialized 在子类/跨包作用域编译报错；
+  JOML Vector3f 的 normalize/reflect/dot 均原地修改返回自身；
+  0xFFFF4545 类字面量超出 Int 范围需 .toInt() 或显式类型。
+- PowerShell 5.1：函数名不能撞内置别名（FC→Format-Custom，别名优先）；
+  .ps1 中文注释必须 UTF-8 BOM 或纯 ASCII，否则多字节误读吞代码行。
+- javap 验证类时 ~/.gradle/caches/neoformruntime/ 可能混有旧版本残留 jar，
+  26.2 正确产物在 build/neoForm/neoFormJoined26.2-1/。
+- 物品模型：assets/<ns>/items/<name>.json 引用 models/item/*.json，缺则贴图不生效。
+- GUI atlas 只扫描 textures/gui/sprites/；容器背景用 textures/gui/container/*.png
+  + graphics.blit(RenderPipelines.GUI_TEXTURED, id, x, y, 0f, 0f, iw, ih, 256, 256)。
 - Slot.x/y 是相对菜单坐标，屏幕坐标 = getLeftPos()+slot.x。
-- ScreenEvent.Render.Post 在 Screen 渲染后触发（浮窗最上层）；
-  RenderGuiLayerEvent.Post(HUD) 在 Screen 之前。
 - Screen.isInGameUi() 控制背景模糊/暗化与 HUD 显示。
-- NeoForge.EVENT_BUS.register(对象) 的 @SubscribeEvent 方法不能 @JvmStatic。
-- 客户端发包用 ClientPacketDistributor.sendToServer（不是 PacketDistributor）。
-- 输入体系：mouseClicked(MouseButtonEvent, boolean)、keyPressed(KeyEvent)；
+- NeoForge.EVENT_BUS.register(对象) 的 @SubscribeEvent 不能 @JvmStatic。
+- 客户端发包用 ClientPacketDistributor.sendToServer。
+- 输入：mouseClicked(MouseButtonEvent,boolean)、keyPressed(KeyEvent)；
   ScreenEvent.MouseButtonPressed/Dragged/Released.Pre 可拦截并 event.isCanceled。
-- 构建/改资源前先结束游戏进程（Windows 文件锁）。
-- dev 改 src 资源后需 processResources 或重启（build/resources/main 才生效）；
-  HTML 例外（dev 直接读源码目录）。
+- 构建/改资源前先结束游戏进程（Windows 文件锁）；dev 改 src 资源需
+  processResources 或重启（HTML 例外，直接读源码目录）。
+- IDE 打开着的旧缓冲可能覆盖磁盘：改完务必确认磁盘内容 + 编译通过。
+- 26.2 HUD 布局：leftHeight 初始 39；心形条底行 y = guiHeight - leftHeight；
+  物品图标渲染 16x16 画在 (slot.x, slot.y)，不 +1 居中；悬停高亮 24x24
+  画在 (slot.x-4, slot.y-4)。
 
 ------------------------------------------------------------
 四、UI/交互架构现状
 ------------------------------------------------------------
-- 法杖信息浮窗（FloatingWindowManager）：
-  * 打开游戏内 UI（isInGameUi）时显示最小化窄顶栏（右侧 56px）；
-  * 悬停物品栏中的法杖（hoveredSlot.item is WandItem）→ 展开；
-  * 移出不自动收起；点 × 后 userClosed，再悬停法杖重新显示；
-  * 内容：蓝量/容量(含 size)/充能/施放数 + 动态法术槽网格（8/行）。
-- 小包悬浮窗（PouchWindowManager）：
-  * 已有 UI 时右键容器槽位小包 → 悬浮窗（拦截原版拾取）；
-  * 手持右键小包 → 服务端容器 UI（PouchEventHandler.openMenu + extraData）。
-  * 渲染：容器屏幕用 ContainerScreenEvent.Render.Foreground（低于拖拽物品/tooltip，
-    pose 需重置），非容器屏幕用 ScreenEvent.Render.Post；UI 关闭时同步隐藏。
-- 槽位拖拽（SlotDragController，数据权威化）：
-  * 拾起（渲染层隐藏 picked）、拖拽跟手、松开放到目标槽产生交换意图（原版瞬时交换）；
-    槽位 stack 永远以服务端同步为准，拖动过程不修改数据。
-- 法术槽位网格（SpellSlotGrid，可变槽位的 UiElement）：
-  * 网格对象固定，setCount 只增删内部槽位，refresh 按法术列表更新 stack；
-    构建时由 spell-grid 占位符确定坐标后整体替换，之后不再改动 window.content。
-- 投放决策（ContainerWindowBase.tryRemoveToContainer）三级：
-  跨浮窗(acceptExternalSpell) > 容器槽位(坐标定位放置/交换) > 背包回退。
-  拖动内容 = ctrl.carriedStack()（拾起瞬间权威快照，源槽数据未被破坏）。
+- 法杖信息浮窗：打开游戏内 UI 显示最小化窄顶栏；悬停背包法杖展开；点 × 后
+  userClosed，再悬停重显；内容：蓝量/容量/充能/施放数 + 法术槽网格（8/行，
+  windowHeight 按槽位数动态计算）。
+- 小包悬浮窗：已有 UI 时右键容器槽位小包 → 悬浮窗；手持右键 → 容器 UI。
+- 槽位拖拽：拾起渲染层隐藏、拖拽跟手、释放产生交换意图（原版瞬时交换，
+  无飞行动画）；槽位 stack 永远以服务端同步为准。
+- 法术槽网格（SpellSlotGrid）：可变槽位 UiElement，网格对象固定，setCount 只
+  增删内部槽位，refresh 只更新 slot.stack；构建时替换 spell-grid 占位符后
+  不再动 window.content。
+- 投放决策（ContainerWindowBase.tryRemoveToContainer）三级：跨浮窗 >
+  容器槽位（坐标定位）> 背包回退；创造模式 silent 删除；拖动内容 =
+  ctrl.carriedStack() 权威快照。
+- 抽象基类 TrackedContainerWindow：按 ID 定位（手持/副手/背包）→ 网格更新
+  → 丢失处理，法杖窗/小包窗共用。
 
------------------------------------------------------------
-五、待办 / 已知问题（下次继续）
------------------------------------------------------------
-- 【未解决·下次】悬浮窗中往外拖拽物品仍有概率消失：待查竞态/回退路径，见 42。
-- 【已实现】被动法术系统 + 能量盾（见 43/44）：需实测能量盾弹开效果与参数平衡；
-  已知耐久重启重置、不弹自身 selfDamage 法术。
-- 【待测】被动法术：能量盾编入法杖→手持（主/副手）时生效，放下/换手停止；
-  破盾暂停→回复→再弹开全流程。
-- 【待测】测试木桩（见 45）：伤害数字弹出动画/面向玩家/亮红效果，空手右键回收，
-  手持物品穿戴；木桩放出来后无法击杀。
-- 【待验证·最高优先】小包容器界面格子偏移 ~2px（见修复历史 26/27/28）：
-  已定位根因为 DrawSlot 填充互相覆盖导致内凹区锯齿状 17x17，并重写脚本使内凹
-  区干净 16x16 与图标完全重合；后续又按用户反馈补全四边描边（凹区居中 +1，
-  物品图标在 SpellPouchScreen.renderSlotContents 中 +1 居中）。需用户进游戏
-  确认最终效果（对齐 + 完整描边）。已知悬停高亮仍有 1px 偏差（见 28）。
-- 【未验证】本轮多项改动待用户实测：按钮行对齐（naturalH 修复）、
-  checkbox target 联动进度条动画、uichecker 与游戏布局一致（div 宽度）、
-  编辑台示例（class/:hover/进度条/checkbox）。
-- 【未推送】封装 nekoui 包 + 全部 UI/转换器改动未提交（含 uichecker、
-  示例 HTML、修复），确认后按"UI 框架封装与 HTML 转换器完善"提交。
-- 已知：副手小包不在 locatePouch/findPouch 遍历范围（inventory.containerSize=36
-  不含副手），若需要可补副手槽。
-- 已知：跨浮窗拖到目标"有物品"槽 → 目标服务端 ADD 交换逻辑会把原法术
-  放入玩家光标（而非换回源窗）。可接受或后续优化。
-- 小包容器 UI quickMoveStack 为简单实现。
+------------------------------------------------------------
+五、待办 / 已知问题
+------------------------------------------------------------
+- 【未解决】悬浮窗往外拖拽物品仍有概率消失：待查竞态/回退路径。
+- 【暂停】小包相关问题暂不跟进（容器格子对齐、悬停高亮 1px 偏差、
+  小包物品栏不显示内部法术等）。
+- 已知：能量盾耐久存于 Magic 实例，服务端重启按 id 重建会重置；不弹自身
+  selfDamage 法术；量子纠缠复制体不独立碰撞伤害。
+- 已知：跨浮窗拖到目标"有物品"槽 → 交换逻辑把原法术放玩家光标（可接受）。
+- 已知：副手小包不在背包遍历范围（containerSize=36 不含副手），需要可补。
 - 贴图生成脚本在 C:\Users\Lty12\AppData\Local\Temp\opencode\
-  （gen_item_textures.ps1 / gen_extra_textures.ps1 / gen_pouch_gui.ps1），
-  需调整贴图时重新运行。
+  （gen_item_textures.ps1 / gen_extra_textures.ps1 / gen_pouch_gui.ps1 /
+  gen_energy_shield.ps1 / gen_test_dummy.ps1 / gen_name_textures.ps1）。
 - 【工具】uichecker 网页在 assets/primalspells/html/uichecker/index.html，
-  浏览器打开选择/拖入 HTML 预览；当前模型不支持图像输入，截图无法直接读取
-  （只能请用户文字描述或用贴图生成脚本验证像素）。
+  浏览器打开选择/拖入 HTML 预览；当前模型不支持图像输入，截图无法直接读取。
 
 ------------------------------------------------------------
 六、测试指引
 ------------------------------------------------------------
-- 法杖信息浮窗：手持/背包放法杖 → 打开背包 → 悬停背包法杖展开；
-  拖动、最小化/最大化/关闭、悬停槽位看 tooltip、拖动法术槽交换。
-- 编杖：背包拾起法术拖到浮窗空槽（ADD）；浮窗拖出到背包格（放置/交换）；
-  拖到小包浮窗（跨窗移动）。
-- 小包：手持右键 → 容器 UI（专属深蓝背景）；背包中右键小包槽 → 悬浮窗；
-  悬浮窗内交换/装卸。
-- 编辑台：右键打开窗口化 UI；修改 html 后 F3+T 热重载。
+- 法杖信息浮窗：悬停背包法杖展开；拖动/最小化/关闭/tooltip/槽位交换。
+- 编杖：背包法术拖到浮窗空槽（ADD）；浮窗拖出到背包格；拖到小包浮窗（跨窗）。
+- 小包：手持右键容器 UI；背包右键小包槽 → 悬浮窗。
+- 编辑台：右键打开窗口化 UI；改 html 后 F3+T 热重载。

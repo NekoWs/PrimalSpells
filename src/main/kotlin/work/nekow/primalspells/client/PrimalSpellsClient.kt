@@ -45,6 +45,13 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
             event.registerEntityRenderer(ModEntities.CUBE.get(), ::CubeEntityRenderer)
             event.registerEntityRenderer(ModEntities.SPHERE.get(), ::SphereEntityRenderer)
             event.registerEntityRenderer(ModEntities.DRONE.get(), ::DroneEntityRenderer)
+            // 测试木桩直接复用原版盔甲架渲染器（TestDummyEntity 是 ArmorStand 子类，
+            // 泛型不匹配，运行时安全，需显式转换）
+            @Suppress("UNCHECKED_CAST")
+            event.registerEntityRenderer(ModEntities.TEST_DUMMY.get()) { ctx ->
+                net.minecraft.client.renderer.entity.ArmorStandRenderer(ctx) as
+                    net.minecraft.client.renderer.entity.EntityRenderer<work.nekow.primalspells.entity.TestDummyEntity, net.minecraft.client.renderer.entity.state.ArmorStandRenderState>
+            }
         }
 
         // 注册实体模型层定义

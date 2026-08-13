@@ -8,7 +8,11 @@ enum class Lore(val key: String) {
     RECHARGE("lore.primalspells.recharge"),
     DAMAGE("lore.primalspells.damage"),
     SPEED("lore.primalspells.speed"),
-    MAX_AGE("lore.primalspells.max_age");
+    MAX_AGE("lore.primalspells.max_age"),
+    DURABILITY("lore.primalspells.durability"),
+    REGEN("lore.primalspells.regen"),
+    BREAK_PAUSE("lore.primalspells.break_pause"),
+    BOUNCE_COST("lore.primalspells.bounce_cost");
 
     companion object {
         fun formatDouble(value: Double): String =

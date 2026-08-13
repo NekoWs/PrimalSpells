@@ -85,6 +85,7 @@ object MagicManager {
         register { SphereOrbit() }
         register { TeleportProjectile() }
         register { QuantumEntanglement() }
+        register { EnergyShield() }
     }
 
     @SubscribeEvent

@@ -294,6 +294,106 @@ PrimalSpells 开发日志（截至 2026-08-13）
         当前仅靠 SPELL_POUCH_CONTENTS 组件单向写入，链路不完整。
       * 悬浮窗中往外拖拽物品仍有概率消失：待查（疑似拖拽释放与同步的
         竞态，或 placeOrGive/giveOrCarry 在特定菜单状态下的回退路径）。
+43. 【已实现】被动法术系统（onInventoryTick 机制）+ 首个被动法术「能量盾」：
+    - Magic：新增 open var needInventory（默认 false）+ open fun onInventoryTick()。
+    - Wand：新增 loadedMagics 缓存（load() 时 = innate + magics 实例重建），
+      reloadIfNeeded 改为「drawPile = loadedMagics + 清 discardPile + 保留
+      recharge 累加」（不再调 load()，避免递归；语义与旧 load() 等价）。
+    - Wand.tick(caster: Entity? = null)：caster 非空时对 needInventory 的法术
+      设置 caster/wand 后调 onInventoryTick；法力/delay 维护仍只在 caster 为
+      null（WandManager.tick）时执行，避免双倍结算。
+    - WandItem.inventoryTick：slot == MAINHAND/OFFHAND 时调 getWand(stack).tick(owner)
+      → 被动仅在法杖位于手上时触发（满足需求）。
+    - 【原版坑】主手持物品每 tick 触发两次 inventoryTick（Inventory.tick 选中槽
+      传 MAINHAND + EntityEquipment.tick 主手），Wand 按 caster.level().getGameTime()
+      去重，每游戏 tick 只驱动一次被动。
+    - 【坑】lateinit 属性在子类中无法用 ::isInitialized 检查（backing field 不可达），
+      改为直接访问；MagicManager 中投射物均先设 caster 再 add，保证安全。
+    - EnergyShield（magic/revise/，继承 Revise，effects 为空 = 修正效果无副作用）：
+      参数 maxDurability=100 / regenPerSecond=10/s / breakPauseTicks=200 /
+      bounceCost=5 / shieldRadius=1.5。每 tick：破盾暂停→回复；扫描
+      MagicManager.projectiles，弹开「hitRadius>0、非己方、在玩家 AABB+半径内、
+      正在靠近」的法术（反射 velocity，推向玩家法线方向 0.05 推出），每次扣耐久，
+      归零进入 breakPause。
+    - 判定细节：只弹开正在靠近的弹（velocity·外法线 < 0），避免把已掠过的弹弹回；
+      不弹自身法术（出生点在玩家眼前，否则出生即被弹回）；hitRadius<=0（爆炸点等）
+      不弹。
+    - 已知（v1 接受）：耐久状态存于 Magic 实例，服务端重启后按 id 重建会重置；
+      不弹自身 selfDamage 法术。
+    - 资源：items/models/textures（energy_shield.png 单独生成脚本
+      gen_energy_shield.ps1，未改动其他贴图）/lang（zh+en）/Lore 新增
+      DURABILITY/REGEN/BREAK_PAUSE/BOUNCE_COST 四类。
+44. 【已实现】能量盾粒子效果 + HUD 盾条（用户反馈两项）：
+    - 粒子：护盾激活期间每 tick 在护盾表面（眼睛位置为球心、半径 1.25 的球面）
+      随机生成 6 个 ELECTRIC_SPARK（speed 0.02 外飘）；弹开命中时在投射物位置
+      爆闪 14 个 ELECTRIC_SPARK + 5 个 END_ROD。破盾期间无粒子（视觉可区分）。
+      用 ServerLevel.sendParticles(ParticleOptions, x,y,z, count, xDist,yDist,zDist, speed)。
+    - HUD 盾条（ShieldHudRenderer，RenderGuiLayerEvent.Post + VanillaGuiLayers.PLAYER_HEALTH）：
+      * 位置：心形条底行 y = guiHeight - 39（9px 高），盾条画在 guiHeight - 29
+        （下方 1px 留白），x 与心形条左对齐（guiWidth/2 - 91），宽 80 高 3 + 描边。
+      * 蓝条 = 当前耐久/最大；橙条 = 破盾暂停进度（1 - pauseTicks/breakPauseTicks）。
+      * 仅生存/冒险显示（mc.gameMode.canHurtPlayer()，与心形条条件一致）。
+      * 数据同步：SyncShieldPayload（playToClient，含 wandId/durability/maxDurability/
+        pauseTicks/breakPauseTicks）；EnergyShield.onInventoryTick 末尾 syncClient()
+        按状态变化发包（实例字段 lastSent 去重，注意不能放 companion，多玩家会互踩）。
+        客户端按持有法杖 wandId 从 shieldMap 取数据（与 statsMap 同模式），
+        换杖/放下后无数据自然隐藏。
+    - 【已改】用户反馈 HUD 盾条不显示 → 改为与充能/延迟条同风格渲染在准星下方
+      （VanillaGuiLayers.CROSSHAIR 层，中心对齐，y = guiHeight/2 + 18，宽 60 高 3），
+      并删除 canHurtPlayer 生存限制（充能条创造模式也显示；原实现创造模式必隐藏，
+      疑为主要原因）。
+    - 【教训】本次 EnergyShield 改动被 IDE 打开着的旧缓冲覆盖回滚过一次
+      （用户侧保存覆盖磁盘），重做后已确认磁盘内容 + 编译通过；
+      IDE 有文件打开时需留意冲突。
+    - 26.2 HUD 布局备忘：leftHeight 初始 39；心形条底行 y = guiHeight - leftHeight，
+      多行向上排（yo = yLineBase - row*rowH）；盔甲条在心上 10px
+      （y = guiHeight - leftHeight(49) + 10 - 10）；食物/气泡在右半边同高度带。
+45. 【已实现】测试木桩实体 + 物品（伤害测试靶子）：
+    - TestDummyEntity 继承 ArmorStand（复用原版盔甲架模型/渲染，无需新模型）：
+      * 血量 = int 上限（createAttributes = ArmorStand.createAttributes() +
+        MAX_HEALTH, Int.MAX_VALUE）
+      * hurtServer 重写：amount <= 0 一律 false（治疗归零）；头顶生成伤害数字；
+        创造模式攻击（source.isCreativePlayer）→ 掉落木桩物品并 kill（可回收）
+      * heal() 空实现（不接受治疗）；knockback 6 参数版空实现（5 参数版委托 6 参数版，
+        覆盖 6 参数版即可同时拦截，木桩不受击退）
+    - DamageNumber（伤害数字）extends Display.TextDisplay（26.2 重构后所有 setter
+      私有，唯一数据入口是 protected readAdditionalSaveData(ValueInput)）：
+      * 构造 CompoundTag（text 经 ComponentSerialization.CODEC + NbtOps 编码、
+        background=0 透明背景）→ TagValueInput.create(ProblemReporter.DISCARDING,
+        level.registryAccess(), tag) → readAdditionalSaveData
+      * tick 内每 tick +0.05 向上飘动，30 tick 后 discard
+      * 实体类型用原版 EntityTypes.TEXT_DISPLAY（spawn 到客户端自动用原版渲染，
+        无需客户端注册）；text 红色 "-N"（Lore.formatDouble 格式化）
+    - TestDummyItem：放置逻辑照抄 ArmorStandItem.useOn（点击面朝下失败、
+      BlockPlaceContext(context).clickedPos 定位、尺寸碰撞检测、yRot 45° 吸附
+      snapTo、放置音效 ARMOR_STAND_PLACE、消耗 1 个）
+    - 渲染：PrimalSpellsClient 里 ArmorStandRenderer(ctx) 强转
+      EntityRenderer<TestDummyEntity, ArmorStandRenderState> 复用（TestDummy 是
+      ArmorStand 子类，运行时安全，泛型不变需显式转换）
+    - 26.2 备忘补充：EntityType 静态字段在 EntityTypes（复数）类（如
+      EntityTypes.TEXT_DISPLAY/ARMOR_STAND）；Attributes 包为
+      net.minecraft.world.entity.ai.attributes.Attributes；放置实体用
+      Entity.snapTo(x,y,z,yRot,xRot)（moveTo 已不存在？编译报 unresolved）；
+      knockback 签名为 (double,double,double,DamageSource,float[,boolean])；
+      ItemStack(DeferredItem) 有 ItemLike/Holder 二义性需 .get()。
+    - 资源：items/models/textures（gen_test_dummy.ps1）/lang（zh+en 物品+实体名）。
+    - 【已改】伤害数字三连优化（用户反馈）：
+      * 始终面向玩家：billboard=center（NBT "billboard" 字符串，"fixed"/"vertical"/
+        "horizontal"/"center"，readAdditionalSaveData 经 BillboardConstraints.CODEC 读取）
+      * 跳出动画：每 tick 重新 readAdditionalSaveData 更新 transformation——
+        缩放 ease-out 0.35→1.0（先快后慢，12 tick 内完成）+ 向上飘动 0.9 格
+        （ease-out，30 tick 全程）；tag 固定带 interpolation_duration=8 +
+        start_interpolation=0，客户端每次 entityData 同步都会重新锚定平滑插值，
+        弥补 3 tick 的 entityData 同步粒度；上升也从 setPos 改为 transformation
+        translation（translation 属 RENDER_STATE_IDS 全量同步，比移动包平滑）
+      * 明亮红：TextColor.fromRgb(0xFFFF4545) + bold（ChatFormatting.RED 偏暗）；
+        【坑】0xFFFF4545 超出 Int 范围会被 Kotlin 推断为 UInt，const val 需
+        .toInt() 或显式类型；Entity.level 字段 26.2 已私有，访问用 level()
+    - 【已改】木桩回收方式（用户反馈）：删除创造模式击杀回收 → 改为
+      **空手右键回收**（interact 重写：空手 → 掉落木桩物品 + 全部装备后 kill，
+      客户端返回 SUCCESS_SERVER；手持物品 → super.interact 保持盔甲架穿戴行为）；
+      生存/创造下任何伤害都只显示数字，木桩放出来后无法打死，只能空手右键回收。
+      【坑】26.2 Player 在 net.minecraft.world.entity.player.Player 包
 
 ----------------------------------------------------------
 三、26.2 易踩坑技术点（务必记住）
@@ -313,6 +413,13 @@ PrimalSpells 开发日志（截至 2026-08-13）
     新的是 Holder.Reference<SoundEvent>（如 GENERIC_EXPLODE 需 .value()）。
   * PowerShell 5.1：脚本函数名不能撞内置别名（FC→Format-Custom），别名优先级
     高于函数；且 .ps1 含中文注释必须 UTF-8 BOM 或纯 ASCII，否则误读吞代码行。
+  * 【物品每 tick 驱动】Item.inventoryTick(stack, level, owner, EquipmentSlot?)：
+    主手持选中槽每 tick 触发两次（Inventory.tick 传 MAINHAND + EntityEquipment.tick
+    传 MAINHAND），副手一次（OFFHAND），背包其他槽传 null。需每 tick 只执行一次的
+    逻辑（被动效果）务必按 level.getGameTime()（LevelAccessor）去重。
+  * 【Kotlin】lateinit 属性的 ::isInitialized 只能在同属主/可达 backing field 的
+    作用域使用，子类跨包访问会编译报错「backing field not accessible」。
+  * JOML Vector3f：normalize()/reflect()/dot() 均为原地修改并返回自身。
 - javap 验证类时注意 ~/.gradle/caches/neoformruntime/ 可能混有其他项目版本
   （如 1.21.1）的残留 jar，26.2 正确产物在 build/neoForm/neoFormJoined26.2-1/。
 - 物品模型：assets/<ns>/items/<name>.json（ItemModelDefinition）引用
@@ -361,6 +468,10 @@ PrimalSpells 开发日志（截至 2026-08-13）
 - 【未解决·下次】法术小包物品栏未显示出内部存储的法术：
   建议按法杖方式重构存储（服务端权威对象 + 组件派生同步），见修复历史 42。
 - 【未解决·下次】悬浮窗中往外拖拽物品仍有概率消失：待查竞态/回退路径，见 42。
+- 【已实现】被动法术系统 + 能量盾（见 43）：需实测能量盾弹开效果与参数平衡；
+  已知耐久重启重置、不弹自身 selfDamage 法术。
+- 【待测】被动法术：能量盾编入法杖→手持（主/副手）时生效，放下/换手停止；
+  破盾暂停→回复→再弹开全流程。
 - 【待验证·最高优先】小包容器界面格子偏移 ~2px（见修复历史 26/27/28）：
   已定位根因为 DrawSlot 填充互相覆盖导致内凹区锯齿状 17x17，并重写脚本使内凹
   区干净 16x16 与图标完全重合；后续又按用户反馈补全四边描边（凹区居中 +1，

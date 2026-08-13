@@ -20,6 +20,15 @@ abstract class Magic {
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()
 
+    /** 被动开关：为 true 时，法杖持于玩家手上（主手/副手）期间每 tick 触发 [onInventoryTick] */
+    open var needInventory: Boolean = false
+
+    /**
+     * 被动效果钩子：仅在 [needInventory] 为 true、且该法术已编入法杖、法杖位于玩家手上时，
+     * 由 [Wand.tick] 每 tick 调用一次（调用前已设置好 [caster]/[wand]）。
+     */
+    open fun onInventoryTick() { }
+
     /**
      * 快捷添加提示
      *

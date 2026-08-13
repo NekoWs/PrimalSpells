@@ -13,10 +13,12 @@ import org.slf4j.Logger
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.item.ItemStack
+import work.nekow.primalspells.client.ShieldHudRenderer
 import work.nekow.primalspells.client.WandHudRenderer
 import work.nekow.primalspells.block.ModBlocks
 import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.ModEntities
+import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.event.PouchEventHandler
 import work.nekow.primalspells.item.ModItems
@@ -27,6 +29,7 @@ import work.nekow.primalspells.magic.MagicManager
 import work.nekow.primalspells.network.EditPouchPayload
 import work.nekow.primalspells.network.EditWandPayload
 import work.nekow.primalspells.network.SelectWandSlotPayload
+import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.wand.WandManager
@@ -49,6 +52,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         // 注册无人机实体属性
         bus.addListener<EntityAttributeCreationEvent> { event ->
             event.put(ModEntities.DRONE.get(), DroneEntity.createAttributes().build())
+            event.put(ModEntities.TEST_DUMMY.get(), TestDummyEntity.createAttributes().build())
         }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
@@ -58,6 +62,12 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 SyncWandStatsPayload.STREAM_CODEC
             ) { payload, _ ->
                 WandHudRenderer.putStats(payload)
+            }
+            registrar.playToClient(
+                SyncShieldPayload.ID,
+                SyncShieldPayload.STREAM_CODEC
+            ) { payload, _ ->
+                ShieldHudRenderer.putShield(payload)
             }
             registrar.playToServer(
                 SelectWandSlotPayload.ID,

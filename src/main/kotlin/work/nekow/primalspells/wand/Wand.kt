@@ -22,6 +22,9 @@ class Wand(var id: String) {
     val hand = arrayListOf<Magic>()
     val discardPile = arrayListOf<Magic>()
 
+    /** 已装载法术缓存（innate + magics），由 [load] 重建；被动驱动与牌堆重置共用 */
+    val loadedMagics = arrayListOf<Magic>()
+
     data class Status(
         var mana: Double = 0.0,
         var delay: Int = 0,
@@ -33,11 +36,13 @@ class Wand(var id: String) {
     var status: Status = Status()
 
     fun load() {
+        loadedMagics.clear()
+        loadedMagics.addAll(innate)
+        magics.filterNotNull().forEach { loadedMagics.add(it) }
         drawPile.clear()
         hand.clear()
         discardPile.clear()
-        drawPile.addAll(innate)
-        magics.filterNotNull().forEach { drawPile.add(it) }
+        drawPile.addAll(loadedMagics)
     }
 
     /**
@@ -211,18 +216,43 @@ class Wand(var id: String) {
     private fun reloadIfNeeded() {
         if (drawPile.isEmpty() && discardPile.isNotEmpty()) {
             status.recharge += recharge
-            load()
+            drawPile.clear()
+            discardPile.clear()
+            drawPile.addAll(loadedMagics)
         }
     }
 
     /**
      * 每 tick 维护法杖状态：递减 delay/recharge，按充电速率回复法力。
+     *
+     * 传入 [caster]（法杖持有者，由 WandItem.inventoryTick 在法杖处于主手/副手时提供）时，
+     * 额外驱动被动法术：对 [loadedMagics] 中 [Magic.needInventory] 为 true 的法术，
+     * 设置 caster/wand 后调用其 [Magic.onInventoryTick]。
+     * 法力/delay 等维护仍只由 [WandManager.tick]（caster 为 null）执行，避免双倍结算。
+     *
+     * 注：原版对主手持物品每 tick 会触发两次 inventoryTick（Inventory.tick 与
+     * EntityEquipment.tick），因此按游戏 tick 去重，保证被动每 tick 只驱动一次。
      */
-    fun tick() {
+    fun tick(caster: Entity? = null) {
+        if (caster != null) {
+            val gameTime = caster.level().getGameTime()
+            if (lastPassiveTick == gameTime) return
+            lastPassiveTick = gameTime
+            loadedMagics.forEach { magic ->
+                if (magic.needInventory) {
+                    magic.caster = caster
+                    magic.wand = this
+                    magic.onInventoryTick()
+                }
+            }
+            return
+        }
         if (status.delay > 0) status.delay--
         if (status.recharge > 0) status.recharge--
         if (status.mana < mana) status.mana = min(mana, status.mana + charge / 20)
     }
+
+    private var lastPassiveTick: Long = -1
 
     /**
      * 将法杖完整状态序列化为 NBT。

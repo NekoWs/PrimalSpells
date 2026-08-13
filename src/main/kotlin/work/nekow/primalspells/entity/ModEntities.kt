@@ -42,6 +42,15 @@ object ModEntities {
             .build(key("drone"))
     }
 
+    /** 测试木桩（伤害测试靶子，外形与盔甲架一致，尺寸同盔甲架） */
+    val TEST_DUMMY = ENTITY_TYPES.register("test_dummy") { _ ->
+        EntityType.Builder.of(::TestDummyEntity, MobCategory.MISC)
+            .sized(0.5f, 1.975f)
+            .clientTrackingRange(10)
+            .updateInterval(3)
+            .build(key("test_dummy"))
+    }
+
     /** 便捷方法：创建实体类型的 ResourceKey */
     private fun key(name: String): ResourceKey<EntityType<*>> =
         ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(PrimalSpells.MODID, name))

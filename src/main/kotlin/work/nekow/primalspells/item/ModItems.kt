@@ -41,6 +41,7 @@ class ModItems {
                     output.accept(WAND)
                     output.accept(WAND_EDITING_TABLE_ITEM)
                     output.accept(SPELL_POUCH)
+                    output.accept(TEST_DUMMY)
                     MAGICS.values.forEach { output.accept(it) }
                 }
                 .build()
@@ -87,6 +88,10 @@ class ModItems {
 
         val SPELL_POUCH = ITEMS.registerItem("spell_pouch") { props ->
             SpellPouchItem(props.stacksTo(1))
+        }
+
+        val TEST_DUMMY = ITEMS.registerItem("test_dummy") { props ->
+            TestDummyItem(props.stacksTo(16))
         }
 
         val WAND_EDITING_TABLE_ITEM = ITEMS.registerSimpleBlockItem("wand_editing_table", ModBlocks.WAND_EDITING_TABLE)

@@ -3,6 +3,7 @@
 
   "item.primalspells.wand": "Primal Wand",
   "item.primalspells.spell_pouch": "Spell Pouch",
+  "item.primalspells.test_dummy": "Test Dummy",
   "item.primalspells.fireball": "Fireball",
   "item.primalspells.trigger_fireball": "Trigger Fireball",
   "item.primalspells.laser": "laser",
@@ -39,6 +40,7 @@
   "item.primalspells.black_hole": "Black Hole",
   "item.primalspells.teleport": "Teleport",
   "item.primalspells.quantum_entanglement": "Quantum Entanglement",
+  "item.primalspells.energy_shield": "Energy Shield",
 
   "block.primalspells.wand_editing_table": "Wand Editing Table",
   "gui.primalspells.close": "Close",
@@ -94,11 +96,17 @@
   "lore.primalspells.black_hole.desc": "Sucks entities toward its center and applies slowness.",
   "lore.primalspells.teleport.desc": "Teleports the caster to where it hits or expires.",
   "lore.primalspells.quantum_entanglement.desc": "Duplicates the next projectile into two copies that orbit the main one with a sine motion; when any dies, all die.",
+  "lore.primalspells.energy_shield.desc": "Passive: while the wand is held, generates an energy shield that deflects enemy spells; breaks when durability runs out, then recharges after a pause.",
+  "lore.primalspells.durability": "Durability: %s",
+  "lore.primalspells.regen": "Regen: %s/s",
+  "lore.primalspells.break_pause": "Break Pause: %st",
+  "lore.primalspells.bounce_cost": "Deflect Cost: %s",
 
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell",
 
   "entity.primalspells.cube": "Drone Cube",
   "entity.primalspells.sphere": "Energy Sphere",
-  "entity.primalspells.drone": "Combat Drone"
+  "entity.primalspells.drone": "Combat Drone",
+  "entity.primalspells.test_dummy": "Test Dummy"
 }

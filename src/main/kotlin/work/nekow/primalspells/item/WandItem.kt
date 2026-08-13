@@ -59,6 +59,10 @@ class WandItem(properties: Properties) : Item(properties) {
     override fun inventoryTick(stack: ItemStack, level: ServerLevel, owner: Entity, slot: EquipmentSlot?) {
         if (!stack.has(ModItems.WAND_ID)) WandManager.createWand(stack)
         tickSync(stack)
+        // 法杖持于主手/副手时驱动被动法术（Wand.tick 内部按游戏 tick 去重）
+        if (slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) {
+            getWand(stack)?.tick(owner)
+        }
         if (owner is ServerPlayer) {
             val wandId = stack.get(ModItems.WAND_ID)
             if (wandId == lastCastWand[owner.uuid]) {

@@ -22,6 +22,8 @@ class Wand(var id: String) {
     val hand = arrayListOf<Magic>()
     val discardPile = arrayListOf<Magic>()
 
+    val discarded = arrayListOf<Magic>()
+
     /** 已装载法术缓存（innate + magics），由 [load] 重建；被动驱动与牌堆重置共用 */
     val loadedMagics = arrayListOf<Magic>()
 
@@ -166,12 +168,13 @@ class Wand(var id: String) {
      */
     private fun discard(magics: List<Magic>) {
         magics.forEach {
-            if (hand.remove(it)) discardPile += it
+            if (hand.remove(it)) discarded += it
         }
     }
 
     private fun discard() {
         discardPile += hand
+        discardPile += discarded
         hand.clear()
         reloadIfNeeded()
     }

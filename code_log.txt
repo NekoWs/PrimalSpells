@@ -87,6 +87,22 @@ PrimalSpells 开发日志（截至 2026-08-13）
       GDI+ 缺失字体静默回退不可靠 → 必须先用 InstalledFontCollection 确认
       字体名（可列表写入文件避免控制台 GBK 乱码），再用确定存在的字体。
     - 已同步 build/resources/main。
+16. 【已实现】悬浮窗八项改进（用户反馈）：
+    - 最小化可拖到屏幕最左：拖动钳制下限在最小化时为 currentWidth-windowWidth
+      （可为负，全宽左边缘越界但窄顶栏可达 x=0）；恢复时 clampToScreen 重新钳制。
+    - 关闭后不再截获鼠标：renderWindow 在窗口隐藏/关闭分支清空 lastBounds
+      （残留矩形曾导致 mixin/UiScreen/拖放屏蔽继续生效）。
+    - 删除最大化：FloatingWindow 移除 maximized/toggleMaximize/□ 按钮，
+      新增边框缩放（左/右/下边+下角，RESIZE_MARGIN=4px，顶边归标题栏拖动），
+      缩放后 stretchBackgroundPanels 拉伸 UiWindow 面板（动态布局适配）；
+      WandInfoWindow 用 userResized 标记暂停自动高度，槽位数变化时恢复自动布局。
+    - 无人机群改为在法术释放位置（status.pos，投射物出生点）召唤，不再用玩家位置。
+    - 悬停法杖不再解除最小化；— 按钮改为切换最小化（仅手动恢复）。
+    - 窗口位置持久：manager 侧 positioned 标志，placeAtRight 仅首次执行；
+      每次渲染 clampToScreen 防 GUI 尺寸变化后窗口出屏。
+    - 能量盾 HUD 条移至屏幕顶端居中（y=4，仍 CROSSHAIR 层）。
+    - 卸载能量盾后 HUD 消失：heldShieldWandId 增加 WAND_SPELLS 组件校验
+      （必须包含 energy_shield），不再只看 shieldMap 缓存。
 
 ------------------------------------------------------------
 三、26.2 易踩坑技术点（务必记住）
@@ -131,10 +147,13 @@ PrimalSpells 开发日志（截至 2026-08-13）
 ------------------------------------------------------------
 四、UI/交互架构现状
 ------------------------------------------------------------
-- 法杖信息浮窗：打开游戏内 UI 显示最小化窄顶栏；悬停背包法杖展开；点 × 后
-  userClosed，再悬停重显；内容：蓝量/容量/充能/施放数 + 法术槽网格（8/行，
-  windowHeight 按槽位数动态计算）。
+- 法杖信息浮窗：打开游戏内 UI 显示最小化窄顶栏（首次定位屏幕右侧，之后位置持久）；
+  悬停背包法杖展开 → 已改为：悬停仅重新显示（关闭后），不解除最小化，
+  恢复大小仅靠 — 按钮；点 × 后 userClosed；内容：蓝量/容量/充能/施放数 +
+  法术槽网格（8/行，windowHeight 按槽位数动态计算，用户手动缩放优先）。
 - 小包悬浮窗：已有 UI 时右键容器槽位小包 → 悬浮窗；手持右键 → 容器 UI。
+- 窗口缩放：无最大化；拖动左/右/下边+下角（4px 判定区）缩放，
+  缩放后背景面板自动拉伸（stretchBackgroundPanels）。
 - 槽位拖拽：拾起渲染层隐藏、拖拽跟手、释放产生交换意图（原版瞬时交换，
   无飞行动画）；槽位 stack 永远以服务端同步为准。
 - 法术槽网格（SpellSlotGrid）：可变槽位 UiElement，网格对象固定，setCount 只

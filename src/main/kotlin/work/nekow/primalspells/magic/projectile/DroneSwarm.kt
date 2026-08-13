@@ -12,8 +12,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 无人机群投射物 —— 静态投射物，施放后在施法者周围召唤 5 个无人机实体（DroneEntity）。
- * 存活 1 tick 后死亡，仅用于触发召唤效果。
+ * 无人机群投射物 —— 静态投射物，施放后在**法术释放位置**（投射物出生点）周围
+ * 召唤 5 个无人机实体（DroneEntity）。存活 1 tick 后死亡，仅用于触发召唤效果。
  */
 class DroneSwarm : Projectile() {
 
@@ -30,13 +30,14 @@ class DroneSwarm : Projectile() {
     }
 
     /**
-     * 施放后立即在施法者周围生成 5 个无人机实体（DroneEntity）。
+     * 施放后立即在法术释放位置周围生成 5 个无人机实体（DroneEntity）。
      */
     override fun onSpell() {
         val level = caster.level() as? ServerLevel ?: return
-        val center = caster.position()
+        // 法术释放位置：投射物出生点（status.pos 已在 effects.onActive 中设置）
+        val center = status.pos
 
-        // 在施法者周围半径 2 格的圆上均匀分布 5 个实体
+        // 在释放位置周围半径 2 格的圆上均匀分布 5 个实体
         val count = 5
         val radius = 2.0
         for (i in 0 until count) {
@@ -45,7 +46,7 @@ class DroneSwarm : Projectile() {
             val offsetX = radius * cos(angle)
             val offsetZ = radius * sin(angle)
 
-            // 生成目标位置（与施法者同 Y 高度）
+            // 生成目标位置（与释放位置同 Y 高度）
             val spawnX = center.x + offsetX
             val spawnY = center.y + 0.25 // 偏移修正：使碰撞箱底部与地面持平
             val spawnZ = center.z + offsetZ

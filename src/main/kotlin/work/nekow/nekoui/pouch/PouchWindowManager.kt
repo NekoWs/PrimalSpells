@@ -21,6 +21,9 @@ object PouchWindowManager {
 
     private var pouch: SpellPouchWindow? = null
 
+    /** 窗口是否已完成首次定位（true 后重新打开不再重置位置） */
+    private var positioned = false
+
     /** 当前打开的小包浮窗 */
     fun current(): SpellPouchWindow? = pouch?.takeIf { it.window.visible }
 
@@ -37,8 +40,10 @@ object PouchWindowManager {
         win.trackedId = SpellPouchItem.getPouchId(stack)
         win.window.visible = true
         win.window.minimized = false
-        val m = Minecraft.getInstance()
-        win.placeAtRight(m.window.guiScaledWidth)
+        if (!positioned) {
+            win.placeAtRight(Minecraft.getInstance().window.guiScaledWidth)
+            positioned = true
+        }
     }
 
     // ---------- 渲染 ----------
@@ -67,6 +72,7 @@ object PouchWindowManager {
         val win = pouch?.window ?: return
         if (!win.visible) return
         val m = Minecraft.getInstance()
+        win.clampToScreen(m.window.guiScaledWidth, m.window.guiScaledHeight)
         pouch?.refresh(m.player, m.gui.screen())
         win.render(graphics, mx, my, m.window.guiScaledWidth, m.window.guiScaledHeight)
     }
@@ -107,7 +113,7 @@ object PouchWindowManager {
     fun onMouseDragged(event: ScreenEvent.MouseDragged.Pre) {
         val win = pouch?.window ?: return
         if (!win.visible) return
-        val dragging = win.isDragging() || win.slotDrag?.isDragging() == true
+        val dragging = win.isDragging() || win.isResizing() || win.slotDrag?.isDragging() == true
         if (dragging) {
             win.mouseDragged(event.mouseX.toInt(), event.mouseY.toInt())
             event.isCanceled = true
@@ -122,7 +128,7 @@ object PouchWindowManager {
         val mx = event.mouseX.toInt()
         val my = event.mouseY.toInt()
 
-        if (win.isDragging() || win.slotDrag?.isDragging() == true) {
+        if (win.isDragging() || win.isResizing() || win.slotDrag?.isDragging() == true) {
             // 拖出窗口 → 卸载
             if (p.tryRemoveToContainer(mx, my, event.screen)) {
                 event.isCanceled = true

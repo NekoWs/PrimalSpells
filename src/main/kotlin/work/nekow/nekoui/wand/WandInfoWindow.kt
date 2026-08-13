@@ -17,7 +17,6 @@ import work.nekow.nekoui.common.TrackedContainerWindow
 import work.nekow.nekoui.element.UiElement
 import work.nekow.nekoui.element.UiLabel
 import work.nekow.nekoui.element.UiSlot
-import work.nekow.nekoui.element.UiWindow
 
 /**
  * 法杖信息悬浮窗：显示当前追踪法杖的基础信息（蓝量、容量、充能等）与法术槽位。
@@ -49,6 +48,9 @@ class WandInfoWindow private constructor(
     private var lastChargeText: String? = null
     private var lastCastText: String? = null
     private var lastCapacityText: String? = null
+
+    /** 最近一次自动布局时的槽位数（用户手动缩放后，槽位数变化时重新应用动态高度） */
+    private var lastAutoSlotCount = -1
 
     companion object {
         const val MAX_SLOTS = 32
@@ -183,11 +185,21 @@ class WandInfoWindow private constructor(
             capacityLabel.text = Component.literal(capacityText)
         }
 
-        // 窗口高度随槽位数同步
+        // 窗口高度随槽位数同步（用户手动缩放后暂停自动高度，直到槽位数变化）
         val height = contentHeight(gridTop, slotCount, perRow)
-        if (window.windowHeight != height) {
-            window.windowHeight = height
-            window.content.filterIsInstance<UiWindow>().forEach { it.height = height }
+        if (window.userResized) {
+            if (slotCount != lastAutoSlotCount) {
+                window.userResized = false
+                window.windowHeight = height
+                lastAutoSlotCount = slotCount
+                window.stretchBackgroundPanels()
+            }
+        } else {
+            lastAutoSlotCount = slotCount
+            if (window.windowHeight != height) {
+                window.windowHeight = height
+                window.stretchBackgroundPanels()
+            }
         }
     }
 

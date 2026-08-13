@@ -1,9 +1,8 @@
-package work.nekow.primalspells.magic.projectile.s_projectile
+package work.nekow.primalspells.magic.projectile.immobile
 
 import net.minecraft.core.particles.ParticleTypes
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.BlackHole
-import work.nekow.primalspells.magic.effect.GravityField
 import work.nekow.primalspells.magic.effect.Trajectory
 import work.nekow.primalspells.utils.Lore
 

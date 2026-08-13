@@ -1,4 +1,4 @@
-package work.nekow.primalspells.magic.projectile.s_projectile
+package work.nekow.primalspells.magic.projectile.immobile
 
 import net.minecraft.core.particles.ParticleTypes
 import work.nekow.primalspells.magic.Projectile

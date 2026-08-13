@@ -1,4 +1,4 @@
-package work.nekow.primalspells.magic.projectile.s_projectile
+package work.nekow.primalspells.magic.projectile.immobile
 
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.Explosion

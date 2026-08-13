@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.EntitySpawnReason
-import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.ModEntities
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.Trajectory
@@ -21,13 +20,12 @@ class DroneSwarm : Projectile() {
     override val id = "drone_swarm"
 
     init {
-        mana = 8.0 // 法力消耗
-        delay = 1 // 施法延迟
-        recharge = 2 // 充能时间
-        maxAge = 1 // 存活 1 tick 后死亡
-        speed = 0f // 静态投射物，不移动
-        hitRadius = 0.0 // 无需碰撞检测
-        // 添加粒子轨迹效果（使用电光火花粒子）
+        mana = 8.0
+        delay = 1
+        recharge = 2
+        maxAge = 1
+        speed = 0f
+        hitRadius = 0.0
         effects += Trajectory(ParticleTypes.ELECTRIC_SPARK)
     }
 

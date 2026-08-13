@@ -7,8 +7,7 @@ import work.nekow.primalspells.magic.effect.Trajectory
 import work.nekow.primalspells.utils.Lore
 
 /**
- * 黑洞 —— 静态投射物，存在 200 tick，
- * 将范围内实体拉向中心并施加迟缓 I。
+ * 黑洞，将范围内实体拉向中心并施加迟缓 I。
  */
 class BlackHoleProjectile : Projectile() {
 

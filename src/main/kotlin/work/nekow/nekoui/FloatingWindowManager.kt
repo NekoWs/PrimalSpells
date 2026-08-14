@@ -5,7 +5,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.neoforge.client.event.ContainerScreenEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.nekoui.NekoUi
 import work.nekow.primalspells.item.WandItem
@@ -55,8 +54,8 @@ object FloatingWindowManager {
      * Foreground 事件在 extractContents 内触发，pose 已平移到菜单原点，需先重置回屏幕坐标。
      */
     @SubscribeEvent
-    fun onRenderContainerForeground(event: ContainerScreenEvent.Render.Foreground) {
-        val screen = event.containerScreen
+    fun onRenderContainerForeground(event: ScreenEvent.Render.Foreground) {
+        val screen = event.screen as? AbstractContainerScreen<*> ?: return
         if (!screen.isInGameUi()) return
         val graphics = event.guiGraphics
         graphics.pose().pushMatrix()

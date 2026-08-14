@@ -5,7 +5,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.entity.player.Player
 import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.neoforge.client.event.ContainerScreenEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.nekoui.NekoUi
 import work.nekow.primalspells.item.SpellPouchItem
@@ -50,8 +49,8 @@ object PouchWindowManager {
 
     /** 容器屏幕（背包/箱子等）：Foreground 事件渲染，位于拖拽物品与 tooltip 之下 */
     @SubscribeEvent
-    fun onRenderContainerForeground(event: ContainerScreenEvent.Render.Foreground) {
-        val screen = event.containerScreen
+    fun onRenderContainerForeground(event: ScreenEvent.Render.Foreground) {
+        val screen = event.screen as? AbstractContainerScreen<*> ?: return
         if (!screen.isInGameUi()) return
         val graphics = event.guiGraphics
         graphics.pose().pushMatrix()

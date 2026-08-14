@@ -28,7 +28,7 @@ sourceSets.main.resources {
 }
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
+    mavenCentral()
 }
 
 base {
@@ -110,6 +110,8 @@ dependencies {
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
     // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
     // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
+    compileOnly "work.nekow:particledrawing:1.0.0"
+    localRuntime "work.nekow:particledrawing:1.0.0"
 }
 
 tasks.withType(ProcessResources).configureEach {
@@ -148,25 +150,9 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 // Kotlin configuration
-// Note: Kotlin 2.1.x supports up to JVM_23 JVM target. JVM bytecode is
-// backwards-compatible, so targeting 23 is safe for the Java 25 runtime.
-// We disable JVM target validation to allow the mismatch between Java (25) and Kotlin (23).
 kotlin {
     jvmToolchain {
         languageVersion.set(JavaLanguageVersion.of(25))
-    }
-}
-
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_23)
-    }
-}
-
-// Allow Kotlin to have a different JVM target than Java
-tasks.named('compileKotlin', org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configure {
-    compilerOptions {
-        jvmTargetValidationMode.set(org.jetbrains.kotlin.gradle.dsl.jvm.JvmTargetValidationMode.IGNORE)
     }
 }
 

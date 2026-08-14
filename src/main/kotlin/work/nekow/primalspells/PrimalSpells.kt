@@ -2,36 +2,32 @@ package work.nekow.primalspells
 
 import com.mojang.logging.LogUtils
 import net.minecraft.network.chat.Component
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.ModContainer
 import net.neoforged.fml.common.Mod
 import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.slf4j.Logger
-import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent
-import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.item.ItemStack
+import work.nekow.primalspells.block.ModBlocks
 import work.nekow.primalspells.client.ShieldHudRenderer
 import work.nekow.primalspells.client.WandHudRenderer
-import work.nekow.primalspells.block.ModBlocks
 import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.ModEntities
 import work.nekow.primalspells.entity.TestDummyEntity
-import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.event.PouchEventHandler
+import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.ModMenus
 import work.nekow.primalspells.item.SpellPouchItem
 import work.nekow.primalspells.item.WandItem
-import work.nekow.primalspells.magic.MagicManager
-import work.nekow.primalspells.network.EditPouchPayload
-import work.nekow.primalspells.network.EditWandPayload
-import work.nekow.primalspells.network.SelectWandSlotPayload
-import work.nekow.primalspells.network.SyncShieldPayload
-import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.item.component.WandID
+import work.nekow.primalspells.magic.MagicManager
+import work.nekow.primalspells.network.*
 import work.nekow.primalspells.wand.WandManager
 
 @Mod(PrimalSpells.MODID)
@@ -111,7 +107,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                         save(list)
                         clearCarriedSpell(player, payload.spellId)
                         ModItems.spellItem(old)?.let {
-                            player.containerMenu.setCarried(ItemStack(it))
+                            player.containerMenu.carried = ItemStack(it)
                         }
                     }
                     }
@@ -141,7 +137,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 EditWandPayload.STREAM_CODEC
             ) { payload, context ->
                 val player = context.player() as? ServerPlayer ?: return@playToServer
-                val wand = WandManager.get(WandID(payload.wandId), null) ?: return@playToServer
+                val wand = WandManager[WandID(payload.wandId), null] ?: return@playToServer
                 when (payload.action) {
                     EditWandPayload.ACTION_ADD -> {
                         val index = payload.slotA
@@ -162,7 +158,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                             wand.load()
                             clearCarriedSpell(player, payload.spellId)
                             oldItem?.let {
-                                player.containerMenu.setCarried(ItemStack(it))
+                                player.containerMenu.carried = ItemStack(it)
                             }
                         }
                     }
@@ -232,7 +228,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         // 创造模式兜底：直接丢弃（客户端已发 silent，此处防客户端能力状态延迟导致的回退）
         if (player.abilities.instabuild) return
         val menu = player.containerMenu
-        val inRange = targetSlot in 0 until menu.slots.size
+        val inRange = targetSlot in menu.slots.indices
         val targetStack = if (inRange) menu.getSlot(targetSlot).item else ItemStack.EMPTY
         when {
             // 目标槽是小包等容器物品：回退放入玩家背包，避免覆盖
@@ -256,7 +252,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
     private fun giveOrCarry(player: ServerPlayer, stack: ItemStack) {
         if (stack.isEmpty) return
         if (!player.addItem(stack)) {
-            player.containerMenu.setCarried(stack)
+            player.containerMenu.carried = stack
         }
     }
 

@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
+import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.*
 import kotlin.math.min
 
@@ -33,6 +34,7 @@ class Wand(var id: String) {
         var recharge: Int = 0,
         var lastDelay: Int = 0,
         var lastRecharge: Int = 0,
+        var particleManager: ParticleManager? = null,
         var failedReason: ArrayList<String> = arrayListOf()
     )
     var status: Status = Status()
@@ -238,6 +240,10 @@ class Wand(var id: String) {
      */
     fun tick(caster: Entity? = null) {
         if (caster != null) {
+            val pm = status.particleManager
+            if (pm?.level != caster.level()) {
+                status.particleManager = ParticleManager.of(caster.level())
+            }
             val gameTime = caster.level().gameTime
             if (lastPassiveTick == gameTime) return
             lastPassiveTick = gameTime

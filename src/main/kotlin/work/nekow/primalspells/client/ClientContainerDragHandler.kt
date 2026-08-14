@@ -9,8 +9,6 @@ import net.minecraft.world.inventory.Slot
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import work.nekow.primalspells.mixin.AbstractContainerScreenInvokerMixin
-import work.nekow.nekoui.FloatingWindowManager
-import work.nekow.nekoui.pouch.PouchWindowManager
 
 /**
  * 原版容器拖放交换：在背包/箱子等容器内 **按住 Ctrl + 左键** 拖动槽位物品到另一槽位，松开即交换。
@@ -36,11 +34,7 @@ object ClientContainerDragHandler {
     private var lastClickSlot: Slot? = null
     private var lastClickTime = 0L
 
-    private fun isInAnyFloatingWindow(mx: Int, my: Int): Boolean =
-        FloatingWindowManager.isPointInsideCurrentWindow(mx, my) ||
-            PouchWindowManager.isPointInsideWindow(mx, my)
-
-    /** 按屏幕坐标定位容器槽位（与悬浮窗卸载逻辑一致：getLeftPos/getTopPos + 相对坐标） */
+    /** 按屏幕坐标定位容器槽位（getLeftPos/getTopPos + 相对坐标） */
     private fun findSlot(screen: AbstractContainerScreen<*>, mx: Int, my: Int): Slot? {
         val leftPos = screen.getLeftPos()
         val topPos = screen.getTopPos()
@@ -65,7 +59,6 @@ object ClientContainerDragHandler {
         if (screen is CraftingScreen) return                // 工作台：交给原版（快速填充等）
         val mx = event.mouseX.toInt()
         val my = event.mouseY.toInt()
-        if (isInAnyFloatingWindow(mx, my)) return           // 浮窗区域交给悬浮窗
         val slot = findSlot(screen, mx, my) ?: return
         if (!slot.hasItem()) return
         if (!screen.menu.carried.isEmpty) return            // 已有携带（原版点击处理）
@@ -85,8 +78,6 @@ object ClientContainerDragHandler {
         val screen = event.screen as? AbstractContainerScreen<*> ?: return
         val mx = event.mouseX.toInt()
         val my = event.mouseY.toInt()
-        // 落在浮窗区域：不接管，由悬浮窗（tryAddFromCarried）消费光标物品
-        if (isInAnyFloatingWindow(mx, my)) return
         val target = findSlot(screen, mx, my)
 
         // 同一槽位（未拖动）：不取消，物品保留在光标 = 原版单击拾起

@@ -8,7 +8,7 @@ import java.util.*
 /**
  * 法术小包：可收纳法术物品的容器（非方块）。
  * 内容存于 [ModItems.SPELL_POUCH_CONTENTS] 组件（法术 id 列表）。
- * 右键打开悬浮窗进行管理（见 ui.pouch.SpellPouchWindow）。
+ * 右键打开容器 UI 进行管理（见 PouchEventHandler）。
  *
  * 小包以 [ModItems.POUCH_ID] 组件唯一标识：容器菜单（背包/小包 UI）切换时
  * 槽位索引会失效，所有定位一律按 pouchId 进行（服务端在玩家背包中查找）。

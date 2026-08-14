@@ -44,7 +44,7 @@ class ClientPouchTooltip(
     }
 
     companion object {
-        /** 小包固定容量（与 SpellPouchWindow.SLOT_COUNT 一致） */
+        /** 小包固定容量 */
         const val SLOT_COUNT = 16
         const val SLOTS_PER_ROW = 8
         const val SLOT_SIZE = 18

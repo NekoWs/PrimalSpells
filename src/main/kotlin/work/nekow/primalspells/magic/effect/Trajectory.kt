@@ -2,12 +2,14 @@ package work.nekow.primalspells.magic.effect
 
 import net.minecraft.core.particles.ParticleOptions
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleHandle
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.api.ParticleStyle
+import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.utils.HitResult
 
 class Trajectory(
@@ -32,13 +34,21 @@ class Trajectory(
 
     override fun onTick() {
         val pos = status.pos
-        manager.create()
-            .style(ParticleStyle.DUST)
-            .position(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
-            .color(Color.BLUE)
-            .lifetime(5)
-            .spawn()
+//        manager.create()
+//            .style(ParticleStyle.DUST)
+//            .position(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
+//            .color(Color.BLUE)
+//            .lifetime(5)
+//            .spawn()
+        handle?.move(
+            Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
+            3, EasingType.LINEAR
+        )
         lastPos = Vector3f(status.pos)
+    }
+
+    override fun onDie() {
+        handle?.remove()
     }
 
     override fun onHit(result: HitResult) {

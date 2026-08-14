@@ -68,6 +68,8 @@ runs {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         // 4K 显示器下窗口放大两倍
         arguments '--width', '1708', '--height', '960'
+        // 随机玩家名：Player + 4 位随机数字，便于区分多个调试实例
+        arguments '--username', "Player${new Random().nextInt(9000) + 1000}"
     }
 
     server {

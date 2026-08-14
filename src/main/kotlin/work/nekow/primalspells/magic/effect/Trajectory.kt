@@ -42,7 +42,7 @@ class Trajectory(
 //            .spawn()
         handle?.move(
             Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()),
-            3, EasingType.LINEAR
+            1, EasingType.LINEAR
         )
         lastPos = Vector3f(status.pos)
     }

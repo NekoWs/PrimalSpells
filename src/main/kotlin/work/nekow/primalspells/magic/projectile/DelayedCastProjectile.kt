@@ -1,7 +1,7 @@
 package work.nekow.primalspells.magic.projectile
 
-import net.minecraft.core.particles.ParticleTypes
 import org.joml.Vector3f
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.Magic
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.TriggerSpell
@@ -15,6 +15,7 @@ import work.nekow.primalspells.utils.Lore
 class DelayedCastProjectile : Projectile(), TriggerSpell {
 
     override val id = "delayed_cast"
+    override val bodyColor = Color.GREEN
 
     override var triggerCast = 1
     override var payload = arrayListOf<Magic>()
@@ -29,7 +30,7 @@ class DelayedCastProjectile : Projectile(), TriggerSpell {
         maxAge = 20
         speed = 0f
         hitRadius = 0.0
-        effects += Trajectory(ParticleTypes.HAPPY_VILLAGER)
+        effects += Trajectory(Color.GREEN)
         effects += DelayedTrigger(this)
     }
 

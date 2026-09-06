@@ -1,6 +1,6 @@
 package work.nekow.primalspells.magic.projectile.immobile
 
-import net.minecraft.core.particles.ParticleTypes
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.GravityField
 import work.nekow.primalspells.magic.effect.Trajectory
@@ -12,6 +12,7 @@ import work.nekow.primalspells.utils.Lore
 class GravityFieldProjectile : Projectile() {
 
     override val id = "gravity_field"
+    override val bodyColor = Color.of(0.5f, 0.4f, 1f)
 
     init {
         mana = 10.0
@@ -20,7 +21,7 @@ class GravityFieldProjectile : Projectile() {
         maxAge = 200 // 存活 10 秒
         speed = 0f // 静态
         hitRadius = 0.0 // 无碰撞
-        effects += Trajectory(ParticleTypes.PORTAL) // 粒子效果
+        effects += Trajectory(Color.of(0.5f, 0.4f, 1f)) // 粒子效果
         effects += GravityField() // 减速效果
     }
 

@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.EntitySpawnReason
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.entity.ModEntities
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.Trajectory
@@ -18,6 +19,7 @@ import kotlin.math.sin
 class DroneSwarm : Projectile() {
 
     override val id = "drone_swarm"
+    override val bodyColor = Color.CYAN
 
     init {
         mana = 8.0
@@ -26,7 +28,7 @@ class DroneSwarm : Projectile() {
         maxAge = 1
         speed = 0f
         hitRadius = 0.0
-        effects += Trajectory(ParticleTypes.ELECTRIC_SPARK)
+        effects += Trajectory(Color.CYAN)
     }
 
     /**

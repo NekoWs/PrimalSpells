@@ -1,12 +1,13 @@
 package work.nekow.primalspells.magic.projectile
 
-import net.minecraft.core.particles.ParticleTypes
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.Hurt
 import work.nekow.primalspells.magic.effect.Trajectory
 
 class Laser: Projectile() {
     override val id = "laser"
+    override val bodyColor = Color.of(0.5f, 0.8f, 1f)
 
     init {
         mana = 10.0
@@ -16,7 +17,7 @@ class Laser: Projectile() {
         maxAge = 1
         status.damage = 0.5
         hitRadius = 0.1
-        effects += Trajectory(ParticleTypes.END_ROD)
+        effects += Trajectory(Color.of(0.5f, 0.8f, 1f))
         effects += Hurt()
     }
 }

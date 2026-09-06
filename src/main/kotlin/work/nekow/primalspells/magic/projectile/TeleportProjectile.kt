@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import org.joml.Vector3f
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.effect.Trajectory
 import work.nekow.primalspells.utils.HitResult
@@ -20,6 +21,7 @@ import work.nekow.primalspells.utils.Lore
 class TeleportProjectile : Projectile() {
 
     override val id = "teleport"
+    override val bodyColor = Color.of(0.6f, 0.3f, 1f)
 
     /** 是否已执行传送（防止命中后死亡重复传送） */
     private var teleported = false
@@ -31,7 +33,7 @@ class TeleportProjectile : Projectile() {
         maxAge = 100
         speed = 1.0f
         hitRadius = 0.2
-        effects += Trajectory(ParticleTypes.PORTAL)
+        effects += Trajectory(Color.of(0.6f, 0.3f, 1f))
     }
 
     override fun onHit(result: HitResult) {

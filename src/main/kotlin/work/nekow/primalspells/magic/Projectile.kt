@@ -2,8 +2,10 @@ package work.nekow.primalspells.magic
 
 import net.minecraft.world.entity.Entity
 import org.joml.Vector3f
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.effect.Move
 import work.nekow.primalspells.magic.effect.Position
+import work.nekow.primalspells.magic.effect.ProjectileBody
 import work.nekow.primalspells.magic.effect.Velocity
 import work.nekow.primalspells.utils.HitResult
 import work.nekow.primalspells.utils.HitType
@@ -14,6 +16,9 @@ abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
 
     override var cast: Int = 0
+
+    /** 投射物本体粒子的颜色（由各投射物子类覆盖）。 */
+    open val bodyColor: Color = Color.WHITE
 
     var maxAge: Int = 0
     var alive: Boolean = true
@@ -31,14 +36,17 @@ abstract class Projectile: Magic() {
     var selfDamage: Boolean = false
 
     override fun spell() {
+        // onTick 顺序：Trajectory（拖尾，读上一 tick 位置）→ Move（更新位置）→ ProjectileBody（本体，读本 tick 位置）。
+        // 拖尾用延迟 1 tick 的数据、本体用本 tick 数据做 partialTick 插值：视觉一致且丝滑。
         effects += Position(position)
+        effects += Velocity(velocity.mul(speed))
         effects += Move(
             dragCoeff,
             hitRadius = hitRadius,
             throughBlocks = throughBlocks,
             selfDamage = selfDamage,
         )
-        effects += Velocity(velocity.mul(speed))
+        effects += ProjectileBody(bodyColor)
 
         effects.forEach {
             it.projectile = this

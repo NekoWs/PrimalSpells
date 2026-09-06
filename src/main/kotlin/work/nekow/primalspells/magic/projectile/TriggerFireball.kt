@@ -1,6 +1,6 @@
 package work.nekow.primalspells.magic.projectile
 
-import net.minecraft.core.particles.ParticleTypes
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.Magic
 import work.nekow.primalspells.magic.Projectile
 import work.nekow.primalspells.magic.TriggerSpell
@@ -10,6 +10,7 @@ import work.nekow.primalspells.magic.effect.Trigger
 
 class TriggerFireball: Projectile(), TriggerSpell {
     override val id = "trigger_fireball"
+    override val bodyColor = Color.ORANGE
 
     override var triggerCast = 1
     override var payload = arrayListOf<Magic>()
@@ -21,7 +22,7 @@ class TriggerFireball: Projectile(), TriggerSpell {
         maxAge = 200
         status.damage = 1.0
         hitRadius = 0.2
-        effects += Trajectory(ParticleTypes.FLAME)
+        effects += Trajectory(Color.ORANGE)
         effects += Hurt()
         effects += Trigger()
     }

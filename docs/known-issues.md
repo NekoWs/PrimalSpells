@@ -32,6 +32,26 @@
 - 历史更正：第 5 轮曾把「球壳塌成一圈」误报为 PD 缺陷，实为**本模组 bug**（`tickAnchored` 在 spawn 时捕获 offset
   → 自转变成错峰剪切），第 6 轮修正；第 7 轮又修了「球壳贴在脚上、像在往下掉」的偏移坐标系问题（见 §6 第 7 轮）。
 
+### 🟡 1.3 用 PD 的 `ParticleGroup` 替换自研的 `ParticleSwarm`（本模组技术债，**不是** PD 缺陷）
+
+- 背景：`ParticleSwarm` 是在**没查 PD 组 API** 的情况下写的，重复了 PD 已有的能力，
+  并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（§6 第 5–8 轮）。
+  判定准则见 [design/effects-api.md](design/effects-api.md) §0.2。
+- 迁移映射（护盾优先）：
+
+  | 现在（`ParticleSwarm`） | 迁移到 |
+  |---|---|
+  | `ensureAttached`（40 个 `attachTo` + 补量） | `ParticleManager.createGroup(pivot)` + `Builder.offsetFromPivot(球面偏移)` + `group.add(handle)` + **`group.followEntity(holder.uuid)`** |
+  | 「自转要每 tick `trackAll`」（1 包/tick） | **`group.spin(axis, radiansPerTick)`**（指令流一次下发、客户端本地求值 → **零带宽**） |
+  | 4 tick 延迟销毁（留给淡出） | **`group.fadeOut(ticks, removeAfter)` / `group.destroyAfter(ticks)`** |
+  | `clear()` | **`group.remove()`** |
+  | 黑洞/重力场范围球壳（一次性 spawn） | `createGroup` + `offsetFromPivot` + `add`（顺带获得 `pulse`/`rotate` 等编排能力） |
+
+- **保留**在 `ParticleSwarm` 的部分（PD 组 API 未覆盖、确属使用方逻辑）：单体 `spawn`、
+  自定义受力的 `spawnSimulated`/`tickSimulated`（一次 `trackAll`）、按位置判据的 `removeWhere`。
+- 收益：删掉整套句柄/寿命簿记（少一类 bug 源）；护盾自转 1 包/tick → 0 包；淡出动画开箱可用。
+- 代价：护盾视觉需要再进游戏确认一次（跟随语义改由 PD 客户端解析）。
+
 ---
 
 ## 2. 性能与表现

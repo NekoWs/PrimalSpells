@@ -9,6 +9,23 @@ import java.util.UUID
 /**
  * PD 粒子群：把**我们自己算出来的位置/速度**交给 ParticleDrawing 去同步与渲染。
  *
+ * ## ⚠️ 定位：临时薄封装，**不是**应该长期留在本模组的东西
+ *
+ * 「一组粒子的通用机制」（批量生成、整组跟随实体、组级旋转/淡出/延时、带宽优化）**属于 PD**，
+ * 而且 PD **已经有现成 API** —— `ParticleGroup`（`followEntity` / `offsetFromPivot` / `spin` /
+ * `fadeOut` / `destroyAfter` / `remove`）。本类当初是在没查组 API 的情况下写的，
+ * 因此重复了它的能力并踩了一串坑（捕获偏移、索引配对、重复身体偏移、重建滑入 ——
+ * 见 `docs/known-issues.md` §6 第 5–8 轮）。
+ *
+ * 判定准则见 `docs/design/effects-api.md` §0.2：**先查 PD 有没有现成能力，再决定要不要在本模组写封装**。
+ *
+ * 本类**只保留 PD 组 API 尚未覆盖的部分**（灰区：需要逐 tick 自定义受力/轨迹时，本模组算位置）：
+ * - [spawn]：单体生成（PD 无「批量按分布生成」入口，但组 + `offsetFromPivot` 可用于刚体形壳）；
+ * - [spawnSimulated] / [tickSimulated]：本模组积分 + 一次 [ParticleManager.trackAll]（黑洞的吸力随距离变化）；
+ * - [removeWhere]：按位置判据回收（重力场下落粒子碰到下半球面）。
+ *
+ * **锚定模式（[ensureAttached]）预期在护盾迁移到 `ParticleGroup.followEntity` 后删除** —— 见 known-issues §1.3。
+ *
  * ## 职责边界（改动前先读 `docs/conventions.md` §9）
  *
  * - **ParticleDrawing 负责**：生成、跨端同步、可见性、寿命、位置积分（速度/加速度驱动时）、客户端插值渲染；

@@ -25,7 +25,31 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 区分清楚：「**不得自行另写一套实现**」这条红线**始终有效**（只要工作碰了 PD API）；
 > 有时机限制的只是「产出末尾的清单」与「登记到 known-issues §7」。
 
-### 0.1 现有接线范式（2026-09-30 更新，接线前先看这张表）
+### 0.2 职责边界判定准则（什么属于 PD、什么属于本模组）
+
+先看一张对照：本模组自研的 `ParticleSwarm` 里，**大部分职责 PD 已经有现成 API**。
+
+| ParticleSwarm 里的做法 | PD 现成能力（应优先使用） |
+|---|---|
+| `ensureAttached`：把 40 个粒子逐个 `attachTo(实体, 世界空间偏移)` 并维持数量 | **`ParticleGroup.followEntity(uuid, offset)`** 让**整组**跟随实体（客户端本地解析）+ `Builder.offsetFromPivot(球面偏移)` 表达每个粒子相对轴心的偏移 |
+| 「想自转就用 `trackAll` 每 tick 发偏移」（1 包/tick） | **`ParticleGroup.spin(axis, radiansPerTick)`**：录制一次指令流下发，客户端本地求值 → **持续动画零带宽** |
+| 预留「放下后 4 tick 再销毁」的窗口，等以后做淡出 | **`ParticleGroup.fadeOut(durationTicks, removeAfter)` / `destroyAfter(ticks)` / `delay(ticks)`** 已内置 |
+| `clear()` | **`ParticleGroup.remove()`** |
+
+**判定准则**：
+
+| 归类 | 判定标准 | 例子 |
+|---|---|---|
+| **属于 PD**（用现成 API，别再自己写） | 与「粒子集合的通用机制」有关：批量生成/更新、组跟随实体/旋转/淡出/延时、寿命与可见性、上限与拒绝处理、带宽优化 | `ParticleGroup`（pivot/`followEntity`/`offsetFromPivot`/`spin`/`fadeOut`/`destroyAfter`）、`trackAll`、`attachTo`、`applyForce` |
+| **属于本模组**（玩法语义，PD 不该知道） | 只有游戏知道的东西：半径/数量/颜色/寿命取值、力的公式、回收判据、被动的持有/放下时机与淡出时长 | `BlackHole` 的吸力与阻尼、`GravityField` 的下落与下半球回收、`EnergyShield` 的 4 tick 延迟、`ParticleShapes.fibonacciSphere` 的选点 |
+| **灰区**（可以留在使用方） | 需要逐 tick 自定义受力/轨迹：本模组算位置，PD 负责同步与渲染 | `ParticleSwarm.spawnSimulated/tickSimulated`（一次 `trackAll` 批量写位置） |
+
+⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
+再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组 API** ——
+本项目就踩过：`ParticleSwarm` 的锚定模式本可用 `ParticleGroup.followEntity`，结果多写了整套簿记，
+并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（见 [../known-issues.md](../known-issues.md) §6 第 5–8 轮）。
+
+### 0.3 现有接线范式（2026-09-30 更新，接线前先看这张表）
 
 | 需求 | 用哪套 API | 每 tick 带宽 | 本项目落点 |
 |---|---|---|---|

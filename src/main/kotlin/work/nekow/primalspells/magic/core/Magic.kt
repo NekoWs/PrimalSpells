@@ -45,6 +45,20 @@ abstract class Magic {
     open fun onPassiveIdle() { }
 
     /**
+     * 被**从法杖上取下**（或所在槽位被别的法术替换掉）时调用（默认空实现）。
+     *
+     * 由 [Wand.load] 在重建「已装载法术」列表时，对**本次不再装载**的实例各调一次；
+     * [Wand.unload]（法杖内存实例被回收时）也会调用。
+     *
+     * 用途：清理「只该在装载期间存在」的东西 —— 例如 `EnergyShield` 的球壳粒子组：
+     * 取下之后本实例不再出现在 [Wand.loadedMagics] 里，[onInventoryTick] / [onPassiveIdle]
+     * **都不会再被调用**，不在这里清理就会把粒子永远留在世界里。
+     *
+     * 约定：调用时 [wand] 仍指向原法杖；此后本实例不会再收到任何 tick。
+     */
+    open fun onUnloaded() { }
+
+    /**
      * 【持久化钩子·写】把本法术需要跨存档保留的**运行期状态**写进给定 NBT（默认什么都不写）。
      *
      * 运行期状态 = 只活在内存里的进度/资源，例如 `EnergyShield` 的当前耐久与破盾暂停剩余 tick；

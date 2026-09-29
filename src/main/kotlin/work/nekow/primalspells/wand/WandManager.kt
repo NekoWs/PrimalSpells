@@ -181,6 +181,7 @@ object WandManager {
             if (record != null && now - record.lastSeenTick <= NON_PLAYER_HOLD_TTL_TICKS) continue
             // 先落盘再丢实例：存档是唯一权威副本，回收只影响内存表。
             writeBack(level, id, wand)
+            wand.unload() // 通知法术清理外部资源（如护盾球壳粒子组），避免留下孤儿粒子
             holders.remove(id)
             iterator.remove()
         }

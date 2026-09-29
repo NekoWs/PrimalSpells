@@ -28,9 +28,21 @@ import kotlin.math.min
  * 每次弹开消耗耐久；耐久归零后护盾破碎，暂停恢复一段时间（[breakPauseTicks]），
  * 之后以 [regenPerSecond] 的速度恢复耐久。
  *
+ * ## 多张护盾卡：一层球壳 + 叠加耐久
+ *
+ * 同一根法杖上装几张 `energy_shield` 都**只出一层球壳**（否则球壳会重叠得很难看），
+ * 但**耐久上限叠加**：容量 = 每张的 [maxDurability] × 卡数，共用一个耐久池。
+ * 由 `loadedMagics` 里的**第一张**（[primaryShield]）负责球壳、弹开结算与 HUD，其余卡只做镜像；
+ * 主卡被取下后，下一张自动接任（它下一 tick 就会铺出自己的球壳）。
+ * ⚠️ 容量变大**不会白送耐久**（池子原样保留、只在超过新容量时才被钳下去）——
+ * 否则「反复拔插第二张卡」就能刷满耐久。
+ *
+ * ## 持久化
+ *
  * 当前耐久与破盾暂停剩余 tick 是**运行期状态**，随法杖存档持久化
  * （见 [saveRuntimeState]/[loadRuntimeState]）：重登/重启/被 `WandManager` 回收后再懒加载，
- * 护盾都不会回满。数值与手感本身仍是待调项（`docs/known-issues.md` §1.1）。
+ * 护盾都不会回满（没读到耐久时按**当前容量**补满，见 [durabilityLoaded]）。
+ * 数值与手感本身仍是待调项（`docs/issues/open.md` 1.1 —— 含 [regenPerSecond] 是否随卡数放大）。
  *
  * 不弹开持有者自己施放的法术（投射物出生点在施法者面前，会被瞬间弹回）。
  */
@@ -76,6 +88,29 @@ class EnergyShield : Modifier() {
     private var idleTicks = 0
 
     /**
+     * 是否已从存档读到过耐久（`durability` 键存在）。
+     *
+     * 没读到（旧档 / 首次入库 / 新装）时**首次结算按当前容量补满** —— 容量随护盾卡数量变化
+     * （见 [shieldCapacity]），所以「补满」不能在 [loadRuntimeState] 里做（那里拿不到 `wand`）。
+     */
+    private var durabilityLoaded = false
+
+    /**
+     * 本杖上的**主卡**：`loadedMagics` 里第一张护盾卡。
+     *
+     * 多张护盾卡**只出一层球壳、共用一个耐久池**（容量 = 每张的 [maxDurability] × 卡数）：
+     * 主卡负责球壳、弹开结算与 HUD 同步，其余卡只做镜像（见 [onInventoryTick]），不铺球壳也不结算。
+     *
+     * 顺序确定（`innate` + 槽位顺序），所以「谁是主卡」不需要额外状态：主卡被取下后，
+     * 下一张自动接任（它下一 tick 就会铺出自己的球壳）。
+     */
+    private fun primaryShield(): EnergyShield? =
+        wand.loadedMagics.firstOrNull { it is EnergyShield } as? EnergyShield
+
+    /** 本杖的护盾耐久上限 = 每张卡的 [maxDurability] × 护盾卡数量（「额外护盾叠加耐久度」）。 */
+    private fun shieldCapacity(): Double = maxDurability * wand.loadedMagics.count { it is EnergyShield }
+
+    /**
      * 运行期状态持久化（写）：把「当前耐久」与「破盾暂停剩余 tick」交给法杖存档。
      *
      * 这两个字段是仅有的、无法由构造参数重算的护盾进度 —— 不入库就会出现
@@ -99,16 +134,34 @@ class EnergyShield : Modifier() {
      * 恢复后的值不用主动同步客户端：法杖回到手上后 [onInventoryTick] 第一次 [syncClient]
      * 就会把恢复值推给 HUD（`lastSent` 初始值是空壳 payload，必然不同）。
      *
-     * @param tag 存档状态；键缺失时退回「满耐久、无暂停」（旧档/首次入库）
+     * @param tag 存档状态；键缺失时记录「未读到」标记，由 [onInventoryTick] 首次结算补满到**当前容量**
      */
     override fun loadRuntimeState(tag: CompoundTag) {
-        durability = tag.getDoubleOr("durability", maxDurability).coerceIn(0.0, maxDurability)
+        durabilityLoaded = tag.contains("durability")
+        // 上限不在读档时钳制（此时拿不到 wand、算不出「卡数 × maxDurability」）：
+        // 只保证非负，上限交给每 tick 的 [shieldCapacity] 钳制。
+        durability = tag.getDoubleOr("durability", maxDurability).coerceAtLeast(0.0)
         pauseTicks = tag.getIntOr("pause_ticks", 0).coerceAtLeast(0)
     }
 
     override var needInventory: Boolean = true
 
+    /**
+     * 每 tick 维护护盾。
+     *
+     * **多张护盾卡**：只有[主卡][primaryShield]在这里干活（球壳 / 弹开 / 回复 / HUD），
+     * 其余卡把主卡的进度镜像过来后直接返回 —— 这样「同一法术 id 只有一份存档状态」
+     * （`Wand.magicStates` 按 id 存，保存时同 id 的卡互相覆盖）在任何一张卡上写的值都一致。
+     */
     override fun onInventoryTick() {
+        val owner = primaryShield()
+        if (owner != null && owner !== this) {
+            durability = owner.durability
+            pauseTicks = owner.pauseTicks
+            durabilityLoaded = owner.durabilityLoaded
+            return
+        }
+
         val player = caster
         if (!player.isAlive) return
         val level = player.level()
@@ -117,11 +170,20 @@ class EnergyShield : Modifier() {
         // 重新被持有：复位「放下倒计时」（见 onPassiveIdle）
         idleTicks = 0
 
+        // 耐久上限随「本杖有几张护盾卡」变化；首次结算（旧档/新装）直接补满到当前容量
+        val capacity = shieldCapacity()
+        if (!durabilityLoaded) {
+            durability = capacity
+            durabilityLoaded = true
+        } else {
+            durability = durability.coerceIn(0.0, capacity)
+        }
+
         // 耐久回复（破盾暂停期间不回复）
         if (pauseTicks > 0) {
             pauseTicks--
         } else {
-            durability = min(maxDurability, durability + regenPerSecond / 20.0)
+            durability = min(capacity, durability + regenPerSecond / 20.0)
         }
         val shieldUp = durability > 0
         if (shieldUp) {
@@ -250,6 +312,17 @@ class EnergyShield : Modifier() {
         if (idleTicks >= SHELL_LINGER_TICKS) clearShieldVisual()
     }
 
+    /**
+     * 从法杖上取下（或槽位被替换）时调用：**立刻销毁球壳**。
+     *
+     * 必须做：取下之后本实例不再出现在 `Wand.loadedMagics` 里，[onInventoryTick] 与 [onPassiveIdle]
+     * **都不会再被调用** —— 而球壳是 `lifetime = -1` 的永存粒子组，不在这里清理就会一直留在世界里。
+     * 若取下的只是「多张护盾卡」中的一张，接任的主卡会在下一 tick 铺出自己的球壳（这里先清掉旧的）。
+     */
+    override fun onUnloaded() {
+        clearShieldVisual()
+    }
+
     /** 破盾/失效：立即销毁整个球壳粒子组（粒子一并销毁）。 */
     private fun clearShieldVisual() {
         shell?.remove()
@@ -262,10 +335,15 @@ class EnergyShield : Modifier() {
     /** 球壳球心相对脚底的偏移：身体中段（身高 55%），比眼睛位置更贴近「包裹全身」的观感。 */
     private fun shellCenterOffset(holder: Entity): Double = holder.bbHeight * 0.55
 
-    /** 同步护盾状态到持有者客户端（仅状态变化时发包，避免每 tick 空包） */
+    /**
+     * 同步护盾状态到持有者客户端（仅状态变化时发包，避免每 tick 空包）。
+     *
+     * `maxDurability` 字段传的是**本杖的护盾容量**（= 每张 [maxDurability] × 卡数），
+     * HUD 按 `durability / maxDurability` 画条，所以多张护盾卡时条会自动按新容量显示。
+     */
     private fun syncClient() {
         val player = caster as? ServerPlayer ?: return
-        val payload = SyncShieldPayload(wand.id, durability, maxDurability, pauseTicks, breakPauseTicks)
+        val payload = SyncShieldPayload(wand.id, durability, shieldCapacity(), pauseTicks, breakPauseTicks)
         if (payload == lastSent) return
         lastSent = payload
         PacketDistributor.sendToPlayer(player, payload)

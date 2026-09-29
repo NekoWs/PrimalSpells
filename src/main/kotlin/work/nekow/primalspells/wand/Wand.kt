@@ -43,8 +43,9 @@ class Wand(var id: String) {
      *
      * ⚠️ 键是**法术 id**，不是槽位：[magics] 里同一个法术 id 可以出现多次（重复卡），
      * 这些重复卡在存档层面**共享同一份**运行期状态 —— 保存时后写的覆盖先写的，
-     * 读档时同一份值回灌给所有同 id 的卡。对当前唯一的用户（`EnergyShield` 是按法杖生效的被动）
-     * 这是可接受的行为（重复装两个护盾，重登后两边取同一个耐久值）；
+     * 读档时同一份值回灌给所有同 id 的卡。对当前唯一的用户（`EnergyShield`）这正是想要的语义：
+     * 一根法杖上的多张护盾卡**共用一个耐久池**（容量 = 每张上限 × 卡数、只出一层球壳），
+     * 由第一张卡负责结算、其余卡每 tick 把它的值镜像过来（见 `EnergyShield.onInventoryTick`）。
      * 若将来出现「每张卡各自计时」的法术，需要把键从法术 id 换成槽位索引。
      */
     val magicStates = hashMapOf<String, CompoundTag>()
@@ -61,13 +62,31 @@ class Wand(var id: String) {
     var status: Status = Status()
 
     fun load() {
+        val previous = loadedMagics.toList()
         loadedMagics.clear()
         loadedMagics.addAll(innate)
         magics.filterNotNull().forEach { loadedMagics.add(it) }
+        // 通知「本次重建后不再装载」的实例（法术被取下 / 槽位被替换）：让它们清理只该在装载期间
+        // 存在的东西（如 `EnergyShield` 的球壳粒子组）—— 此后它们不会再收到任何 tick。
+        previous.forEach { if (it !in loadedMagics) it.onUnloaded() }
         drawPile.clear()
         hand.clear()
         discardPile.clear()
         drawPile.addAll(loadedMagics)
+    }
+
+    /**
+     * 丢弃本内存实例：通知全部已装载法术 [Magic.onUnloaded]（清理粒子组等外部资源），
+     * 并清空法术/牌堆列表。由 [WandManager] 在回收「无人持有」的法杖前调用
+     * （调用方负责先 [saveTag] 落盘 —— 存档才是权威副本）。
+     */
+    fun unload() {
+        loadedMagics.forEach { it.onUnloaded() }
+        loadedMagics.clear()
+        magics.clear()
+        drawPile.clear()
+        hand.clear()
+        discardPile.clear()
     }
 
     /**

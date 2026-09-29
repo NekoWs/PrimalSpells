@@ -147,6 +147,17 @@
 
 ---
 
+## 第 12 轮（2026-09-30，PD 1.0.10 批量运动入口接入 / 护盾自转）
+
+| 编号 | 事项 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 12.1 | 前置升级到 **1.0.10-ALPHA**（PD 提交 `e0cbd5d`：批量设速/批量施力 + 「运动指令一律解除实体锚点」口径统一） | 在 PD 仓库 `./gradlew build` 出包（含其单测）→ `lib/` 换 jar（`particledrawing-1.0.10-ALPHA.jar` + `-sources.jar`，旧 1.0.9 删除）→ `gradle.properties` 的 `particledrawing_version` / `particledrawing_version_range=[1.0.10-ALPHA,)` → 构建通过（产物 `mods.toml` 为 `[1.0.10-ALPHA,)`） | `lib/`、`gradle.properties`、`docs/build-and-run.md` |
+| 12.2 | **黑洞的「本模组自持速度表」临时降级可以撤了**（第 10/11 轮遗留：`velocities: HashMap<UUID, Vec3>` + 每 tick 一次 `trackAll` 写位置） | 改用 `ParticleBatch.setVelocityAll(velocities)`：每 tick 由 `forEach` 读 PD 的权威 `pos/vel` 算出**本 tick 每颗粒子该有的速度**（`v ← v·阻尼 + 向心加速度`），一包下发（**1 包/tick**），**位置积分交回 PD**（`pos += vel`，服务端权威、暂停不外推）。删掉速度表与自算积分 —— 本模组不再持有任何跨 tick 粒子状态；PD 需求 #1（批量施力/设速）就此闭环 | `magic/effect/lifecycle/BlackHole.kt`、`docs/issues/pd-api-requests.md` |
+| 12.3 | 护盾**没有自转**（第 7/8 轮为绕开「错峰重建/滑入」把偏移固定死了），且球壳用 `ParticleBatch` + 逐粒子 `attachTo` 表达 —— 想自转只能「每 tick `trackAll` 下发旋转后的偏移」（1 包/tick，且位置指令会解除实体锚点） | 改用**编排式**的 `ParticleGroup`：`Draw.sphere(manager, 球心, 1.7, 40, 颜色, 缩放).followEntity(uuid, 身体中段偏移).spin(轴, 弧度/tick)` —— 球壳一次铺满（黄金角螺旋 = 均匀）、跟随与自转都在**客户端本地求值**，**0 包/tick**；跨维度 / 换实体才重建（按 `level` + `uuid` 判定）。`SHELL_SPIN_AXIS`（略倾斜，非纯 Y）与 `SHELL_SPIN_RADIANS_PER_TICK`（π/60 ≈ 3°/tick ≈ 6 秒一圈）是可调常数，改它们不花带宽 | `magic/modifier/EnergyShield.kt` |
+| 12.4 | 依赖语义笔记（1.0.10 起） | `setVelocity`/`setVelocityAll`/`applyForce`/`applyForceAll` **都会解除实体锚点**（1.0.9 的 `setVelocity` 漏了这一步，位置每 tick 仍被锚点覆盖）→ 「先 `attachTo` 再给速度/力」是无效组合；护盾改用组编排后天然避开这条口径 | `docs/issues/pd-api-requests.md`（能力边界表）、`docs/architecture.md` §9 |
+
+---
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：
@@ -216,10 +227,11 @@
 
 #### [需求 ✓已加] 实体锚点 `attachTo` / `attachToLocal`
 
-- 现状：护盾球壳用 `attachTo(Entity, offset)`（世界空间偏移，刚性平移、零逐 tick 包；
-  第 10 轮起改用 1.0.9 的 `Entity` 入口，UUID 为主身份）；
-  `attachToLocal`（随实体朝向旋转）暂未使用 —— 需要「贴在身前/身侧」的粒子时可用
-- 落点：`magic/modifier/EnergyShield.kt`
+- 现状：护盾球壳**第 12 轮已改用组编排**（`Draw.sphere` + `ParticleGroup.followEntity(uuid, offset)` + `spin`，
+  跟随与自转都在客户端本地求值、0 包/tick）；`ParticleHandle.attachTo(Entity, offset)` 保留给
+  「一堆各自独立的粒子钉在实体上」的场景（当前无使用者）；
+  `attachToLocal`（随实体朝向旋转）也仍未使用 —— 需要「贴在身前/身侧」的粒子时可用
+- 落点：`magic/modifier/EnergyShield.kt`（组编排）、`magic/effect/lifecycle/BlackHole.kt`（不涉及锚定）
 
 #### [需求 ✓已加] 批量施力 / 批量设速（一次网络包覆盖多粒子）
 
@@ -234,7 +246,10 @@
   载荷集合变化 → 网络注册版本提到 `"4"`，两端必须同一个 jar）。
   同批还修掉了「`setVelocity`/`applyForce` 未解除实体锚点」——此前先 `attachTo` 再设速度/力，
   位置每 tick 仍被锚点覆盖，现在与 `move`/`track` 统一为「运动指令接管位置」。
-- 本侧现状：**暂未迁移**。黑洞仍是「本模组积分 + 一包/tick `trackAll`」——两者带宽同为 1 包/tick，
-  而自算积分能给确定的轨迹与精确的「进入中心才销毁」判定；要交回 PD 积分时改用它即可（恢复条件已满足）。
+- 本侧落地（**第 12 轮**）：黑洞改用 `ParticleBatch.setVelocityAll(velocities)` —— 每 tick
+  `forEach` 读 PD 的权威 `pos/vel` 算出该 tick 的速度（`v ← v·阻尼 + 向心加速度`）、一包下发，
+  **位置积分交回 PD**（`pos += vel`，服务端权威、暂停不外推），自持的速度表与自算积分一并删除。
+  带宽与之前同为 1 包/tick，但**本模组不再持有任何跨 tick 粒子状态**，且「抵达中心才销毁」仍用
+  `removeIf` 读 PD 的权威位置判定（判定精度不变）。轨迹已在接入前用 500 随机样本复算过（第 11 轮）。
 - 落点：`magic/effect/lifecycle/BlackHole.kt`
 

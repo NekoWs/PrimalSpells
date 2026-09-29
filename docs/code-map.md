@@ -180,7 +180,7 @@
 | `sphere_orbit` | `SphereOrbit` | 修饰器（`OVERRIDE` 定位） | `magic/modifier/SphereOrbit.kt` |
 | `teleport` | `TeleportProjectile` | 投射物 | `magic/projectile/TeleportProjectile.kt` |
 | `quantum_entanglement` | `QuantumEntanglement` | 修饰器（生成子弹） | `magic/modifier/QuantumEntanglement.kt` |
-| `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`；未完成） | `magic/modifier/EnergyShield.kt` |
+| `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`；功能可用，数值/手感待调，见 [issues/open.md](issues/open.md) 1.1） | `magic/modifier/EnergyShield.kt` |
 
 **非法术物品**（`registry/ModItems.kt` 直接注册）：`wand`、`spell_pouch`、`test_dummy`。
 

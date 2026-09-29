@@ -13,7 +13,32 @@
 
 ---
 
-## 1. 已知的能力边界（不是缺陷，但接线前必须知道）
+**当前 1 条未决**（文档级，见下）。上一条（批量施力 / 批量设速）已由 PD `e0cbd5d`（**1.0.10-ALPHA**）落地
+（`ParticleBatch.setVelocityAll` / `applyForceAll`，一次包覆盖全组、按 `handles()` 顺序对齐），
+本模组已在第 12 轮接入（黑洞据此删掉了自持的「粒子 id → 速度」表）。已闭环条目见 [resolved.md](resolved.md) 附录 B。
+
+## 1. [需求] 写明 `ParticleGroup` 各变换指令用「哪个轴心」（文档级）
+
+- 状态：**未决**
+- 目标能力：护盾球壳要「跟随持有者 + 持续自转」，即 `.followEntity(uuid, offset)` 之后再 `.spin(axis, radPerTick)`。
+  文档只说 `spin` 是「无限匀速旋转」，**没说它绕哪个轴心转**，也没说它和 `followEntity` 的调用顺序是否有约束。
+- 现有 API 为什么不够（不是行为错，是语义没写明）：
+  - `ParticleGroup.spin` 的实现是 `emit(AnimInstruction.Spin(cursorMs, PivotRef.Fixed(pivot), axis, radiansPerTick / 50))`
+    —— 它塞进去的 `PivotRef.Fixed(pivot)` 在客户端**根本没被读**：客户端处理 `Spin` 时只做
+    `rotateToSnapshot(p, slot, ins.axis, angle)`（`ClientAnimationProgramManager` 内），轴心用的是
+    **当前轴心绑定**（`p.pivotEntity` / `p.pivotFixed`，由 `BindPivot` 设）。
+  - 结论是「先 `followEntity` 再 `spin` 才绕实体转」，但这一点只能靠**读客户端源码**确认；
+    `spin`/`followEntity` 的 KDoc 都没写。指令载荷里那个被忽略的 `PivotRef` 也容易让人误判。
+- 期望 API 形态（二选一即可）：
+  1. **补文档**：`spin`（以及 `rotate`/`scale`/`pulse` 等以轴心为基准的指令）KDoc 写明
+     「绕**当前**轴心绑定旋转；要用实体轴心请先 `followEntity(...)`」；
+  2. 或**去掉** `AnimInstruction.Spin` 里未被消费的 `PivotRef`（避免读者以为可以逐指令指定轴心）。
+- 影响面：`modifier/EnergyShield.kt`（第 12 轮接入护盾自转时踩到）；未来任何「跟随 + 旋转」的组动画
+- 临时降级：本模组已按「先 `followEntity` 再 `spin`」接线，并把结论写进
+  `magic/modifier/EnergyShield.kt` 的 KDoc 与 [design/effects-api.md](../design/effects-api.md) §0.3；
+  实机若出现「转起来后球壳偏出身体」就是这条没吃透（[verify.md](verify.md) 第 20 项）。
+
+## 2. 已知的能力边界（不是缺陷，但接线前必须知道）
 
 | 项 | 现状 | 影响 | 我们的处理 |
 |---|---|---|---|
@@ -25,7 +50,7 @@
 
 ---
 
-## 2. 需求登记模板（新增需求时照抄）
+## 3. 需求登记模板（新增需求时照抄）
 
 ```
 ### [需求] <一句话标题>

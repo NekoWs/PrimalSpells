@@ -40,9 +40,9 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 成员管理 | `add()` 会把 `armed` 置 false → **重发全量受控清单** | `add`/`addAll`/`remove` 增量登记、随时增删，**不重发全量** | 每 tick 增删 1~3 个成员：`Batch` |
 | 每粒子状态 | 组级**统一**变换（`spin/rotate/scale/pulse/move/movePath`） | 位置/速度按句柄读（`forEach { i, h, pos, vel -> }`），位置用**一次** `trackAll` 批量写 | 「每粒子各自被吸向中心」：`Batch` |
 | 条件回收 | 整组 `remove()` / `destroyAfter(ticks)` | `removeIf { h, pos, vel -> … }`，过期成员自动出列 | 按位置/速度回收：`Batch` |
-| 锚定身份 | `followEntity(uuid, offset, local)`、`defineEntity` | 逐粒子 `attachTo(Entity / uuid / entityId, offset)`（1.0.9 起三入口统一） | 形状刚性、零逐 tick 包：`attachTo` |
+| 锚定身份 | `followEntity(uuid, offset, local)`、`defineEntity` | 逐粒子 `attachTo(Entity / uuid / entityId, offset)`（1.0.9 起三入口统一） | 形状刚性、零逐 tick 包：**整组跟随用 `followEntity`（护盾球壳在用）**，零散粒子才用 `attachTo` |
 | 补量/上限 | 组不负责补量 | `ensureSize(n, spawner)`：被维度上限拒了就停下，下次再补 | 球壳补齐：`Batch.ensureSize` |
-| 组级动画 | **`spin`/`pulse`/`fadeOut`/`destroyAfter` 等零带宽编排** | 无（Batch 只走位置/速度/力） | 护盾要自转/淡出就用组（尚未接线） |
+| 组级动画 | **`spin`/`pulse`/`fadeOut`/`destroyAfter` 等零带宽编排** | 无（Batch 只走位置/速度/力） | 护盾的自转就用组：**第 12 轮已接线**（`Draw.sphere` + `followEntity` + `spin`，0 包/tick） |
 
 **判定准则**：
 
@@ -50,7 +50,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 |---|---|---|
 | **属于 PD**（用现成 API，别再自己写） | 与「粒子集合的通用机制」有关：批量成员管理、组跟随实体/旋转/淡出/延时、寿命与可见性、上限与拒绝处理、带宽优化 | `ParticleBatch`（成员簿记）、`ParticleGroup` 的组级编排、`trackAll`、`attachTo`、`applyForce` |
 | **属于本模组**（玩法语义，PD 不该知道） | 只有游戏知道的东西：半径/数量/颜色/寿命取值、力的公式、回收判据、被动的持有/放下时机与淡出时长 | `BlackHole` 的吸力与阻尼、`GravityField` 的下落与下半球回收、`EnergyShield` 的 4 tick 延迟、`ParticleShapes.fibonacciSphere` 的选点 |
-| **灰区（当前留在使用方）** | **随距离变化的每粒子受力**：PD 的 `applyForce` 是「一次下发的恒定加速度」，逐 tick 变力只能逐粒子重发（N 包/tick）。PD 1.0.10-ALPHA 已补批量入口 `applyForceAll(加速列表, ticks)`（1 包/tick），该需求已闭环 | `BlackHole` 仍是「自算积分 + 一次 `trackAll`」并自持一张「粒子 id → 速度」表；换不换只影响带宽口径（都是 1 包/tick），见 [../issues/resolved.md](../issues/resolved.md) 附录 B.2 |
+| **灰区（已收敛，无遗留）** | 曾经留在使用方的「随距离变化的每粒子受力」已被 PD 收走：1.0.10-ALPHA 的 `setVelocityAll` / `applyForceAll` **一次包覆盖全组**（按 `handles()` 顺序对齐、逐玩家按可见性裁剪） | `BlackHole` 第 12 轮改用 `setVelocityAll`：**速度每 tick 由本模组重算，位置积分归 PD**，本模组不再持有任何跨 tick 粒子状态（见 [../issues/resolved.md](../issues/resolved.md) 第 12 轮） |
 
 ⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleBatch`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
 再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组/集 API** ——
@@ -63,10 +63,12 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 |---|---|---|---|
 | 粒子固定不动 | `create()…spawn()`（不设速度、不发位置指令） | 0 | `GravityField` 范围球壳 |
 | 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
-| 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleManager.trackAll(ids, positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）、`BlackHole`（批量） |
-| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞吸力随距离变化） |
-| 锚在一个实体身上（形状刚性） | `handle.attachTo(entityId/uuid, 偏移)`（1.0.9 起身份统一）；整组跟随用 `ParticleGroup.followEntity(uuid, offset, local)` | **0** | `EnergyShield` 球壳 |
-| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll` 为 1 包/tick） | **已在用**（第 10 轮迁移完成）：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）、`EnergyShield`（球壳）。见 [../issues/README.md](../issues/resolved.md) 第 10 轮 |
+| 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleBatch.trackAll(positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）。本模组没有「自己算位置」的批量使用者了 |
+| **每 tick 变化的每粒子速度**（受力随位置变化） | **`ParticleBatch.setVelocityAll(velocities)`**（1.0.10 起）：速度每 tick 重算、一包下发，**位置积分归 PD**（`pos += vel`） | **1 包/tick**（与粒子数无关） | `BlackHole` 被吸入粒子（`v ← v·阻尼 + 向心加速度`） |
+| **组级编排：跟随 + 持续旋转/淡出** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeOut(ticks, removeAfter)`；都在**客户端本地求值** | **0 包/tick** | `EnergyShield` 球壳（第 12 轮接入） |
+| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞的力随距离变化，用 `setVelocityAll` 直接表达） |
+| 锚在一个实体身上（形状刚性） | 整组用 `ParticleGroup.followEntity(uuid, offset, local)`；零散粒子用 `handle.attachTo(Entity/uuid/entityId, 偏移)`（1.0.9 起身份统一） | **0** | `EnergyShield` 球壳已改用**组**（要自转）；`attachTo` 当前无使用者 |
+| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起，1.0.10 补批量设速/施力）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity(All)`/`applyForce(All)`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll`/`setVelocityAll` 为 1 包/tick） | **已在用**：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）。见 [../issues/resolved.md](../issues/resolved.md) 第 10/12 轮 |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
 六条硬要点：
@@ -138,11 +140,11 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > - 1.0.10-ALPHA 相对 1.0.9 的 API 增量：批量运动指令 **`ParticleBatch.setVelocityAll(速度列表)` / `applyForceAll(加速列表, ticks = 1)`**
 >   （各列表与 `handles()` 顺序一一对应，一包覆盖全组，逐玩家按可见性裁剪；`ParticleManager` 同名的 id 列表版本），
 >   以及修正「`setVelocity`/`applyForce` 未解除实体锚点」（现在与 `move`/`track` 一致：运动指令接管位置）。
->   本模组尚未改用（黑洞仍是自算积分 + 一包/tick `trackAll`，见 [../issues/resolved.md](../issues/resolved.md) 附录 B.2）。
+>   **第 12 轮已接入**：黑洞改用 `setVelocityAll`（速度每 tick 重算、位置积分交回 PD，删掉了自持的「粒子 id → 速度」表）。
 > - **2026-09-30（第 10 轮）**：本模组已按 §0.2/§0.3 完成迁移 —— 自研 `ParticleSwarm`（273 行）**已删除**，
->   三处接线（`BlackHole`/`GravityField`/`EnergyShield`）改用 `ParticleBatch`，生成入口收敛为 `util/PdParticles.kt` 的
->   `ParticleManager.spawnParticle(...)`；随距离变化的每粒子受力仍留在使用方（该需求已由 1.0.10 的
->   `applyForceAll` 闭环，本模组暂未迁移）。
+>   三处接线改用 `ParticleBatch`，生成入口收敛为 `util/PdParticles.kt` 的
+>   `ParticleManager.spawnParticle(...)`；随距离变化的每粒子受力当时仍留在使用方（该需求已由 1.0.10 的
+>   `setVelocityAll`/`applyForceAll` 闭环，本模组已在第 12 轮迁移）。
 > - 本文引用的包路径按重构前书写，现对应关系：`magic/effect/Trajectory.kt` → `magic/effect/visual/Trajectory.kt`；`magic/effect/*` 其余类分入 `magic/effect/{geometry,lifecycle}`；`magic/Revise.kt` → `magic/core/Modifier.kt`（类 `Revise` → `Modifier`）；`magic/Projectile.kt` → `magic/projectile/Projectile.kt`；`magic/{Magic,MagicStatus,MagicManager}.kt` → `magic/core/`；`item/ModItems.kt` → `registry/ModItems.kt`。完整对照见 [../conventions.md](../conventions.md) 第 8 节。
 
 

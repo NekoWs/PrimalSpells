@@ -29,11 +29,11 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟢 | 黑洞粒子带宽：范围球壳 96 个（`ParticleBatch.ensureSize` 首 tick 铺满、静止）+ 被吸入粒子（本模组积分 + **一次 `trackAll`**） | `magic/effect/lifecycle/BlackHole.kt` | 球壳 **0 包/tick**；被吸入粒子 **1 包/tick（与粒子数无关）**，峰值约 **34** 个（每 tick 1 个 × 平均 34 tick 抵达中心销毁，阻尼 0.9 下实测） |
+| 🟢 | 黑洞粒子带宽：范围球壳 96 个（`ParticleBatch.ensureSize` 首 tick 铺满、静止）+ 被吸入粒子（本模组每 tick 重算速度 + **一次 `setVelocityAll`**，位置由 PD 积分） | `magic/effect/lifecycle/BlackHole.kt` | 球壳 **0 包/tick**；被吸入粒子 **1 包/tick（与粒子数无关）**，峰值约 **34** 个（每 tick 1 个 × 平均 34 tick 抵达中心销毁，阻尼 0.9 下实测）。**本模组不再持有任何跨 tick 粒子状态** |
 | 🟢 | 重力场粒子带宽：范围球壳 96 个（`ensureSize` 首 tick 铺满、静止）+ 下落粒子（生成时一次 `setVelocity`） | `magic/effect/lifecycle/GravityField.kt` | **0 包/tick**；回收判定用 `ParticleBatch.removeIf` 只读 PD 的权威位置（读不产包）。要更密改 `FALLING_PER_TICK` |
-| 🟡 | `EnergyShield` 护盾球壳带宽：`attachTo` 锚定（40 个粒子、半径 1.7、**永存**） | `magic/modifier/EnergyShield.kt` | **0 包/tick**（只在首次挂载与补齐时各发一次，不做周期重建）；放下法杖后由 `onPassiveIdle` 在 4 tick 内显式清除。想让它自转就用组级 `spin`（0 包）或 `trackAll`（1 包/tick） |
+| 🟢 | `EnergyShield` 护盾球壳带宽：`ParticleGroup`（40 个粒子、半径 1.7、**永存**）+ 跟随 + 自转 | `magic/modifier/EnergyShield.kt` | 跟随与自转都是**客户端本地求值** → **0 包/tick**（只在建立时下发一次；跨维度/换实体才重建）；破盾立即 `group.remove()`，放下法杖后由 `onPassiveIdle` 在 4 tick 内清除。转速/轴是常数，调它不花带宽 |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 已加两道剪枝：场上无投射物直接返回；先按「到玩家中心的距离球」粗筛（半径 = 护盾半径 + 玩家包围盒最远角 1.0 + 该投射物碰撞半径，保证不漏判）。法术数量再上量级时可考虑空间分桶/网格 |
 
-> 想让它自转/淡出：PD 的 `ParticleGroup` 有 `spin`/`fadeOut`/`destroyAfter` 的零带宽编排，
-> 与 `ParticleBatch` 分工见 [design/effects-api.md §0.2](../design/effects-api.md)。
+> 自转/淡出这类**组级编排**都用 `ParticleGroup`（客户端求值、零逐 tick 包），与 `ParticleBatch` 的分工见
+> [design/effects-api.md §0.2](../design/effects-api.md)。

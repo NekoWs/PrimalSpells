@@ -293,7 +293,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 | 小包没有右键界面 | 编辑与法杖一致：滚轮选槽 + 物品对上物品装卸 | `item/SpellPouchItem.kt` |
 | 蛇形与往复运动可叠加 | 蛇形只施加方向**旋转增量**，不再覆写方向 | `magic/modifier/Serpentine.kt` |
 | 区域场**会影响魔法投射物** | 黑洞把范围内投射物吸向中心、重力场给投射物持续的向下力；**区域弹自身除外**（否则会被自己往下压/吸住）。这是刻意的：黑洞就该「把飞进来的法术吸掉」 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
-| 区域/本体粒子的「位置」在本模组算 | 三种写法：`attachTo` 锚定（0 包/tick）/ 一次 `trackAll` 批量写位置（1 包/tick）/ 一次 `setVelocity` 交给 PD 积分（0 包/tick）；**成员簿记归 PD 的 `ParticleBatch`**，本模组只算数值。见 §9 | `magic/effect/lifecycle/{BlackHole,GravityField}.kt`、`magic/modifier/EnergyShield.kt`、`util/PdParticles.kt` |
+| 法术粒子的驱动方式与「谁持有运动状态」 | 四种写法：**组级编排**（`Draw.sphere` + `followEntity` + `spin`：跟随与旋转都在客户端本地求值，**0 包/tick**）/ `attachTo` 锚定（0 包/tick）/ 一次 `setVelocity` 或每 tick 一次 `setVelocityAll` 交给 PD 积分（0~1 包/tick）/ 一次 `trackAll` 批量写位置（1 包/tick）；**成员簿记归 `ParticleBatch`/`ParticleGroup`，位置与速度也读 PD 的权威值**，本模组只算数值。见 §9 | `magic/effect/lifecycle/{BlackHole,GravityField}.kt`、`magic/modifier/EnergyShield.kt`、`util/PdParticles.kt` |
 | PD 粒子管理器由 `wand.pdParticles(level)` 兜底创建 | 管理器原本只在「持有者背包物品被 tick」时建立；未来的生物施法者不走 `inventoryTick`，不兜底就会出现「有伤害没粒子」 | `util/PdParticles.kt` |
 
 （第 1、7 两条与上面 5./7./8./10./11. 有重叠，不重复列出。）
@@ -305,24 +305,27 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
   [issues/resolved.md](issues/resolved.md) 第 10 轮与 [design/effects-api.md](design/effects-api.md) §0.3。
-- **护盾球壳**（`EnergyShield`）现状：40 个淡蓝粒子按 Fibonacci 球铺在半径 1.7 的球面上，
-  **锚定在持有者身体中段**（`attachTo` 的偏移基准是脚底 `Entity.position()`，所以球面偏移之外还要加身高 55% ——
-  少加会让球壳贴在脚上，多加会让新粒子「从上方滑入」）；粒子**永存、不做周期重建**
-  （重建必带滑入动画），只在数量不足时 `ensureSize` 补齐；法杖不再被持有 **4 tick** 后由
-  `Magic.onPassiveIdle` 清除（这段时长是留给未来「消失动画」的窗口）。
-- 已接线（三种用法，均对应 PD 的低带宽写法）：
-  1. **锚定**：`attachTo(实体, 世界空间偏移)`——护盾球壳，服务端只在挂载时发一次，客户端本地解析实体位置，
-     **0 包/tick** 且天然刚性；
-  2. **批量写位置**：`ParticleBatch.trackAll(positions)`（内部走 `ParticleManager.trackAll`）——黑洞被吸入粒子
-     （本模组积分，吸力随距离变化），**1 包/tick，与粒子数无关**；
-  3. **速度驱动**：生成时一次 `setVelocity`，之后交给 PD 积分——重力场下落粒子（**0 包/tick**），
+- **护盾球壳**（`EnergyShield`）现状：一个 `ParticleGroup` —— `Draw.sphere` 一次性铺出 40 个淡蓝粒子
+  （黄金角螺旋 = Fibonacci 球，半径 1.7，粒子永存），`.followEntity(uuid, 偏移)` 让**轴心跟随持有者**、
+  `.spin(轴, 弧度/tick)` 让它**持续自转**；这两件事都在**客户端本地求值**，服务端只在建立时下发一次，
+  之后 **0 包/tick**。⚠️ 轴心偏移的基准是脚底 `Entity.position()`，所以偏移里必须含「身体中段（身高 55%）」，
+  且**只能加一次**（球心坐标与轴心偏移两处都加就高了 ≈1 格 → 新粒子「从上方滑入」，见第 8 轮）；
+  **不做周期重建**（重建必带滑入动画）；法杖不再被持有 **4 tick** 后由 `Magic.onPassiveIdle` 清除
+  （这段时长是留给「消失动画」的窗口，组 API 现成：`.fadeOut(ticks, removeAfter)`，尚未接）。
+- 已接线（四种用法，均对应 PD 的低带宽写法）：
+  1. **组级编排**：`Draw.sphere(...).followEntity(uuid, offset).spin(axis, radPerTick)`——护盾球壳；
+     跟随与旋转都由客户端每 tick 本地求值，**0 包/tick** 且天然刚性；
+  2. **锚定**：`ParticleHandle.attachTo(实体, 世界空间偏移)`——需要「一堆各自独立的粒子钉在实体上」时用
+     （当前没有使用者；护盾已改用第 1 条）；
+  3. **批量设速**：`ParticleBatch.setVelocityAll(velocities)`——黑洞被吸入粒子（吸力**随距离变化**，
+     每 tick 重算每颗粒子的速度），之后由 PD 逐 tick 做 `pos += vel`，**1 包/tick、与粒子数无关**；
+  4. **速度驱动（一次设速）**：生成时一次 `setVelocity`，之后交给 PD 积分——重力场下落粒子（**0 包/tick**），
      回收判定只读 `ParticleBatch.forEach/removeIf` 给的权威位置；另 `Trajectory`（拖尾）同样只发一次速度。
 - 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
   生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
-- 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
-  1.0.10 起「每颗粒子各自的力」有了批量入口 `ParticleBatch.applyForceAll(加速列表, ticks)` / `setVelocityAll(速度列表)`
-  （各列表与 `handles()` 顺序一一对应，一次包覆盖全组，逐玩家按可见性裁剪）；黑洞目前仍是
-  「本模组积分 + 一包/tick `trackAll`」，要交回 PD 积分时改用它即可（见 [issues/resolved.md](issues/resolved.md) 附录 B.2）。
+- 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）、`applyForce`/`applyForceAll`
+  （黑洞要的是「每 tick 重算速度」，用 `setVelocityAll` 直接表达更清楚；恒定或分段恒定的力才用施力入口）、
+  `ParticleGroup.fadeOut/destroyAfter`（护盾的消失动画窗口已留好）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份；
   1.0.10-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。

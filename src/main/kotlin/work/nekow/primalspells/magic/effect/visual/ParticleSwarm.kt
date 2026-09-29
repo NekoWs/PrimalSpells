@@ -63,6 +63,9 @@ class ParticleSwarm {
     /** 静止/匀速粒子数（用于「只生成一次」这类判断）。 */
     val size: Int get() = handles.size
 
+    /** 三张表都空（用于「放下后延迟清理」这类判断）。 */
+    val isEmpty: Boolean get() = handles.isEmpty() && attached.isEmpty() && simulated.isEmpty()
+
     // ---------- 静止 / 匀速 ----------
 
     /**

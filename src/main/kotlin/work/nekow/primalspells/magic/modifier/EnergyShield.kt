@@ -58,8 +58,11 @@ class EnergyShield : Modifier() {
     /** 护盾球壳粒子（ParticleDrawing）：以持有者为锚点的淡蓝色球壳，见 [updateShieldVisual]。 */
     private val shieldSwarm = ParticleSwarm()
 
-    /** 球壳粒子的球面偏移（首次生成时随机采样一次，之后固定 —— 球壳静态，只跟随持有者平移）。 */
+    /** 球壳粒子的球面偏移（首次生成时用 Fibonacci 球算一次，之后固定 —— 球壳静态，只跟随持有者平移）。 */
     private var shellOffsets: List<Vec3> = emptyList()
+
+    /** 「未被持有」持续的 tick 数：达到 [SHELL_LINGER_TICKS] 就清掉球壳（见 [onPassiveIdle]）。 */
+    private var idleTicks = 0
 
     /**
      * 运行期状态持久化（写）：把「当前耐久」与「破盾暂停剩余 tick」交给法杖存档。
@@ -99,6 +102,9 @@ class EnergyShield : Modifier() {
         if (!player.isAlive) return
         val level = player.level()
         if (level !is ServerLevel) return
+
+        // 重新被持有：复位「放下倒计时」（见 onPassiveIdle）
+        idleTicks = 0
 
         // 耐久回复（破盾暂停期间不回复）
         if (pauseTicks > 0) {
@@ -179,40 +185,54 @@ class EnergyShield : Modifier() {
      * 实现要点：
      * - 球壳用 PD 的 `attachTo(实体, 世界空间偏移)` 钉在持有者身上：**服务端只在挂载时下发一次**，
      *   之后由客户端每 tick 本地解析实体位置 —— 每 tick 零包，而且天然刚性（不受位置插值影响）；
-     * - 粒子寿命有限（[SHELL_LIFETIME_TICKS]）、由 [ParticleSwarm.refreshAttached] **错峰**重建：
-     *   法杖一旦不再被持有（放下/丢进箱子/卸下法术），`onInventoryTick` 就不再被调用，
-     *   我们**没有**「被动停止」回调可用来清理 —— 有限寿命让粒子逐个自然过期，不留孤儿粒子；
-     * - **不做自转**：挂载偏移是固定的世界空间偏移。想做自转要改成「每 tick 用一次
-     *   `ParticleManager.trackAll` 下发旋转后的偏移」（1 包/tick，见 [ParticleSwarm] 的说明），
-     *   不要退回逐粒子 `track`（N 包/tick，且历史上按索引配对出过错位与形状剪切）；
+     * - ⚠️ **挂载偏移必须包含「身体中段」那一段**：`attachTo` 的偏移是相对 `entity.position()`（脚底）的，
+     *   只给球面偏移会让球壳整个贴在脚上（实机表现为「球在玩家下方、粒子像在往下掉」）；
+     * - 球面用 [ParticleShapes.fibonacciSphere]**均匀**取点（不是随机采样），所以看起来是一个均匀球壳；
+     * - 粒子寿命 [SHELL_LIFETIME_TICKS]、由 [ParticleSwarm.refreshAttached]**错峰**重建（保持粒子新鲜）；
+     *   放下法杖后的清理走「显式倒计时」（见 [onPassiveIdle]），不再依赖寿命自然过期；
+     * - **不做自转**：挂载偏移固定。想做自转要改成「每 tick 用一次 `ParticleManager.trackAll`
+     *   下发旋转后的偏移」（1 包/tick，见 [ParticleSwarm] 的说明），不要退回逐粒子 `track`；
      * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建。
      */
     private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
         if (shellOffsets.isEmpty()) {
-            val random = level.random
-            shellOffsets = (0 until SHELL_PARTICLES).map {
-                ParticleShapes.randomUnitVector(random).scale(SHELL_RADIUS)
-            }
+            // Fibonacci 球：点间距近似相等（均匀球壳），且结果确定、便于复现问题
+            shellOffsets = ParticleShapes.fibonacciSphere(SHELL_PARTICLES)
+                .map { it.scale(SHELL_RADIUS) }
         }
+        val bodyOffset = shellCenterOffset(holder)
         shieldSwarm.refreshAttached(
             manager = wand.pdParticles(level),
             entityId = holder.id,
-            anchor = shellCenter(holder),
+            anchor = holder.position().add(0.0, bodyOffset, 0.0),
             count = SHELL_PARTICLES,
             color = SHELL_COLOR,
             scale = SHELL_SCALE,
             lifetimeTicks = SHELL_LIFETIME_TICKS,
-        ) { index -> shellOffsets[index % shellOffsets.size] }
+        ) { index -> shellOffsets[index % shellOffsets.size].add(0.0, bodyOffset, 0.0) }
+    }
+
+    /**
+     * 被动「未被持有」时的每 tick 回调（由 `Wand.tick` 的闲置分支驱动）。
+     *
+     * 放下法杖后**保留 [SHELL_LINGER_TICKS] tick** 再清除球壳 —— 这段时间是留给后续
+     * 「消失动画」的窗口（现在只是延迟销毁，看不出淡出）。重新握杖时 [onInventoryTick]
+     * 会把倒计时归零。
+     */
+    override fun onPassiveIdle() {
+        if (shieldSwarm.isEmpty) return
+        idleTicks++
+        if (idleTicks >= SHELL_LINGER_TICKS) clearShieldVisual()
     }
 
     /** 破盾/失效：立即销毁球壳粒子。 */
     private fun clearShieldVisual() {
         shieldSwarm.clear()
+        idleTicks = 0
     }
 
-    /** 球壳球心：持有者身体中段（脚 + 身高 55%），比眼睛位置更贴近「包裹全身」的观感。 */
-    private fun shellCenter(holder: Entity): Vec3 =
-        holder.position().add(0.0, holder.bbHeight * 0.55, 0.0)
+    /** 球壳球心相对脚底的偏移：身体中段（身高 55%），比眼睛位置更贴近「包裹全身」的观感。 */
+    private fun shellCenterOffset(holder: Entity): Double = holder.bbHeight * 0.55
 
     /** 同步护盾状态到持有者客户端（仅状态变化时发包，避免每 tick 空包） */
     private fun syncClient() {
@@ -234,18 +254,23 @@ class EnergyShield : Modifier() {
 
         // ---- 球壳粒子（ParticleDrawing）参数 ----
 
-        /** 球壳粒子数：每 tick 每个粒子各广播一次位置包，别开太大 */
-        private const val SHELL_PARTICLES = 24
+        /** 球壳粒子数：Fibonacci 均匀取点；`attachTo` 后无逐 tick 带宽，可以放心多一些 */
+        private const val SHELL_PARTICLES = 40
 
-        /** 球壳半径（方块）：略小于 [shieldRadius] + 玩家体积，视觉上包住身体 */
-        private const val SHELL_RADIUS = 0.85
+        /** 球壳半径（方块）：`attachTo` 的偏移相对脚底，球心还要再加「身体中段」那一段 */
+        private const val SHELL_RADIUS = 1.7
 
         /** 粒子尺寸 */
         private const val SHELL_SCALE = 0.4f
 
-        /** 粒子寿命（tick）：有限寿命让「法杖不再被持有时」粒子自行过期，不留孤儿。
-         *  要 ≥ [SHELL_PARTICLES] 才能让 [ParticleSwarm.tickAnchored] 的错峰重建完全铺开。 */
+        /** 粒子寿命（tick）：错峰重建保持新鲜；放下法杖的清理走 [onPassiveIdle] 的显式倒计时 */
         private const val SHELL_LIFETIME_TICKS = 60
+
+        /**
+         * 放下法杖后球壳保留的 tick 数（= [onPassiveIdle] 的倒计时阈值）。
+         * 目前只是延迟销毁；将来做「消失动画」时，这段时间就是动画窗口。
+         */
+        private const val SHELL_LINGER_TICKS = 4
 
         /** 淡蓝色 */
         private val SHELL_COLOR: Color = Color.ofInt(120, 200, 255)

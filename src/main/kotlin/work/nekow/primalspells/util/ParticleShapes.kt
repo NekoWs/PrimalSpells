@@ -7,7 +7,9 @@ import net.minecraft.world.phys.Vec3
 import kotlin.math.acos
 import kotlin.math.cbrt
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * 球体采样工具 —— 爆炸/黑洞/重力场等共用同一套采样与撒点逻辑。
@@ -42,6 +44,28 @@ object ParticleShapes {
             tangent = candidate.subtract(normal.scale(candidate.dot(normal)))
         }
         return tangent.normalize()
+    }
+
+    /**
+     * 球面**均匀**取点（Fibonacci 球 / 黄金角螺旋）：返回 [count] 个单位方向，相邻间距近似相等。
+     *
+     * 与随机采样（[randomUnitVector]）的区别：随机采样会有结块与空洞；
+     * 做「范围球壳」这类需要看起来均匀的视觉标识时用这个。结果确定（同一 count 得到同一组方向），
+     * 便于复现问题，也便于按 index 稳定配对。
+     */
+    fun fibonacciSphere(count: Int): List<Vec3> {
+        if (count <= 0) return emptyList()
+        if (count == 1) return listOf(Vec3(0.0, 1.0, 0.0))
+        val points = ArrayList<Vec3>(count)
+        val goldenAngle = Math.PI * (3.0 - sqrt(5.0))
+        for (i in 0 until count) {
+            // y 在 [-1, 1] 上按面积均匀分布；theta 按黄金角递增 → 间距近似相等
+            val y = 1.0 - 2.0 * (i + 0.5) / count
+            val ringRadius = sqrt(max(0.0, 1.0 - y * y))
+            val theta = goldenAngle * i
+            points += Vec3(cos(theta) * ringRadius, y, sin(theta) * ringRadius)
+        }
+        return points
     }
 
     /** 在**球壳**上均匀撒点（粒子都落在半径 [radius] 的球面上）。 */

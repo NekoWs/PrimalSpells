@@ -3,6 +3,7 @@ package work.nekow.primalspells.wand
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import work.nekow.particledrawing.api.ParticleManager
 import kotlin.math.min
@@ -262,10 +263,15 @@ class Wand(var id: String) {
      * 设置 caster/wand 后调用其 [Magic.onInventoryTick]。
      * 法力/delay 等维护仍只由 [WandManager.tick]（caster 为 null）执行，避免双倍结算。
      *
+     * 闲置分支（`caster == null`，由 [WandManager.tick] 每 tick 调用）额外负责
+     * 「被动法术未被持有」的通知：若上一 tick 之后没有持有者驱动过被动，就对
+     * [Magic.needInventory] 的法术各调一次 [Magic.onPassiveIdle]（用于放下后的延迟清理/淡出）。
+     * 需要 [level] 才能判断时间差；不传则跳过该通知。
+     *
      * 注：原版对主手持物品每 tick 会触发两次 inventoryTick（Inventory.tick 与
      * EntityEquipment.tick），因此按游戏 tick 去重，保证被动每 tick 只驱动一次。
      */
-    fun tick(caster: Entity? = null) {
+    fun tick(caster: Entity? = null, level: ServerLevel? = null) {
         if (caster != null) {
             val pm = status.particleManager
             if (pm?.level != caster.level()) {
@@ -286,6 +292,14 @@ class Wand(var id: String) {
         if (status.delay > 0) status.delay--
         if (status.recharge > 0) status.recharge--
         if (status.mana < mana) status.mana = min(mana, status.mana + charge / 20)
+
+        // 被动「未被持有」通知：闲置分支跑在 ServerTickEvent.Pre（实体 tick 之前），
+        // 因此「本 tick 被持有」时 lastPassiveTick 恰为 gameTime - 1；大于 1 说明持有者已离开。
+        if (level != null && level.gameTime - lastPassiveTick > 1) {
+            loadedMagics.forEach { magic ->
+                if (magic.needInventory) magic.onPassiveIdle()
+            }
+        }
     }
 
     private var lastPassiveTick: Long = -1

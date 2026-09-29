@@ -39,10 +39,9 @@ class GravityField : AreaFieldEffect(
         val random = caster.level().random
 
         if (shell.size == 0) {
-            repeat(SHELL_PARTICLES) {
-                val pos = center.add(ParticleShapes.randomUnitVector(random).scale(EFFECT_RADIUS))
-                // 永存（lifetime = -1）：由 clearVisuals 在场结束时销毁
-                shell.spawn(manager, pos, SHELL_COLOR, SHELL_SCALE, -1)
+            // 均匀球壳（Fibonacci 球）：点到点间距近似相等，才像「范围标识」
+            for (unit in ParticleShapes.fibonacciSphere(SHELL_PARTICLES)) {
+                shell.spawn(manager, center.add(unit.scale(EFFECT_RADIUS)), SHELL_COLOR, SHELL_SCALE, -1)
             }
         }
 

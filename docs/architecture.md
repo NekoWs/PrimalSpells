@@ -50,7 +50,10 @@
 - `spell()`：按 `EffectPhase.activeOrder` 升序触发 `onActive()`，再调 `onSpell()`；
 - `tick()`：按 `EffectPhase.tickOrder` 升序触发 `onTick()`；
 - `die()`：按注入顺序触发 `onDie()`，再调 `onDie()`；
-- `onInventoryTick()`：仅当 `needInventory = true` 且法杖在主手/副手时，由 `Wand.tick(caster)` 每 tick 驱动（被动法术的唯一入口，目前只有 `EnergyShield` 用）。
+- `onInventoryTick()`：仅当 `needInventory = true` 且法杖在主手/副手时，由 `Wand.tick(caster)` 每 tick 驱动（被动法术的持有期入口）。
+- `onPassiveIdle()`：法杖**这一 tick 没有被任何实体驱动**时，由 `Wand.tick(level = …)` 的闲置分支逐 tick 驱动一次
+  —— 用于「放下后延迟清理 / 播淡出动画」这类收尾（`EnergyShield` 用它做球壳的 4 tick 延迟销毁）。
+  判断依据是 `lastPassiveTick` 落后当前 `gameTime` 超过 1 tick（闲置分支跑在 `ServerTickEvent.Pre`，早于实体 tick）。
 - `clone()`：**从注册表新建一枚「本次施法实例」**，不是字段拷贝——修饰器会把效果注入实例自身的 `effects`，复用实例会让效果累积；`id` 未注册时直接抛 `IllegalStateException`（而不是 `!!` 的 NPE）。
 
 ### 2.2 `Projectile`（`magic/projectile/Projectile.kt`）

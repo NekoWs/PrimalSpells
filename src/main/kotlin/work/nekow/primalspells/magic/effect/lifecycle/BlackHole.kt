@@ -12,8 +12,11 @@ import work.nekow.primalspells.util.ParticleShapes
  * 黑洞 —— 半径 5 的引力场：
  * - **生物**：迟缓 I，并按 `0.12 / (距离 + 0.5)` 每 tick 拉向中心；
  * - **魔法投射物**：每 tick 沿指向中心的方向加速（吸力同样随距离衰减）—— 把飞进来的法术吸进去；
- * - **粒子**（ParticleDrawing）：每 tick 在 5 格球壳上生成 [PARTICLES_PER_TICK] 个紫色粒子，
- *   初速度取**随机切向**（绕中心旋转），随后被吸向中心，抵达中心（[CONSUME_RADIUS] 内）即销毁。
+ * - **粒子**（ParticleDrawing）分两层：
+ *   1. **范围球壳**：在半径 [EFFECT_RADIUS] 的球面上均匀铺 [SHELL_PARTICLES] 个**灰黑色**半透明粒子并永存，
+ *      用来标识黑洞的**大小/作用范围**（场本身静止，故不需要每 tick 跟踪；场结束时统一销毁）；
+ *   2. **被吸入的粒子**：每 tick 在球壳上生成 [PARTICLES_PER_TICK] 个紫色粒子，初速度取**随机切向**
+ *      （绕中心旋转），随后被吸向中心，抵达中心（[CONSUME_RADIUS] 内）即销毁。
  *
  * ## 吸力：越近越强 + 轻微阻尼
  *
@@ -29,18 +32,26 @@ import work.nekow.primalspells.util.ParticleShapes
  * 渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
  */
 class BlackHole : AreaFieldEffect(
-    radius = 5.0,
+    radius = EFFECT_RADIUS,
     slownessAmplifier = 0,
     pullPerTick = PULL_PER_TICK,
 ) {
     private val swarm = ParticleSwarm()
 
-    /** 每 tick 在球壳上生成粒子，初速度沿随机切向。 */
+    /** 每 tick 在球壳上生成粒子，初速度沿随机切向；范围球壳只在第一 tick 铺一次。 */
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = caster.level().random
+
+        if (swarm.size == 0) {
+            // 均匀（Fibonacci 球）灰黑球壳：标识黑洞大小，永存到本效果结束
+            for (unit in ParticleShapes.fibonacciSphere(SHELL_PARTICLES)) {
+                swarm.spawn(manager, center.add(unit.scale(EFFECT_RADIUS)), SHELL_COLOR, SHELL_SCALE, -1)
+            }
+        }
+
         repeat(PARTICLES_PER_TICK) {
             val radial = ParticleShapes.randomUnitVector(random)
-            val pos = center.add(radial.scale(SPAWN_RADIUS))
+            val pos = center.add(radial.scale(EFFECT_RADIUS))
             val tangent = ParticleShapes.randomTangent(radial, random).scale(TANGENTIAL_SPEED)
             swarm.spawnSimulated(manager, pos, tangent, COLOR, SCALE, LIFETIME_TICKS)
         }
@@ -69,11 +80,18 @@ class BlackHole : AreaFieldEffect(
     }
 
     private companion object {
-        /** 每 tick 生成的粒子数 */
-        const val PARTICLES_PER_TICK = 1
+        /** 生效半径：同时是范围球壳与粒子生成半径 */
+        const val EFFECT_RADIUS = 5.0
 
-        /** 粒子生成半径（球壳） */
-        const val SPAWN_RADIUS = 5.0
+        /** 范围球壳：均匀（Fibonacci）灰黑球，标识黑洞大小 */
+        const val SHELL_PARTICLES = 96
+        const val SHELL_SCALE = 0.5f
+
+        /** 灰黑色（半透明）：作为「黑洞大小」的标识，不抢被吸入粒子的视觉 */
+        val SHELL_COLOR: Color = Color.ofInt(70, 70, 80, 140)
+
+        /** 每 tick 生成的被吸入粒子数 */
+        const val PARTICLES_PER_TICK = 1
 
         /** 初始切向速度（blocks/tick）：决定起始绕转快慢 */
         const val TANGENTIAL_SPEED = 0.22

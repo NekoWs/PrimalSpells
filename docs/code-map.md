@@ -58,7 +58,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例） |
+| `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例）、被动钩子 `onInventoryTick`/`onPassiveIdle`、运行期状态钩子 `saveRuntimeState`/`loadRuntimeState` |
 | `core/EffectPhase.kt` | 效果执行阶段：`SETUP` / `MODIFIER` / `MOTION` / `OVERRIDE` / `VISUAL` |
 | `core/MagicStatus.kt` | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 |
 | `core/MagicManager.kt` | 36 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
@@ -110,7 +110,7 @@
 | `event/WandEventHandler.kt` | 公共侧：右键拦截（不与方块/实体交互但可施法）、登录补发同步、登出清理施法记录 |
 | `util/HitResult.kt` | 命中结果（`HitType`、`pos`、`normal`、`entity`） |
 | `util/Lore.kt` | 词条类型枚举（本地化 key）+ `LoreEntry` |
-| `util/ParticleShapes.kt` | 球体采样：球面/球内均匀取点、随机切向（原版粒子撒点 + PD 粒子生成共用） |
+| `util/ParticleShapes.kt` | 球体采样：Fibonacci 均匀球面取点、随机球面/球内取点、随机切向（原版粒子撒点 + PD 粒子共用） |
 | `util/PdParticles.kt` | `Wand.pdParticles(level)`：取/兜底创建 ParticleDrawing 粒子管理器 |
 
 ### 客户端 `client/`

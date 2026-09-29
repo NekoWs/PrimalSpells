@@ -153,7 +153,8 @@ object WandManager {
      * @param level 服务端主世界（提供 `gameTime` 与 [WandSavedData]）
      */
     fun tick(level: ServerLevel) {
-        wands.forEach { (_, wand) -> wand.tick() }
+        // 顺带把 level 传给闲置分支：被动法术需要它来判断「本 tick 有没有被持有」（见 Wand.tick）
+        wands.forEach { (_, wand) -> wand.tick(level = level) }
         // 回收按周期做：扫全部在线玩家背包不便宜，100 tick 一次足够。
         if (level.gameTime % RECYCLE_INTERVAL_TICKS == 0L) recycleUnheld(level)
     }

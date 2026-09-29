@@ -34,6 +34,17 @@ abstract class Magic {
     open fun onInventoryTick() { }
 
     /**
+     * 被动法术「未被持有」时的每 tick 回调（默认空实现）。
+     *
+     * 由 [Wand.tick] 的闲置分支调用：当法杖在**这一 tick** 没有被任何实体驱动过被动
+     * （即 [needInventory] 的 [onInventoryTick] 没跑）时，逐 tick 通知一次。
+     *
+     * 用途：需要「放下后延迟清理 / 播淡出动画」的被动法术（例如 `EnergyShield` 的球壳粒子）。
+     * 约定：被重新持有后 [onInventoryTick] 会继续跑，法术应自行复位自己的倒计时。
+     */
+    open fun onPassiveIdle() { }
+
+    /**
      * 【持久化钩子·写】把本法术需要跨存档保留的**运行期状态**写进给定 NBT（默认什么都不写）。
      *
      * 运行期状态 = 只活在内存里的进度/资源，例如 `EnergyShield` 的当前耐久与破盾暂停剩余 tick；

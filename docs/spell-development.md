@@ -85,6 +85,7 @@ class IceShard : Projectile() {
 | `onHitEntity(entity)` / `onHitBlock(pos)` / `onHit(result)` | 命中（在 effect 的同名钩子之后调用） | 投射物专属命中行为 |
 | `onDie()` | 死亡（`alive=false` 后的下一 tick） | 清理、结算 |
 | `onInventoryTick()` | 仅 `needInventory = true` 且法杖在主/副手时，每 tick | 被动法术（见 §5） |
+| `onPassiveIdle()` | 仅 `needInventory = true` 且法杖**这一 tick 没被持有**时，每 tick | 放下后的延迟清理/淡出（见 §5） |
 | `initLore()` | 物品 tooltip 生成时 | 追加词条；**记得先 `super.initLore()`** |
 | `clone()` | 复制到牌堆/子弹时 | 默认 `MagicManager.create(id)!!`（见 §7 坑 2） |
 
@@ -275,8 +276,17 @@ class MyPassive : Modifier() {
     override val id = "my_passive"
     override var needInventory = true          // 关键：法杖在主/副手时每 tick 驱动
 
+    private var idleTicks = 0
+
     override fun onInventoryTick() {
         // caster / wand 已由 Wand.tick(caster) 注入
+        idleTicks = 0                            // 被重新持有：复位放下倒计时
+    }
+
+    override fun onPassiveIdle() {
+        // 法杖这一 tick 没有被任何实体持有/驱动（每 tick 调用一次）
+        // 适合「放下后延迟清理」：先保留几 tick 再销毁，为消失动画留窗口
+        if (++idleTicks >= 4) { /* 清理表现/资源 */ }
     }
 }
 ```
@@ -284,8 +294,11 @@ class MyPassive : Modifier() {
 约束：
 
 - 只有 `Wand.loadedMagics`（`innate + magics`）中的法术会被驱动；`Wand.tick(caster)` 内部按 `gameTime` 去重，保证每 tick 只驱动一次。
-- 法力/冷却维护由 `WandManager.tick()`（`caster == null`）负责，`needsInventory` 分支**不要**再做这些事。
-- 需要跨存档保存的状态要自己写进 `Wand.saveTag()`（现有 `EnergyShield.durability` 就没保存，见 [known-issues.md](known-issues.md)）。
+- `onPassiveIdle()` 由 `Wand.tick(level = …)` 的**闲置分支**逐 tick 驱动（`WandManager.tick(level)` → 所有已加载法杖），
+  在「法杖没被持有」时持续触发；**不要**假设它只触发一次，清理逻辑要幂等。
+- 法力/冷却维护由 `WandManager.tick()`（`caster == null`）负责，被动分支**不要**再做这些事。
+- 运行期状态要持久化就覆写 `saveRuntimeState`/`loadRuntimeState`（见 `EnergyShield` 的耐久），
+  不要再往 `Wand.saveTag()` 里塞专用字段。
 
 ---
 

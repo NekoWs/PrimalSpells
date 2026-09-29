@@ -40,6 +40,16 @@ abstract class AreaFieldEffect(
     /** 本效果当前施加过迟缓的生物（用于「离开即解除」）。 */
     private val affected = HashSet<LivingEntity>()
 
+    /**
+     * 本效果所在的维度：**首 tick 捕获**，之后不再看 `caster.level()`。
+     *
+     * 施法者跨维度后 `caster.level()` 会变成新维度，而本效果的坐标（`status.pos`）仍在原维度
+     * —— 继续用新维度会让迟缓、投射物施力与 PD 粒子一起落到错误维度并**静默失效**
+     * （查询不到任何实体）。固定下来后，「一个区域场 = 一个维度」也才成立，
+     * 子类缓存粒子集（构造时绑定该维度的粒子管理器）才是安全的。
+     */
+    private var fieldLevel: ServerLevel? = null
+
     // ---------- 子类扩展点 ----------
 
     /** 每 tick 生成本 tick 的视觉粒子（用 PD API；默认无）。 */
@@ -62,7 +72,7 @@ abstract class AreaFieldEffect(
     // ---------- 主循环 ----------
 
     override fun onTick() {
-        val level = caster.level() as? ServerLevel ?: return
+        val level = fieldLevel ?: (caster.level() as? ServerLevel)?.also { fieldLevel = it } ?: return
         val center = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
 
         // 视觉：PD 粒子（管理器缺失时现场建立，保证非玩家施法者也有粒子表现）

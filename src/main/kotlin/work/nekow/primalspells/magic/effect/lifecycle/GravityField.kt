@@ -3,10 +3,11 @@ package work.nekow.primalspells.magic.effect.lifecycle
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
+import work.nekow.particledrawing.api.ParticleBatch
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.effect.visual.ParticleSwarm
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.ParticleShapes
+import work.nekow.primalspells.util.spawnParticle
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -19,56 +20,63 @@ import kotlin.math.sqrt
  *      用来标识重力场的**作用范围**。场本身静止，所以球壳不需要每 tick 跟踪；场结束（[clearVisuals]）统一销毁。
  *   2. **下落粒子**：每 tick 在**上半球表面**生成 [FALLING_PER_TICK] 个淡灰色粒子，竖直向下匀速下落，
  *      抵达**下半球表面**时销毁 —— 速度交给 PD 逐 tick 积分（零包），回收判定只读 PD 的权威位置
- *      （[ParticleSwarm.removeWhere]）。
+ *      （[ParticleBatch.removeIf]）。
  *
+ * 成员簿记全部交给 PD 的 [ParticleBatch]（球壳用 `ensureSize` 补齐、下落粒子用 `removeIf` 按几何面回收）；
  * 粒子在世界空间里下落、不跟随投射物；位置积分/同步/渲染由 ParticleDrawing 负责
- * （见 [ParticleSwarm] 与 `docs/conventions.md` §9）。
+ * （见 `docs/conventions.md` §9 与 `docs/design/effects-api.md` §0）。
  */
 class GravityField : AreaFieldEffect(
     radius = EFFECT_RADIUS,
     slownessAmplifier = 3,
     pullPerTick = 0.0,
 ) {
-    /** 范围球壳（永存粒子，仅生成时广播一次） */
-    private val shell = ParticleSwarm()
+    /** 范围球壳（永存粒子）：首 tick 铺满，之后只在 PD 侧有损耗时补齐。 */
+    private var shell: ParticleBatch? = null
 
-    /** 下落粒子（匀速，按位置条件回收） */
-    private val falling = ParticleSwarm()
+    /** 下落粒子（匀速，按位置条件回收）。 */
+    private var falling: ParticleBatch? = null
+
+    /** 球壳偏移（相对中心，半径 [EFFECT_RADIUS]）：Fibonacci 球结果确定，算一次即可。 */
+    private val shellOffsets: List<Vec3> by lazy {
+        ParticleShapes.fibonacciSphere(SHELL_PARTICLES).map { it.scale(EFFECT_RADIUS) }
+    }
 
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = caster.level().random
 
-        if (shell.size == 0) {
-            // 均匀球壳（Fibonacci 球）：点到点间距近似相等，才像「范围标识」
-            for (unit in ParticleShapes.fibonacciSphere(SHELL_PARTICLES)) {
-                shell.spawn(manager, center.add(unit.scale(EFFECT_RADIUS)), SHELL_COLOR, SHELL_SCALE, -1)
-            }
+        val shellBatch = shell ?: ParticleBatch(manager).also { shell = it }
+        // 均匀球壳（Fibonacci 球）：点到点间距近似相等，才像「范围标识」
+        shellBatch.ensureSize(SHELL_PARTICLES) { index ->
+            manager.spawnParticle(center.add(shellOffsets[index]), SHELL_COLOR, SHELL_SCALE)
         }
 
+        val fallingBatch = falling ?: ParticleBatch(manager).also { falling = it }
         repeat(FALLING_PER_TICK) {
             // 上半球表面：把随机球面方向翻到 y ≥ 0
             val dir = ParticleShapes.randomUnitVector(random)
             val upper = if (dir.y < 0.0) dir.scale(-1.0) else dir
             // 匀速下落：速度交给 PD 逐 tick 积分（零逐 tick 包）；生命靠「碰到下半球表面」的判定收掉
-            falling.spawn(
-                manager,
-                center.add(upper.scale(EFFECT_RADIUS)),
-                FALL_COLOR,
-                FALL_SCALE,
-                FALL_LIFETIME_TICKS,
-                FALL_VELOCITY,
+            fallingBatch.add(
+                manager.spawnParticle(
+                    center.add(upper.scale(EFFECT_RADIUS)),
+                    FALL_COLOR,
+                    FALL_SCALE,
+                    FALL_LIFETIME_TICKS,
+                    FALL_VELOCITY,
+                )
             )
         }
     }
 
     /** 只读 PD 的权威位置判定：下落粒子碰到下半球表面即销毁（读位置不产生任何包）。 */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
-        falling.removeWhere { pos -> pos.y <= lowerSurfaceY(center, pos) }
+        falling?.removeIf { _, pos, _ -> pos.y <= lowerSurfaceY(center, pos) }
     }
 
     override fun clearVisuals() {
-        shell.clear()
-        falling.clear()
+        shell?.clear()
+        falling?.clear()
     }
 
     /** 投射物：每 tick 附加向下的力（与 `gravity` 修正同一量级）。 */

@@ -9,13 +9,15 @@ import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.network.PacketDistributor
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
+import work.nekow.particledrawing.api.ParticleBatch
+import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
-import work.nekow.primalspells.magic.effect.visual.ParticleSwarm
 import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
 import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.pdParticles
+import work.nekow.primalspells.util.spawnParticle
 import kotlin.math.min
 
 /**
@@ -55,8 +57,11 @@ class EnergyShield : Modifier() {
     /** 破盾暂停剩余 tick */
     var pauseTicks: Int = 0
 
-    /** 护盾球壳粒子（ParticleDrawing）：以持有者为锚点的淡蓝色球壳，见 [updateShieldVisual]。 */
-    private val shieldSwarm = ParticleSwarm()
+    /** 护盾球壳粒子集（ParticleDrawing）：以持有者为锚点的淡蓝色球壳，见 [updateShieldVisual]。 */
+    private var shell: ParticleBatch? = null
+
+    /** [shell] 建立时所用的粒子管理器：跨维度会换实例，换了就重建球壳（见 [shieldShell]）。 */
+    private var shellManager: ParticleManager? = null
 
     /** 球壳粒子的球面偏移（首次生成时用 Fibonacci 球算一次，之后固定 —— 球壳静态，只跟随持有者平移）。 */
     private var shellOffsets: List<Vec3> = emptyList()
@@ -188,11 +193,11 @@ class EnergyShield : Modifier() {
      * - ⚠️ **挂载偏移必须包含「身体中段」那一段**：`attachTo` 的偏移是相对 `entity.position()`（脚底）的，
      *   只给球面偏移会让球壳整个贴在脚上（实机表现为「球在玩家下方、粒子像在往下掉」）；
      * - 球面用 [ParticleShapes.fibonacciSphere]**均匀**取点（不是随机采样），所以看起来是一个均匀球壳；
-     * - 粒子**永存**（`lifetime = -1`）、[ParticleSwarm.ensureAttached] 只在缺数量时补齐：
+     * - 粒子**永存**（`lifetime = -1`）、[ParticleBatch.ensureSize] 只在缺数量时补齐：
      *   **不做周期重建** —— 重建（销毁+新建）会让新粒子从生成位置滑到挂载位置，
      *   实机表现就是「粒子每隔一会儿瞬移一下 / 从上方落下」。清理走 [onPassiveIdle] 的显式倒计时；
-     * - **不自转**：挂载偏移固定。想做自转要改成「每 tick 用一次 `ParticleManager.trackAll`
-     *   下发旋转后的偏移」（1 包/tick，见 [ParticleSwarm] 的说明），不要退回逐粒子 `track`；
+     * - **不自转**：挂载偏移固定。想做自转要改成「每 tick 用一次 `ParticleBatch.trackAll`
+     *   下发旋转后的偏移」（1 包/tick），不要退回逐粒子 `track`；
      * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建。
      */
     private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
@@ -201,17 +206,29 @@ class EnergyShield : Modifier() {
             shellOffsets = ParticleShapes.fibonacciSphere(SHELL_PARTICLES)
                 .map { it.scale(SHELL_RADIUS) }
         }
+        val manager = wand.pdParticles(level)
         val bodyOffset = shellCenterOffset(holder)
-        shieldSwarm.ensureAttached(
-            manager = wand.pdParticles(level),
-            entityId = holder.id,
-            // ⚠️ 必须是 entity.position()（脚底）：attachTo 的偏移就在这个坐标系里，
-            // 生成位置 = 这里 + 偏移；多算一段就会出现「新粒子从上方滑入」的动画
-            entityPos = holder.position(),
-            count = SHELL_PARTICLES,
-            color = SHELL_COLOR,
-            scale = SHELL_SCALE,
-        ) { index -> shellOffsets[index % shellOffsets.size].add(0.0, bodyOffset, 0.0) }
+        shieldShell(manager).ensureSize(SHELL_PARTICLES) { index ->
+            // ⚠️ 生成位置 = entity.position()（脚底）+ 偏移，必须与 attachTo 的坐标系一致：
+            // 多算一段就会出现「新粒子从上方滑入」的动画（见 §6 第 8 轮）
+            val offset = shellOffsets[index % shellOffsets.size].add(0.0, bodyOffset, 0.0)
+            manager.spawnParticle(holder.position().add(offset), SHELL_COLOR, SHELL_SCALE)
+                ?.attachTo(holder, offset)
+        }
+    }
+
+    /**
+     * 取本护盾的球壳粒子集（同一管理器时复用）。
+     *
+     * [ParticleBatch] 在**构造时**绑定粒子管理器，而 `wand.pdParticles(level)` 在跨维度时会换成新维度的
+     * 实例（`util/PdParticles.kt` 的约定）—— 直接缓存粒子集会让球壳留在旧维度，所以这里按管理器缓存、
+     * 换了就先把旧球壳销毁再重建。护盾只用「成员增删 + 锚定」，不用位置批量下发（球壳零逐 tick 包）。
+     */
+    private fun shieldShell(manager: ParticleManager): ParticleBatch {
+        val cached = shell
+        if (cached != null && shellManager === manager) return cached
+        cached?.clear()
+        return ParticleBatch(manager).also { shell = it; shellManager = manager }
     }
 
     /**
@@ -222,14 +239,15 @@ class EnergyShield : Modifier() {
      * 会把倒计时归零。
      */
     override fun onPassiveIdle() {
-        if (shieldSwarm.isEmpty) return
+        val batch = shell ?: return
+        if (batch.isEmpty()) return
         idleTicks++
         if (idleTicks >= SHELL_LINGER_TICKS) clearShieldVisual()
     }
 
     /** 破盾/失效：立即销毁球壳粒子。 */
     private fun clearShieldVisual() {
-        shieldSwarm.clear()
+        shell?.clear()
         idleTicks = 0
     }
 

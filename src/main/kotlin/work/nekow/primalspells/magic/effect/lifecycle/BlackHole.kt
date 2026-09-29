@@ -3,10 +3,12 @@ package work.nekow.primalspells.magic.effect.lifecycle
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
+import work.nekow.particledrawing.api.ParticleBatch
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.effect.visual.ParticleSwarm
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.ParticleShapes
+import work.nekow.primalspells.util.spawnParticle
+import java.util.UUID
 
 /**
  * 黑洞 —— 半径 5 的引力场：
@@ -18,6 +20,9 @@ import work.nekow.primalspells.util.ParticleShapes
  *   2. **被吸入的粒子**：每 tick 在球壳上生成 [PARTICLES_PER_TICK] 个紫色粒子，初速度取**随机切向**
  *      （绕中心旋转），随后被吸向中心，抵达中心（[CONSUME_RADIUS] 内）即销毁。
  *
+ * 成员簿记全部交给 PD 的 [ParticleBatch]（增量登记、过期自动出列、`removeIf` 按条件回收、
+ * `ensureSize` 补齐球壳）；本模组只算**数值**：位置、速度、颜色、寿命与回收判据。
+ *
  * ## 吸力：越近越强 + 轻微阻尼
  *
  * 加速度随距离增强（`0.12/(距离+0.5)`），并且每 tick 顺带乘一点阻尼（[DAMPING_PER_TICK]）让切向速度衰减。
@@ -25,53 +30,98 @@ import work.nekow.primalspells.util.ParticleShapes
  *
  * ## 位置由本模组积分，用一次 `trackAll` 批量下发
  *
- * 吸力随距离变化，交给引擎的恒定加速度表达不了；因此位置由本模组算好后，
- * 用 [work.nekow.particledrawing.api.ParticleManager.trackAll] **一次包**写出全部粒子
- * （与粒子数无关，见 [ParticleSwarm] 的三种模式表）。好处：轨迹确定、能保证「进入中心 0.1 格才消失」，
- * 且暂停时不会因客户端外推而飘出范围。
- * 渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
+ * 吸力**随距离变化**，用 PD 的 `applyForce`（一次下发的恒定加速度）表达不了：逐 tick 为每颗粒子重发一次力
+ * 是 N 包/tick，而位置批量下发只要 1 包/tick（与粒子数无关）。所以位置由本模组算好后用
+ * [ParticleBatch.trackAll] 写出。好处：轨迹确定、能保证「进入中心 0.1 格才消失」，
+ * 且服务端暂停时不会因客户端外推而飘出范围。渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
+ *
+ * 代价：PD 的**位置指令会清掉粒子上的速度与力**（`ServerParticleEngine.takeOverPosition`），
+ * 所以速度只能记在本模组（[velocities]）—— 见 `docs/known-issues.md` §7.3 第 4 条
+ * （「批量施力/批量设速」在 PD 落地后，这张表也可以删掉）。
  */
 class BlackHole : AreaFieldEffect(
     radius = EFFECT_RADIUS,
     slownessAmplifier = 0,
     pullPerTick = PULL_PER_TICK,
 ) {
-    private val swarm = ParticleSwarm()
+    /** 范围球壳：永存粒子，首 tick 铺满，之后只在 PD 侧有损耗时补齐（[ParticleBatch.ensureSize]）。 */
+    private var shell: ParticleBatch? = null
 
-    /** 每 tick 在球壳上生成粒子，初速度沿随机切向；范围球壳只在第一 tick 铺一次。 */
+    /** 被吸入的粒子：成员由 PD 簿记，位置每 tick 由本模组积分后用一次 `trackAll` 下发。 */
+    private var sucked: ParticleBatch? = null
+
+    /**
+     * 被吸入粒子的速度（本模组持有，键 = 粒子 id）。
+     *
+     * 键集每 tick 按「[ParticleBatch.forEach] 见到的存活成员」重建，所以 PD 侧寿命到点/被上限挤掉的
+     * 成员不会在这里留下残项；不依赖任何下标配对（历史上一类 bug 的来源，见 `docs/known-issues.md` §6）。
+     */
+    private var velocities = HashMap<UUID, Vec3>()
+
+    /** 球壳偏移（相对中心，半径 [EFFECT_RADIUS]）：Fibonacci 球结果确定，算一次即可。 */
+    private val shellOffsets: List<Vec3> by lazy {
+        ParticleShapes.fibonacciSphere(SHELL_PARTICLES).map { it.scale(EFFECT_RADIUS) }
+    }
+
+    /** 每 tick 在球壳上生成粒子，初速度沿随机切向；范围球壳只在首 tick 铺一次。 */
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = caster.level().random
 
-        if (swarm.size == 0) {
-            // 均匀（Fibonacci 球）灰黑球壳：标识黑洞大小，永存到本效果结束
-            for (unit in ParticleShapes.fibonacciSphere(SHELL_PARTICLES)) {
-                swarm.spawn(manager, center.add(unit.scale(EFFECT_RADIUS)), SHELL_COLOR, SHELL_SCALE, -1)
-            }
+        val shellBatch = shell ?: ParticleBatch(manager).also { shell = it }
+        // 均匀（Fibonacci 球）灰黑球壳：标识黑洞大小，永存到本效果结束
+        shellBatch.ensureSize(SHELL_PARTICLES) { index ->
+            manager.spawnParticle(center.add(shellOffsets[index]), SHELL_COLOR, SHELL_SCALE)
         }
 
+        val suckedBatch = sucked ?: ParticleBatch(manager).also { sucked = it }
         repeat(PARTICLES_PER_TICK) {
             val radial = ParticleShapes.randomUnitVector(random)
             val pos = center.add(radial.scale(EFFECT_RADIUS))
-            val tangent = ParticleShapes.randomTangent(radial, random).scale(TANGENTIAL_SPEED)
-            swarm.spawnSimulated(manager, pos, tangent, COLOR, SCALE, LIFETIME_TICKS)
+            // 生成时不设速度：位置每条 tick 由本模组算好下发（速度指令会被位置指令清掉，见类注释）
+            val handle = manager.spawnParticle(pos, COLOR, SCALE, LIFETIME_TICKS) ?: return@repeat
+            suckedBatch.add(handle)
+            velocities[handle.id] = ParticleShapes.randomTangent(radial, random).scale(TANGENTIAL_SPEED)
         }
     }
 
-    /** 每 tick 施力 + 积分 + **一次 `trackAll` 批量写回位置**；抵达中心（返回 null）即销毁。 */
+    /** 每 tick 施力 + 积分 + **一次 `trackAll` 批量写回位置**，并把抵达中心的粒子销毁。 */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
-        swarm.tickSimulated(manager, step = { pos, vel ->
+        val batch = sucked ?: return
+        if (batch.isEmpty()) {
+            velocities.clear()
+            return
+        }
+
+        // 1) 按 PD 的权威位置推进本模组的速度，并算出这一 tick 的新位置
+        val positions = ArrayList<Vec3>(batch.size())
+        val advanced = HashMap<UUID, Vec3>(velocities.size)
+        batch.forEach { _, handle, pos, _ ->
+            val vel = velocities[handle.id] ?: Vec3.ZERO
             val toCenter = center.subtract(pos)
             val dist = toCenter.length()
-            if (dist <= CONSUME_RADIUS) {
-                null // 已抵达中心：销毁
-            } else {
-                // 随距离增强的向心加速度 + 轻微阻尼：越接近中心吸得越狠，切向速度逐渐衰减
-                vel.scale(DAMPING_PER_TICK).add(toCenter.normalize().scale(PULL_PER_TICK / (dist + 0.5)))
-            }
-        })
+            // 随距离增强的向心加速度 + 轻微阻尼：越接近中心吸得越狠，切向速度逐渐衰减
+            val next = vel.scale(DAMPING_PER_TICK).add(toCenter.normalize().scale(PULL_PER_TICK / (dist + 0.5)))
+            advanced[handle.id] = next
+            positions.add(pos.add(next))
+        }
+        velocities = advanced
+
+        // 2) 一次包下发全部位置（与粒子数无关）
+        batch.trackAll(positions)
+
+        // 3) 抵达中心的粒子销毁。放在 trackAll 之后：中途出列会打乱「成员顺序 ↔ positions」的对应关系
+        batch.removeIf { handle, pos, _ ->
+            val consumed = pos.distanceTo(center) <= CONSUME_RADIUS
+            if (consumed) velocities.remove(handle.id)
+            consumed
+        }
     }
 
-    override fun clearVisuals() = swarm.clear()
+    override fun clearVisuals() {
+        shell?.clear()
+        sucked?.clear()
+        velocities.clear()
+    }
 
     /** 投射物：每 tick 沿指向中心的方向加速（吸力随距离衰减）。 */
     override fun applyProjectileForce(projectile: Projectile, dirToCenter: Vector3f, dist: Double) {

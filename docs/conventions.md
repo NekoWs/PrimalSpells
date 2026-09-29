@@ -62,7 +62,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  │                           PouchTooltip/ClientPouchTooltip, SpellSlotTracker
 │  ├─ input/                    SpellSlotScrollHandler（滚轮选槽，法杖/小包共用）, ClientContainerDragHandler（Ctrl+左键拖拽交换）
 │  └─ render/                   DroneEntityModel/DroneEntityRenderer
-├─ util/                        无状态工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）
+├─ util/                        无状态工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）、PdParticles.kt（PD 管理器兜底 + spawnParticle）
 └─ mixin/                       Java mixin；包名被 primalspells.mixins.json 引用，**不要改**
 ```
 
@@ -222,6 +222,9 @@ magic/modifier  ──→ magic/core, magic/effect
   影响面 / 临时降级（含恢复条件）。
 - 允许的例外：用原版 `ServerLevel.sendParticles` 实现**本就不属于 ParticleDrawing 职责**的效果
   （如爆炸/黑洞/重力场的球体采样，统一走 `util/ParticleShapes.kt`）；禁止的是「把 ParticleDrawing 该做的事在本侧重生一份」。
+- 接线前先看能力清单：[design/effects-api.md](design/effects-api.md) §0.2/§0.3 给出「什么归 PD、什么归本模组」的判定准则与
+  现有范式表 —— 集合类粒子用 `ParticleBatch`、锚定用 `attachTo`、**不要自研粒子集合**（第 10 轮删除的
+  `ParticleSwarm` 就是反例：自写的句柄/寿命簿记接连引出四个 bug）。
 - 升级依赖的固定流程（都用 `gradle.properties` 做单一数据源，不再手改 `mods.toml`）：
   新 jar 放 `lib/` → 改 `particledrawing_version`（jar 文件名版本段）与 `particledrawing_version_range`
   （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.9-ALPHA,)`，写 `[1.0.9,)` 不匹配 `1.0.9-ALPHA`）→

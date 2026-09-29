@@ -27,33 +27,34 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 ### 0.2 职责边界判定准则（什么属于 PD、什么属于本模组）
 
-先看一张对照：本模组自研的 `ParticleSwarm` 与 PD 的 `ParticleGroup` **职责有重叠，但不是同一种抽象**。
+先看两张对照。本模组原先自研的 `ParticleSwarm` 已经**删除**（2026-09-30 第 10 轮迁移到 `ParticleBatch`），
+但下面这张「取向对照」保留 —— 它正是当初判定「**不能直接迁移到 `ParticleGroup`**」的依据：
 
-**⚠️ 结论：不能直接迁移。** `ParticleGroup` 面向**编排式动画**（成员基本固定、组级统一变换、指令流一次下发、
-客户端本地求值 —— 适合 `.pdrawc` 那类"播放"），而本模组要的是**程序化粒子流**
-（成员逐 tick 增删、每粒子独立速度/轨迹/寿命、按位置条件回收）。
-逐条差异与由此产生的 PD 侧需求见 [../known-issues.md](../known-issues.md) §7.3（本模组**不再**把它当成"直接迁移项"）。
+**⚠️ 结论：`ParticleGroup` 与「程序化粒子流」不是同一种抽象。**
+`ParticleGroup` 面向**编排式动画**（成员基本固定、组级统一变换、指令流一次下发、客户端本地求值 —— 适合 `.pdrawc` 那类"播放"），
+而本模组要的是**程序化粒子流**（成员逐 tick 增删、每粒子独立速度/轨迹/寿命、按位置条件回收）。
+差异与由此产生的 PD 侧需求见 [../known-issues.md](../known-issues.md) §7.3 —— 其中第 1 条已由 PD 以 **`ParticleBatch`** 落地（1.0.9-ALPHA），本模组已迁移完毕。
 
-| 维度 | `ParticleSwarm`（本模组薄封装） | `ParticleGroup`（PD） | 差异 |
+| 维度 | `ParticleGroup`（PD，编排式动画） | `ParticleBatch`（PD，程序化粒子集） | 这套用在哪 |
 |---|---|---|---|
-| 成员管理 | 句柄表自动增删，随时 `spawn` 加入 | `add()` 会把 `armed` 置 false → **重发全量受控清单** | 组不适合"每 tick 增删 1~3 个成员"的流 |
-| 每粒子状态 | 每粒子独立 pos/vel，`tickSimulated(step)` 逐粒子算 | 组级**统一**变换（`spin/rotate/scale/pulse/move/movePath`） | 组表达不了"每粒子各自被吸向中心" |
-| 条件回收 | `removeWhere { pos -> … }`（读 `position()`） | 只有整组 `remove()` / `destroyAfter(ticks)` | 缺"按每粒子位置移除" |
-| 锚定身份 | 只用 `entityId`；我们自己存句柄 | `attachTo(entityId)` / `attachToLocal(entityId)` / `followEntity(uuid)` / `defineEntity(handle, uuid)` | **三套身份 + 两套偏移语义**，且 `followEntity` 只跟随位置 |
-| 补量/上限 | 自己每 tick 补到 N 个（含上限拒绝重试） | 组不负责补量 | 缺通用「补齐到 N」 |
-| 组级动画 | 无（用每 tick 位置写） | **`spin`/`pulse`/`fadeOut` 等零带宽编排** | PD 更强 —— 这是**该用**的部分 |
+| 成员管理 | `add()` 会把 `armed` 置 false → **重发全量受控清单** | `add`/`addAll`/`remove` 增量登记、随时增删，**不重发全量** | 每 tick 增删 1~3 个成员：`Batch` |
+| 每粒子状态 | 组级**统一**变换（`spin/rotate/scale/pulse/move/movePath`） | 位置/速度按句柄读（`forEach { i, h, pos, vel -> }`），位置用**一次** `trackAll` 批量写 | 「每粒子各自被吸向中心」：`Batch` |
+| 条件回收 | 整组 `remove()` / `destroyAfter(ticks)` | `removeIf { h, pos, vel -> … }`，过期成员自动出列 | 按位置/速度回收：`Batch` |
+| 锚定身份 | `followEntity(uuid, offset, local)`、`defineEntity` | 逐粒子 `attachTo(Entity / uuid / entityId, offset)`（1.0.9 起三入口统一） | 形状刚性、零逐 tick 包：`attachTo` |
+| 补量/上限 | 组不负责补量 | `ensureSize(n, spawner)`：被维度上限拒了就停下，下次再补 | 球壳补齐：`Batch.ensureSize` |
+| 组级动画 | **`spin`/`pulse`/`fadeOut`/`destroyAfter` 等零带宽编排** | 无（Batch 只走位置/速度/力） | 护盾要自转/淡出就用组（尚未接线） |
 
 **判定准则**：
 
 | 归类 | 判定标准 | 例子 |
 |---|---|---|
-| **属于 PD**（用现成 API，别再自己写） | 与「粒子集合的通用机制」有关：批量生成/更新、组跟随实体/旋转/淡出/延时、寿命与可见性、上限与拒绝处理、带宽优化 | `ParticleGroup` 的组级编排（`followEntity`/`spin`/`fadeOut`/`destroyAfter`）、`trackAll`、`attachTo`、`applyForce` |
+| **属于 PD**（用现成 API，别再自己写） | 与「粒子集合的通用机制」有关：批量成员管理、组跟随实体/旋转/淡出/延时、寿命与可见性、上限与拒绝处理、带宽优化 | `ParticleBatch`（成员簿记）、`ParticleGroup` 的组级编排、`trackAll`、`attachTo`、`applyForce` |
 | **属于本模组**（玩法语义，PD 不该知道） | 只有游戏知道的东西：半径/数量/颜色/寿命取值、力的公式、回收判据、被动的持有/放下时机与淡出时长 | `BlackHole` 的吸力与阻尼、`GravityField` 的下落与下半球回收、`EnergyShield` 的 4 tick 延迟、`ParticleShapes.fibonacciSphere` 的选点 |
-| **灰区（当前留在使用方）** | 逐 tick 自定义受力/轨迹的**程序化粒子流** —— 等 PD 补齐 §7.3 第 1 条的泛用入口后再收敛 | `ParticleSwarm.spawnSimulated/tickSimulated`（一次 `trackAll`）、`removeWhere` |
+| **灰区（当前留在使用方）** | **随距离变化的每粒子受力**：PD 的 `applyForce` 是「一次下发的恒定加速度」，逐 tick 变力只能逐粒子重发（N 包/tick） | `BlackHole` 自算位置 + 一次 `trackAll`（并自持一张「粒子 id → 速度」表）；已在 §7.3 第 4 条提出「批量施力 / 批量设速」需求 |
 
-⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
-再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组 API** ——
-本项目就踩过：`ParticleSwarm` 的锚定模式本可用 `ParticleGroup.followEntity`，结果多写了整套簿记，
+⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleBatch`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
+再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组/集 API** ——
+本项目就踩过：自研 `ParticleSwarm` 的锚定模式本可用 `attachTo` 直接表达，结果多写了整套簿记，
 并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（见 [../known-issues.md](../known-issues.md) §6 第 5–8 轮）。
 
 ### 0.3 现有接线范式（2026-09-30 更新，接线前先看这张表）
@@ -65,7 +66,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleManager.trackAll(ids, positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）、`BlackHole`（批量） |
 | 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞吸力随距离变化） |
 | 锚在一个实体身上（形状刚性） | `handle.attachTo(entityId/uuid, 偏移)`（1.0.9 起身份统一）；整组跟随用 `ParticleGroup.followEntity(uuid, offset, local)` | **0** | `EnergyShield` 球壳 |
-| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll` 为 1 包/tick） | **迁移目标**：`ParticleSwarm` 应换成它（见 [../known-issues.md](../known-issues.md) §1.3） |
+| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll` 为 1 包/tick） | **已在用**（第 10 轮迁移完成）：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）、`EnergyShield`（球壳）。见 [../known-issues.md](../known-issues.md) §1.3 |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
 六条硬要点：
@@ -73,10 +74,13 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 1. **能在客户端本地解析的就别逐 tick 发**：只要粒子位置是「实体 + 固定偏移」，用 `attachTo`
    （**0 包/tick**、天然刚性）；需要逐 tick 变化的位置，再用 `trackAll` 批量下发。
 2. **位置指令与速度/力不要混用**：`move`/`track`/`trackAll` 会**停掉**该粒子上的速度与力
-   （PD 明确语义），所以同一粒子要么位置驱动、要么速度/力驱动。
+   （PD `ServerParticleEngine.takeOverPosition` 的明确语义），所以同一粒子要么位置驱动、要么速度/力驱动。
+   ⚠️ 推论：**用 `trackAll` 驱动的粒子，其速度只有使用方自己知道**（PD 里已被清零）——
+   `BlackHole` 的「吸力随距离变化」正落在这个角落里，代价是自持一张「粒子 id → 速度」表。
 3. **多粒子优先用批量 API**：`trackAll` 1 包/tick ↔ 逐粒子 `track` N 包/tick。
-   本项目改造后：护盾 0 包、黑洞 1 包、重力场 0 包。
-4. **引擎有每维度粒子上限**：超限时 `spawn()` 返回 `null`，使用方必须能接受「丢粒子」而不是当成错误。
+   本项目现状：护盾 **0 包**、黑洞 **1 包**、重力场 **0 包**（不随粒子数增长）。
+4. **引擎有每维度粒子上限**：超限时 `spawn()` 返回 `null`，使用方必须能接受「丢粒子」而不是当成错误；
+   `ParticleBatch.ensureSize` 的约定正好吻合（返回 null 就停下，下次调用再补，不空转）。
 5. **不要把「偏移」按列表索引配对**：一旦有个别 `spawn()` 被拒或粒子被重建，索引就会错位
    （表现为瞬移/形状剪切 —— 本项目第 5 轮就是这么踩的坑）。偏移要**绑在句柄上**，或者干脆用 `attachTo`。
 6. **暂停语义已修，但仍建议按需选型**：PD 已修「服务端暂停时速度驱动粒子被客户端外推」；
@@ -131,6 +135,9 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
 > - 1.0.9-ALPHA 相对 1.0.8 的 API 增量：**`api/ParticleBatch`**（程序化粒子集：`add`/`trackAll`/`trackEach`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）、
 >   `ParticleGroup.followEntity(..., local)`（组级跟随可选随朝向）、`ParticleHandle.position()/applyForce()/attachTo()` 等（1.0.8 起）。`.pdrawc` 动画特效在 PrimalSpells 侧的接线仍未落地。
+> - **2026-09-30（第 10 轮）**：本模组已按 §0.2/§0.3 完成迁移 —— 自研 `ParticleSwarm`（273 行）**已删除**，
+>   三处接线（`BlackHole`/`GravityField`/`EnergyShield`）改用 `ParticleBatch`，生成入口收敛为 `util/PdParticles.kt` 的
+>   `ParticleManager.spawnParticle(...)`；随距离变化的每粒子受力仍留在使用方（§7.3 第 4 条已提需求）。
 > - 本文引用的包路径按重构前书写，现对应关系：`magic/effect/Trajectory.kt` → `magic/effect/visual/Trajectory.kt`；`magic/effect/*` 其余类分入 `magic/effect/{geometry,lifecycle}`；`magic/Revise.kt` → `magic/core/Modifier.kt`（类 `Revise` → `Modifier`）；`magic/Projectile.kt` → `magic/projectile/Projectile.kt`；`magic/{Magic,MagicStatus,MagicManager}.kt` → `magic/core/`；`item/ModItems.kt` → `registry/ModItems.kt`。完整对照见 [../conventions.md](../conventions.md) 第 8 节。
 
 

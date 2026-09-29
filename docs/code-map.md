@@ -16,8 +16,8 @@
 | 改投射物飞行 / 碰撞 | `magic/effect/geometry/Move.kt` | `magic/projectile/Projectile.kt`（`hitBlock`/`hitEntity`） |
 | 改命中伤害 | `magic/effect/lifecycle/Hurt.kt` | `magic/core/MagicStatus.kt`（`damage`） |
 | 改爆炸表现 / 范围 | `magic/effect/lifecycle/Explosion.kt` | `magic/core/MagicStatus.kt`（`explosion*`） |
-| 改区域场（黑洞 / 重力场） | `magic/effect/lifecycle/AreaFieldEffect.kt`（半径/迟缓/拉拽/投射物施力钩子） | `BlackHole.kt` / `GravityField.kt`（参数与 PD 粒子）、`magic/effect/visual/ParticleSwarm.kt` |
-| 改投射物外观（粒子） | `magic/effect/visual/ProjectileBody.kt`（本体）、`Trajectory.kt`（拖尾） | `magic/effect/visual/ParticleSwarm.kt`（力驱动粒子）、`util/PdParticles.kt`（管理器）、`lib/particledrawing` |
+| 改区域场（黑洞 / 重力场） | `magic/effect/lifecycle/AreaFieldEffect.kt`（**首 tick 固定维度** + 半径/迟缓/拉拽/投射物施力钩子） | `BlackHole.kt` / `GravityField.kt`（参数与 PD 粒子）、`util/PdParticles.kt`（粒子管理器与生成入口） |
+| 改投射物外观（粒子） | `magic/effect/visual/ProjectileBody.kt`（本体）、`Trajectory.kt`（拖尾） | `util/PdParticles.kt`（管理器 + `spawnParticle`）、`lib/particledrawing`（`ParticleBatch`/`ParticleHandle` 在这里） |
 | 改「效果谁先跑」 | `magic/core/EffectPhase.kt`（阶段表） | `magic/core/Magic.kt`（排序执行） |
 | 加一个新的法术 | 见 [spell-development.md](spell-development.md) | `magic/core/MagicManager.kt`（注册） |
 | 改某法术的数值 | `magic/projectile/<类>.kt` 或 `magic/modifier/<类>.kt` 的字段 | id ↔ 类见 §3 |
@@ -79,7 +79,7 @@
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
-| `effect/visual/{ProjectileBody,Trajectory,ParticleSwarm}.kt` | 粒子表现（particledrawing）：本体、拖尾，以及**临时薄封装**粒子群（锚定 / 批量写位置 / 序列回收）——「组」类能力应优先用 PD 的 `ParticleGroup`，见 [known-issues.md](known-issues.md) §1.3 |
+| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**集合类粒子已全部改用 PD 的 `ParticleBatch`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [known-issues.md](known-issues.md) §1.3、[design/effects-api.md](design/effects-api.md) §0.3 |
 
 ### 法杖、物品、实体
 
@@ -111,7 +111,7 @@
 | `util/HitResult.kt` | 命中结果（`HitType`、`pos`、`normal`、`entity`） |
 | `util/Lore.kt` | 词条类型枚举（本地化 key）+ `LoreEntry` |
 | `util/ParticleShapes.kt` | 球体采样：Fibonacci 均匀球面取点、随机球面/球内取点、随机切向（原版粒子撒点 + PD 粒子共用） |
-| `util/PdParticles.kt` | `Wand.pdParticles(level)`：取/兜底创建 ParticleDrawing 粒子管理器 |
+| `util/PdParticles.kt` | PD 接线入口：`Wand.pdParticles(level)`（取/兜底创建粒子管理器）、`ParticleManager.spawnParticle(...)`（生成一颗粒子）、`PD_IMMORTAL`（永存寿命 `-1`） |
 
 ### 客户端 `client/`
 

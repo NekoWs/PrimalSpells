@@ -111,7 +111,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 **同类效果叠加**：统一用 `BaseEffect.stackScale`（√N）与 `isStackPrimary`（只有首个同类实例改写状态），
 `Tracking`/`Reciprocate`/`Serpentine`/`GradualAccelerate`/`GradualDecelerate` 都改用了这两个辅助属性。
 
-**球体粒子采样**统一走 `util/ParticleShapes`（`sphereSurface` / `sphereVolume`），爆炸、黑洞、重力场共用。
+**球体粒子采样**统一走 `util/ParticleShapes`：原版粒子的球内/球面撒点（`sphereVolume` 现由 `Explosion` 使用；`sphereSurface` 目前已无调用方），以及 PD 粒子共用的**取点工具**（`fibonacciSphere` 均匀球壳、`randomUnitVector`、`randomTangent`——黑洞/重力场/护盾在用）。
 
 ### 2.5 `MagicStatus`（`magic/core/MagicStatus.kt`）
 
@@ -277,21 +277,27 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 7. **命中回调每个 tick 都会触发**（投射物停在实体体内时）：穿刺玩法依赖这一点，`Move` 刻意不去重。
 8. **触发法术 payload 是一次性的**：释放即清空，穿刺多次命中不会重复释放。
 9. **公共侧不引用客户端类**：S→C 包一律经 `network/ClientPayloadSink` 转发（见 §6）。
-10. **粒子表现有两条路**：投射物本体/拖尾走 `particledrawing`（`wand.status.particleManager`，服务端权威 + 客户端插值）；爆炸/黑洞/重力场/无人机/传送/护盾用原版 `ServerLevel.sendParticles`（球体采样统一走 `util/ParticleShapes`）。
+10. **粒子表现有两条路**：法术粒子走 `particledrawing`（`wand.status.particleManager`，服务端权威 + 客户端插值）——投射物本体/拖尾/黑洞与重力场的球壳与运动粒子/护盾球壳都在这一路（集合簿记用 PD 的 `ParticleBatch`，见 §9）；纯装饰性的一次性撒点走原版 `ServerLevel.sendParticles`（爆炸、无人机、传送、护盾弹开命中）。
 11. **区域场每 tick 结算、离开即解除**：`AreaFieldEffect` 每 tick 刷新迟缓并施加拉拽，实体离开范围（或效果结束）时**立刻**撤销迟缓，不留尾巴。
 
 ## 9. 与 ParticleDrawing 的接口现状
 
 - 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.9-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 集合类粒子（球壳、被吸入粒子、下落粒子、护盾球壳）**成员簿记统一交给 PD 的 `ParticleBatch`**：
+  `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
+  本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
+  [known-issues.md](known-issues.md) §1.3 与 [design/effects-api.md](design/effects-api.md) §0.3。
 - 已接线（三种用法，均对应 PD 的低带宽写法）：
   1. **锚定**：`attachTo(实体, 世界空间偏移)`——护盾球壳，服务端只在挂载时发一次，客户端本地解析实体位置，
      **0 包/tick** 且天然刚性；
-  2. **批量写位置**：`ParticleManager.trackAll(ids, positions)`——黑洞粒子（本模组积分，吸力随距离变化），
-     **1 包/tick，与粒子数无关**；
+  2. **批量写位置**：`ParticleBatch.trackAll(positions)`（内部走 `ParticleManager.trackAll`）——黑洞被吸入粒子
+     （本模组积分，吸力随距离变化），**1 包/tick，与粒子数无关**；
   3. **速度驱动**：生成时一次 `setVelocity`，之后交给 PD 积分——重力场下落粒子（**0 包/tick**），
-     回收判定只读 `ParticleHandle.position()`；另 `Trajectory`（拖尾）同样只发一次速度。
-- 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现。
-- 未使用：`applyForce(accel, ticks)`（黑洞吸力随距离变化，用 `trackAll` 更省也更可控，理由见 `ParticleSwarm` KDoc）、
+     回收判定只读 `ParticleBatch.forEach/removeIf` 给的权威位置；另 `Trajectory`（拖尾）同样只发一次速度。
+- 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
+  生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
+- 未使用：`applyForce(accel, ticks)`（黑洞吸力随距离变化，用 `trackAll` 更省也更可控；`applyForce` 只能表达
+  一次下发的恒定加速度，见 [known-issues.md](known-issues.md) §7.3 第 4 条）、
   `attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份。

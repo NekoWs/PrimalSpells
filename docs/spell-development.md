@@ -193,15 +193,18 @@ override fun onTick() {
 - **位置固定在实体身上** → `handle.attachTo(entityId, 世界空间偏移)`：跟随实体、**0 包/tick**、天然刚性
   （偏移要随朝向旋转用 `attachToLocal`）；
 - **匀速直线** → 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分（**0 包/tick**）；
-- **逐 tick 变化的轨迹**（被吸引、绕转） → 本模组算好位置：多粒子用**一次**
-  `ParticleManager.trackAll(ids, positions)`（**1 包/tick，与粒子数无关**），单体可用 `handle.track(pos)`；
+- **逐 tick 变化的轨迹**（被吸引、绕转） → 本模组算好位置，用 `ParticleBatch.trackAll(positions)`
+  一次包下发（**1 包/tick，与粒子数无关**）；单体可用 `handle.track(pos)`；
 - **恒定 / 分段恒定的力** → `handle.applyForce(accel, ticks)`（两端同规则积分，只在施力时发一次）；
-- 这些写法都封装在 `magic/effect/visual/ParticleSwarm.kt`（三种模式 + 错峰重建 + 按 `position()` 回收）；
+  ⚠️ 随距离变化的力表达不了，只能自算位置（见 `BlackHole` 的说明）；
+- **成员簿记一律用 PD 的 `ParticleBatch`**（`add`/`ensureSize`/`forEach`/`removeIf`/`clear`）——
+  别再自己存句柄表或寿命表（原 `ParticleSwarm` 已在第 10 轮删除，见 [known-issues.md](known-issues.md) §1.3）；
+- **生成**一颗粒子统一用 `ParticleManager.spawnParticle(pos, color, scale, lifetime, velocity?)`；
 - **管理器**统一用 `wand.pdParticles(level)` 获取（缺失/跨维度时兜底创建，未来的生物施法者也有粒子）；
 - 采样工具在 `util/ParticleShapes.kt`（球面/球内均匀取点、随机切向）；
-- 参考实现：`BlackHole.kt`（切向初速 → 自己积分 → `trackAll` 批量写回 → 抵达中心销毁）、
-  `GravityField.kt`（范围球壳一次 spawn；下落粒子一次 `setVelocity` + `position()` 判定回收）、
-  `EnergyShield.kt`（`attachTo` 刚性球壳 + 错峰重建）。
+- 参考实现：`BlackHole.kt`（`ensureSize` 铺球壳；切向初速 → 自己积分 → `trackAll` 批量写回 → 抵达中心销毁）、
+  `GravityField.kt`（球壳 `ensureSize`；下落粒子一次 `setVelocity` + `removeIf` 判定回收）、
+  `EnergyShield.kt`（`attachTo` 刚性球壳 + `ensureSize` 补齐、不做周期重建）。
 - ⚠️ 两条铁律：**不要自己写粒子系统**；**不要按列表索引给粒子配对偏移**（有粒子被拒/重建就会错位）——
   PD 缺能力时停下并提需求（[conventions.md](conventions.md) §9）。
 

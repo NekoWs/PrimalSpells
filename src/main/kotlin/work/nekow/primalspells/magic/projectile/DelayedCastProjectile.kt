@@ -2,12 +2,11 @@ package work.nekow.primalspells.magic.projectile
 
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
-import work.nekow.primalspells.magic.Magic
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.TriggerSpell
-import work.nekow.primalspells.magic.effect.DelayedTrigger
-import work.nekow.primalspells.magic.effect.Trajectory
-import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.magic.core.Magic
+import work.nekow.primalspells.magic.core.TriggerSpell
+import work.nekow.primalspells.magic.effect.lifecycle.DelayedTrigger
+import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.util.Lore
 
 /**
  * 延迟施法，死亡时以施法朝向释放 payload 中的法术。

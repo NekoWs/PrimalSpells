@@ -112,8 +112,10 @@ dependencies {
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
     // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
     // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
-    compileOnly files('lib/particledrawing-1.0.6.jar')
-    localRuntime files('lib/particledrawing-1.0.6.jar')
+    // ParticleDrawing（本地前置模组 jar，版本见 gradle.properties 的 particledrawing_version）
+    // compileOnly = 只用于编译期接口；localRuntime = 只在本机开发运行环境里加载，不传递给下游。
+    compileOnly files("lib/particledrawing-${particledrawing_version}.jar")
+    localRuntime files("lib/particledrawing-${particledrawing_version}.jar")
 }
 
 tasks.withType(ProcessResources).configureEach {
@@ -125,6 +127,8 @@ tasks.withType(ProcessResources).configureEach {
             mod_name               : mod_name,
             mod_license            : mod_license,
             mod_version            : mod_version,
+            // 前置模组 ParticleDrawing 的版本区间（本地 jar 依赖，值在 gradle.properties）
+            particledrawing_version_range: particledrawing_version_range,
     ]
     inputs.properties replaceProperties
 

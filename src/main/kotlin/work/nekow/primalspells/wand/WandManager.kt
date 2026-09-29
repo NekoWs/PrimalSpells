@@ -6,7 +6,7 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStartedEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
-import work.nekow.primalspells.item.ModItems
+import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.item.component.WandID
 import java.util.*
 
@@ -23,6 +23,9 @@ object WandManager {
 
     fun load(level: ServerLevel) {
         val data = WandSavedData.getOrCreate(level)
+        // 先清空：整合服务器在同一 JVM 内换世界/重载会再次触发 ServerStartedEvent，
+        // 不清空会把上一个世界的法杖残留下来。
+        wands.clear()
         data.wandTags.forEach { (id, tag) ->
             wands[WandID(id)] = Wand.fromTag(tag)
         }

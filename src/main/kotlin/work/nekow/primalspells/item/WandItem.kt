@@ -16,11 +16,12 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.neoforged.neoforge.network.PacketDistributor
 import work.nekow.primalspells.item.component.WandID
-import work.nekow.primalspells.magic.MagicManager
+import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
 import java.util.*
+import work.nekow.primalspells.registry.ModItems
 
 class WandItem(properties: Properties) : Item(properties) {
 
@@ -30,6 +31,31 @@ class WandItem(properties: Properties) : Item(properties) {
         fun getWand(stack: ItemStack): Wand? {
             val id = stack.get(ModItems.WAND_ID) ?: return null
             return WandManager[id, null]
+        }
+
+        /**
+         * 清掉某个玩家的施法记录（玩家登出时由 `WandEventHandler` 调用）。
+         * 这张表只是「最近一次施法用的法杖」，不清理会随玩家数量只增不减。
+         */
+        fun forgetCastState(playerId: UUID) {
+            lastCastWand.remove(playerId)
+        }
+
+        /**
+         * 读取物品栈上的法杖展示数据：`wandId` + 槽位法术 id 列表。
+         *
+         * 数据来自服务端同步到客户端的物品组件，因此本方法与运行侧无关：
+         * 客户端 tooltip（`client/tooltip/ClientTooltipHandler`）与
+         * 滚轮选槽（`client/input/SpellSlotScrollHandler`）共用。
+         *
+         * @return 非 18 格法杖物品、或组件缺失/为空时返回 null
+         */
+        fun getWandData(stack: ItemStack): Pair<String, List<String>>? {
+            if (stack.item !is WandItem) return null
+            val spells = stack.get(ModItems.WAND_SPELLS.get()) ?: return null
+            if (spells.isEmpty()) return null
+            val wandId = stack.get(ModItems.WAND_ID.get())?.wandId ?: return null
+            return wandId to spells
         }
 
         /**
@@ -50,8 +76,7 @@ class WandItem(properties: Properties) : Item(properties) {
                 wand.cast,
                 wand.status.lastDelay,
                 wand.status.lastRecharge,
-                wand.charge,
-                wand.size
+                wand.charge
             ))
         }
     }
@@ -72,9 +97,9 @@ class WandItem(properties: Properties) : Item(properties) {
     }
 
     override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResult {
-        if (!level.isClientSide) {
-            player.startUsingItem(hand)
-        }
+        // 两侧都要进入使用状态：客户端进入使用状态才会有举杖动画与 isUsingItem 判定，
+        // 真正的施法由服务端每 tick 的 onUseTick 驱动。
+        player.startUsingItem(hand)
         return InteractionResult.CONSUME
     }
 
@@ -114,7 +139,7 @@ class WandItem(properties: Properties) : Item(properties) {
         carried.set(makeStack(magic))
     }
 
-    private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, id: String): work.nekow.primalspells.magic.Magic? {
+    private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, id: String): work.nekow.primalspells.magic.core.Magic? {
         while (wand.magics.size <= target) wand.magics.add(null)
         val existing = wand.magics.getOrNull(target)
         wand.magics[target] = MagicManager.create(id)!!
@@ -122,7 +147,7 @@ class WandItem(properties: Properties) : Item(properties) {
         return existing
     }
 
-    private fun clearMagic(wand: Wand, stack: ItemStack, target: Int): work.nekow.primalspells.magic.Magic? {
+    private fun clearMagic(wand: Wand, stack: ItemStack, target: Int): work.nekow.primalspells.magic.core.Magic? {
         val magic = wand.magics.getOrNull(target) ?: return null
         wand.magics[target] = null
         wand.load(); tickSync(stack)
@@ -131,7 +156,7 @@ class WandItem(properties: Properties) : Item(properties) {
 
     private fun findMagic(item: Item) = ModItems.spellIdOf(item)
 
-    private fun makeStack(magic: work.nekow.primalspells.magic.Magic): ItemStack {
+    private fun makeStack(magic: work.nekow.primalspells.magic.core.Magic): ItemStack {
         val item = ModItems.spellItem(magic.id) ?: return ItemStack.EMPTY
         return ItemStack(item)
     }

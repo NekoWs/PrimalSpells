@@ -1,12 +1,11 @@
 package work.nekow.primalspells.magic.projectile
 
 import work.nekow.particledrawing.api.Color
-import work.nekow.primalspells.magic.Magic
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.TriggerSpell
-import work.nekow.primalspells.magic.effect.Hurt
-import work.nekow.primalspells.magic.effect.Trajectory
-import work.nekow.primalspells.magic.effect.Trigger
+import work.nekow.primalspells.magic.core.Magic
+import work.nekow.primalspells.magic.core.TriggerSpell
+import work.nekow.primalspells.magic.effect.lifecycle.Hurt
+import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.magic.effect.lifecycle.Trigger
 
 class TriggerFireball: Projectile(), TriggerSpell {
     override val id = "trigger_fireball"

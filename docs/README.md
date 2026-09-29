@@ -1,0 +1,84 @@
+# PrimalSpells 文档索引
+
+> PrimalSpells 是一个 Minecraft（NeoForge）模组：**法杖 + 牌堆式法术组合**。
+> 玩家持有的法杖里装着一组法术，施法时从牌堆抽牌，把「投射物」与「修饰器」组合成一次具体法术；法术小包用于收纳法术物品，法杖编辑台用于整理法杖。
+>
+> 本目录是项目的唯一权威文档来源；仓库根的 [`AGENTS.md`](../AGENTS.md) 只做路由，不重复内容。
+
+---
+
+## 1. 文档索引
+
+| 文档 | 内容 | 什么时候读 |
+|---|---|---|
+| [architecture.md](architecture.md) | 分层架构、法术对象模型、牌堆与施法流程、投射物生命周期、持久化、网络、客户端 | **第一次接触本项目**；要改核心机制、排查「为什么没生效」 |
+| [code-map.md](code-map.md) | 逐包逐文件的代码导航 + 「我要改 X → 去哪个文件」 | 知道要改什么、但不知道文件在哪 |
+| [spell-development.md](spell-development.md) | 新增投射物 / 修饰器 / 特效 / 物品 / 资源 / 语言键的完整步骤与注册点 | 要添加或修改法术内容 |
+| [build-and-run.md](build-and-run.md) | 版本矩阵、依赖、Gradle 命令、运行目录、CI、常见故障 | 要构建、运行、排障 |
+| [known-issues.md](known-issues.md) | 已知缺陷、技术债、命名与职责可疑点、待验证项 | 踩坑前先查；修完问题后回填 |
+| [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
+| [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
+
+## 2. 技术栈与关键事实
+
+| 项 | 值 |
+|---|---|
+| Minecraft / NeoForge | 26.2 / 26.2.0.59 |
+| 语言 | Kotlin（主）+ 2 个 Java mixin |
+| Java / Gradle | 25（toolchain）/ 9.6.1（wrapper） |
+| modId / 包根 | `primalspells` / `work.nekow.primalspells` |
+| 关键前置 | `particledrawing`（粒子，本地 `lib/particledrawing-<particledrawing_version>.jar`，现为 `1.0.8-ALPHA`） |
+| 许可证 | GNU AGPLv3 |
+
+细节见 [build-and-run.md](build-and-run.md)。
+
+## 3. 仓库结构（顶层）
+
+```
+PrimalSpells/
+├─ build.gradle / gradle.properties / settings.gradle   构建与版本
+├─ gradlew, gradlew.bat, gradle/wrapper/                Gradle wrapper（9.6.1）
+├─ lib/particledrawing-1.0.8-ALPHA.jar                 本地前置模组 jar（版本由 gradle.properties 指定）
+├─ src/main/kotlin/work/nekow/primalspells/             模组源码（包结构见 conventions.md）
+├─ src/main/java/work/nekow/primalspells/mixin/         Java mixin
+├─ src/main/resources/                                  资源：assets（模型/贴图/语言/物品）、data（伤害类型）、META-INF
+├─ src/generated/resources/                             数据生成输出（可选）
+├─ docs/                                                本文档目录
+├─ .github/workflows/build.yml                          CI：JDK 25 + ./gradlew build
+├─ run/                                                 开发运行目录（不入库）：存档/日志/崩溃报告
+└─ build/                                               Gradle 产物与 NeoForm 缓存（不入库，体积大）
+```
+
+源码分包规则与每个包的职责见 [conventions.md](conventions.md#1-包结构总览)。
+
+## 4. 术语表
+
+| 术语 | 含义 | 主要位置 |
+|---|---|---|
+| **Magic** | 法术基类：`id`、`mana`、`delay`、`recharge`、`effects`、`lore`、生命周期钩子 | `magic/core/Magic.kt` |
+| **Projectile** | 特殊法术：不是 MC 实体，而是服务端 Kotlin 对象，靠每 tick 的 effect 驱动位置与命中 | `magic/projectile/Projectile.kt` |
+| **Modifier**（原 `Revise`） | 修饰器：施法时把自身携带的 effect 注入到本次施法的投射物上，或改动参数（伤害/速度/弹跳…） | `magic/core/Modifier.kt`、`magic/modifier/` |
+| **Effect** | 挂在投射物上的可组合行为：几何（`Move`/`Velocity`…）、时机与结算（`Hurt`/`Explosion`/`Trigger`…）、表现（`ProjectileBody`/`Trajectory`） | `magic/effect/` |
+| **MagicStatus** | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 | `magic/core/MagicStatus.kt` |
+| **EffectPhase** | 效果执行阶段（SETUP/MODIFIER/MOTION/OVERRIDE/VISUAL），决定效果谁先跑 | `magic/core/EffectPhase.kt` |
+| **Wand** | 法杖运行时对象：牌堆（`drawPile`/`hand`/`discardPile`）、法力与冷却、NBT 序列化 | `wand/Wand.kt` |
+| **牌堆 / 抽牌** | 施法时按 `cast` 预算从 `drawPile` 抽牌进 `hand`，结算后进 `discardPile`；抽牌堆空时回洗并附加 `recharge` | `wand/Wand.kt` |
+| **TriggerSpell** | 触发法术：会额外抽牌组成 `payload`，命中时触发 payload 内法术 | `magic/core/TriggerSpell.kt` |
+| **wandId / pouchId** | 物品数据组件里的唯一标识（UUID 字符串），用于把物品栈关联到服务端的 `Wand` 实例或小包内容 | `item/component/WandID.kt` |
+| **HUD** | 法杖数值条与能量护盾数值条 | `client/hud/` |
+
+## 5. 推荐的阅读 / 改动路径
+
+- **我要跑起来**：`./gradlew runClient` → 失败看 [build-and-run.md](build-and-run.md#6-常见故障) 与 [known-issues.md](known-issues.md)。
+- **我要加一个法术**：先 [spell-development.md](spell-development.md)，再照抄同类实现（同类清单见 [code-map.md](code-map.md)）。
+- **我要理解施法全过程**：[architecture.md](architecture.md#3-一次施法的完整流程)。
+- **我遇到「法术没效果 / 不命中 / 不显示」**：[known-issues.md](known-issues.md) → 再看 [architecture.md](architecture.md) 对应链路。
+- **我要重命名或移动文件**：[conventions.md](conventions.md#1-包结构总览) 决定位置 → 改完必须 `./gradlew build`。
+
+## 6. 文档维护规则
+
+1. **代码结构变化 → 同步本文档**：移动/新增/删除包或文件后，更新 [code-map.md](code-map.md) 与 [conventions.md](conventions.md#8-本次结构重构的旧--新对照迁移记录)。
+2. **新发现的问题 → 登记 [known-issues.md](known-issues.md)**，写清现象、复现、影响、涉及文件。
+3. **修好问题 → 从 [known-issues.md](known-issues.md) 移除**，必要时在对应文档补结论。
+4. **[AGENTS.md](../AGENTS.md) 只允许放「指针」**，不得复制本文档内容；内容变化只改 docs/。
+5. 文档与代码不一致时，**以代码为准**，并立刻修文档。

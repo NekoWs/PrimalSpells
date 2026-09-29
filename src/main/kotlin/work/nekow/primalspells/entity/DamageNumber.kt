@@ -15,7 +15,7 @@ import net.minecraft.world.level.storage.TagValueInput
 import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
 import org.joml.Vector3f
-import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.util.Lore
 
 /**
  * 头顶伤害数字：基于 [Display.TextDisplay] 的文本实体。

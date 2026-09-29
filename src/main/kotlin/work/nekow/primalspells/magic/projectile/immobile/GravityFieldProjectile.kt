@@ -1,10 +1,10 @@
 package work.nekow.primalspells.magic.projectile.immobile
 
 import work.nekow.particledrawing.api.Color
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.effect.GravityField
-import work.nekow.primalspells.magic.effect.Trajectory
-import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.effect.lifecycle.GravityField
+import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.util.Lore
 
 /**
  * 重力场，对直径 5 格球体范围内实体施加减速药水效果。

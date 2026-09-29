@@ -1,10 +1,10 @@
 package work.nekow.primalspells.magic.projectile.immobile
 
 import work.nekow.particledrawing.api.Color
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.effect.BlackHole
-import work.nekow.primalspells.magic.effect.Trajectory
-import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.effect.lifecycle.BlackHole
+import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.util.Lore
 
 /**
  * 黑洞，将范围内实体拉向中心并施加迟缓 I。

@@ -5,10 +5,9 @@ import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.EntitySpawnReason
 import work.nekow.particledrawing.api.Color
-import work.nekow.primalspells.entity.ModEntities
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.effect.Trajectory
-import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.registry.ModEntities
+import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.util.Lore
 import kotlin.math.cos
 import kotlin.math.sin
 

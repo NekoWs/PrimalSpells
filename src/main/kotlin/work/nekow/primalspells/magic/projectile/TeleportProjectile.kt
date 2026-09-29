@@ -6,10 +6,9 @@ import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.effect.Trajectory
-import work.nekow.primalspells.utils.HitResult
-import work.nekow.primalspells.utils.Lore
+import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.util.HitResult
+import work.nekow.primalspells.util.Lore
 
 /**
  * 传送魔弹 —— 命中实体/方块，或自然消亡（到达 maxAge）时，将施法者传送到该位置。

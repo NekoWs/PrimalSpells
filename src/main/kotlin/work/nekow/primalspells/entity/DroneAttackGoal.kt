@@ -32,7 +32,14 @@ class DroneAttackGoal(
         this.flags = EnumSet.of(Flag.MOVE, Flag.LOOK)
     }
 
+    /**
+     * 搜索目标并锁定。**仅服务端**运行：
+     * 本 goal 会写 `drone.target` 并调用 `navigation.moveTo`，而客户端本地没有权威寻路与
+     * 实体列表。若两侧都跑，客户端会用自己的随机序列（`updateStrafe`）挑选平移目标，
+     * 与服务端同步位置对抗 → 无人机乱晃、抖动。
+     */
     override fun canUse(): Boolean {
+        if (drone.level().isClientSide) return false
         val target = findValidTarget() ?: return false
         drone.target = target
         return true

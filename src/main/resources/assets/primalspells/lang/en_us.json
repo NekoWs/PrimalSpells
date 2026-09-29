@@ -21,7 +21,7 @@
   "item.primalspells.gradual_decelerate": "Gradual Decelerate",
   "item.primalspells.random_path": "Random Path",
   "item.primalspells.reciprocate": "Reciprocate",
-  "item.primalspells.sine_wave": "Sine Wave",
+  "item.primalspells.sine_wave": "Serpentine",
   "item.primalspells.mana_injection": "Mana Injection",
   "item.primalspells.diffusion": "Diffusion",
   "item.primalspells.implosion": "Implosion",
@@ -34,7 +34,6 @@
   "item.primalspells.large_explosion": "Large Explosion",
   "item.primalspells.self_orbit": "Self Orbit",
   "item.primalspells.sphere_orbit": "Sphere Orbit",
-  "item.primalspells.speed_getter": "Speed Getter",
 
   "item.primalspells.drone_swarm": "Drone Swarm",
   "item.primalspells.gravity_field": "Gravity Field",
@@ -43,8 +42,6 @@
   "item.primalspells.quantum_entanglement": "Quantum Entanglement",
   "item.primalspells.energy_shield": "Energy Shield",
 
-  "block.primalspells.wand_editing_table": "Wand Editing Table",
-  "gui.primalspells.close": "Close",
 
   "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
   "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
@@ -52,20 +49,17 @@
   "tooltip.primalspells.cast": "Casts: %s",
   "tooltip.primalspells.charge": "Recharge Speed: %s/s",
   "tooltip.primalspells.hold_alt": "Hold [Alt] to view wand stats",
-  "tooltip.primalspells.wand_id": "Wand ID: %s",
-  "tooltip.primalspells.wand_id.ungenerated": "Ungenerated",
 
   "lore.primalspells.mana": "Mana Cost: %s",
   "lore.primalspells.delay": "Cast Delay: %st",
   "lore.primalspells.recharge": "Recharge Time: %st",
-  "lore.primalspells.cast": "Draw Count: %s",
   "lore.primalspells.damage": "Damage: %s",
   "lore.primalspells.max_age": "Duration: %st",
   "lore.primalspells.speed": "Speed: x%s",
   "lore.primalspells.fireball.desc": "A slow-moving fireball.",
   "lore.primalspells.trigger_fireball.desc": "A slow-moving fireball that casts another spell on impact.",
   "lore.primalspells.laser.desc": "An extremely fast laser beam.",
-  "lore.primalspells.damage_boost.desc": "Increases the spell's damage_boost.",
+  "lore.primalspells.damage_boost.desc": "Increases the spell's damage.",
   "lore.primalspells.bounce.desc": "Allows the spell to bounce.",
   "lore.primalspells.double_cast.desc": "Casts an additional spell.",
   "lore.primalspells.gravity.desc": "Makes the spell affected by gravity.",
@@ -79,7 +73,7 @@
   "lore.primalspells.gradual_decelerate.desc": "Starts fast and gradually decelerates.",
   "lore.primalspells.random_path.desc": "Makes the spell move in random directions.",
   "lore.primalspells.reciprocate.desc": "The spell reverses direction periodically.",
-  "lore.primalspells.sine_wave.desc": "Makes the spell follow a sine wave path.",
+  "lore.primalspells.sine_wave.desc": "Makes the spell follow a serpentine (sine wave) path.",
   "lore.primalspells.mana_injection.desc": "Restores 30 mana when cast.",
   "lore.primalspells.diffusion.desc": "Increases explosion radius, reduces damage.",
   "lore.primalspells.implosion.desc": "Reduces explosion radius, increases damage.",
@@ -106,8 +100,6 @@
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell",
 
-  "entity.primalspells.cube": "Drone Cube",
-  "entity.primalspells.sphere": "Energy Sphere",
   "entity.primalspells.drone": "Combat Drone",
   "entity.primalspells.test_dummy": "Test Dummy"
 }

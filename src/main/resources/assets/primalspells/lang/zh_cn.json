@@ -21,7 +21,7 @@
   "item.primalspells.gradual_decelerate": "逐渐减速",
   "item.primalspells.random_path": "随机路径",
   "item.primalspells.reciprocate": "往复运动",
-  "item.primalspells.sine_wave": "三角函数",
+  "item.primalspells.sine_wave": "蛇形",
   "item.primalspells.mana_injection": "注入玛那",
   "item.primalspells.diffusion": "扩散",
   "item.primalspells.implosion": "聚爆",
@@ -34,7 +34,6 @@
   "item.primalspells.large_explosion": "大型爆炸",
   "item.primalspells.self_orbit": "周身环绕",
   "item.primalspells.sphere_orbit": "球形环绕",
-  "item.primalspells.speed_getter": "速度获取",
 
   "item.primalspells.drone_swarm": "无人机群",
   "item.primalspells.gravity_field": "重力场",
@@ -43,8 +42,6 @@
   "item.primalspells.quantum_entanglement": "量子纠缠",
   "item.primalspells.energy_shield": "能量盾",
 
-  "block.primalspells.wand_editing_table": "法杖编辑台",
-  "gui.primalspells.close": "关闭",
 
   "tooltip.primalspells.mana": "魔力：%s\u00a0/ %s",
   "tooltip.primalspells.delay": "施放延迟：%s\u00a0",
@@ -52,13 +49,10 @@
   "tooltip.primalspells.cast": "施放数：%s",
   "tooltip.primalspells.charge": "充能速度：%s/s",
   "tooltip.primalspells.hold_alt": "按住 [Alt] 键查看法杖信息",
-  "tooltip.primalspells.wand_id": "法杖ID：%s",
-  "tooltip.primalspells.wand_id.ungenerated": "未生成",
 
   "lore.primalspells.mana": "法力消耗：%s",
   "lore.primalspells.delay": "施放延迟：%st",
   "lore.primalspells.recharge": "充能时间：%st",
-  "lore.primalspells.cast": "抽取数量：%s",
   "lore.primalspells.damage": "伤害：%s",
   "lore.primalspells.max_age": "持续时间：%st",
   "lore.primalspells.speed": "速度：x%s",
@@ -79,7 +73,7 @@
   "lore.primalspells.gradual_decelerate.desc": "初始快速，后逐渐减速。",
   "lore.primalspells.random_path.desc": "使法术随机改变方向。",
   "lore.primalspells.reciprocate.desc": "使法术周期性反向运动。",
-  "lore.primalspells.sine_wave.desc": "使法术沿正弦波路径运动。",
+  "lore.primalspells.sine_wave.desc": "使法术沿蛇形（正弦波）路径运动。",
   "lore.primalspells.mana_injection.desc": "施放时恢复 30 法力。",
   "lore.primalspells.diffusion.desc": "增加爆炸范围，减少爆炸伤害。",
   "lore.primalspells.implosion.desc": "减少爆炸范围，增加爆炸伤害。",
@@ -106,8 +100,6 @@
   "death.attack.primalspells_projectile": "%1$s 被法术击中",
   "death.attack.primalspells_projectile.player": "%1$s 被 %2$s 的法术击杀",
 
-  "entity.primalspells.cube": "无人机方块",
-  "entity.primalspells.sphere": "能量球体",
   "entity.primalspells.drone": "战斗无人机",
   "entity.primalspells.test_dummy": "测试木桩"
 }

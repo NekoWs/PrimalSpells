@@ -5,8 +5,12 @@ import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.*
 import kotlin.math.min
+import work.nekow.primalspells.magic.core.Magic
+import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.Modifier
+import work.nekow.primalspells.magic.core.TriggerSpell
+import work.nekow.primalspells.magic.projectile.Projectile
 
 class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
@@ -73,7 +77,7 @@ class Wand(var id: String) {
     }
 
     /**
-     * 执行手牌：先将所有 [Revise] 的法术效果提取出来（消耗法力、累加 delay/recharge），
+     * 执行手牌：先将所有 [Modifier] 的法术效果提取出来（消耗法力、累加 delay/recharge），
      * 再依次施放每个 [Projectile]，如果有 [TriggerSpell] 则额外抽牌组装 payload。
      *
      * @param caster 施法者实体
@@ -83,7 +87,7 @@ class Wand(var id: String) {
         val magics = arrayListOf<Magic>()
         magics += hand
 
-        val revises = magics.filterIsInstance<Revise>().toList()
+        val revises = magics.filterIsInstance<Modifier>().toList()
         revises.forEach { magics.remove(it) }
         val validRevises = revises.filter {
             if (consumeMana(it)) {
@@ -284,7 +288,12 @@ class Wand(var id: String) {
         innate.forEach { innateList.add(StringTag.valueOf(it.id)) }
         tag.put("innate", innateList)
         val magicsList = ListTag()
-        magics.forEach { if (it != null) magicsList.add(StringTag.valueOf(it.id)) }
+        // 固定写满到 max(size, 已用槽数)：空槽写成空串占位，
+        // 否则读档时后面的法术会整体前移，装到错误的槽位上。
+        val slotCount = maxOf(size, magics.size, 1)
+        for (i in 0 until slotCount) {
+            magicsList.add(StringTag.valueOf(magics.getOrNull(i)?.id ?: ""))
+        }
         tag.put("magics", magicsList)
         return tag
     }
@@ -311,7 +320,9 @@ class Wand(var id: String) {
                 MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.innate += m }
             }
             tag.getListOrEmpty("magics").forEach {
-                MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.magics += m }
+                // 空串 = 空槽占位，必须原样保留，保证槽位索引不变
+                val id = (it as StringTag).asString().get()
+                wand.magics += if (id.isEmpty()) null else MagicManager.create(id)
             }
             return wand.also { wand.load() }
         }

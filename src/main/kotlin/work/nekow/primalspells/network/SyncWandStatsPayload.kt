@@ -6,6 +6,12 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
 import work.nekow.primalspells.PrimalSpells
 
+/**
+ * 服务端 → 客户端：法杖展示数值（HUD 与 tooltip 用）。
+ *
+ * 只同步**展示需要**的标量；槽位内容由物品组件（`WAND_SPELLS`）同步，
+ * 所以这里不再冗余携带 `size`。
+ */
 data class SyncWandStatsPayload(
     val wandId: String,
     val currentMana: Double,
@@ -16,7 +22,6 @@ data class SyncWandStatsPayload(
     val lastDelay: Int,
     val lastRecharge: Int,
     val charge: Double,
-    val size: Int,
 ) : CustomPacketPayload {
 
     companion object {
@@ -34,8 +39,7 @@ data class SyncWandStatsPayload(
                     buf.readVarInt(),
                     buf.readVarInt(),
                     buf.readVarInt(),
-                    buf.readDouble(),
-                    buf.readVarInt()
+                    buf.readDouble()
                 )
                 override fun encode(buf: RegistryFriendlyByteBuf, p: SyncWandStatsPayload) {
                     buf.writeUtf(p.wandId)
@@ -47,7 +51,6 @@ data class SyncWandStatsPayload(
                     buf.writeVarInt(p.lastDelay)
                     buf.writeVarInt(p.lastRecharge)
                     buf.writeDouble(p.charge)
-                    buf.writeVarInt(p.size)
                 }
             }
     }

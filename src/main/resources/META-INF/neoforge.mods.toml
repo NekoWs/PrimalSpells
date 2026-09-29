@@ -77,7 +77,7 @@ config="${mod_id}.mixins.json"
 [[dependencies.${mod_id}]]
     modId="particledrawing"
     type="required"
-    versionRange="[1.0.0,)"
+    versionRange="${particledrawing_version_range}"
     ordering="AFTER"
     side="BOTH"
 

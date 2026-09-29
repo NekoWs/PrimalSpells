@@ -1,6 +1,7 @@
 package work.nekow.primalspells.entity
 
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.util.Mth
 import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
@@ -19,8 +20,8 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.pathfinder.PathType
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
-import work.nekow.primalspells.magic.MagicManager
-import work.nekow.primalspells.magic.Projectile
+import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand
 import java.util.*
 import kotlin.math.atan2
@@ -84,19 +85,36 @@ class DroneEntity(
         if (localTickCounter % 3 == 0) {
             moveAge = if (navigation.path != null) min(moveAge + 3, rampTicks) else 0
         }
-        applySpeedCurve()
-        if (localTickCounter % 5 == 0) applySeparation()
-        if (localTickCounter % 3 == 0) applyPathNoise()
-        faceMovement() // 朝移动方向转向，战斗时由攻击目标覆盖
+        // 以下四项都会直接改 deltaMovement / yRot，而 tick() 在客户端与服务端都会执行：
+        // 客户端没有服务端 navigation.path（moveAge 恒为 0）、实体 random 序列也不同、
+        // 且客户端 deltaMovement 每 tick 还会被 aiStep 衰减——两侧算出的轨迹必然分叉。
+        // 客户端本地写入只会与「服务端同步 + 插值」的结果互相对抗，表现为朝向乱晃/位置抖动。
+        // 因此一切运动扰动只由服务端权威计算一次，客户端只负责插值服务端同步过来的位置与朝向。
+        if (!level().isClientSide) {
+            applySpeedCurve()
+            if (localTickCounter % 5 == 0) applySeparation()
+            if (localTickCounter % 3 == 0) applyPathNoise()
+            faceMovement() // 朝移动方向转向，战斗时由攻击目标覆盖
+        }
     }
 
-    /** 非战斗时朝移动方向转向 */
+    /**
+     * 非战斗时朝移动方向转向（仅服务端执行）。
+     *
+     * 朝向本应由服务端算好后随移动包同步、客户端插值即可；旧代码在两侧都从本地
+     * `deltaMovement` 反推 yaw，而本地速度又被噪声（随机序列不同）与速度曲线（客户端
+     * moveAge 恒为 0）污染，于是同一个角度在客户端与服务端之间来回争夺 → 视觉抖动。
+     * 另外改用 `Mth.approachDegrees` 限制单 tick 最大转角：原来直接赋值会让噪声引起的
+     * 方向抖动被整帧放大，限速后转向平滑、不会再高频抖动。
+     */
     private fun faceMovement() {
-        if (target != null) return // 战斗中不干预
+        if (target != null) return // 战斗中不干预（由 lookControl 注视目标）
         val d = deltaMovement
         val horizSq = d.x * d.x + d.z * d.z
         if (horizSq > 0.0001) {
-            yRot = Math.toDegrees(atan2(d.z, d.x)).toFloat() - 90f
+            // 单 tick 最大转 12°，足够跟上 0.6 的移动速度，同时滤掉逐 tick 的方向毛刺
+            yRot = Mth.approachDegrees(yRot, Math.toDegrees(atan2(d.z, d.x)).toFloat() - 90f, 12f)
+            // 头部与身体都跟随该权威角度；客户端靠 yBodyRotO/yBodyRot、yHeadRotO/yHeadRot 插值
             yHeadRot = yRot
             yBodyRot = yRot
         }
@@ -158,6 +176,14 @@ class DroneEntity(
         addDeltaMovement(Vec3(px, py, pz))
     }
 
+    /**
+     * 逐段路径噪声 —— **只能由服务端调用**。
+     *
+     * 这里用的是实体自带的 `random`：客户端与服务端各自持有一条互不相同的随机序列，
+     * 而本方法一旦在两侧都执行，同一架无人机会在两侧得到两条不同轨迹，客户端插值
+     * 就不断被服务端同步位置回拉 → 位置抖动。改为仅服务端执行后，噪声属于权威运动，
+     * 客户端只负责插值，视觉上仍然是轻微的飘移感。
+     */
     private fun applyPathNoise() {
         val dx = deltaMovement.x; val dy = deltaMovement.y; val dz = deltaMovement.z
         if (dx * dx + dy * dy + dz * dz < 0.0025) return

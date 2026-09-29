@@ -1,26 +1,38 @@
 package work.nekow.primalspells.event
 
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.item.ItemStack
+import net.minecraft.world.InteractionResult
 import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.neoforge.client.event.ScreenEvent
 import net.neoforged.neoforge.event.entity.player.PlayerEvent
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
-import work.nekow.primalspells.client.WandTooltipTracker
-import work.nekow.primalspells.item.ModItems
 import work.nekow.primalspells.item.WandItem
-import work.nekow.primalspells.network.SelectWandSlotPayload
 
+/**
+ * 法杖相关的**公共侧**事件处理（专用服务器也会加载）。
+ *
+ * 行为约定（已实机确认）：
+ * - 法杖**不与方块/实体交互**：右键方块、右键生物的原版交互一律取消；
+ * - 取消结果显式设为 [InteractionResult.PASS]，让流程回落到 `Item.use`，
+ *   于是「对着方块或生物长按右键」依然能正常进入长按施法（否则会完全没反应）；
+ * - 玩家登出时清掉该玩家的施法记录，避免静态表随玩家数量只增不减。
+ *
+ * 纯客户端的输入/表现（滚轮选槽、tooltip、HUD）不在这里：
+ * 见 `client/input/SpellSlotScrollHandler` 与 `client/tooltip`、`client/hud` 两个包。
+ */
 object WandEventHandler {
+
     @SubscribeEvent
     fun onEntityInteract(event: PlayerInteractEvent.EntityInteract) {
-        if (event.itemStack.item is WandItem) event.isCanceled = true
+        if (event.itemStack.item !is WandItem) return
+        event.isCanceled = true
+        event.setCancellationResult(InteractionResult.PASS)
     }
 
     @SubscribeEvent
     fun onRightClickBlock(event: PlayerInteractEvent.RightClickBlock) {
-        if (event.itemStack.item is WandItem) event.isCanceled = true
+        if (event.itemStack.item !is WandItem) return
+        event.isCanceled = true
+        event.setCancellationResult(InteractionResult.PASS)
     }
 
     @SubscribeEvent
@@ -36,26 +48,9 @@ object WandEventHandler {
     }
 
     @SubscribeEvent
-    fun onMouseScrolled(event: ScreenEvent.MouseScrolled.Pre) {
-        val screen = event.screen
-        if (screen !is AbstractContainerScreen<*>) return
-        val slot = screen.hoveredSlot ?: return
-        val (wandId, spells) = getWandData(slot.item) ?: return
-        val current = WandTooltipTracker.getSelectedSlot(wandId)
-        val direction = if (event.scrollDeltaY > 0) -1 else 1
-        val newSlot = (current + direction).mod(spells.size)
-        WandTooltipTracker.setSelectedSlot(wandId, newSlot)
-        // 客户端本地更新（tooltip 即时显示）+ 服务端同步（右键装卸按该槽位）
-        slot.item.set(ModItems.WAND_SELECTED_SLOT.get(), newSlot)
-        SelectWandSlotPayload(wandId, newSlot).send()
-        event.isCanceled = true
-    }
-
-    fun getWandData(stack: ItemStack): Pair<String, List<String>>? {
-        if (stack.item !is WandItem) return null
-        val spells = stack.get(ModItems.WAND_SPELLS.get()) ?: return null
-        if (spells.isEmpty()) return null
-        val wandId = stack.get(ModItems.WAND_ID.get())?.wandId ?: return null
-        return wandId to spells
+    fun onPlayerLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
+        val player = event.entity as? ServerPlayer ?: return
+        // 施法记录按玩家 UUID 缓存在静态表里，登出即清理
+        WandItem.forgetCastState(player.uuid)
     }
 }

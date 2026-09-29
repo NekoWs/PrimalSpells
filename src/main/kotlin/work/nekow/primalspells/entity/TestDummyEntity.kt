@@ -13,7 +13,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.phys.Vec3
-import work.nekow.primalspells.item.ModItems
+import work.nekow.primalspells.registry.ModItems
 
 /**
  * 测试木桩：用于测试伤害的假人靶子，外形与盔甲架一致（复用盔甲架模型/渲染）。

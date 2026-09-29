@@ -11,7 +11,7 @@ import net.minecraft.world.item.context.BlockPlaceContext
 import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.level.gameevent.GameEvent
 import net.minecraft.world.phys.Vec3
-import work.nekow.primalspells.entity.ModEntities
+import work.nekow.primalspells.registry.ModEntities
 import work.nekow.primalspells.entity.TestDummyEntity
 
 /**

@@ -1,7 +1,7 @@
 package work.nekow.primalspells.magic.projectile.immobile
 
-import work.nekow.primalspells.magic.Projectile
-import work.nekow.primalspells.magic.effect.Explosion
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.effect.lifecycle.Explosion
 
 class SmallExplosion : Projectile() {
 
@@ -20,6 +20,5 @@ class SmallExplosion : Projectile() {
     override fun onSpell() {
         status.explosionRadius = 3.0f
         status.explosionDamage = 4.0
-        status.explosionLevel = 0
     }
 }

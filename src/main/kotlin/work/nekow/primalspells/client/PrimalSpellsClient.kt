@@ -1,57 +1,77 @@
-﻿package work.nekow.primalspells.client
+package work.nekow.primalspells.client
 
+import net.minecraft.client.renderer.entity.ArmorStandRenderer
+import net.minecraft.client.renderer.entity.EntityRenderer
+import net.minecraft.client.renderer.entity.state.ArmorStandRenderState
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.ModContainer
 import net.neoforged.fml.common.Mod
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
 import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent
-import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent
 import net.neoforged.neoforge.common.NeoForge
 import work.nekow.primalspells.PrimalSpells
-import work.nekow.primalspells.item.ModMenus
-import work.nekow.primalspells.client.entity.CubeEntityModel
-import work.nekow.primalspells.client.entity.CubeEntityRenderer
-import work.nekow.primalspells.client.entity.DroneEntityModel
-import work.nekow.primalspells.client.entity.DroneEntityRenderer
-import work.nekow.primalspells.client.entity.SphereEntityModel
-import work.nekow.primalspells.client.entity.SphereEntityRenderer
-import work.nekow.primalspells.entity.ModEntities
+import work.nekow.primalspells.client.hud.ShieldHudRenderer
+import work.nekow.primalspells.client.hud.WandHudRenderer
+import work.nekow.primalspells.client.input.ClientContainerDragHandler
+import work.nekow.primalspells.client.input.SpellSlotScrollHandler
+import work.nekow.primalspells.client.render.DroneEntityModel
+import work.nekow.primalspells.client.render.DroneEntityRenderer
+import work.nekow.primalspells.client.tooltip.ClientPouchTooltip
+import work.nekow.primalspells.client.tooltip.ClientTooltipHandler
+import work.nekow.primalspells.client.tooltip.ClientWandSpellTooltip
+import work.nekow.primalspells.client.tooltip.PouchTooltip
+import work.nekow.primalspells.client.tooltip.SpellSlotTracker
+import work.nekow.primalspells.client.tooltip.WandSpellTooltip
+import work.nekow.primalspells.entity.TestDummyEntity
+import work.nekow.primalspells.network.ClientPayloadSink
+import work.nekow.primalspells.registry.ModEntities
 
+/**
+ * 客户端入口（`@Mod(dist = CLIENT)`，专用服务器不加载本类）。
+ *
+ * 这里集中做三件事：
+ * 1. 给公共侧网络包安装客户端处理器（[ClientPayloadSink]）——公共入口因此不必引用客户端类；
+ * 2. 注册纯客户端功能：tooltip 组装/工厂、容器输入（滚轮选槽、Ctrl 拖拽交换）、实体渲染器与模型层；
+ * 3. 退出世界/断线时清理按 id 缓存的客户端状态（HUD 数值、护盾、选槽预览）。
+ */
 @Mod(value = PrimalSpells.MODID, dist = [Dist.CLIENT])
 class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
     init {
+        // 1. 网络包的客户端处理器
+        ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
+        ClientPayloadSink.shield = { ShieldHudRenderer.putShield(it) }
+
+        // 2. 纯客户端事件与功能注册
         NeoForge.EVENT_BUS.register(ClientTooltipHandler)
         NeoForge.EVENT_BUS.register(ClientContainerDragHandler)
+        NeoForge.EVENT_BUS.register(SpellSlotScrollHandler)
+
+        NeoForge.EVENT_BUS.addListener<ClientPlayerNetworkEvent.LoggingOut> {
+            // 3. 清理只增不减的客户端缓存
+            WandHudRenderer.clear()
+            ShieldHudRenderer.clear()
+            SpellSlotTracker.clear()
+        }
 
         bus.addListener<RegisterClientTooltipComponentFactoriesEvent> { event ->
             event.register(WandSpellTooltip::class.java, ::ClientWandSpellTooltip)
             event.register(PouchTooltip::class.java, ::ClientPouchTooltip)
         }
 
-        // 注册法术小包容器界面
-        bus.addListener<RegisterMenuScreensEvent> { event ->
-            event.register(ModMenus.SPELL_POUCH.get(), ::SpellPouchScreen)
-        }
-
-        // 注册实体渲染器
         bus.addListener<EntityRenderersEvent.RegisterRenderers> { event ->
-            event.registerEntityRenderer(ModEntities.CUBE.get(), ::CubeEntityRenderer)
-            event.registerEntityRenderer(ModEntities.SPHERE.get(), ::SphereEntityRenderer)
             event.registerEntityRenderer(ModEntities.DRONE.get(), ::DroneEntityRenderer)
             // 测试木桩直接复用原版盔甲架渲染器（TestDummyEntity 是 ArmorStand 子类，
             // 泛型不匹配，运行时安全，需显式转换）
             @Suppress("UNCHECKED_CAST")
             event.registerEntityRenderer(ModEntities.TEST_DUMMY.get()) { ctx ->
-                net.minecraft.client.renderer.entity.ArmorStandRenderer(ctx) as
-                    net.minecraft.client.renderer.entity.EntityRenderer<work.nekow.primalspells.entity.TestDummyEntity, net.minecraft.client.renderer.entity.state.ArmorStandRenderState>
+                ArmorStandRenderer(ctx) as
+                    EntityRenderer<TestDummyEntity, ArmorStandRenderState>
             }
         }
 
-        // 注册实体模型层定义
         bus.addListener<EntityRenderersEvent.RegisterLayerDefinitions> { event ->
-            event.registerLayerDefinition(CubeEntityRenderer.CUBE_LAYER, CubeEntityModel::createBodyLayer)
-            event.registerLayerDefinition(SphereEntityRenderer.SPHERE_LAYER, SphereEntityModel::createBodyLayer)
             event.registerLayerDefinition(DroneEntityRenderer.DRONE_LAYER, DroneEntityModel::createBodyLayer)
         }
     }

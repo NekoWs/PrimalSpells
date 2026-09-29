@@ -1,0 +1,101 @@
+package work.nekow.primalspells.magic.core
+
+import net.minecraft.world.entity.Entity
+import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.Lore
+import work.nekow.primalspells.util.LoreEntry
+import work.nekow.primalspells.wand.Wand
+
+abstract class Magic {
+    abstract val id: String
+
+    lateinit var caster: Entity
+    lateinit var wand: Wand
+
+    open var cast: Int = 1
+
+    /** 消耗法术值 **/
+    var mana: Double = 0.0
+    /** 增加施法延迟 **/
+    var delay: Int = 0
+    /** 增加充能时间 **/
+    var recharge: Int = 0
+    var effects = arrayListOf<BaseEffect>()
+    var lore = arrayListOf<LoreEntry>()
+
+    /** 被动开关：为 true 时，法杖持于玩家手上（主手/副手）期间每 tick 触发 [onInventoryTick] */
+    open var needInventory: Boolean = false
+
+    /**
+     * 被动效果钩子：仅在 [needInventory] 为 true、且该法术已编入法杖、法杖位于玩家手上时，
+     * 由 [Wand.tick] 每 tick 调用一次（调用前已设置好 [caster]/[wand]）。
+     */
+    open fun onInventoryTick() { }
+
+    /**
+     * 快捷添加提示
+     *
+     * @param lore 提示类型
+     * @param args 参数
+     */
+    fun lore(lore: Lore, vararg args: Any) {
+        this.lore += LoreEntry(lore, args)
+    }
+
+    /**
+     * 施法瞬间：按 [EffectPhase.activeOrder] 依次触发每个效果的 `onActive`，最后调用 [onSpell]。
+     *
+     * 顺序契约（见 [EffectPhase]）：[EffectPhase.SETUP] 先把 `status.pos`/`status.velocity` 初始化，
+     * [EffectPhase.MODIFIER] 注入的玩法效果随后在有效状态上改数值。同阶段内按注入顺序执行
+     * （`sortedBy` 稳定排序），也就是「抽牌顺序」。
+     */
+    open fun spell() {
+        effects.sortedBy { it.phase.activeOrder }.forEach {
+            it.caster = caster
+            it.wand = wand
+            it.onActive()
+        }
+        onSpell()
+    }
+
+    /**
+     * 每 tick：按 [EffectPhase.tickOrder] 依次触发 `onTick`。
+     *
+     * 顺序契约：玩法效果改速度/伤害 → `Move` 位置积分 → 轨道类绝对定位 → 粒子表现。
+     */
+    fun tick() {
+        effects.sortedBy { it.phase.tickOrder }.forEach { it.onTick() }
+    }
+
+    /** 死亡结算：按注入顺序触发 `onDie`（顺序对清理无影响，保持插入顺序）。 */
+    fun die() {
+        effects.forEach { it.onDie() }
+        onDie()
+    }
+
+    open fun onSpell() { }
+    open fun onDie() { }
+
+    open fun initLore() {
+        val base = arrayListOf<LoreEntry>()
+        base += LoreEntry(Lore.DESCRIPTION, emptyArray())
+        base += LoreEntry(Lore.BR, emptyArray())
+        base += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
+        if (delay != 0) base += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))
+        if (recharge != 0) base += LoreEntry(Lore.RECHARGE, arrayOf(recharge.toString()))
+        lore.addAll(0, base)
+    }
+
+    /**
+     * 新建一枚「本次施法专用」的法术实例 —— **这是新建，不是字段拷贝**。
+     *
+     * 为什么必须新建：[Wand.castHand] 会把修饰器的效果注入到**实例自身**的 [effects]，
+     * 复用同一实例会让上一发注入的效果残留、并随施法次数不断叠加。
+     * 因此这里从注册表工厂重建一个默认状态实例；运行期状态（当前速度、被修饰器改过的伤害等）
+     * **不会**被继承——任何依赖「克隆时继承父投射物状态」的逻辑都是错的。
+     *
+     * @throws IllegalStateException [id] 未注册时抛出（比 `!!` 的 NPE 更容易定位）
+     */
+    open fun clone(): Magic = MagicManager.create(id)
+        ?: throw IllegalStateException("法术 id 未注册，无法创建施法实例：$id")
+}

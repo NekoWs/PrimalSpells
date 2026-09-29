@@ -21,7 +21,7 @@ import java.util.UUID
  * | 模式 | PD 用法 | 每 tick 带宽 | 本项目用途 |
  * |---|---|---|---|
  * | [spawn] 静止 / 匀速 | `create()…spawn()`（可选一次 `setVelocity`） | 0（速度由 PD 逐 tick 积分） | 重力场范围球壳、下落粒子 |
- * | [refreshAttached] | `attachTo(实体, 世界空间偏移)` | **0**（只在挂载时下发一次） | 护盾球壳 |
+ * | [ensureAttached] | `attachTo(实体, 世界空间偏移)` | **0**（只在挂载时下发一次） | 护盾球壳 |
  * | [spawnSimulated] + [tickSimulated] | 本模组积分 + 一次 [ParticleManager.trackAll] | **1 包/tick，与粒子数无关** | 黑洞绕转吸入 |
  *
  * 另：PD 的 `applyForce(accel, ticks)`（服务端权威加速度，两端同规则积分）适合「力恒定或可分段」的场景；
@@ -30,7 +30,7 @@ import java.util.UUID
  *
  * ## 自转怎么办（供以后需要时使用）
  *
- * [refreshAttached] 的偏移在挂载时固定（世界空间），所以球壳是**刚性平移**、不会自转 —— 这也正是它零带宽的原因。
+ * [ensureAttached] 的偏移在挂载时固定（世界空间），所以球壳是**刚性平移**、不会自转 —— 这也正是它零带宽的原因。
  * 要做「每 tick 旋转过的偏移」，改用 [ParticleManager.trackAll] 一次包发全部粒子：
  * `manager.trackAll(ids, offsets.map { anchor.add(rotateY(it, angle)) })`（1 包/tick），
  * 不要再退回「逐粒子 `track`」（那会变成 N 包/tick，而且历史上曾因按索引配对出过错位）。
@@ -42,11 +42,11 @@ class ParticleSwarm {
 
     /**
      * 锚定粒子：位置 = 实体位置 + 固定世界空间偏移（客户端本地解析，服务端零逐 tick 包）。
+     * 粒子**永存**，由调用方在明确时机 [clear]。
      *
-     * @property offset    挂载时的偏移（**世界空间**，不随实体朝向旋转）
-     * @property remaining 剩余寿命（tick），到 0 只重建这一个粒子（错峰，避免整圈同时闪断）
+     * @property offset 挂载时的偏移（**世界空间**、含身体中段偏移，不随实体朝向旋转）
      */
-    private class Attached(var handle: ParticleHandle, val offset: Vec3, var remaining: Int)
+    private class Attached(var handle: ParticleHandle, val offset: Vec3)
 
     private val attached = ArrayList<Attached>()
 
@@ -107,44 +107,36 @@ class ParticleSwarm {
     // ---------- 锚定（零逐 tick 包） ----------
 
     /**
-     * 维护 [count] 个锚定粒子（位置 = 实体 + 各自偏移），寿命**错峰**重建：
-     * 每个粒子独立倒计时，到点只重建它自己 —— 于是「法杖不再被持有」时粒子会逐个自然过期，
-     * 而不会整圈同时销毁+重建（那种做法历史上出现过「瞬移」与「形状被剪切」两种问题）。
+     * 维护 [count] 个**锚定粒子**（位置 = 实体 + 各自偏移），粒子**永存**（`lifetime = -1`）。
      *
-     * 注意本方法**不写位置**：位置由 `attachTo` 交给客户端本地解析，所以每 tick 只做倒计时与重建判定。
+     * - 位置由 `attachTo` 交给客户端本地解析：本方法**不写位置**、也不重建健康粒子，
+     *   只在数量不足时补齐、并清掉已被 PD 销毁的句柄；
+     * - **为什么不做「错峰重建」**：重建 = 销毁 + 新建，而新建那一刻客户端会从**生成位置**
+     *   插值到挂载位置 —— 表现为「粒子每隔一会儿就瞬移一下、或从上方滑落」（实机现象）。
+     *   清理改由调用方在明确时机 `clear()`（例如 `EnergyShield` 用 `Magic.onPassiveIdle` 的
+     *   放下倒计时），不依赖寿命自然过期；
+     * - ⚠️ [entityPos] 必须与 `attachTo` 的坐标系一致（即 `Entity.position()`，脚底）：
+     *   生成位置 = [entityPos] + 偏移，若这里多/少算一段，新粒子就会「从错误位置滑入」。
      *
-     * @param offsetAt 第 index 个粒子相对实体的偏移；**必须是 index 的确定性函数**（会被反复调用）
+     * @param offsetAt 第 index 个粒子相对实体位置的偏移（含任何身体中段偏移）；
+     *                 **必须是 index 的确定性函数**（补齐时会按 index 反复调用）
      */
-    fun refreshAttached(
+    fun ensureAttached(
         manager: ParticleManager,
         entityId: Int,
-        anchor: Vec3,
+        entityPos: Vec3,
         count: Int,
         color: Color,
         scale: Float,
-        lifetimeTicks: Int,
         offsetAt: (index: Int) -> Vec3,
     ) {
-        while (attached.size < count) {
-            val index = attached.size
-            val entry = createAttached(manager, entityId, anchor, offsetAt(index), color, scale, lifetimeTicks) ?: break
-            // 错峰：把初始剩余寿命沿 [1, lifetimeTicks] 均匀铺开
-            entry.remaining = (lifetimeTicks - index * lifetimeTicks / count).coerceAtLeast(1)
-            attached.add(entry)
-        }
         attached.removeIf { it.handle.position() == null }
-
-        for (entry in attached) {
-            entry.remaining--
-            if (entry.remaining > 0) continue
-            entry.handle.remove()
-            val rebuilt = createAttached(manager, entityId, anchor, entry.offset, color, scale, lifetimeTicks)
-            if (rebuilt != null) {
-                entry.handle = rebuilt.handle
-                entry.remaining = lifetimeTicks
-            } else {
-                entry.remaining = 2 // 被维度上限拒绝：过两 tick 再试，避免每 tick 空转
-            }
+        // 每 tick 最多补这么多：即使 PD 侧异常地把锚定粒子都报成「不存在」，也不会瞬间刷出上百个生成包
+        var budget = MAX_TOP_UP_PER_TICK
+        while (attached.size < count && budget-- > 0) {
+            val entry = createAttached(manager, entityId, entityPos, offsetAt(attached.size), color, scale, IMMORTAL)
+                ?: break // 被维度上限拒绝：下一 tick 再补
+            attached.add(entry)
         }
     }
 
@@ -223,19 +215,19 @@ class ParticleSwarm {
 
     // ---------- 内部 ----------
 
-    /** 创建一个已挂载的锚定条目（不加入跟踪表），供 [refreshAttached] 复用。 */
+    /** 创建一个已挂载的锚定条目（不加入跟踪表），供 [ensureAttached] 复用。 */
     private fun createAttached(
         manager: ParticleManager,
         entityId: Int,
-        anchor: Vec3,
+        entityPos: Vec3,
         offset: Vec3,
         color: Color,
         scale: Float,
         lifetimeTicks: Int,
     ): Attached? {
-        val handle = spawnRaw(manager, anchor.add(offset), color, scale, lifetimeTicks) ?: return null
+        val handle = spawnRaw(manager, entityPos.add(offset), color, scale, lifetimeTicks) ?: return null
         handle.attachTo(entityId, offset)
-        return Attached(handle, offset, lifetimeTicks)
+        return Attached(handle, offset)
     }
 
     /** 内部生成：只创建、不纳入任何跟踪表。 */
@@ -255,5 +247,13 @@ class ParticleSwarm {
             .spawn() ?: return null
         if (velocity != null) handle.setVelocity(velocity)
         return handle
+    }
+
+    private companion object {
+        /** `lifetime = -1`：永存粒子（由调用方显式 [clear]）。 */
+        const val IMMORTAL = -1
+
+        /** 每 tick 最多补齐的锚定粒子数（防异常情况下瞬间刷包）。 */
+        const val MAX_TOP_UP_PER_TICK = 4
     }
 }

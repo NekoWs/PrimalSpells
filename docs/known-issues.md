@@ -32,11 +32,11 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟠 | 黑洞粒子：每 tick 生成 32 个 PD 粒子，寿命最长 60 tick（峰值约 1900 个） | `magic/effect/lifecycle/BlackHole.kt` | 已做两件事：①落到中心即销毁（`CONSUME_DISTANCE`）；②**施力每 3 tick 一次**（PD 每次 `setVelocity` 都会广播，每 tick 对上千粒子广播代价过大）。若仍嫌重：降 `PARTICLES_PER_TICK`/`LIFETIME_TICKS`，或按玩家可见性削减 |
-| 🟡 | 重力场粒子：每 tick 1 个、寿命 60 tick（峰值约 60 个） | `magic/effect/lifecycle/GravityField.kt` | 开销很小；若要更密可调 `SPAWN_RADIUS`/寿命 |
+| 🟡 | 黑洞粒子：每 tick 1 个、寿命最长 60 tick（峰值约 60 个），**位置由本模组积分 + `track` 写回** | `magic/effect/lifecycle/BlackHole.kt` | 改成位置驱动后每 tick 每粒子一次位置广播（峰值约 60/tick），可控；若嫌密就调 `LIFETIME_TICKS` |
+| 🟡 | 重力场粒子：范围球壳 96 个（永存，仅生成时广播）+ 每 tick 3 个下落粒子 | `magic/effect/lifecycle/GravityField.kt` | 下落粒子寿命 120 tick 兜底，正常在碰到下半球表面时销毁；要更密改 `FALLING_PER_TICK` |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 已加两道剪枝：场上无投射物直接返回；先按「到玩家中心的距离球」粗筛（半径 = 护盾半径 + 玩家包围盒最远角 1.0 + 该投射物碰撞半径，保证不漏判）。法术数量再上量级时可考虑空间分桶/网格 |
-| 🟡 | `EnergyShield` 护盾球壳：24 个 PD 粒子，每 tick 各广播一次位置包 | `magic/modifier/EnergyShield.kt` | 有限寿命（20 tick）+ 每 10 tick 重建，粒子不再被驱动时自行过期。要省广播就得等 PD 的实体锚点 API（§7） |
+| 🟡 | `EnergyShield` 护盾球壳：24 个 PD 粒子，每 tick 各广播一次位置包 | `magic/modifier/EnergyShield.kt` | 寿命 40 tick，由 `tickAnchored` **错峰**重建（每 tick 只重建到点的那一个），不再整圈销毁+重建。要省广播就得等 PD 的实体锚点 API（§7） |
 
 ---
 
@@ -89,13 +89,14 @@
 10. 命中一致性：`Move` 改为宽相位后，快速目标（奔跑的玩家/坐骑）是否仍能被正常命中。
 11. **黑洞吸附投射物**：把法术打进黑洞范围，是否被明显吸向中心（含自己的法术）。
 12. **重力场压投射物**：法术穿过重力场时是否可见下坠（与 `gravity` 修正同量级 0.03/tick）。
-13. **黑洞粒子**：紫色、每 tick 32 个、起始绕中心切向旋转，随后被吸入并在中心消失；密度是否合适
-    （峰值约 1900 个，若卡顿就调 `PARTICLES_PER_TICK`/`LIFETIME_TICKS`）。
-14. **重力场粒子**：球体内每 tick 1 个淡灰色粒子，匀速下落、不跟随投射物。
+13. **黑洞粒子**（第 4 轮已改）：每 tick 1 个、紫色、起始绕中心切向旋转，**一直转到中心 0.1 格内才消失**
+    （不应再有中心空洞）；单人按 Esc 暂停时粒子应**就地定格**，不再飘出范围。
+14. **重力场粒子**（第 4 轮已改）：半径 5 的**半透明球壳**标识作用范围（96 个永存粒子）；
+    下落粒子只出现在**上半球表面**、竖直下落，碰到**下半球表面**即消失（不应穿出球体继续下落）。
 15. **法杖持有者记录与回收**（见 §6 第 3 轮）：放下/丢弃法杖一段时间后再拿起，法力、牌堆、冷却、
     护盾耐久是否都不丢。
-16. **护盾球壳粒子**：淡蓝色球体是否跟随持有者移动并缓慢自转；破盾是否立即消失；
-    放下法杖（或卸下 `energy_shield`）后约 1 秒内粒子是否自行消失（不留孤儿）。
+16. **护盾球壳粒子**（第 4 轮已改）：淡蓝色球体跟随持有者移动并缓慢自转；**不应再周期性瞬移**
+    （错峰重建后每次只替换一个粒子）；破盾立即消失；放下法杖后约 2 秒内粒子自行过期。
 
 ---
 
@@ -176,6 +177,16 @@
 | 3.8 | PD 粒子管理器兜底 | 新增 `wand.pdParticles(level)`：管理器缺失/跨维度时现场建立并缓存，保证未来的生物施法者也有粒子表现；`Trajectory`/`ProjectileBody`/区域场统一走它 | `util/PdParticles.kt`、`effect/visual/{Trajectory,ProjectileBody}.kt`、`effect/lifecycle/AreaFieldEffect.kt` |
 | 3.9 | 施法时弃牌堆会无界重复累积 | 顺带修：`Wand.discard()` 把暂存表 `discarded` 并进弃牌堆后**从不清空**，导致每次施法都把历史弃牌重复并入（并随新加的 `discard_pile` 写进存档）。现已在并入后 `discarded.clear()` | `wand/Wand.kt` |
 
+### 第 4 轮（同日晚，实机观感修正）
+
+| 编号 | 裁决 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 4.1 | 黑洞粒子太多 → 每 tick 1 个 | `PARTICLES_PER_TICK` 32 → **1** | `effect/lifecycle/BlackHole.kt` |
+| 4.2 | 黑洞粒子在离中心一段距离有明显空域；预期到中心（≈0.1 格）才消失 | 两个根因都修：①销毁半径 0.35 → **0.1**；②吸力改为**随距离增强**（`0.12/(距离+0.5)`，与对生物/投射物同一公式）+ 每 tick 轻微阻尼（0.995），否则粒子会在 `r ≈ v²/a` 处稳定环绕形成空域 | `effect/lifecycle/BlackHole.kt` |
+| 4.3 | 重力场粒子改为：球面均匀球壳标识范围 + 下落粒子只在上半球表面生成、碰到下半球表面消失 | 球壳：半径 **5**（= 作用范围）上均匀铺 96 个半透明淡蓝灰永存粒子；下落粒子：每 tick 3 个、出生点取**上半球表面**、竖直下落，`y ≤ center.y − √(r²−dx²−dz²)`（下半球表面）即销毁 | `effect/lifecycle/GravityField.kt` |
+| 4.4 | 护盾粒子每隔一段时间瞬移一下 | 根因不是 PD 插值，而是**整圈同时销毁+重建**时按「索引 → 偏移」配对：一旦 PD 因维度粒子上限拒掉个别生成，所有粒子就会整体错位（表现为瞬移）。改为 `tickAnchored` **错峰重建**（每个粒子独立倒计时、每 tick 只换到点的那一个）+ 偏移**绑在句柄上**，寿命 20 → 40 | `effect/visual/ParticleSwarm.kt`、`modifier/EnergyShield.kt` |
+| 4.5 | 单人按 Esc 时黑洞粒子飘出原定范围 | 根因：粒子之前靠引擎按速度积分，**服务端暂停时客户端仍按最后速度外推**。改为**本模组自己积分 + `track` 写回位置**（`ParticleSwarm.spawnSimulated/tickSimulated`）：暂停时不再下发新位置，粒子就地定格；顺带把「到达中心才消失」变成可控的位置判定。重力场下落粒子同步改为该模式 | `effect/visual/ParticleSwarm.kt`、`effect/lifecycle/BlackHole.kt`、`GravityField.kt` |
+
 ---
 
 ## 7. ParticleDrawing API 需求（待对方实现）
@@ -190,7 +201,18 @@
 > 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.8-ALPHA`
 > （`lib/particledrawing-1.0.8-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
 
-**未决需求：3 条**（均由第 3 轮的黑洞/护盾粒子接线暴露出来，见下）。
+**未决需求：4 条**（前三条由第 3 轮接线暴露，第 4 条由第 4 轮实机观察暴露）。
+
+### [需求] 服务端暂停时，速度驱动的粒子不应被客户端继续外推
+
+- 状态：未决（**已在用法侧规避**：黑洞/重力场下落粒子改为「本模组积分位置 + `track`」，暂停时定格）
+- 现象：单人游戏按 Esc（集成服务端暂停）后，`setVelocity` 驱动的粒子会沿最后速度**飘出原定范围**
+- 现有 API 为什么不够：引擎对「有速度的粒子」每 tick 自行推进位置，而客户端在服务端没有新状态时仍按最后速度
+  继续外推（PD 有 `ClockSyncPayload` 时钟同步，但没有「暂停时不推进」的语义）
+- 期望行为/API 形态（任一）：① 服务端暂停（时钟冻结）时客户端停止推进速度驱动粒子；
+  ② 恢复时下发一次权威位置做重同步；③ 在 API 文档里明确「速度驱动粒子在暂停期间会被外推」，便于使用方选择 `track`
+- 影响面：任何使用 `setVelocity` 的效果（本项目现在只用位置驱动规避）
+- 临时降级：改用 `ParticleSwarm.spawnSimulated/tickSimulated`（本模组积分 + `track`）
 
 ### [需求] `ParticleHandle` 缺少 api 级的只读位置查询
 

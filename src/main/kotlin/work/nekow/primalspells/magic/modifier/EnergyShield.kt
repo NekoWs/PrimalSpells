@@ -16,9 +16,7 @@ import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
 import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.pdParticles
-import kotlin.math.cos
 import kotlin.math.min
-import kotlin.math.sin
 
 /**
  * 能量盾（被动法术）：编入法杖后，只要法杖位于玩家手上（主手/副手）即自动生效。
@@ -60,11 +58,8 @@ class EnergyShield : Modifier() {
     /** 护盾球壳粒子（ParticleDrawing）：以持有者为锚点的淡蓝色球壳，见 [updateShieldVisual]。 */
     private val shieldSwarm = ParticleSwarm()
 
-    /** 球壳粒子的球面偏移（首次生成时随机采样一次，之后复用并缓慢自转）。 */
+    /** 球壳粒子的球面偏移（首次生成时随机采样一次，之后固定 —— 球壳静态，只跟随持有者平移）。 */
     private var shellOffsets: List<Vec3> = emptyList()
-
-    /** 球壳绕 Y 轴的自转角（弧度） */
-    private var shellSpin = 0f
 
     /**
      * 运行期状态持久化（写）：把「当前耐久」与「破盾暂停剩余 tick」交给法杖存档。
@@ -179,15 +174,17 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * 护盾视觉（ParticleDrawing）：以持有者为锚点的**淡蓝色球壳**。
+     * 护盾视觉（ParticleDrawing）：以持有者为锚点的**淡蓝色球壳**（静态球面 + 跟随持有者平移）。
      *
      * 实现要点：
-     * - 位置由我们算（锚点 + 球面偏移 + 绕 Y 缓慢自转），PD 负责渲染与客户端插值；
-     *   用 `track` 直设位置（`move` 缓动会永远慢一拍）；
+     * - 位置由我们算（锚点 + 固定球面偏移），PD 负责渲染与客户端插值；用 `track` 直设位置；
      * - 用 [ParticleSwarm.tickAnchored] 维护球壳：**每个粒子独立错峰重建**，而不是整圈同时销毁+重建 ——
      *   后者会出现「每隔一段时间瞬移一下」：同一 tick 集中重建时，若 PD 因维度粒子上限拒掉了个别粒子，
      *   「索引 → 偏移」的配对就会整体错位（实测现象），错峰 + 把偏移绑在句柄上可彻底避免；
-     * - 粒子寿命仍然有限（[SHELL_LIFETIME_TICKS]）：法杖一旦不再被持有（放下/丢进箱子/卸下法术），
+     * - ⚠️ **球壳不再自转**（曾经每 tick 绕 Y 转 0.03 rad）：PD 的 `track` 位置插值会让「每 tick 变化的偏移」
+     *   被拉成一条/一圈残影（实机截图：初始是球、旋转后摊成一排）。改为静态球面后，`track` 只承担**平移**，
+     *   球壳保持刚性。等 PD 修好 `track` 插值后可以再把自转加回来（见 `docs/known-issues.md` §7）；
+     * - 粒子寿命有限（[SHELL_LIFETIME_TICKS]）：法杖一旦不再被持有（放下/丢进箱子/卸下法术），
      *   `onInventoryTick` 就不再被调用，我们**没有**「被动停止」回调可用来清理 ——
      *   有限寿命让粒子自行过期，不会在世界里留下孤儿粒子；
      * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建。
@@ -201,10 +198,6 @@ class EnergyShield : Modifier() {
                 ParticleShapes.randomUnitVector(random).scale(SHELL_RADIUS)
             }
         }
-        shellSpin += SHELL_SPIN_PER_TICK
-        val cosSpin = cos(shellSpin)
-        val sinSpin = sin(shellSpin)
-
         shieldSwarm.tickAnchored(
             manager = wand.pdParticles(level),
             anchor = shellCenter(holder),
@@ -212,11 +205,7 @@ class EnergyShield : Modifier() {
             color = SHELL_COLOR,
             scale = SHELL_SCALE,
             lifetimeTicks = SHELL_LIFETIME_TICKS,
-        ) { index ->
-            val offset = shellOffsets[index % shellOffsets.size]
-            // 绕 Y 轴缓慢自转，让球壳看起来是「活的」
-            Vec3(offset.x * cosSpin - offset.z * sinSpin, offset.y, offset.x * sinSpin + offset.z * cosSpin)
-        }
+        ) { index -> shellOffsets[index % shellOffsets.size] }
     }
 
     /** 破盾/失效：立即销毁球壳粒子。 */
@@ -258,11 +247,8 @@ class EnergyShield : Modifier() {
         private const val SHELL_SCALE = 0.4f
 
         /** 粒子寿命（tick）：有限寿命让「法杖不再被持有时」粒子自行过期，不留孤儿。
-         *  必须 ≥ [SHELL_PARTICLES] 才能让 [ParticleSwarm.tickAnchored] 的错峰重建完全铺开。 */
-        private const val SHELL_LIFETIME_TICKS = 40
-
-        /** 球壳自转角速度（弧度/tick）：约 0.03 rad ≈ 1.7°/tick，慢速旋转 */
-        private const val SHELL_SPIN_PER_TICK = 0.03f
+         *  要 ≥ [SHELL_PARTICLES] 才能让 [ParticleSwarm.tickAnchored] 的错峰重建完全铺开。 */
+        private const val SHELL_LIFETIME_TICKS = 60
 
         /** 淡蓝色 */
         private val SHELL_COLOR: Color = Color.ofInt(120, 200, 255)

@@ -88,8 +88,9 @@ class ExplosionProjectile : Modifier() {
                 val perpendicular = Vector3f(v).cross(arbitrary).normalize()
                 // 随机旋转角度
                 val angle = Random.nextFloat() * 2.0f * Math.PI.toFloat()
-                val cosA = kotlin.math.cos(angle).toFloat()
-                val sinA = kotlin.math.sin(angle).toFloat()
+                // angle 是 Float，kotlin.math.cos/sin 对 Float 直接返回 Float，无需再 toFloat()
+                val cosA = kotlin.math.cos(angle)
+                val sinA = kotlin.math.sin(angle)
                 // 绕 v 旋转 perpendicular
                 return Vector3f(perpendicular).mul(cosA)
                     .add(Vector3f(perpendicular).cross(v).normalize().mul(sinA))

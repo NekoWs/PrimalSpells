@@ -1,5 +1,41 @@
-# Disable autocrlf on generated files, they always generate with LF
-# Add any extra files or paths here to make git stop saying they
-# are changed when only line endings change.
+# 行尾统一：仓库内一律 LF，工作区检出也用 LF
+# （本机 core.autocrlf=true，若不显式声明，编辑器/工具写入的 LF 文件每次提交都会刷
+#   “LF will be replaced by CRLF” 警告 —— 用 eol=lf 显式压掉，并保证跨平台一致）
+* text=auto eol=lf
+
+# Windows 批处理必须 CRLF（cmd 对 LF-only 的 .bat 有边角情况）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# shell 脚本必须 LF
+gradlew text eol=lf
+*.sh text eol=lf
+
+# 二进制：禁止任何行尾/编码转换（本地前置模组 jar 也签入库，务必保护）
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ogg binary
+*.zip binary
+
+# 生成文件（NeoForge MDK 原规则）：生成器固定输出 LF，声明后 git 不再报“仅行尾变化”
 src/generated/**/.cache/* text eol=lf
 src/generated/**/*.json text eol=lf
+
+# 语言/数据文件保持可读的文本 diff
+*.json text
+*.json5 text
+*.toml text
+*.md text
+*.kt text
+*.kts text
+*.java text
+*.gradle text
+*.properties text
+*.yml text
+*.yaml text
+*.cfg text
+*.mcmeta text

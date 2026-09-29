@@ -294,7 +294,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 - 未使用：`applyForce(accel, ticks)`（黑洞吸力随距离变化，用 `trackAll` 更省也更可控，理由见 `ParticleSwarm` KDoc）、
   `attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
-  1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备。
+  1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份。
 - 历史 problem 记录：API 缺陷/需求清单与闭环情况见 [known-issues.md](known-issues.md) §7
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
 - ✅ **依赖构建口径（已解决）**：PD 把 `mod_version` 提到 **1.0.9-ALPHA** 后，本模组的

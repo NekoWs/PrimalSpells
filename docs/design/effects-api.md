@@ -2,7 +2,7 @@
 
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
-ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.8-ALPHA**）。
+ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.9-ALPHA**）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
 **触发条件**（满足任一即进入本政策）：
@@ -64,7 +64,8 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
 | 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleManager.trackAll(ids, positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）、`BlackHole`（批量） |
 | 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞吸力随距离变化） |
-| 锚在一个实体身上（形状刚性） | `handle.attachTo(entityId, 世界空间偏移)`；偏移要随朝向旋转用 `attachToLocal` | **0** | `EnergyShield` 球壳 |
+| 锚在一个实体身上（形状刚性） | `handle.attachTo(entityId/uuid, 偏移)`（1.0.9 起身份统一）；整组跟随用 `ParticleGroup.followEntity(uuid, offset, local)` | **0** | `EnergyShield` 球壳 |
+| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll` 为 1 包/tick） | **迁移目标**：`ParticleSwarm` 应换成它（见 [../known-issues.md](../known-issues.md) §1.3） |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
 六条硬要点：
@@ -128,14 +129,15 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > - 依赖版本：**1.0.9-ALPHA**（`lib/particledrawing-1.0.9-ALPHA.jar`，附 `-sources.jar`），
 >   由 `gradle.properties` 的 `particledrawing_version` 驱动；下方正文中出现的 1.0.6 等版本号是**当时的历史记录**。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
-> - 1.0.8-ALPHA 相对 1.0.6 的 API 增量：新增 `api/EffectCallbacks`（播放结束/参数变更回调）与 `api/EffectVarStore`（`setParam` 覆盖值记忆，`getParam` 的诚实实现），**无删除、无签名破坏**；`.pdrawc` 动画特效在 PrimalSpells 侧的接线仍未落地。
+> - 1.0.9-ALPHA 相对 1.0.8 的 API 增量：**`api/ParticleBatch`**（程序化粒子集：`add`/`trackAll`/`trackEach`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）、
+>   `ParticleGroup.followEntity(..., local)`（组级跟随可选随朝向）、`ParticleHandle.position()/applyForce()/attachTo()` 等（1.0.8 起）。`.pdrawc` 动画特效在 PrimalSpells 侧的接线仍未落地。
 > - 本文引用的包路径按重构前书写，现对应关系：`magic/effect/Trajectory.kt` → `magic/effect/visual/Trajectory.kt`；`magic/effect/*` 其余类分入 `magic/effect/{geometry,lifecycle}`；`magic/Revise.kt` → `magic/core/Modifier.kt`（类 `Revise` → `Modifier`）；`magic/Projectile.kt` → `magic/projectile/Projectile.kt`；`magic/{Magic,MagicStatus,MagicManager}.kt` → `magic/core/`；`item/ModItems.kt` → `registry/ModItems.kt`。完整对照见 [../conventions.md](../conventions.md) 第 8 节。
 
 
 > 状态：**播放器侧 API 轮子已实现**（`particledrawing` 仓库，§5 全部落地并通过 `gradlew build` + 单测）。
 > 魔法模组端（`primalspells`）动画/特效接线**后续再做**。
 > 涉及仓库：
-> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.8-ALPHA）
+> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.9-ALPHA）
 > - 魔法模组：`D:\Backup\IDEA Projects\PrimalSpells`（`primalspells`，MC 26.2 / NeoForge 26.2.0.59 / Java 25）
 
 ---

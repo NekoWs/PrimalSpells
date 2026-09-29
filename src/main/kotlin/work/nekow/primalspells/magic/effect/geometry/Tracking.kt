@@ -104,7 +104,8 @@ class Tracking(
             val dx = entity.x - status.pos.x
             val dy = entity.y - status.pos.y
             val dz = entity.z - status.pos.z
-            val distSq = (dx * dx + dy * dy + dz * dz).toDouble()
+            // entity.x 是 Double、status.pos.x 是 Float → 表达式本身已是 Double，无需再 toDouble()
+            val distSq = dx * dx + dy * dy + dz * dz
             if (distSq < nearestDistSq) {
                 nearestDistSq = distSq
                 nearestEntity = entity

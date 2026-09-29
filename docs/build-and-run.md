@@ -32,7 +32,7 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 - jar 以**本地文件**形式签入 `lib/`，不走 Maven；文件名与版本区间都由 `gradle.properties` 驱动（`particledrawing_version` / `particledrawing_version_range`），`build.gradle` 与 `mods.toml` 不再硬编码。
 - 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：`ParticleManager`（`create`/`trackAll`）、
   `ParticleHandle`（`setVelocity`/`track`/`position`/`applyForce`/`attachTo`/`attachToLocal`/`remove`）、`Color`；
-  另有 `EffectCallbacks`、`EffectVarStore`（动画特效接线时用）。
+  另有 `ParticleBatch`（**程序化粒子集的推荐入口**：`add`/`trackAll`/`forEach`/`removeIf`/`ensureSize`/`evictDead`）、`ParticleGroup`（编排式动画）、`EffectCallbacks`、`EffectVarStore`。
 - ✅ **构建口径（同名换 jar 的坑，已解决）**：2026-09-30 当天曾在**同一版本号字符串**下替换过 `lib/` 里的 jar，
   旧构建缺 `position`/`applyForce`/`attachTo`/`trackAll` 而 `versionRange` 拦不住。
   现在 PD 已把 `mod_version` 提到 **1.0.9-ALPHA**，本模组的下限同步为 `[1.0.9-ALPHA,)`，
@@ -49,7 +49,7 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
   [known-issues.md](known-issues.md#7-particledrawing-api-需求待对方实现)（政策全文见 [design/effects-api.md](design/effects-api.md) 第 0 节）。
 - 当前锁定版本为 **1.0.9-ALPHA**（含 §7.3 的 `ParticleBatch` 与实体锚点三入口；1.0.8 → 1.0.9 只新增 API，无破坏性变更——`attachTo(entityId, offset)` 等旧签名保留）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
-- `lib/` 里可能残留不再被引用的旧版本 jar（如 `particledrawing-1.0.6.jar`）：**对照 API 请以当前版本的 `-sources.jar` 为准**。
+- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.9-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
 
 ## 3. 常用命令
 

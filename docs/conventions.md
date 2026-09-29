@@ -224,7 +224,7 @@ magic/modifier  ──→ magic/core, magic/effect
   （如爆炸/黑洞/重力场的球体采样，统一走 `util/ParticleShapes.kt`）；禁止的是「把 ParticleDrawing 该做的事在本侧重生一份」。
 - 升级依赖的固定流程（都用 `gradle.properties` 做单一数据源，不再手改 `mods.toml`）：
   新 jar 放 `lib/` → 改 `particledrawing_version`（jar 文件名版本段）与 `particledrawing_version_range`
-  （下限 = 该版本；**预发布必须带标识**，如 `[1.0.8-ALPHA,)`，写 `[1.0.8,)` 不匹配 `1.0.8-ALPHA`）→
+  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.9-ALPHA,)`，写 `[1.0.9,)` 不匹配 `1.0.9-ALPHA`）→
   `./gradlew build --no-build-cache`；
   **构建失败就回到上面两条（停下 + 提需求），不要就地绕开**。
 

@@ -63,7 +63,8 @@ class Serpentine : Modifier() {
                 // √N 叠加倍率（见 BaseEffect.stackScale）
                 val adjustedFreq = baseFreq * stackScale
                 val adjustedAmp = baseAmp * stackScale
-                val yOffset = adjustedAmp * sin(adjustedFreq * status.age).toFloat()
+                // adjustedFreq 与 status.age 相乘仍是 Float，sin(Float) 返回 Float，无需再 toFloat()
+                val yOffset = adjustedAmp * sin(adjustedFreq * status.age)
 
                 val waveDir = Vector3f(forward).add(Vector3f(worldUp).mul(yOffset)).normalize()
                 val prevWaveDir = lastWaveDir

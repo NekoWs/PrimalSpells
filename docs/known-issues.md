@@ -38,8 +38,13 @@
   **不能直接迁移到 `ParticleGroup`** —— 它是「编排式动画」抽象（成员基本固定、组级统一变换），
   而本项目要的是「程序化粒子流」（成员逐 tick 增删、每粒子独立受力、按位置条件回收）。
   差异总表见 [design/effects-api.md](design/effects-api.md) §0.2，**待 PD 侧补的能力见 §7.3**。
-- 因此本项的**前置条件**是 §7.3 第 1 条（`ParticleBatch` 之类）与第 2 条（统一锚定身份/坐标）落地；
-  在那之前，`ParticleSwarm` 保留为薄封装（只算位置/速度与销毁，不含渲染/同步逻辑）。
+- **前置条件已满足**（2026-09-30）：PD `1.0.9-ALPHA`（提交 `52534d5`）已提供 §7.3 的
+  **`ParticleBatch`**（`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/
+  `forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）与统一的锚定身份
+  （`attachTo` 支持 `Entity`/`uuid`/`entityId`，`followEntity(uuid, offset, local)`）。
+  → 迁移可以开工：`spawnSimulated/tickSimulated` → `batch.forEach { … } + batch.trackAll(...)`、
+  `removeWhere` → `batch.removeIf { … }`、`ensureAttached` → `batch.ensureSize(n, spawner)`，
+  届时**整个 `ParticleSwarm` 可以删除**。本模组尚未改接线（属独立一轮，需要进游戏确认）。
 - 迁移后能顺带拿到的能力（属于 `ParticleGroup` 已有的强项，**现在就可以用**，与迁移解耦）：
   组级编排零带宽 —— `spin(axis, radiansPerTick)`（护盾自转不必再每 tick `trackAll`，1 包/tick → 0 包）、
   `fadeOut(ticks, removeAfter)` / `destroyAfter(ticks)`（正在预留的"消失动画"窗口可以直接用它做）。
@@ -121,8 +126,7 @@
     破盾立即消失；**放下法杖 4 tick 后**球壳消失（重新握杖后立即恢复）。
 17. **本轮接线改造后的回归检查**（第 6 轮）：① 投射物**本体粒子**是否不再前后抖动（PD 已修直设位置链路）；
     ② 黑洞粒子是否仍能绕转并被吸入中心（已改 `trackAll` 批量下发）；③ 重力场下落粒子是否仍在下半球表面消失、
-    且**按 Esc 暂停时不再飘**（PD 已修暂停外推）；④ 使用**旧构建**的 `1.0.8-ALPHA` jar 时应报
-    `NoSuchMethodError`（提醒：本模组现在要求 2026-09-30 或更新的构建，见 §7 顶部）。
+    且**按 Esc 暂停时不再飘**（PD 已修暂停外推）。
 
 ---
 
@@ -249,6 +253,14 @@
 | 8.2 | **每个粒子逐个**「瞬移到上方再落回原位」 | 根因是「错峰重建」：为让粒子在法杖不再被持有时自行过期，我每约 1.5 tick 销毁并新建 1 个粒子 —— 而**新建的粒子必然从生成点滑到挂载点**，于是这个滑入动画被不断重演。现在 `Magic.onPassiveIdle` 已能可靠触发清理，不再需要靠寿命过期：改为 `ensureAttached` **一次性锚定 + `lifetime = -1` 永存**，只在数量不足时补齐、不做周期重建 | `effect/visual/ParticleSwarm.kt`、`modifier/EnergyShield.kt` |
 | 8.3 | 过一段时间粒子开始消失、散落到脚下 | 8.1/8.2 的产物（生成点错位 + 反复重建 + 60 tick 寿命陆续到期；寿命一到 PD 就地销毁，视觉上就是「消失/落在错误位置」）。改永存 + 显式清理后不再有寿命到期这一路径；顶部每 tick 的 `ensureAttached` 会把被 PD 回收的粒子补齐。**若仍出现异常**，按 §7 流程提 PD issue（附复现步骤与场景） | 同上 |
 
+### 第 9 轮（工程卫生：编译警告 / 行尾规范 / 清理旧依赖）
+
+| 编号 | 事项 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 9.1 | 全量编译有 4 条 `w: Redundant call of conversion method` | 都是对**已经是目标类型**的值再调一次转换：`Tracking.kt:107`（`entity.x` 是 Double、`status.pos.x` 是 Float → 差值已是 Double，去掉 `.toDouble()`）、`ExplosionProjectile.kt:91/92`（`angle` 是 Float，`kotlin.math.cos/sin(Float)` 直接返回 Float，去掉 `.toFloat()`）、`Serpentine.kt:66`（`Float * Int` 仍是 Float，`sin` 返回 Float，去掉 `.toFloat()`）。现全量编译 **0 warning** | `effect/geometry/Tracking.kt`、`modifier/ExplosionProjectile.kt`、`modifier/Serpentine.kt` |
+| 9.2 | 行尾/二进制属性没规范，提交时反复刷 `LF will be replaced by CRLF` | 重写 `.gitattributes`：`* text=auto eol=lf`（仓库与工作区统一 LF，`core.autocrlf=true` 不再干扰）、`*.bat`/`*.cmd` 用 CRLF、`gradlew`/`*.sh` 用 LF、`*.jar`/`*.png`/`*.ogg`/`*.zip` 等标为 `binary`（禁止任何转换，`lib/` 下的前置模组 jar 也受保护）、文本类扩展名显式 `text`，并保留 MDK 的 `src/generated/**` 规则。`git add --renormalize .` 校验：**没有产生行尾 churn**（既存 blob 本就是 LF）；实测 CRLF 新文件提示「将被归一为 LF」、LF 新文件零警告 | `.gitattributes` |
+| 9.3 | `lib/` 残留旧版前置模组 jar | 删除 `lib/particledrawing-1.0.6.jar`（已不被引用）；`lib/` 现在只留 `particledrawing-1.0.9-ALPHA.jar` + `-sources.jar`。依赖面同步：`particledrawing_version=1.0.9-ALPHA`、`version_range=[1.0.9-ALPHA,)`（由 `gradle.properties` 驱动 `mods.toml` 插值） | `lib/`、`gradle.properties`、`docs/build-and-run.md` |
+
 ---
 
 ## 7. ParticleDrawing API 需求（待对方实现）
@@ -292,7 +304,7 @@
 > `particledrawing_version=1.0.9-ALPHA` / `particledrawing_version_range=[1.0.9-ALPHA,)`——
 > 依赖区间现在能表达「最低可用构建」：缺 `position`/`trackAll`/`applyForce`/`attachTo`/
 > `ParticleBatch` 的旧构建会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
-> `lib/` 下的 `particledrawing-1.0.8-ALPHA.jar` 已删除，只留当前版本；`particledrawing-1.0.6.jar` 是历史遗留（未被引用）。
+> `lib/` 下的 `particledrawing-1.0.8-ALPHA.jar` 与旧版 `particledrawing-1.0.6.jar` 均已删除，只留当前版本。
 
 ### 7.1 历史条目（备查）
 

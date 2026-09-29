@@ -2,7 +2,7 @@
 
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
-ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.10-ALPHA**）。
+ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.11-ALPHA**）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
 **触发条件**（满足任一即进入本政策）：
@@ -50,7 +50,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 |---|---|---|
 | **属于 PD**（用现成 API，别再自己写） | 与「粒子集合的通用机制」有关：批量成员管理、组跟随实体/旋转/淡出/延时、寿命与可见性、上限与拒绝处理、带宽优化 | `ParticleBatch`（成员簿记）、`ParticleGroup` 的组级编排、`trackAll`、`attachTo`、`applyForce` |
 | **属于本模组**（玩法语义，PD 不该知道） | 只有游戏知道的东西：半径/数量/颜色/寿命取值、力的公式、回收判据、被动的持有/放下时机与淡出时长 | `BlackHole` 的吸力与阻尼、`GravityField` 的下落与下半球回收、`EnergyShield` 的 4 tick 延迟、`ParticleShapes.fibonacciSphere` 的选点 |
-| **灰区（已收敛，无遗留）** | 曾经留在使用方的「随距离变化的每粒子受力」已被 PD 收走：1.0.10-ALPHA 的 `setVelocityAll` / `applyForceAll` **一次包覆盖全组**（按 `handles()` 顺序对齐、逐玩家按可见性裁剪） | `BlackHole` 第 12 轮改用 `setVelocityAll`：**速度每 tick 由本模组重算，位置积分归 PD**，本模组不再持有任何跨 tick 粒子状态（见 [../issues/resolved.md](../issues/resolved.md) 第 12 轮） |
+| **灰区（已收敛，无遗留）** | 曾经留在使用方的「随距离变化的每粒子受力」已被 PD 收走：1.0.11-ALPHA 的 `setVelocityAll` / `applyForceAll` **一次包覆盖全组**（按 `handles()` 顺序对齐、逐玩家按可见性裁剪） | `BlackHole` 第 12 轮改用 `setVelocityAll`：**速度每 tick 由本模组重算，位置积分归 PD**，本模组不再持有任何跨 tick 粒子状态（见 [../issues/resolved.md](../issues/resolved.md) 第 12 轮） |
 
 ⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleBatch`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
 再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组/集 API** ——
@@ -65,7 +65,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
 | 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleBatch.trackAll(positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）。本模组没有「自己算位置」的批量使用者了 |
 | **每 tick 变化的每粒子速度**（受力随位置变化） | **`ParticleBatch.setVelocityAll(velocities)`**（1.0.10 起）：速度每 tick 重算、一包下发，**位置积分归 PD**（`pos += vel`） | **1 包/tick**（与粒子数无关） | `BlackHole` 被吸入粒子（`v ← v·阻尼 + 向心加速度`） |
-| **组级编排：跟随 + 持续旋转/淡出** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeOut(ticks, removeAfter)`；都在**客户端本地求值** | **0 包/tick** | `EnergyShield` 球壳（第 12 轮接入） |
+| **组级编排：跟随 + 持续旋转/淡出** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeOut(ticks, removeAfter)`；都在**客户端本地求值**。⚠️ **顺序即语义**：轴的绑定（`setPivot`/`followEntity`）对**其后**的旋转/缩放生效，且成员必须相对**绑定后的轴心**铺开（`followEntity(offset)` 会同步改组的 `pivot` 字段，而客户端按「spawn 位置 − 该字段」算相对偏移） | **0 包/tick** | `EnergyShield` 球壳（第 12 轮接入；第 13 轮修正轴心顺序） |
 | 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞的力随距离变化，用 `setVelocityAll` 直接表达） |
 | 锚在一个实体身上（形状刚性） | 整组用 `ParticleGroup.followEntity(uuid, offset, local)`；零散粒子用 `handle.attachTo(Entity/uuid/entityId, 偏移)`（1.0.9 起身份统一） | **0** | `EnergyShield` 球壳已改用**组**（要自转）；`attachTo` 当前无使用者 |
 | **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起，1.0.10 补批量设速/施力）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity(All)`/`applyForce(All)`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll`/`setVelocityAll` 为 1 包/tick） | **已在用**：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）。见 [../issues/resolved.md](../issues/resolved.md) 第 10/12 轮 |
@@ -132,12 +132,12 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > **文档状态（2026-09 结构重构时补记，2026-09-29 更新版本）**
 > - 本文件原在仓库根（`effects-api-design.md`），现已归入 `docs/design/`。
-> - 依赖版本：**1.0.10-ALPHA**（`lib/particledrawing-1.0.10-ALPHA.jar`，附 `-sources.jar`），
+> - 依赖版本：**1.0.11-ALPHA**（`lib/particledrawing-1.0.11-ALPHA.jar`，附 `-sources.jar`），
 >   由 `gradle.properties` 的 `particledrawing_version` 驱动；下方正文中出现的 1.0.6 等版本号是**当时的历史记录**。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
 > - 1.0.9-ALPHA 相对 1.0.8 的 API 增量：**`api/ParticleBatch`**（程序化粒子集：`add`/`trackAll`/`trackEach`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）、
 >   `ParticleGroup.followEntity(..., local)`（组级跟随可选随朝向）、`ParticleHandle.position()/applyForce()/attachTo()` 等（1.0.8 起）。`.pdrawc` 动画特效在 PrimalSpells 侧的接线仍未落地。
-> - 1.0.10-ALPHA 相对 1.0.9 的 API 增量：批量运动指令 **`ParticleBatch.setVelocityAll(速度列表)` / `applyForceAll(加速列表, ticks = 1)`**
+> - 1.0.11-ALPHA 相对 1.0.9 的 API 增量：批量运动指令 **`ParticleBatch.setVelocityAll(速度列表)` / `applyForceAll(加速列表, ticks = 1)`**
 >   （各列表与 `handles()` 顺序一一对应，一包覆盖全组，逐玩家按可见性裁剪；`ParticleManager` 同名的 id 列表版本），
 >   以及修正「`setVelocity`/`applyForce` 未解除实体锚点」（现在与 `move`/`track` 一致：运动指令接管位置）。
 >   **第 12 轮已接入**：黑洞改用 `setVelocityAll`（速度每 tick 重算、位置积分交回 PD，删掉了自持的「粒子 id → 速度」表）。
@@ -151,7 +151,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 状态：**播放器侧 API 轮子已实现**（`particledrawing` 仓库，§5 全部落地并通过 `gradlew build` + 单测）。
 > 魔法模组端（`primalspells`）动画/特效接线**后续再做**。
 > 涉及仓库：
-> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.10-ALPHA）
+> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.11-ALPHA）
 > - 魔法模组：`D:\Backup\IDEA Projects\PrimalSpells`（`primalspells`，MC 26.2 / NeoForge 26.2.0.59 / Java 25）
 
 ---

@@ -158,6 +158,17 @@
 
 ---
 
+## 第 13 轮（2026-09-30，护盾球壳「掉到脚下」/ PD 1.0.11 轴心语义）
+
+| 编号 | 事项 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 13.1 | 前置升级到 **1.0.11-ALPHA**（PD `3007b22`：把「组轴心是程序级状态、调用顺序即语义」写进 KDoc 与 `api-guide.md`，并删掉指令里从未被消费的 `PivotRef` 字段）—— 这正是第 12 轮提出、登记在 `pd-api-requests.md` 的那条文档需求 | `lib/` 换 jar（`particledrawing-1.0.11-ALPHA.jar` + `-sources.jar`）、`gradle.properties` 的版本与区间 → `[1.0.11-ALPHA,)`；构建 + 服务端冒烟通过（`Done (0.262s)`）；文档里的版本引用同步 | `lib/`、`gradle.properties`、`docs/build-and-run.md`、`docs/README.md`、`docs/design/effects-api.md`、`docs/architecture.md`、`docs/conventions.md` |
+| 13.2 | **实机 bug（本模组）：护盾球壳出现时位置正确，之后「跳」到脚下的错误位置** | 根因是**组轴心与成员相对偏移的账算错了**：客户端的 `rel` 是按「成员 spawn 位置 − arm 时下发的组 `pivot` 字段」重算的（`ClientAnimationProgramManager.arm`），而 `followEntity(uuid, offset)` 会**顺手把组 `pivot` 字段加上这个 offset**（`pivot = offset.add(pivot)`）。原写法「先 `Draw.sphere(球心)` 再 `followEntity(身体中段)`」于是让 `pivot` 变成「球心 + 身体中段」，`rel` 少算了一整个身体中段（−0.99 格）→ arm 后整壳正好掉回脚下（arm 前渲染的是 spawn 位置，所以「开始是对的」）。修法：**先 `createGroup(脚底)` → `followEntity(uuid, 身体中段)` 绑定轴心 → 再让 `Draw.sphere` 的 `center` 等于绑定后的轴心**（= 球心）铺成员，这样 `rel = 球面偏移`、每 tick 轴心 = 球心、`spin` 才是原地转 | `magic/modifier/EnergyShield.kt` |
+| 13.3 | 上述 bug 的**离线验证**（客户端看不到，只能按 PD 源码语义算账） | 按 6 条源码事实（`followEntity` 改 pivot 字段 / `flush` 用当前字段当 `initialPivot` / `arm` 用 `spawn − initialPivot` 算 rel / `resolvePivot` = 实体位置 + offset / `PivotFrame.apply` = pivot + rel / `spin` 旋转 rel）复算三种写法：**修前**球壳中心落在脚底（+0.000，期望 +0.990）且球心相对轴心 0.990 → 自转还会绕轴心画圈；**修后** +0.990 且球心相对轴心 0.011 ≈ 0（自转原地转）。对照写法「轴心留脚底、偏移塞进粒子」位置对但自转画圈（0.990），说明偏移必须落在**轴心**上而不是粒子上 | `build/verify/shield-pivot-accounting.txt`（一次性脚本，未入库）；结论已写进 `EnergyShield.kt` 的 KDoc |
+| 13.4 | 易踩点固化 | PD 的 KDoc 已写明「轴心是程序级状态、顺序即语义」，本模组在 `EnergyShield.updateShieldVisual` 的 KDoc 与 [design/effects-api.md](../design/effects-api.md) §0.3 里补上**本项目的正确顺序**（先绑轴心再铺成员），并在 [verify.md](verify.md) 第 20 项写成实机检查点 | `magic/modifier/EnergyShield.kt`、`docs/design/effects-api.md`、`docs/issues/verify.md` |
+
+---
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：
@@ -253,3 +264,16 @@
   `removeIf` 读 PD 的权威位置判定（判定精度不变）。轨迹已在接入前用 500 随机样本复算过（第 11 轮）。
 - 落点：`magic/effect/lifecycle/BlackHole.kt`
 
+
+#### [需求 ✓已加] 写明 `ParticleGroup` 各变换指令用「哪个轴心」（文档级）
+
+- 当初的困难：护盾要「跟随持有者 + 持续自转」，但 `spin` 的 KDoc 只说「无限匀速旋转」，
+  **没说绕哪个轴心**、也没说和 `followEntity` 的调用顺序有没有约束；指令载荷里那个
+  `PivotRef`（客户端根本不读）反而容易让人以为可以逐指令指定轴心。只能靠读客户端源码才敢接线。
+- PD 侧落地（`3007b22`，1.0.11-ALPHA）：`ParticleGroup` 类注释 + `setPivot`/`followEntity`/`rotate`/`spin`
+  的 KDoc 都写明「轴心是**程序级状态**、绑定一次对其后的 `rotate`/`spin`/`scale`/`pulse` 生效、
+  **调用顺序即语义**」，`api-guide.md` 也加了「轴心：组级变换都绕它算（调用顺序即语义）」一节；
+  同时**删掉了指令里从未被消费的 `PivotRef`**（`RotateOnce`/`Spin`）。
+- 本侧价值：第 13 轮正是靠这条文档把护盾「出现时对、之后掉到脚下」的轴心偏移账算清楚的
+  （`rel` 按「成员 spawn 位置 − arm 时的 pivot 字段」重算，而 `followEntity(offset)` 会顺手改那个字段）。
+- 落点：`magic/modifier/EnergyShield.kt`（第 13 轮修复），见 [第 13 轮](#第-13-轮2026-09-30护盾球壳掉到脚下--pd-1011-轴心语义)

@@ -300,7 +300,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 9. 与 ParticleDrawing 的接口现状
 
-- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.10-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.11-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 集合类粒子（球壳、被吸入粒子、下落粒子、护盾球壳）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
@@ -310,6 +310,10 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   `.spin(轴, 弧度/tick)` 让它**持续自转**；这两件事都在**客户端本地求值**，服务端只在建立时下发一次，
   之后 **0 包/tick**。⚠️ 轴心偏移的基准是脚底 `Entity.position()`，所以偏移里必须含「身体中段（身高 55%）」，
   且**只能加一次**（球心坐标与轴心偏移两处都加就高了 ≈1 格 → 新粒子「从上方滑入」，见第 8 轮）；
+  ⚠️ **调用顺序是硬要求**：必须**先** `createGroup(脚底)` + `followEntity(uuid, 身体中段)` 绑定轴心，
+  **再**让 `Draw.sphere` 的 `center` 等于绑定后的轴心（= 球心）铺成员 —— 客户端的相对偏移是按
+  「成员 spawn 位置 − arm 时的组 `pivot` 字段」重算的，而 `followEntity(offset)` 会顺手改那个字段，
+  顺序反了就会差一整个身体中段（实机：出现时对、arm 后掉到脚下，见 `issues/resolved.md` 第 13 轮）；
   **不做周期重建**（重建必带滑入动画）；法杖不再被持有 **4 tick** 后由 `Magic.onPassiveIdle` 清除
   （这段时长是留给「消失动画」的窗口，组 API 现成：`.fadeOut(ticks, removeAfter)`，尚未接）。
 - 已接线（四种用法，均对应 PD 的低带宽写法）：
@@ -328,11 +332,11 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   `ParticleGroup.fadeOut/destroyAfter`（护盾的消失动画窗口已留好）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份；
-  1.0.10-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。
+  1.0.11-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。
 - 历史 problem 记录：未决需求见 [issues/pd-api-requests.md](issues/pd-api-requests.md)，已闭环条目见 [issues/resolved.md](issues/resolved.md) 附录 B
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
-- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.10-ALPHA**），本模组的
-  `particledrawing_version_range=[1.0.10-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
+- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.11-ALPHA**），本模组的
+  `particledrawing_version_range=[1.0.11-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
   `attachTo`/`trackAll`，或 §7.3 的 `ParticleBatch`/三入口锚点，或 1.0.10 的 `setVelocityAll`/`applyForceAll`）
   会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：

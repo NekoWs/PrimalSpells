@@ -9,15 +9,16 @@ import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.network.PacketDistributor
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
-import work.nekow.particledrawing.api.ParticleBatch
-import work.nekow.particledrawing.api.ParticleManager
+import work.nekow.particledrawing.api.ColorSource
+import work.nekow.particledrawing.api.Draw
+import work.nekow.particledrawing.api.ParticleGroup
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
-import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.pdParticles
-import work.nekow.primalspells.util.spawnParticle
+import java.util.UUID
+import kotlin.math.PI
 import kotlin.math.min
 
 /**
@@ -57,14 +58,19 @@ class EnergyShield : Modifier() {
     /** 破盾暂停剩余 tick */
     var pauseTicks: Int = 0
 
-    /** 护盾球壳粒子集（ParticleDrawing）：以持有者为锚点的淡蓝色球壳，见 [updateShieldVisual]。 */
-    private var shell: ParticleBatch? = null
+    /**
+     * 护盾球壳粒子组（ParticleDrawing）：跟随持有者 + 持续自转的淡蓝色球壳，见 [updateShieldVisual]。
+     *
+     * 用 `ParticleGroup`（**编排式动画**）而不是 `ParticleBatch`：球壳成员固定、变换是整组统一的
+     * 「跟随 + 自转」，而这两件事在组里都由**客户端本地求值**（每 tick 零网络包），服务端只在建立时下发一次。
+     */
+    private var shell: ParticleGroup? = null
 
-    /** [shell] 建立时所用的粒子管理器：跨维度会换实例，换了就重建球壳（见 [shieldShell]）。 */
-    private var shellManager: ParticleManager? = null
+    /** [shell] 建立时所在的维度：跨维度后旧粒子组留在旧维度，需要重建（见 [updateShieldVisual]）。 */
+    private var shellLevel: ServerLevel? = null
 
-    /** 球壳粒子的球面偏移（首次生成时用 Fibonacci 球算一次，之后固定 —— 球壳静态，只跟随持有者平移）。 */
-    private var shellOffsets: List<Vec3> = emptyList()
+    /** [shell] 建立时锚定的实体：换实体（重生等）后 uuid 对不上，同样重建。 */
+    private var shellHolder: UUID? = null
 
     /** 「未被持有」持续的 tick 数：达到 [SHELL_LINGER_TICKS] 就清掉球壳（见 [onPassiveIdle]）。 */
     private var idleTicks = 0
@@ -185,69 +191,62 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * 护盾视觉（ParticleDrawing）：以持有者为锚点的**淡蓝色球壳**（刚性平移，零逐 tick 包）。
+     * 护盾视觉（ParticleDrawing）：以持有者为**轴心**的淡蓝色球壳 —— 跟随 + 自转，均**零逐 tick 包**。
      *
      * 实现要点：
-     * - 球壳用 PD 的 `attachTo(实体, 世界空间偏移)` 钉在持有者身上：**服务端只在挂载时下发一次**，
-     *   之后由客户端每 tick 本地解析实体位置 —— 每 tick 零包，而且天然刚性（不受位置插值影响）；
-     * - ⚠️ **挂载偏移必须包含「身体中段」那一段**：`attachTo` 的偏移是相对 `entity.position()`（脚底）的，
-     *   只给球面偏移会让球壳整个贴在脚上（实机表现为「球在玩家下方、粒子像在往下掉」）；
-     * - 球面用 [ParticleShapes.fibonacciSphere]**均匀**取点（不是随机采样），所以看起来是一个均匀球壳；
-     * - 粒子**永存**（`lifetime = -1`）、[ParticleBatch.ensureSize] 只在缺数量时补齐：
-     *   **不做周期重建** —— 重建（销毁+新建）会让新粒子从生成位置滑到挂载位置，
-     *   实机表现就是「粒子每隔一会儿瞬移一下 / 从上方落下」。清理走 [onPassiveIdle] 的显式倒计时；
-     * - **不自转**：挂载偏移固定。想做自转要改成「每 tick 用一次 `ParticleBatch.trackAll`
-     *   下发旋转后的偏移」（1 包/tick），不要退回逐粒子 `track`；
-     * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建。
+     * - 用 `Draw.sphere(...)` 一次性铺出**均匀球壳**（黄金角螺旋取点，即 Fibonacci 球），返回一个
+     *   `ParticleGroup`；成员固定、粒子永存（`lifetime = -1`），**不做周期重建**
+     *   —— 重建（销毁+新建）会让新粒子从生成位置滑到轴心，实机表现就是「粒子每隔一会儿瞬移一下 / 从上方落下」；
+     * - `.followEntity(uuid, offset)` 把轴心交给客户端本地解析（每 tick 读实体位置）→ **0 包/tick 且天然刚性**；
+     * - `.spin(axis, radiansPerTick)` 是**组级编排**：客户端本地求值累加旋转角 → 同样 **0 包/tick**
+     *   （旧写法「每 tick `trackAll` 下发旋转后的偏移」是 1 包/tick，且位置指令会解除实体锚点）；
+     * - ⚠️ **轴心偏移必须包含「身体中段」那一段**：`followEntity` 的偏移基准是实体脚底（`Entity.position()`），
+     *   只给球面偏移会让球壳贴在脚上（实机表现为「球在玩家下方、粒子像在往下掉」）；
+     *   反过来说，**这一段只能加一次**（球心坐标 + 轴心偏移两处都加就高了 ≈1 格，新粒子会「从上方滑入」，见第 8 轮）；
+     * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建；放下法杖的延迟清理见 [onPassiveIdle]。
      */
     private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
-        if (shellOffsets.isEmpty()) {
-            // Fibonacci 球：点间距近似相等（均匀球壳），且结果确定、便于复现问题
-            shellOffsets = ParticleShapes.fibonacciSphere(SHELL_PARTICLES)
-                .map { it.scale(SHELL_RADIUS) }
-        }
-        val manager = wand.pdParticles(level)
-        val bodyOffset = shellCenterOffset(holder)
-        shieldShell(manager).ensureSize(SHELL_PARTICLES) { index ->
-            // ⚠️ 生成位置 = entity.position()（脚底）+ 偏移，必须与 attachTo 的坐标系一致：
-            // 多算一段就会出现「新粒子从上方滑入」的动画（见 §6 第 8 轮）
-            val offset = shellOffsets[index % shellOffsets.size].add(0.0, bodyOffset, 0.0)
-            manager.spawnParticle(holder.position().add(offset), SHELL_COLOR, SHELL_SCALE)
-                ?.attachTo(holder, offset)
-        }
-    }
+        // 已建立且维度/实体都没变：跟随与自转都在客户端本地推进，这里不需要再做任何事
+        if (shell != null && shellLevel === level && shellHolder == holder.uuid) return
+        clearShieldVisual() // 跨维度 / 换实体：先销毁旧的，避免球壳留在旧维度或挂在已消失的实体上
 
-    /**
-     * 取本护盾的球壳粒子集（同一管理器时复用）。
-     *
-     * [ParticleBatch] 在**构造时**绑定粒子管理器，而 `wand.pdParticles(level)` 在跨维度时会换成新维度的
-     * 实例（`util/PdParticles.kt` 的约定）—— 直接缓存粒子集会让球壳留在旧维度，所以这里按管理器缓存、
-     * 换了就先把旧球壳销毁再重建。护盾只用「成员增删 + 锚定」，不用位置批量下发（球壳零逐 tick 包）。
-     */
-    private fun shieldShell(manager: ParticleManager): ParticleBatch {
-        val cached = shell
-        if (cached != null && shellManager === manager) return cached
-        cached?.clear()
-        return ParticleBatch(manager).also { shell = it; shellManager = manager }
+        val bodyOffset = shellCenterOffset(holder)
+        // 球心 = 脚底 + 身体中段；粒子按「相对球心的球面偏移」登记，所以 spin 会绕球心转
+        shell = Draw.sphere(
+            wand.pdParticles(level),
+            holder.position().add(0.0, bodyOffset, 0.0),
+            SHELL_RADIUS,
+            SHELL_PARTICLES,
+            ColorSource.of(SHELL_COLOR),
+            SHELL_SCALE,
+        )
+            // 轴心跟随持有者（偏移基准是脚底 → 补上身体中段，球心才落在身体中间）
+            .followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
+            // 持续自转：无限循环、客户端本地求值
+            .spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+        shellLevel = level
+        shellHolder = holder.uuid
     }
 
     /**
      * 被动「未被持有」时的每 tick 回调（由 `Wand.tick` 的闲置分支驱动）。
      *
-     * 放下法杖后**保留 [SHELL_LINGER_TICKS] tick** 再清除球壳 —— 这段时间是留给后续
-     * 「消失动画」的窗口（现在只是延迟销毁，看不出淡出）。重新握杖时 [onInventoryTick]
-     * 会把倒计时归零。
+     * 放下法杖后**保留 [SHELL_LINGER_TICKS] tick** 再清除球壳 —— 这段窗口就是给「消失动画」留的，
+     * 组 API 现成可用：`.fadeOut(ticks, removeAfter)` / `.destroyAfter(ticks)`（还没接）。重新握杖时
+     * [onInventoryTick] 会把倒计时归零。
      */
     override fun onPassiveIdle() {
-        val batch = shell ?: return
-        if (batch.isEmpty()) return
+        if (shell == null) return
         idleTicks++
         if (idleTicks >= SHELL_LINGER_TICKS) clearShieldVisual()
     }
 
-    /** 破盾/失效：立即销毁球壳粒子。 */
+    /** 破盾/失效：立即销毁整个球壳粒子组（粒子一并销毁）。 */
     private fun clearShieldVisual() {
-        shell?.clear()
+        shell?.remove()
+        shell = null
+        shellLevel = null
+        shellHolder = null
         idleTicks = 0
     }
 
@@ -274,18 +273,35 @@ class EnergyShield : Modifier() {
 
         // ---- 球壳粒子（ParticleDrawing）参数 ----
 
-        /** 球壳粒子数：Fibonacci 均匀取点；`attachTo` 后无逐 tick 带宽，可以放心多一些 */
+        /** 球壳粒子数：`Draw.sphere` 用黄金角螺旋均匀取点（Fibonacci 球）；组级跟随/自转都是零逐 tick 包，可以放心多一些 */
         private const val SHELL_PARTICLES = 40
 
-        /** 球壳半径（方块）：`attachTo` 的偏移相对脚底，球心还要再加「身体中段」那一段 */
+        /** 球壳半径（方块）：`followEntity` 的偏移相对脚底，球心还要再加「身体中段」那一段 */
         private const val SHELL_RADIUS = 1.7
 
         /** 粒子尺寸 */
         private const val SHELL_SCALE = 0.4f
 
         /**
+         * 自转轴：略微倾斜（不是纯 Y 轴）。
+         *
+         * 纯 Y 轴下粒子只沿纬线滑动，倾斜一点会让它们走出大圆、更像「能量场在流动」。
+         * 想改成「只绕竖直轴转」就把这里换成 `Vec3(0.0, 1.0, 0.0)`。
+         */
+        private val SHELL_SPIN_AXIS: Vec3 = Vec3(0.25, 1.0, 0.12).normalize()
+
+        /**
+         * 自转速度（弧度/tick）：`PI / 60 ≈ 3°/tick`，约 **6 秒一圈**。
+         *
+         * 调大 = 转得更快（`PI / 30` 约 3 秒一圈）；调小 = 更慢。组级 spin 是客户端本地累加，
+         * 改这个值只影响观感，不增加带宽。
+         */
+        private const val SHELL_SPIN_RADIANS_PER_TICK = PI / 60.0
+
+        /**
          * 放下法杖后球壳保留的 tick 数（= [onPassiveIdle] 的倒计时阈值）。
-         * 目前只是延迟销毁；将来做「消失动画」时，这段时间就是动画窗口。
+         * 目前只是延迟销毁；将来做「消失动画」时，这段时间就是动画窗口
+         * （组 API 现成：`.fadeOut(ticks, removeAfter)`）。
          */
         private const val SHELL_LINGER_TICKS = 4
 

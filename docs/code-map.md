@@ -58,7 +58,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例）、被动钩子 `onInventoryTick`/`onPassiveIdle`、运行期状态钩子 `saveRuntimeState`/`loadRuntimeState` |
+| `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例）、被动钩子 `onInventoryTick`/`onPassiveIdle`/`onUnloaded`（取下时清理）、运行期状态钩子 `saveRuntimeState`/`loadRuntimeState` |
 | `core/EffectPhase.kt` | 效果执行阶段：`SETUP` / `MODIFIER` / `MOTION` / `OVERRIDE` / `VISUAL` |
 | `core/MagicStatus.kt` | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 |
 | `core/MagicManager.kt` | 36 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |

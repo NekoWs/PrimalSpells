@@ -86,6 +86,7 @@ class IceShard : Projectile() {
 | `onDie()` | 死亡（`alive=false` 后的下一 tick） | 清理、结算 |
 | `onInventoryTick()` | 仅 `needInventory = true` 且法杖在主/副手时，每 tick | 被动法术（见 §5） |
 | `onPassiveIdle()` | 仅 `needInventory = true` 且法杖**这一 tick 没被持有**时，每 tick | 放下后的延迟清理/淡出（见 §5） |
+| `onUnloaded()` | 法术被**从法杖上取下**（或槽位被替换）时一次；法杖内存实例被回收时也调 | 清理「只该在装载期间存在」的资源（粒子组等）—— 之后本实例不会再有任何 tick |
 | `initLore()` | 物品 tooltip 生成时 | 追加词条；**记得先 `super.initLore()`** |
 | `clone()` | 复制到牌堆/子弹时 | 默认 `MagicManager.create(id)!!`（见 §7 坑 2） |
 
@@ -291,6 +292,12 @@ class MyPassive : Modifier() {
         // 适合「放下后延迟清理」：先保留几 tick 再销毁，为消失动画留窗口
         if (++idleTicks >= 4) { /* 清理表现/资源 */ }
     }
+
+    override fun onUnloaded() {
+        // 被从法杖上取下：本实例之后**不会再有任何 tick**，
+        // 只该在装载期间存在的资源必须在这里销毁（否则粒子会永远留在世界里）
+        clearVisual()
+    }
 }
 ```
 
@@ -300,6 +307,8 @@ class MyPassive : Modifier() {
 - `onPassiveIdle()` 由 `Wand.tick(level = …)` 的**闲置分支**逐 tick 驱动（`WandManager.tick(level)` → 所有已加载法杖），
   在「法杖没被持有」时持续触发；**不要**假设它只触发一次，清理逻辑要幂等。
 - 法力/冷却维护由 `WandManager.tick()`（`caster == null`）负责，被动分支**不要**再做这些事。
+- **取下即静默**：法术被取下后不再进入 `loadedMagics`，因此 [onInventoryTick]/[onPassiveIdle] 都不会再触发 ——
+  需要收尾的东西必须走 `onUnloaded()`（`Wand.load()`/`Wand.unload()` 会调），不能指望「下一次 tick 自己发现」。
 - 运行期状态要持久化就覆写 `saveRuntimeState`/`loadRuntimeState`（见 `EnergyShield` 的耐久），
   不要再往 `Wand.saveTag()` 里塞专用字段。
 

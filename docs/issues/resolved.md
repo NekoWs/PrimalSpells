@@ -169,6 +169,16 @@
 
 ---
 
+## 第 14 轮（2026-09-30，护盾：取下泄漏 / 多张卡只出一层球壳）
+
+| 编号 | 事项 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 14.1 | **实机 bug：护盾生效期间把护盾法术从法杖里取出 → 球壳粒子一直留着**（顺带确认：效果本身已经停了） | 根因：法术被取下后 `Wand.load()` 重建 `loadedMagics`，该实例**不再有任何 tick**（`onInventoryTick`/`onPassiveIdle` 都不会跑），而球壳是 `lifetime = -1` 的永存粒子组 → 没人销毁它。**效果**本身不会残留（弹开逻辑只在该实例的 `onInventoryTick` 里，已不再执行），残留的只有表现。修法：新增生命周期钩子 `Magic.onUnloaded()` —— 由 `Wand.load()` 对「本次重建后不再装载」的实例调用，另由 `Wand.unload()`（法杖内存实例被回收，`WandManager.recycleUnheld`）调用；`EnergyShield` 在钩子里 `clearShieldVisual()` | `magic/core/Magic.kt`、`wand/Wand.kt`、`wand/WandManager.kt`、`magic/modifier/EnergyShield.kt` |
+| 14.2 | **多张护盾卡的球壳互相叠加**（不好看），且各自独立结算 | 改为「**一层球壳 + 一个耐久池**」：容量 = 每张 `maxDurability` × 卡数；由 `loadedMagics` 里的**第一张卡**（主卡）负责球壳/弹开/HUD，其余卡每 tick 把主卡的 `durability`/`pauseTicks`/`durabilityLoaded` 镜像过来后直接返回。镜像的目的是让「同一法术 id 只有一份存档状态」（`Wand.magicStates` 按 id 存、保存时同 id 互相覆盖）在**任何一张卡上写都一致**。主卡被取下后下一张自动接任（下一 tick 铺出自己的球壳，旧的由 14.1 的钩子先清掉）。容量变大**不白送耐久**（池子原样保留、只在超过新容量时钳下去），避免「反复拔插第二张卡刷满耐久」 | `magic/modifier/EnergyShield.kt` |
+| 14.3 | 耐久读档的钳制口径 | `loadRuntimeState` 不能再用「钳到单卡上限」（那时拿不到 `wand`、算不出卡数）：改为只保证非负 + 记录「是否读到过耐久」（`durabilityLoaded`）；**首次结算**（旧档/新装）按当前容量补满，之后每 tick 按 `shieldCapacity()` 钳制。HUD 的 `maxDurability` 字段改为传**本杖容量**（HUD 本就按 `durability / maxDurability` 画条） | `magic/modifier/EnergyShield.kt` |
+
+---
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

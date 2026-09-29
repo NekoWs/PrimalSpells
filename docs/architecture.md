@@ -54,6 +54,10 @@
 - `onPassiveIdle()`：法杖**这一 tick 没有被任何实体驱动**时，由 `Wand.tick(level = …)` 的闲置分支逐 tick 驱动一次
   —— 用于「放下后延迟清理 / 播淡出动画」这类收尾（`EnergyShield` 用它做球壳的 4 tick 延迟销毁）。
   判断依据是 `lastPassiveTick` 落后当前 `gameTime` 超过 1 tick（闲置分支跑在 `ServerTickEvent.Pre`，早于实体 tick）。
+- `onUnloaded()`：法术**被从法杖上取下**（或槽位被替换）时调用一次 —— 由 `Wand.load()` 对「本次重建后不再装载」的实例触发，
+  也由 `Wand.unload()`（法杖内存实例被回收）触发。用于清理「只该在装载期间存在」的东西：
+  取下之后该实例**不再有任何 tick**（`onInventoryTick`/`onPassiveIdle` 都不会再跑），
+  不在这里清理就会把永存粒子组之类的资源永远留在世界里（`EnergyShield` 的球壳就是例子）。
 - `clone()`：**从注册表新建一枚「本次施法实例」**，不是字段拷贝——修饰器会把效果注入实例自身的 `effects`，复用实例会让效果累积；`id` 未注册时直接抛 `IllegalStateException`（而不是 `!!` 的 NPE）。
 
 ### 2.2 `Projectile`（`magic/projectile/Projectile.kt`）

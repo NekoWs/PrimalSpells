@@ -122,7 +122,7 @@ magic/modifier  ──→ magic/core, magic/effect
 - 代码注释与 KDoc 用**中文**；标识符、命令、资源键保留英文。
 - 对外可见的类与公开函数必须写 KDoc，说明：它是什么、被谁调用、参数含义、服务端/客户端归属。
 - 非显然的算法（如碰撞面法线求解、partialTick 插值、牌堆抽牌预算）必须写「为什么这么做」，而不是复述代码。
-- `// TODO` / `// FIXME` 必须写清「卡在哪里、下一步做什么」，并在 [known-issues.md](known-issues.md) 里登记。
+- `// TODO` / `// FIXME` 必须写清「卡在哪里、下一步做什么」，并在 [issues/open.md](issues/open.md) 里登记。
 
 ---
 
@@ -215,7 +215,7 @@ magic/modifier  ──→ magic/core, magic/effect
 - 先**停止**该接入点的尝试（不要猜签名反复试、不要反射绕过、不要改 `lib/` 下的 jar、
   不要把它的逻辑复制/内联到本仓库、不要用别的机制伪装实现同一 API 语义）。
 - 然后在本次产出末尾列出**「ParticleDrawing API 修改需求」清单**，并登记到
-  [known-issues.md](known-issues.md#7-particledrawing-api-需求待对方实现)（永久落盘，不能只写在聊天里）。
+  [issues/pd-api-requests.md](issues/pd-api-requests.md)（永久落盘，不能只写在聊天里）。
   **出现时机**：**仅当本次功能要求涉及 ParticleDrawing API 时**（特效接线、升级导致 API 变化、需求要求用它的能力）；
   纯配置/版本号/其它系统的改动**不要**附该清单，避免噪音。
   每条形如：需求标题 / 目标能力 / 现有 API 为什么不够（类 + 方法 + 编译错误或运行现象）/ 期望签名草案 /
@@ -249,7 +249,7 @@ magic/modifier  ──→ magic/core, magic/effect
 - `<简短描述>` **只说明大概干了什么**：不列具体改动内容、不点文件名/类名、不写实现细节、
   不写"为什么"；**一句、尽量 ≤ 20 字**，结尾不加句号。
 - 不使用 body/列表罗列改动 —— 细节由 `diff` 与 `docs/` 承载；需要背景说明的决策写进
-  [known-issues.md](known-issues.md) 或对应文档，而不是塞进提交信息。
+  [issues/open.md](issues/open.md) 或对应文档，而不是塞进提交信息。
 - 破坏性变更不需要额外标记（本项目允许不兼容旧版），但应在 `docs/` 里留痕。
 
 示例：

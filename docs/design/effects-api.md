@@ -23,7 +23,7 @@ ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍�
 HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > 区分清楚：「**不得自行另写一套实现**」这条红线**始终有效**（只要工作碰了 PD API）；
-> 有时机限制的只是「产出末尾的清单」与「登记到 known-issues §7」。
+> 有时机限制的只是「产出末尾的清单」与「登记到 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)」。
 
 ### 0.2 职责边界判定准则（什么属于 PD、什么属于本模组）
 
@@ -33,7 +33,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 **⚠️ 结论：`ParticleGroup` 与「程序化粒子流」不是同一种抽象。**
 `ParticleGroup` 面向**编排式动画**（成员基本固定、组级统一变换、指令流一次下发、客户端本地求值 —— 适合 `.pdrawc` 那类"播放"），
 而本模组要的是**程序化粒子流**（成员逐 tick 增删、每粒子独立速度/轨迹/寿命、按位置条件回收）。
-差异与由此产生的 PD 侧需求见 [../known-issues.md](../known-issues.md) §7.3 —— 其中第 1 条已由 PD 以 **`ParticleBatch`** 落地（1.0.9-ALPHA），本模组已迁移完毕。
+差异与由此产生的 PD 侧需求见 [../issues/README.md](../issues/pd-api-requests.md) —— 其中第 1 条已由 PD 以 **`ParticleBatch`** 落地（1.0.9-ALPHA），本模组已迁移完毕。
 
 | 维度 | `ParticleGroup`（PD，编排式动画） | `ParticleBatch`（PD，程序化粒子集） | 这套用在哪 |
 |---|---|---|---|
@@ -55,7 +55,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 ⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleBatch`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
 再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组/集 API** ——
 本项目就踩过：自研 `ParticleSwarm` 的锚定模式本可用 `attachTo` 直接表达，结果多写了整套簿记，
-并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（见 [../known-issues.md](../known-issues.md) §6 第 5–8 轮）。
+并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（见 [../issues/README.md](../issues/resolved.md)）。
 
 ### 0.3 现有接线范式（2026-09-30 更新，接线前先看这张表）
 
@@ -66,7 +66,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleManager.trackAll(ids, positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）、`BlackHole`（批量） |
 | 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞吸力随距离变化） |
 | 锚在一个实体身上（形状刚性） | `handle.attachTo(entityId/uuid, 偏移)`（1.0.9 起身份统一）；整组跟随用 `ParticleGroup.followEntity(uuid, offset, local)` | **0** | `EnergyShield` 球壳 |
-| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll` 为 1 包/tick） | **已在用**（第 10 轮迁移完成）：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）、`EnergyShield`（球壳）。见 [../known-issues.md](../known-issues.md) §1.3 |
+| **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity`/`applyForce`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll` 为 1 包/tick） | **已在用**（第 10 轮迁移完成）：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）、`EnergyShield`（球壳）。见 [../issues/README.md](../issues/resolved.md) 第 10 轮 |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
 六条硬要点：
@@ -97,7 +97,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
      也是现状（如爆炸/黑洞/重力场的球体采样，统一走 `util/ParticleShapes.kt`）。
 2. **停止在该接入点继续试错**：不要为一个缺失/异常的 API 反复猜签名、反复重试；不要在 PrimalSpells 侧「造轮子填坑」。
 3. **在本次工作产出末尾列出「ParticleDrawing API 修改需求」清单**（**仅当本次功能要求涉及 ParticleDrawing API 时**，见上文「出现时机」），
-   并**同步登记到 [../known-issues.md](../known-issues.md#7-particledrawing-api-需求待对方实现)** 的固定章节
+   并**同步登记到 [../issues/README.md](../issues/pd-api-requests.md)** 的固定章节
    （永久落盘；只写在聊天/提交说明里不算数）。
 4. **每条需求必须写成可执行的形式**（缺任何一项都不算合格）：
 

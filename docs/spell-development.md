@@ -2,7 +2,7 @@
 
 > 目标：**照着本文就能新增/修改一个法术，并且知道每一步为什么必须做。**
 > 前置阅读：[architecture.md](architecture.md)（对象模型与流程）、[conventions.md](conventions.md)（包结构与命名）。
-> 相关：文件位置见 [code-map.md](code-map.md)，已知缺陷见 [known-issues.md](known-issues.md)。
+> 相关：文件位置见 [code-map.md](code-map.md)，已知缺陷见 [issues/README.md](issues/README.md)。
 
 ---
 
@@ -198,10 +198,10 @@ override fun onTick() {
 - **恒定 / 分段恒定的力** → `handle.applyForce(accel, ticks)`（两端同规则积分，只在施力时发一次）；
   ⚠️ 随距离变化的力表达不了，只能自算位置（见 `BlackHole` 的说明）；
 - **成员簿记一律用 PD 的 `ParticleBatch`**（`add`/`ensureSize`/`forEach`/`removeIf`/`clear`）——
-  别再自己存句柄表或寿命表（原 `ParticleSwarm` 已在第 10 轮删除，见 [known-issues.md](known-issues.md) §1.3）；
+  别再自己存句柄表或寿命表（原 `ParticleSwarm` 已在第 10 轮删除，见 [issues/resolved.md](issues/resolved.md) 第 10 轮）；
 - **生成**一颗粒子统一用 `ParticleManager.spawnParticle(pos, color, scale, lifetime, velocity?)`；
 - **管理器**统一用 `wand.pdParticles(level)` 获取（缺失/跨维度时兜底创建，未来的生物施法者也有粒子）；
-- 采样工具在 `util/ParticleShapes.kt`（球面/球内均匀取点、随机切向）；
+- 采样工具在 `util/ParticleShapes.kt`（`fibonacciSphere` 均匀球壳取点、随机单位方向/球内取点、随机切向）；
 - 参考实现：`BlackHole.kt`（`ensureSize` 铺球壳；切向初速 → 自己积分 → `trackAll` 批量写回 → 抵达中心销毁）、
   `GravityField.kt`（球壳 `ensureSize`；下落粒子一次 `setVelocity` + `removeIf` 判定回收）、
   `EnergyShield.kt`（`attachTo` 刚性球壳 + `ensureSize` 补齐、不做周期重建）。
@@ -268,7 +268,7 @@ class IceTrigger : Projectile(), TriggerSpell {
 - `triggerCast` 是**额外抽牌预算**，被抽到的牌同样按各自的 `cast` 增减预算。
 - `Trigger.onHit` 会用 `HitResult.normal` 作为 payload 投射物的初速方向；命中实体时该方向是**反弹方向**。
 - 释放前，payload 里的 `Modifier` 会被摘出并把效果转发给 payload 投射物（`Trigger` 与 `DelayedTrigger` 都这么做）。
-- **已知缺陷**：`Trigger.onHit` 不清空 payload，配合 `maxHitTargets > 1`/`Piercing` 会重复释放；且不会给 payload 投射物设置 `speed` 之外的状态（见 [known-issues.md](known-issues.md)）。
+- **已知缺陷**：`Trigger.onHit` 不清空 payload，配合 `maxHitTargets > 1`/`Piercing` 会重复释放；且不会给 payload 投射物设置 `speed` 之外的状态（见 [issues/README.md](issues/README.md)）。
 
 ---
 

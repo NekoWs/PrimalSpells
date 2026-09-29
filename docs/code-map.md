@@ -79,7 +79,7 @@
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
-| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**集合类粒子已全部改用 PD 的 `ParticleBatch`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [known-issues.md](known-issues.md) §1.3、[design/effects-api.md](design/effects-api.md) §0.3 |
+| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**集合类粒子已全部改用 PD 的 `ParticleBatch`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [issues/resolved.md](issues/resolved.md) 第 10 轮、[design/effects-api.md](design/effects-api.md) §0.3 |
 
 ### 法杖、物品、实体
 
@@ -110,7 +110,7 @@
 | `event/WandEventHandler.kt` | 公共侧：右键拦截（不与方块/实体交互但可施法）、登录补发同步、登出清理施法记录 |
 | `util/HitResult.kt` | 命中结果（`HitType`、`pos`、`normal`、`entity`） |
 | `util/Lore.kt` | 词条类型枚举（本地化 key）+ `LoreEntry` |
-| `util/ParticleShapes.kt` | 球体采样：Fibonacci 均匀球面取点、随机球面/球内取点、随机切向（原版粒子撒点 + PD 粒子共用） |
+| `util/ParticleShapes.kt` | 球体采样：Fibonacci 均匀球壳取点（`fibonacciSphere`）、随机单位方向/球内取点、随机切向；原版一次性撒点 `sphereVolume`（`Explosion` 用）。**无调用方的 `sphereSurface` 已于第 11 轮删除** |
 | `util/PdParticles.kt` | PD 接线入口：`Wand.pdParticles(level)`（取/兜底创建粒子管理器）、`ParticleManager.spawnParticle(...)`（生成一颗粒子）、`PD_IMMORTAL`（永存寿命 `-1`） |
 
 ### 客户端 `client/`

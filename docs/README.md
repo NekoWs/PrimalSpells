@@ -15,7 +15,11 @@
 | [code-map.md](code-map.md) | 逐包逐文件的代码导航 + 「我要改 X → 去哪个文件」 | 知道要改什么、但不知道文件在哪 |
 | [spell-development.md](spell-development.md) | 新增投射物 / 修饰器 / 特效 / 物品 / 资源 / 语言键的完整步骤与注册点 | 要添加或修改法术内容 |
 | [build-and-run.md](build-and-run.md) | 版本矩阵、依赖、Gradle 命令、运行目录、CI、常见故障 | 要构建、运行、排障 |
-| [known-issues.md](known-issues.md) | 已知缺陷、技术债、命名与职责可疑点、待验证项 | 踩坑前先查；修完问题后回填 |
+| [issues/README.md](issues/README.md) | **问题台账索引**：目录分工、严重度图例、维护规则 | 踩坑前先查；登记/关闭问题时对着规则来 |
+| ↳ [issues/open.md](issues/open.md) | **仍未解决**：待续开发的功能、性能与表现问题 | 修 bug 前先看有没有已知坑 |
+| ↳ [issues/verify.md](issues/verify.md) | **待实机验证清单**（编译过了但要进游戏确认手感） | 改完视觉/手感、或每次发版前 |
+| ↳ [issues/resolved.md](issues/resolved.md) | **已解决记录**（按轮次，含历史崩溃与 PD 已闭环条目） | 想知道「当初为什么这么改」 |
+| ↳ [issues/pd-api-requests.md](issues/pd-api-requests.md) | 要提给 ParticleDrawing 的 **API 需求**（未决）+ 能力边界 | 接粒子特效、升级前置模组 |
 | [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
 | [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
 
@@ -69,16 +73,16 @@ PrimalSpells/
 
 ## 5. 推荐的阅读 / 改动路径
 
-- **我要跑起来**：`./gradlew runClient` → 失败看 [build-and-run.md](build-and-run.md#6-常见故障) 与 [known-issues.md](known-issues.md)。
+- **我要跑起来**：`./gradlew runClient` → 失败看 [build-and-run.md](build-and-run.md#6-常见故障) 与 [issues/open.md](issues/open.md)。
 - **我要加一个法术**：先 [spell-development.md](spell-development.md)，再照抄同类实现（同类清单见 [code-map.md](code-map.md)）。
 - **我要理解施法全过程**：[architecture.md](architecture.md#3-一次施法的完整流程)。
-- **我遇到「法术没效果 / 不命中 / 不显示」**：[known-issues.md](known-issues.md) → 再看 [architecture.md](architecture.md) 对应链路。
+- **我遇到「法术没效果 / 不命中 / 不显示」**：[issues/open.md](issues/open.md) → 再看 [architecture.md](architecture.md) 对应链路。
 - **我要重命名或移动文件**：[conventions.md](conventions.md#1-包结构总览) 决定位置 → 改完必须 `./gradlew build`。
 
 ## 6. 文档维护规则
 
 1. **代码结构变化 → 同步本文档**：移动/新增/删除包或文件后，更新 [code-map.md](code-map.md) 与 [conventions.md](conventions.md#8-本次结构重构的旧--新对照迁移记录)。
-2. **新发现的问题 → 登记 [known-issues.md](known-issues.md)**，写清现象、复现、影响、涉及文件。
-3. **修好问题 → 从 [known-issues.md](known-issues.md) 移除**，必要时在对应文档补结论。
+2. **新发现的问题 → 登记 [issues/open.md](issues/open.md)**，写清现象、复现、影响、涉及文件。
+3. **修好问题 → 从 [issues/open.md](issues/open.md) 删掉**，把结论回填到 [issues/resolved.md](issues/resolved.md)（规则见 [issues/README.md](issues/README.md)）。
 4. **[AGENTS.md](../AGENTS.md) 只允许放「指针」**，不得复制本文档内容；内容变化只改 docs/。
 5. 文档与代码不一致时，**以代码为准**，并立刻修文档。

@@ -84,7 +84,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 1. **纯注入**：在 `init` 里 `effects += SomeEffect(...)`（如 `Homing` → `Tracking`、`MoreBounce` → `Bounce(8)`）；
 2. **匿名效果**：在 `init` 里 `effects += object : BaseEffect() { override fun onActive() { … } }`，直接改 `status`/`projectile` 的字段（如 `Diffusion` 放大爆炸半径、`Piercing` 改 `maxHitTargets`）。
 
-另有 4 个会**生成新投射物**（`ClusterBomb`、`ExplosionProjectile`、`BounceDuplicate`、`QuantumEntanglement`）——它们语义上更接近「法术」而非「修饰器」，但通过继承 `Modifier` 借用了手牌结算流程（见 [known-issues.md](known-issues.md)）。
+另有 4 个会**生成新投射物**（`ClusterBomb`、`ExplosionProjectile`、`BounceDuplicate`、`QuantumEntanglement`）——它们语义上更接近「法术」而非「修饰器」，但通过继承 `Modifier` 借用了手牌结算流程（结构债见 [issues/open.md](issues/open.md) 1.2）。
 
 ### 2.4 `BaseEffect` 与 14 个实现（`magic/effect/`）
 
@@ -101,7 +101,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 | `lifecycle/` | `Trigger` | `onHit` **一次性**释放 `TriggerSpell.payload`（释放后清空） |
 | | `DelayedTrigger` | `onDie` 沿施法方向一次性释放 payload（`DelayedCastProjectile` 用） |
 | | `Hurt` | 命中实体造成伤害（临时清零 `invulnerableTime`；伤害类型缺失时跳过而不是崩服） |
-| | `Explosion` | 自定义爆炸：音效 + 粒子 + 距离衰减伤害与击退（**不破坏方块**，见 [known-issues.md](known-issues.md) §1.3） |
+| | `Explosion` | 自定义爆炸：音效 + 粒子 + 距离衰减伤害与击退（**不破坏方块**，见 §8.1） |
 | | `AreaFieldEffect` | 区域场基类：**每 tick** 结算 —— 范围内刷新迟缓 + 按半径拉拽 + **对半径内投射物施力（黑洞口把法术吸进去、重力场往下压）**；实体离开范围立即撤销迟缓。视觉由子类用 PD 粒子实现（`spawnVisuals`/`updateVisuals`/`clearVisuals` 三个钩子） |
 | | `BlackHole` | 半径 5 引力场：迟缓 I + 把生物与**魔法投射物**拉向中心；PD 粒子每 tick 1 个（紫色、随机切向初速、**本模组积分位置**、吸力随距离增强 + 阻尼，抵达中心 0.1 格才销毁） |
 | | `GravityField` | 半径 5 重力场：迟缓 IV + 给**魔法投射物**向下的力；PD 粒子两层 —— 半径 5 的半透明球壳标识范围（96 个永存），以及上半球表面生成、竖直下落、碰到下半球表面即销毁的下落粒子 |
@@ -111,7 +111,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 **同类效果叠加**：统一用 `BaseEffect.stackScale`（√N）与 `isStackPrimary`（只有首个同类实例改写状态），
 `Tracking`/`Reciprocate`/`Serpentine`/`GradualAccelerate`/`GradualDecelerate` 都改用了这两个辅助属性。
 
-**球体粒子采样**统一走 `util/ParticleShapes`：原版粒子的球内/球面撒点（`sphereVolume` 现由 `Explosion` 使用；`sphereSurface` 目前已无调用方），以及 PD 粒子共用的**取点工具**（`fibonacciSphere` 均匀球壳、`randomUnitVector`、`randomTangent`——黑洞/重力场/护盾在用）。
+**球体采样**统一走 `util/ParticleShapes`：原版粒子的一次性撒点（`sphereVolume`，`Explosion` 在用），以及 PD 粒子共用的**取点工具**（`fibonacciSphere` 均匀球壳、`randomUnitVector`、`randomTangent`——黑洞/重力场/护盾在用）。已无调用方的 `sphereSurface` 在第 11 轮删除。
 
 ### 2.5 `MagicStatus`（`magic/core/MagicStatus.kt`）
 
@@ -279,6 +279,24 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 9. **公共侧不引用客户端类**：S→C 包一律经 `network/ClientPayloadSink` 转发（见 §6）。
 10. **粒子表现有两条路**：法术粒子走 `particledrawing`（`wand.status.particleManager`，服务端权威 + 客户端插值）——投射物本体/拖尾/黑洞与重力场的球壳与运动粒子/护盾球壳都在这一路（集合簿记用 PD 的 `ParticleBatch`，见 §9）；纯装饰性的一次性撒点走原版 `ServerLevel.sendParticles`（爆炸、无人机、传送、护盾弹开命中）。
 11. **区域场每 tick 结算、离开即解除**：`AreaFieldEffect` 每 tick 刷新迟缓并施加拉拽，实体离开范围（或效果结束）时**立刻**撤销迟缓，不留尾巴。
+12. **区域场的维度在首 tick 捕获**（`AreaFieldEffect.fieldLevel`）：不能每 tick 读 `caster.level()` —— 施法者跨维度后那是**新**维度，而场的坐标还在旧维度，会导致迟缓/投射物施力/粒子一起静默失效。
+
+### 8.1 已知的「不是 bug」的预期行为
+
+这些看起来像 bug，其实是刻意的设计（原 `issues/README.md` §3，现归到这里）：
+
+| 项 | 说明 | 位置 |
+|---|---|---|
+| 穿刺 = 伤害 −8，可能为负 → 不结算伤害 | 加减法，与顺序无关；「穿刺后打不出伤害」是定价的预期结果 | `magic/modifier/Piercing.kt` |
+| 爆炸**不破坏方块** | 预期行为（`explosionLevel` / `destroyBlocks` 死代码已删除） | `magic/effect/lifecycle/Explosion.kt` |
+| `Magic.recharge` / `Magic.delay` 是有效字段 | `Wand.castHand` 与 `loadPayload` 会读取它们累加冷却 | `magic/core/Magic.kt`、`wand/Wand.kt` |
+| 小包没有右键界面 | 编辑与法杖一致：滚轮选槽 + 物品对上物品装卸 | `item/SpellPouchItem.kt` |
+| 蛇形与往复运动可叠加 | 蛇形只施加方向**旋转增量**，不再覆写方向 | `magic/modifier/Serpentine.kt` |
+| 区域场**会影响魔法投射物** | 黑洞把范围内投射物吸向中心、重力场给投射物持续的向下力；**区域弹自身除外**（否则会被自己往下压/吸住）。这是刻意的：黑洞就该「把飞进来的法术吸掉」 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
+| 区域/本体粒子的「位置」在本模组算 | 三种写法：`attachTo` 锚定（0 包/tick）/ 一次 `trackAll` 批量写位置（1 包/tick）/ 一次 `setVelocity` 交给 PD 积分（0 包/tick）；**成员簿记归 PD 的 `ParticleBatch`**，本模组只算数值。见 §9 | `magic/effect/lifecycle/{BlackHole,GravityField}.kt`、`magic/modifier/EnergyShield.kt`、`util/PdParticles.kt` |
+| PD 粒子管理器由 `wand.pdParticles(level)` 兜底创建 | 管理器原本只在「持有者背包物品被 tick」时建立；未来的生物施法者不走 `inventoryTick`，不兜底就会出现「有伤害没粒子」 | `util/PdParticles.kt` |
+
+（第 1、7 两条与上面 5./7./8./10./11. 有重叠，不重复列出。）
 
 ## 9. 与 ParticleDrawing 的接口现状
 
@@ -286,7 +304,12 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 - 集合类粒子（球壳、被吸入粒子、下落粒子、护盾球壳）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
-  [known-issues.md](known-issues.md) §1.3 与 [design/effects-api.md](design/effects-api.md) §0.3。
+  [issues/resolved.md](issues/resolved.md) 第 10 轮与 [design/effects-api.md](design/effects-api.md) §0.3。
+- **护盾球壳**（`EnergyShield`）现状：40 个淡蓝粒子按 Fibonacci 球铺在半径 1.7 的球面上，
+  **锚定在持有者身体中段**（`attachTo` 的偏移基准是脚底 `Entity.position()`，所以球面偏移之外还要加身高 55% ——
+  少加会让球壳贴在脚上，多加会让新粒子「从上方滑入」）；粒子**永存、不做周期重建**
+  （重建必带滑入动画），只在数量不足时 `ensureSize` 补齐；法杖不再被持有 **4 tick** 后由
+  `Magic.onPassiveIdle` 清除（这段时长是留给未来「消失动画」的窗口）。
 - 已接线（三种用法，均对应 PD 的低带宽写法）：
   1. **锚定**：`attachTo(实体, 世界空间偏移)`——护盾球壳，服务端只在挂载时发一次，客户端本地解析实体位置，
      **0 包/tick** 且天然刚性；
@@ -297,11 +320,11 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 - 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
   生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
 - 未使用：`applyForce(accel, ticks)`（黑洞吸力随距离变化，用 `trackAll` 更省也更可控；`applyForce` 只能表达
-  一次下发的恒定加速度，见 [known-issues.md](known-issues.md) §7.3 第 4 条）、
+  一次下发的恒定加速度，见 [issues/pd-api-requests.md](issues/pd-api-requests.md) 第 1 条）、
   `attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份。
-- 历史 problem 记录：API 缺陷/需求清单与闭环情况见 [known-issues.md](known-issues.md) §7
+- 历史 problem 记录：未决需求见 [issues/pd-api-requests.md](issues/pd-api-requests.md)，已闭环条目见 [issues/resolved.md](issues/resolved.md) 附录 B
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
 - ✅ **依赖构建口径（已解决）**：PD 把 `mod_version` 提到 **1.0.9-ALPHA** 后，本模组的
   `particledrawing_version_range=[1.0.9-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/

@@ -25,31 +25,30 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 区分清楚：「**不得自行另写一套实现**」这条红线**始终有效**（只要工作碰了 PD API）；
 > 有时机限制的只是「产出末尾的清单」与「登记到 known-issues §7」。
 
-### 0.1 现有接线范式（2026-09 实测，接线前先看这张表）
+### 0.1 现有接线范式（2026-09-30 更新，接线前先看这张表）
 
-| 需求 | 用哪套 API | 本项目落点 |
-|---|---|---|
-| 粒子固定在一个点 | `create()…spawn()`（不加速度，生成后不动） | `GravityField` 的范围球壳 |
-| 粒子跟随一个非实体点 / 一点一点算好轨迹 | `create()…spawn()` + 每 tick `handle.track(pos)`（本项目封装为 `ParticleSwarm.spawnSimulated/tickSimulated`） | `BlackHole`（绕转吸向中心）、`GravityField`（下落）、`ProjectileBody`、`Trajectory` |
-| 粒子按「力」运动（交给引擎积分） | `create()…spawn()` + `handle.setVelocity(v)`（引擎每 tick `pos += v`） | **本项目已不用**：服务端暂停时会被客户端外推飘走（见下方第 5 条） |
-| 粒子锚在一个实体身上（护盾球壳） | `create()…spawn()`（给有限寿命）+ 每 tick `handle.track(锚点 + 偏移)`，`ParticleSwarm.tickAnchored`（错峰重建） | `EnergyShield` |
-| 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | **尚未接线** |
+| 需求 | 用哪套 API | 每 tick 带宽 | 本项目落点 |
+|---|---|---|---|
+| 粒子固定不动 | `create()…spawn()`（不设速度、不发位置指令） | 0 | `GravityField` 范围球壳 |
+| 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
+| 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleManager.trackAll(ids, positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）、`BlackHole`（批量） |
+| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞吸力随距离变化） |
+| 锚在一个实体身上（形状刚性） | `handle.attachTo(entityId, 世界空间偏移)`；偏移要随朝向旋转用 `attachToLocal` | **0** | `EnergyShield` 球壳 |
+| 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
-四条硬要点：
+六条硬要点：
 
-1. **位置由使用方算、或交给引擎推进，二选一并清楚代价**：
-   引擎对「有速度的粒子」每 tick 自行 `pos += velocity`（见 `ServerParticleEngine.tick`）；
-   但**服务端暂停时（单人按 Esc）客户端仍会按最后速度外推**——需要「暂停即定格」或精确轨迹时，
-   应改用「本模组积分 + `track` 写回」（`ParticleSwarm.spawnSimulated/tickSimulated`），见第 5 条。
-2. **`track` 与 `setVelocity` 不互斥但会叠加**：`track` 直设位置、velocity 仍每 tick 自增位置，
-   同一粒子**二选一**（位置驱动用 `track`，速度驱动用 `setVelocity`）。
-3. **每次 `setVelocity`/`track` 都会向可见玩家广播一次** → 「粒子数 × 更新频率」要有预算
-   （黑洞峰值约 60 粒子/tick，护盾 24 粒子/tick；相关 API 需求见 [../known-issues.md](../known-issues.md) §7）。
-4. **引擎有每维度粒子上限**：超限时 `spawn()` 返回 `null`，使用方必须能接受「丢粒子」而不是当成错误；
-   按「索引 → 偏移」配对锚定粒子会在此时整体错位（表现为瞬移）——`ParticleSwarm.tickAnchored` 已把偏移绑在句柄上。
-5. **暂停保真**：速度驱动粒子在服务端暂停期间会被客户端外推飘走（本项目实测），
-   位置驱动（`track`）则就地定格。相关 PD 需求见 §7 第 1 条。
-6. `ParticleHandle.data()` 返回的是 `core.server.ParticleData`（非 api 类型）——已在 §7 提出 API 需求。
+1. **能在客户端本地解析的就别逐 tick 发**：只要粒子位置是「实体 + 固定偏移」，用 `attachTo`
+   （**0 包/tick**、天然刚性）；需要逐 tick 变化的位置，再用 `trackAll` 批量下发。
+2. **位置指令与速度/力不要混用**：`move`/`track`/`trackAll` 会**停掉**该粒子上的速度与力
+   （PD 明确语义），所以同一粒子要么位置驱动、要么速度/力驱动。
+3. **多粒子优先用批量 API**：`trackAll` 1 包/tick ↔ 逐粒子 `track` N 包/tick。
+   本项目改造后：护盾 0 包、黑洞 1 包、重力场 0 包。
+4. **引擎有每维度粒子上限**：超限时 `spawn()` 返回 `null`，使用方必须能接受「丢粒子」而不是当成错误。
+5. **不要把「偏移」按列表索引配对**：一旦有个别 `spawn()` 被拒或粒子被重建，索引就会错位
+   （表现为瞬移/形状剪切 —— 本项目第 5 轮就是这么踩的坑）。偏移要**绑在句柄上**，或者干脆用 `attachTo`。
+6. **暂停语义已修，但仍建议按需选型**：PD 已修「服务端暂停时速度驱动粒子被客户端外推」；
+   黑洞仍用位置驱动，是因为吸力随距离变化、且「抵达中心才消失」需要位置完全可控，不是因为暂停问题。
 
 **硬性要求**：
 

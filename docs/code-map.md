@@ -79,7 +79,7 @@
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
-| `effect/visual/{ProjectileBody,Trajectory,ParticleSwarm}.kt` | 粒子表现（particledrawing）：本体、拖尾，以及粒子群工具（静止 / 运动「本模组积分 + `track`」/ 锚定 三种模式） |
+| `effect/visual/{ProjectileBody,Trajectory,ParticleSwarm}.kt` | 粒子表现（particledrawing）：本体、拖尾，以及粒子群工具（`attachTo` 锚定 0 包 / `trackAll` 批量 1 包 / `setVelocity` 交给 PD 积分 0 包 三种模式） |
 
 ### 法杖、物品、实体
 

@@ -174,22 +174,18 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * 护盾视觉（ParticleDrawing）：以持有者为锚点的**淡蓝色球壳**（静态球面 + 跟随持有者平移）。
+     * 护盾视觉（ParticleDrawing）：以持有者为锚点的**淡蓝色球壳**（刚性平移，零逐 tick 包）。
      *
      * 实现要点：
-     * - 位置由我们算（锚点 + 固定球面偏移），PD 负责渲染与客户端插值；用 `track` 直设位置；
-     * - 用 [ParticleSwarm.tickAnchored] 维护球壳：**每个粒子独立错峰重建**，而不是整圈同时销毁+重建 ——
-     *   后者会出现「每隔一段时间瞬移一下」：同一 tick 集中重建时，若 PD 因维度粒子上限拒掉了个别粒子，
-     *   「索引 → 偏移」的配对就会整体错位（实测现象），错峰 + 把偏移绑在句柄上可彻底避免；
-     * - ⚠️ **球壳不再自转**（曾经每 tick 绕 Y 转 0.03 rad）：PD 的 `track` 位置插值会让「每 tick 变化的偏移」
-     *   被拉成一条/一圈残影（实机截图：初始是球、旋转后摊成一排）。改为静态球面后，`track` 只承担**平移**，
-     *   球壳保持刚性。等 PD 修好 `track` 插值后可以再把自转加回来（见 `docs/known-issues.md` §7）；
-     * - 粒子寿命有限（[SHELL_LIFETIME_TICKS]）：法杖一旦不再被持有（放下/丢进箱子/卸下法术），
-     *   `onInventoryTick` 就不再被调用，我们**没有**「被动停止」回调可用来清理 ——
-     *   有限寿命让粒子自行过期，不会在世界里留下孤儿粒子；
+     * - 球壳用 PD 的 `attachTo(实体, 世界空间偏移)` 钉在持有者身上：**服务端只在挂载时下发一次**，
+     *   之后由客户端每 tick 本地解析实体位置 —— 每 tick 零包，而且天然刚性（不受位置插值影响）；
+     * - 粒子寿命有限（[SHELL_LIFETIME_TICKS]）、由 [ParticleSwarm.refreshAttached] **错峰**重建：
+     *   法杖一旦不再被持有（放下/丢进箱子/卸下法术），`onInventoryTick` 就不再被调用，
+     *   我们**没有**「被动停止」回调可用来清理 —— 有限寿命让粒子逐个自然过期，不留孤儿粒子；
+     * - **不做自转**：挂载偏移是固定的世界空间偏移。想做自转要改成「每 tick 用一次
+     *   `ParticleManager.trackAll` 下发旋转后的偏移」（1 包/tick，见 [ParticleSwarm] 的说明），
+     *   不要退回逐粒子 `track`（N 包/tick，且历史上按索引配对出过错位与形状剪切）；
      * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建。
-     *
-     * 网络开销：每 tick 对 [SHELL_PARTICLES] 个粒子各广播一次位置包（见 `docs/known-issues.md` §7）。
      */
     private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
         if (shellOffsets.isEmpty()) {
@@ -198,8 +194,9 @@ class EnergyShield : Modifier() {
                 ParticleShapes.randomUnitVector(random).scale(SHELL_RADIUS)
             }
         }
-        shieldSwarm.tickAnchored(
+        shieldSwarm.refreshAttached(
             manager = wand.pdParticles(level),
+            entityId = holder.id,
             anchor = shellCenter(holder),
             count = SHELL_PARTICLES,
             color = SHELL_COLOR,

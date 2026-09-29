@@ -18,15 +18,15 @@
   1. 数值与手感（反射强度、破盾暂停、耐久曲线）尚未调平；
   2. 结构上它是被动法术却继承 `Modifier`、放在 `magic/modifier/`（你已明确暂不处理命名/结构债）。
 
-### 🟡 1.2 能量护盾的粒子表现（已改用 ParticleDrawing，仅剩调参）
+### 🟢 1.2 能量护盾的粒子表现（已用 PD `attachTo` 锚定，零逐 tick 包）
 
-- 现状：球壳是 **PD 粒子**（`EnergyShield.updateShieldVisual`）——24 个淡蓝色粒子铺在半径 0.85 的球面上，
-  以持有者身体中段为锚点，每 tick `track` 位置；**静态球面、不自转**（自转会让 PD 的 `track` 插值把球壳拉成
-  残影/一圈，见 §7.1「一组 track 粒子不刚性」）；破盾立即清除。
-- 实现要点：粒子寿命 60 tick、错峰重建（每约 2.5 tick 只换 1 个粒子）—— 这样「法杖不再被持有」时
-  （`onInventoryTick` 不再被调用、我们**没有**被动停止回调）粒子会自行过期，不会在世界里留下孤儿粒子。
-- 仍可优化：粒子数与跟踪频率（每 tick 24 次位置广播）；若 PD 提供实体锚点 API 可省掉这些广播（见 §7.2）。
-- ⚠️ 若在实机看到球壳变形/瞬移，先看 §7.1 的两条 PD 缺陷是否已修 —— 那不是本模组的几何算错。
+- 现状：球壳 = **PD 粒子 + `attachTo(持有者, 世界空间偏移)`**（`EnergyShield.updateShieldVisual`）——
+  24 个淡蓝色粒子铺在半径 0.85 的球面上；服务端只在挂载时下发一次，之后由客户端每 tick 本地解析实体位置，
+  **零逐 tick 带宽且天然刚性**；静态球面、不自转（要自转就改用 `trackAll` 每 tick 发一次旋转后的偏移，1 包/tick）。
+- 实现要点：粒子寿命 60 tick、错峰重建（每约 2.5 tick 只换 1 个粒子）—— 「法杖不再被持有」时
+  （`onInventoryTick` 不再被调用、我们**没有**被动停止回调）粒子会逐个自行过期，不会留下孤儿粒子。
+- 历史更正：第 5 轮曾把「球壳塌成一圈」当成 PD 缺陷上报，实为**本模组 bug**（`tickAnchored` 在 spawn 时
+  捕获 offset，自转实际变成错峰剪切），已在第 6 轮修正 —— 见 §7 顶部表格第 2 行。
 
 ---
 
@@ -34,11 +34,11 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟡 | 黑洞粒子：每 tick 1 个、寿命最长 60 tick（峰值约 60 个），**位置由本模组积分 + `track` 写回** | `magic/effect/lifecycle/BlackHole.kt` | 改成位置驱动后每 tick 每粒子一次位置广播（峰值约 60/tick），可控；若嫌密就调 `LIFETIME_TICKS` |
-| 🟡 | 重力场粒子：范围球壳 96 个（永存，仅生成时广播）+ 每 tick 3 个下落粒子 | `magic/effect/lifecycle/GravityField.kt` | 下落粒子寿命 120 tick 兜底，正常在碰到下半球表面时销毁；要更密改 `FALLING_PER_TICK` |
+| 🟢 | 黑洞粒子带宽：本模组积分 + **一次 `trackAll`** | `magic/effect/lifecycle/BlackHole.kt` | **1 包/tick（与粒子数无关）**；峰值约 60 个粒子（每 tick 1 个、寿命 60），嫌密就调 `LIFETIME_TICKS` |
+| 🟢 | 重力场粒子带宽：范围球壳 96 个（一次 spawn、静止）+ 下落粒子（生成时一次 `setVelocity`） | `magic/effect/lifecycle/GravityField.kt` | **0 包/tick**；回收判定只读 `position()`（读不产包）。要更密改 `FALLING_PER_TICK` |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 已加两道剪枝：场上无投射物直接返回；先按「到玩家中心的距离球」粗筛（半径 = 护盾半径 + 玩家包围盒最远角 1.0 + 该投射物碰撞半径，保证不漏判）。法术数量再上量级时可考虑空间分桶/网格 |
-| 🟡 | `EnergyShield` 护盾球壳：24 个 PD 粒子，每 tick 各广播一次位置包 | `magic/modifier/EnergyShield.kt` | 静态球面（**不自转**：PD 的 `track` 插值会把每 tick 变化的偏移拉成残影，见 §7.1）；寿命 60 tick，由 `tickAnchored` **错峰**重建（每约 2.5 tick 换 1 个粒子），不再整圈销毁+重建。要省广播就得等 PD 的实体锚点 API（§7.2） |
+| 🟢 | `EnergyShield` 护盾球壳带宽：`attachTo` 锚定 | `magic/modifier/EnergyShield.kt` | **0 包/tick**（只在挂载/错峰重建时各发一次）；寿命 60 tick、错峰重建让粒子在法杖不再被持有时逐个过期。想让它自转就用 `trackAll`（1 包/tick），见 §7 |
 
 ---
 
@@ -71,7 +71,7 @@
 | 蛇形与往复运动可叠加 | 蛇形只施加方向**旋转增量**，不再覆写方向 | `magic/modifier/Serpentine.kt` |
 | 区域魔法每 tick 结算、离开即解除 | 离开范围**立刻**撤销迟缓（不等效果到期）；撤销时只清等级相同的迟缓 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
 | 区域场**会影响魔法投射物** | 黑洞把范围内投射物吸向中心、重力场给投射物持续的向下力；**区域弹自身除外**（否则会被自己往下压/吸住）。这是刻意的：黑洞就该「把飞进来的法术吸掉」 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
-| 区域/本体粒子的「力」在本模组算，积分与渲染归 ParticleDrawing | `ParticleSwarm` 只负责生成句柄、写速度、到点销毁；位置积分（引擎 `pos += velocity`）、同步、可见性、寿命、渲染全由 PD 负责 | `magic/effect/visual/ParticleSwarm.kt` |
+| 区域/本体粒子的「位置」在本模组算，同步与渲染归 ParticleDrawing | `ParticleSwarm` 三种写法：`attachTo` 锚定（0 包/tick）/ 一次 `trackAll` 批量写位置（1 包/tick）/ 一次 `setVelocity` 交给 PD 积分（0 包/tick）；同步、可见性、寿命、渲染全由 PD 负责 | `magic/effect/visual/ParticleSwarm.kt` |
 | PD 粒子管理器由 `wand.pdParticles(level)` 兜底创建 | 管理器原本只在「持有者背包物品被 tick」时建立；未来的生物施法者不走 `inventoryTick`，不兜底就会出现「有伤害没粒子」 | `util/PdParticles.kt` |
 
 ---
@@ -97,9 +97,12 @@
     下落粒子只出现在**上半球表面**、竖直下落，碰到**下半球表面**即消失（不应穿出球体继续下落）。
 15. **法杖持有者记录与回收**（见 §6 第 3 轮）：放下/丢弃法杖一段时间后再拿起，法力、牌堆、冷却、
     护盾耐久是否都不丢。
-16. **护盾球壳粒子**（第 5 轮已改）：淡蓝色球体跟随持有者移动，**形状保持刚性**（已取消自转 —— PD 的
-    `track` 插值会把「每 tick 变化的偏移」拉成残影，见 §7.1）；不应再周期性瞬移；破盾立即消失；
-    放下法杖后约 3 秒内粒子自行过期。等 PD 修好 `track` 插值后可把自转加回来。
+16. **护盾球壳粒子**（第 6 轮改为 `attachTo` 锚定）：淡蓝色球体跟随持有者移动、形状刚性（**不自转**）；
+    破盾立即消失；放下法杖后约 3 秒内粒子逐个过期（不留孤儿）；移动/转身时不应有残影、瞬移或错位。
+17. **本轮接线改造后的回归检查**（第 6 轮）：① 投射物**本体粒子**是否不再前后抖动（PD 已修直设位置链路）；
+    ② 黑洞粒子是否仍能绕转并被吸入中心（已改 `trackAll` 批量下发）；③ 重力场下落粒子是否仍在下半球表面消失、
+    且**按 Esc 暂停时不再飘**（PD 已修暂停外推）；④ 使用**旧构建**的 `1.0.8-ALPHA` jar 时应报
+    `NoSuchMethodError`（提醒：本模组现在要求 2026-09-30 或更新的构建，见 §7 顶部）。
 
 ---
 
@@ -198,6 +201,16 @@
 | 5.2 | 护盾球壳初始正常，环绕时塌成一排/一圈 | 先按本侧可规避的成因处理：**取消球壳自转**（偏移固定，`track` 只承担平移，球壳保持刚性）；同时把「一组 `track` 粒子的偏移每 tick 变化时不刚性」写成 PD issue（§7.1 第 2 条，附两种怀疑方向：插值不刚性 / 错峰重建继承插值状态）。PD 修好后可把自转加回 | `modifier/EnergyShield.kt`、`docs/known-issues.md` §7 |
 | 5.3 | （顺带）球壳粒子重建更稀一些 | `SHELL_LIFETIME_TICKS` 40 → **60**：错峰重建频率降为约「每 2.5 tick 换 1 个粒子」，减少销毁/新生的抖动面 | `modifier/EnergyShield.kt` |
 
+### 第 6 轮（PD 侧修完 6 条后的接线改造）
+
+| 编号 | 起因 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 6.1 | **本模组 bug**：`tickAnchored` 在 spawn 时捕获 offset、之后不再调 `offsetAt`，导致「自转」实际是错峰剪切（球壳摊成扇形） | 删除 `tickAnchored`；护盾球壳改用 PD 的 `attachTo(实体, 世界空间偏移)`：偏移固定、刚性平移、**零逐 tick 包** | `effect/visual/ParticleSwarm.kt`、`modifier/EnergyShield.kt` |
+| 6.2 | PD 新增批量位置 API | 黑洞粒子位置改用**一次 `ParticleManager.trackAll`** 下发（原来逐粒子 `track` ≈ 60 包/tick → **1 包/tick，与粒子数无关**） | `effect/visual/ParticleSwarm.kt`、`effect/lifecycle/BlackHole.kt` |
+| 6.3 | PD 新增 `position()`（api 级只读位置） | 重力场下落粒子回到「生成时一次 `setVelocity`」的零包写法，回收判定只读 `position()`；**不再使用 `handle.data()`**（core 类型依赖消失） | `effect/lifecycle/GravityField.kt`、`effect/visual/ParticleSwarm.kt` |
+| 6.4 | PD 修复「服务端暂停时外推」 | 位置驱动不再是为了规避暂停漂移（黑洞保留位置驱动是为了**轨迹确定 + 中心判定可控**，理由写在 `BlackHole` KDoc） | `effect/lifecycle/BlackHole.kt` |
+| 6.5 | 同一版本号换 jar | 记录依赖卫生问题：`1.0.8-ALPHA` 的旧构建没有新 API，`versionRange` 无法区分；已在 §7 顶部写明「必须 ≥ 2026-09-30 构建」并建议 PD 提升版本号 | `docs/known-issues.md` §7、`docs/build-and-run.md` §2 |
+
 ---
 
 ## 7. ParticleDrawing API 需求（待对方实现）
@@ -212,17 +225,43 @@
 > 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.8-ALPHA`
 > （`lib/particledrawing-1.0.8-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
 
-**未决条目：6 条** —— 3 条是 **PD 缺陷**（已在本侧规避或无法规避），3 条是 **API 需求**（缺能力）。
+**当前状态：6 条全部闭环**（PD 侧 2 个提交 + 本模组 1 处自己的 bug）。
 
-### 7.1 缺陷（PD 行为不符合预期，等 PD 侧修）
+| # | 条目 | 结论 | 落点 |
+|---|---|---|---|
+| 1 | `track` 跟随高速目标前后瞬移 | **PD 已修**（`e73d88b`「直设位置端点重扫」） | PD core/client |
+| 2 | 一组 `track` 粒子的偏移每 tick 变化时被拉成一排/一圈 | **❌ 撤回：这是本模组的 bug**，PD 侧复现不出是对的（插值误差上限只有一个 tick 的旋转量 ≈ 0.025 格）。真因：`ParticleSwarm.tickAnchored` 在 spawn 时把 offset 捕获进 `Anchored.offset`，之后**再也不调 `offsetAt`** → 错峰重建把「不同时刻的旋转角」陆续注进同一个球壳，球面被逐渐剪切、摊平成扇形。已改为 `attachTo` 方案（偏移固定、刚性） | 本模组 |
+| 3 | 服务端暂停时速度驱动粒子被客户端继续外推 | **PD 已修**（`e73d88b`「暂停时外推」） | PD core/client |
+| 4 | `ParticleHandle` 缺 api 级只读位置 | **PD 已加**（`2244515`）→ `position(): Vec3?` | PD api |
+| 5 | 缺力/加速度与批量位置下发 | **PD 已加**（`2244515`）→ `applyForce(accel, ticks)`、`ParticleManager.trackAll(ids, positions)` | PD api |
+| 6 | 原始粒子缺实体锚点 | **PD 已加**（`2244515`）→ `attachTo(entityId, offset)` / `attachToLocal(...)` | PD api |
 
-#### [缺陷] `track` 跟随高速目标时「前后瞬移」（往返抖动）
+**本模组据此改成三种零/低带宽写法**（详见 `magic/effect/visual/ParticleSwarm.kt`）：
 
-- 状态：未决（**本侧无法规避**：本体粒子必须贴住投射物位置）
-- 现象：法术飞行时**粒子本体**（`ProjectileBody`）沿运动方向前后瞬移/抖动；速度越高越明显
-  （`laser` speed=5 格/tick 最明显，`fireball` speed=0.5 也能看出轻微抖动）
-- 复现：装填任意投射物法术（推荐 `laser`）后施法，观察本体粒子
-- 我们的用法（**同一 tick 恰好一次 `track`**，位置只有一处来源，可排除「重复更新」）：
+| 用途 | PD 用法 | 每 tick 带宽 |
+|---|---|---|
+| 护盾球壳 | `attachTo(实体, 世界空间偏移)`（客户端本地解析实体位置） | **0 包** |
+| 黑洞粒子 | 本模组积分 + **一次** `trackAll` | **1 包**（与粒子数无关） |
+| 重力场下落粒子 | 生成时一次 `setVelocity` + 只读 `position()` 做回收判定 | **0 包** |
+| 重力场范围球壳 | 一次 `spawn`（静止，永存） | **0 包** |
+
+`applyForce` 暂未使用：黑洞吸力**随距离变化**，逐几 tick 重发力的包量（约 20 包/tick）高于 `trackAll`（1 包/tick），
+且位置驱动能保证「抵达中心 0.1 格才消失」完全可控。理由写在 `ParticleSwarm` 的类注释里。
+
+> ⚠️ **依赖版本卫生（建议 PD 侧处理）**：新 jar 沿用了同一个版本号字符串 `1.0.8-ALPHA`
+> （`lib/particledrawing-1.0.8-ALPHA.jar` 于 2026-09-30 00:10 被替换），而本模组的
+> `particledrawing_version_range=[1.0.8-ALPHA,)` **无法区分「没有新 API 的旧构建」**——
+> 用旧构建启动会在运行期报 `NoSuchMethodError`（`attachTo` / `trackAll` / `position`）。
+> 建议 PD 把 `mod_version` 提到 `1.0.9-ALPHA`（或加构建后缀），本模组才能真正声明「最低可用构建」。
+> 本模组口头约定：**必须使用 2026-09-30 或更新的 1.0.8-ALPHA 构建**（见 [build-and-run.md](build-and-run.md) §2）。
+
+### 7.1 历史条目（备查）
+
+#### [缺陷 ✓已修] `track` 跟随高速目标时「前后瞬移」（往返抖动）
+
+- 现象：法术飞行时**粒子本体**（`ProjectileBody`）沿运动方向前后瞬移；速度越高越明显
+  （`laser` speed=5 格/tick 最明显）
+- 我们的用法（同一 tick 恰好一次 `track`，位置只有一处来源，可排除「重复更新 / 速度叠加」）：
 
   ```kotlin
   // magic/effect/visual/ProjectileBody.kt
@@ -234,81 +273,44 @@
   }
   ```
 
-- 期望：`track` 之后的客户端渲染在「上一位置 → 新位置」之间按 partialTick **单调**插值，
-  不出现反向过冲，也不随帧率/负载改变插值相位
-- 怀疑方向：`track` 直设位置后，客户端插值的**起点**可能被写成「当前渲染位置」（或每帧重复套用插值），
-  导致相位在 tick 边界来回错位 —— 逻辑在 `core/client`，本模组看不到内部
+- 结论：PD `e73d88b` 修掉了直设位置链路的端点重扫偏差。
 
-#### [缺陷] 一组 `track` 粒子在「偏移每 tick 变化」时被拉成一排/一圈（不刚性）
+#### [缺陷 ❌撤回] 一组 `track` 粒子的偏移每 tick 变化时被拉成一排/一圈
 
-- 状态：未决（**已在本侧规避**：取消球壳自转，只保留平移）
-- 现象：能量护盾球壳初始正常（24 个淡蓝粒子均匀铺在球面上），
-  随球壳自转若干 tick 后塌成「一排/一圈」粒子（像被拉成残影/圆环）
-- 复现：装填 `energy_shield` 并握杖；球壳每 tick 绕 Y 轴旋转 0.03 rad，持续观察 2~5 秒
-- 我们的用法：锚点（持有者身体中段）+ **每 tick 旋转过的**球面偏移，逐 tick `track`：
+- 现象（当时）：护盾球壳初始是标准球，随自转几秒后塌成一条/一圈。
+- **正确结论（本模组 bug，已修）**：`tickAnchored` 的 `Anchored.offset` 是 **spawn 那一刻**捕获的，
+  每 tick 只跟踪它、不再调 `offsetAt`。于是「自转」并没有真的转：错峰重建时，每个被重建的粒子
+  取到的是**重建那一刻**的旋转角，而其余粒子还停在各自旧角度上 —— 球面被错峰剪切成扇形，
+  看起来就是「一圈/一排」。PD 侧的插值误差上限只有一个 tick 的旋转量（0.03 rad × 0.85 ≈ **0.025 格**），
+  远不足以解释该现象，所以 PD 复现不出是正确的。
+- 修法：球壳改用 `attachTo`（偏移固定，天然刚性，零逐 tick 包）；
+  `tickAnchored` 整个删掉（它的「按索引取偏移」写法本身就是这次 bug 的温床）。
+  若以后要自转：每 tick 用一次 `ParticleManager.trackAll(ids, 旋转后的偏移)`（1 包/tick），不要退回逐粒子 `track`。
 
-  ```kotlin
-  // magic/modifier/EnergyShield.kt（规避前的写法）
-  shieldSwarm.tickAnchored(manager, anchor, count = 24, color = ..., scale = ..., lifetimeTicks = 40) { index ->
-      val o = shellOffsets[index]
-      Vec3(o.x * cosSpin - o.z * sinSpin, o.y, o.x * sinSpin + o.z * cosSpin)  // 每 tick 变化的偏移
-  }
-  // tickAnchored 内部：entry.handle.track(anchor + offset)（每 tick 一次/粒子）
-  ```
+#### [缺陷 ✓已修] 服务端暂停时，速度驱动的粒子仍被客户端继续外推
 
-- 期望：每个粒子严格跟随各自的 `track` 目标，球壳保持刚性（整体旋转不改变形状）
-- 怀疑方向（任一都请确认）：
-  1. `track` 插值对「每 tick 变化的偏移」不够刚性（例如插值起点用了上一帧渲染位置，累积滞后拉成残影）；
-  2. 错峰重建（销毁 + 同位置新生）时新粒子继承了旧粒子的插值状态（若 PD 内部按槽位/组复用状态）
-- 本侧临时规避：偏移固定（取消自转），`track` 只承担平移；PD 修好后可把自转加回来
+- 现象：单人按 Esc（集成服务端暂停）后，`setVelocity` 驱动的粒子沿最后速度飘出原定范围
+- 当时的临时降级：黑洞/下落粒子改「本模组积分 + `track`」；**现已不需要**（PD `e73d88b` 修掉外推，
+  重力场下落粒子已回到「生成时一次 `setVelocity`」的零包写法）
 
-#### [缺陷] 服务端暂停时，速度驱动的粒子仍被客户端继续外推
+### 7.2 已实现的 API 需求（本模组已在用）
 
-- 状态：未决（**已在用法侧规避**：黑洞/重力场下落粒子改为「本模组积分位置 + `track`」，暂停时定格）
-- 现象：单人游戏按 Esc（集成服务端暂停）后，`setVelocity` 驱动的粒子会沿最后速度**飘出原定范围**
-- 现有 API 为什么不够：引擎对「有速度的粒子」每 tick 自行推进位置，而客户端在服务端没有新状态时仍按最后速度
-  继续外推（PD 有 `ClockSyncPayload` 时钟同步，但没有「暂停时不推进」的语义）
-- 期望行为（任一）：① 服务端暂停（时钟冻结）时客户端停止推进速度驱动粒子；
-  ② 恢复时下发一次权威位置做重同步；③ 至少把该行为写进 API 文档，便于使用方选择 `track`
-- 影响面：任何使用 `setVelocity` 的效果
-- 临时降级：改用 `ParticleSwarm.spawnSimulated/tickSimulated`（本模组积分 + `track`）
+#### [需求 ✓已加] `ParticleHandle.position(): Vec3?`
 
-### 7.2 API 需求（缺能力，不是缺陷）
+- 用途：黑洞/下落粒子按**权威位置**做「抵达中心」「碰到下半球表面」的回收判定
+- 现状：已改用 `position()`；**不再依赖** `handle.data()`（那是 `core.server.ParticleData`，非 api 类型）
+- 落点：`magic/effect/visual/ParticleSwarm.kt`
 
-#### [需求] `ParticleHandle` 缺少 api 级的只读位置查询
+#### [需求 ✓已加] `applyForce(accel, ticks)` 与 `ParticleManager.trackAll(ids, positions)`
 
-- 状态：未决
-- 目标能力：黑洞粒子要「每 tick 朝中心施力」，因此必须知道 PD 引擎里该粒子的**权威当前位置**
-- 现有 API 为什么不够：`ParticleHandle.velocity()` 属于 api 包，但**位置**只能通过 `data(): ParticleData?` 取，
-  而 `ParticleData` 在 `work.nekow.particledrawing.core.server`（非 api 包）——使用方被迫依赖 core 内部类型
-- 期望 API 形态：`fun position(): Vec3?`（与 `velocity()` 对称，内部转调 engine 的 `getParticle(id)?.position()`）；
-  若不想暴露单粒子查询，也可在 api 包提供只读快照类型
-- 影响面：`magic/effect/visual/ParticleSwarm.kt`
-- 临时降级：用 `handle.data()?.position()`（能跑，但绑定了 core 类型，PD 内部重命名/移动包会波及本模组）
+- 现状：`trackAll` 已用于黑洞（1 包/tick，与粒子数无关）；`applyForce` 备而不用（理由见上文表格后的说明）
+- 落点：`magic/effect/visual/ParticleSwarm.kt`、`magic/effect/lifecycle/BlackHole.kt`
 
-#### [需求] 缺少「力/加速度」与批量更新，只能逐粒子每 tick 广播速度
+#### [需求 ✓已加] 实体锚点 `attachTo` / `attachToLocal`
 
-- 状态：未决（当前黑洞已改为「本模组积分 + `track`」，本条降级为**性能诉求**）
-- 目标能力：需要驱动大量粒子沿力运动时不产生 O(粒子数) 的每 tick 广播
-- 现有 API 为什么不够：`setVelocity` 是**单粒子即时广播**（`ParticleVelocityPayload`）；`track` 同样是单粒子广播
-- 期望 API 形态（任一即可）：
-  1. `applyForce(particleId, accel: Vec3, ticks: Int)`：服务端权威加速度，客户端按同一规则积分，只在开始时广播一次；
-  2. 批量接口 `setVelocity(ids, velocities)` / `track(ids, positions)`：一个包覆盖多粒子；
-  3. 「速度缓动版 `move`」：`setVelocity(target, durationTicks, easing)`，一次下发、N tick 内插值到位
-- 影响面：`magic/effect/visual/ParticleSwarm.kt`（黑洞/重力场/护盾都逐粒子广播，峰值约 60+24 包/tick）
-- 临时降级：控制粒子数（黑洞 1 个/tick、护盾 24 个）+ 隔 tick 更新
-
-#### [需求] 原始粒子缺少「实体锚点」绑定
-
-- 状态：未决（**不阻塞**：护盾已用 `trackAnchored` 每 tick 钉位置实现，只是广播开销偏高）
-- 目标能力：能量护盾的淡蓝色球体（§1.2）以持有者为锚点，随实体移动；理想情况下服务端只更新锚点一次
-- 现有 API 为什么不够：`Anchor.Entity(entityId)` 只服务 `.pdrawc` **动画播放**路径；
-  原始粒子要跟随实体，使用方只能每 tick 对**每个**粒子 `track(...)`（一次广播/粒子/tick）
-- 期望 API 形态：`ParticleHandle.attachTo(entityId: Int, offsetFromPivot: Vec3)`，
-  或让 `ParticleGroup` 支持实体锚点（服务端只更新锚点一次，客户端本地解析实体位置与朝向）
-- 影响面：`magic/modifier/EnergyShield.kt`（现用降级方案）、`magic/effect/visual/ParticleSwarm.kt`
-- 临时降级：用 `tickAnchored` 每 tick 钉位置，粒子数控制在数十个（当前 24）
-
+- 现状：护盾球壳用 `attachTo`（世界空间偏移，刚性平移、零逐 tick 包）；
+  `attachToLocal`（随实体朝向旋转）暂未使用 —— 需要「贴在身前/身侧」的粒子时可用
+- 落点：`magic/modifier/EnergyShield.kt`、`magic/effect/visual/ParticleSwarm.kt`
 已知的**能力边界**（不是缺陷，但接线前必须知道）：
 
 | 项 | 现状 | 影响 | 我们的处理 |

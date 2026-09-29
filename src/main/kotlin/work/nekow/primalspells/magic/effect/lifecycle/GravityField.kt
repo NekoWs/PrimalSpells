@@ -18,8 +18,8 @@ import kotlin.math.sqrt
  *   1. **范围球壳**：在半径 [EFFECT_RADIUS] 的球面上均匀铺 [SHELL_PARTICLES] 个半透明淡蓝灰粒子并永存，
  *      用来标识重力场的**作用范围**。场本身静止，所以球壳不需要每 tick 跟踪；场结束（[clearVisuals]）统一销毁。
  *   2. **下落粒子**：每 tick 在**上半球表面**生成 [FALLING_PER_TICK] 个淡灰色粒子，竖直向下匀速下落，
- *      抵达**下半球表面**时销毁 —— 位置由本模组积分（[ParticleSwarm.spawnSimulated]），
- *      因此服务端暂停（单人按 Esc）时粒子就地定格，不会被客户端按速度外推飘走。
+ *      抵达**下半球表面**时销毁 —— 速度交给 PD 逐 tick 积分（零包），回收判定只读 PD 的权威位置
+ *      （[ParticleSwarm.removeWhere]）。
  *
  * 粒子在世界空间里下落、不跟随投射物；位置积分/同步/渲染由 ParticleDrawing 负责
  * （见 [ParticleSwarm] 与 `docs/conventions.md` §9）。
@@ -50,24 +50,21 @@ class GravityField : AreaFieldEffect(
             // 上半球表面：把随机球面方向翻到 y ≥ 0
             val dir = ParticleShapes.randomUnitVector(random)
             val upper = if (dir.y < 0.0) dir.scale(-1.0) else dir
-            // 运动粒子：位置由本模组积分（服务端暂停时不会像速度驱动那样被客户端外推）
-            falling.spawnSimulated(
+            // 匀速下落：速度交给 PD 逐 tick 积分（零逐 tick 包）；生命靠「碰到下半球表面」的判定收掉
+            falling.spawn(
                 manager,
                 center.add(upper.scale(EFFECT_RADIUS)),
-                FALL_VELOCITY,
                 FALL_COLOR,
                 FALL_SCALE,
                 FALL_LIFETIME_TICKS,
+                FALL_VELOCITY,
             )
         }
     }
 
-    /** 只读本模组自己的位置判定：下落粒子碰到下半球表面即销毁；否则匀速下落（速度不变）。 */
+    /** 只读 PD 的权威位置判定：下落粒子碰到下半球表面即销毁（读位置不产生任何包）。 */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
-        falling.tickSimulated(
-            step = { _, vel -> vel },
-            removeIf = { pos -> pos.y <= lowerSurfaceY(center, pos) },
-        )
+        falling.removeWhere { pos -> pos.y <= lowerSurfaceY(center, pos) }
     }
 
     override fun clearVisuals() {

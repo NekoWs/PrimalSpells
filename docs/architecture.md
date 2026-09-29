@@ -280,14 +280,21 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 ## 9. 与 ParticleDrawing 的接口现状
 
 - 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.8-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
-- 已接线（三种用法）：
-  1. **跟随类**：`Trajectory`（拖尾）、`ProjectileBody`（本体）——`manager.create()…spawn()` + `track(pos)`；
-  2. **力驱动粒子**：`ParticleSwarm` + `BlackHole`（每 tick 32 个紫色粒子，随机切向初速、被吸向中心后销毁）、
-     `GravityField`（每 tick 1 个淡灰粒子，竖直向下匀速）——**本模组只算力（`setVelocity`），
-     位置积分 `pos += velocity`、寿命、跨端同步、可见性与渲染全部由 PD 负责**；
-  3. **管理器获取**：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现。
+- 已接线（三种用法，均对应 PD 的低带宽写法）：
+  1. **锚定**：`attachTo(实体, 世界空间偏移)`——护盾球壳，服务端只在挂载时发一次，客户端本地解析实体位置，
+     **0 包/tick** 且天然刚性；
+  2. **批量写位置**：`ParticleManager.trackAll(ids, positions)`——黑洞粒子（本模组积分，吸力随距离变化），
+     **1 包/tick，与粒子数无关**；
+  3. **速度驱动**：生成时一次 `setVelocity`，之后交给 PD 积分——重力场下落粒子（**0 包/tick**），
+     回收判定只读 `ParticleHandle.position()`；另 `Trajectory`（拖尾）同样只发一次速度。
+- 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现。
+- 未使用：`applyForce(accel, ticks)`（黑洞吸力随距离变化，用 `trackAll` 更省也更可控，理由见 `ParticleSwarm` KDoc）、
+  `attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备。
-- 由实际接线暴露出的 **PD API 需求**（位置查询、批量/加速度、实体锚点）登记在 [known-issues.md](known-issues.md) §7。
+- 历史 problem 记录：API 缺陷/需求清单与闭环情况见 [known-issues.md](known-issues.md) §7
+  （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
+- ⚠️ **依赖构建口径**：`lib/particledrawing-1.0.8-ALPHA.jar` 在 2026-09-30 被同名替换为新构建
+  （旧构建没有上述新 API，且 `versionRange` 无法区分）——**必须使用该日期或更新的构建**。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：
   不得在本模组自行另写一套替代实现，应停止尝试并列出 API 修改需求。

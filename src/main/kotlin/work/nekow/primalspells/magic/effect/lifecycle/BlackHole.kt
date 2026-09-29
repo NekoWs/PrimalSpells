@@ -20,11 +20,13 @@ import work.nekow.primalspells.util.ParticleShapes
  * 加速度随距离增强（`0.12/(距离+0.5)`），并且每 tick 顺带乘一点阻尼（[DAMPING_PER_TICK]）让切向速度衰减。
  * 二者缺一，粒子会在某个半径上稳定环绕 —— 现象就是「离中心一段距离有明显空域、到不了中心」。
  *
- * ## 位置由本模组积分（不是交给引擎按速度推进）
+ * ## 位置由本模组积分，用一次 `trackAll` 批量下发
  *
- * 理由与做法见 [ParticleSwarm.spawnSimulated]：速度驱动的粒子在**服务端暂停时会被客户端继续外推**
- * （单人按 Esc 会看到粒子飘出范围），改成「本模组每 tick 算好位置、`track` 写回」即可就地定格，
- * 同时保证「进入中心 0.1 格才消失」。渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
+ * 吸力随距离变化，交给引擎的恒定加速度表达不了；因此位置由本模组算好后，
+ * 用 [work.nekow.particledrawing.api.ParticleManager.trackAll] **一次包**写出全部粒子
+ * （与粒子数无关，见 [ParticleSwarm] 的三种模式表）。好处：轨迹确定、能保证「进入中心 0.1 格才消失」，
+ * 且暂停时不会因客户端外推而飘出范围。
+ * 渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
  */
 class BlackHole : AreaFieldEffect(
     radius = 5.0,
@@ -44,9 +46,9 @@ class BlackHole : AreaFieldEffect(
         }
     }
 
-    /** 每 tick 施力 + 积分 + 写回位置；抵达中心（返回 null）即销毁。 */
+    /** 每 tick 施力 + 积分 + **一次 `trackAll` 批量写回位置**；抵达中心（返回 null）即销毁。 */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
-        swarm.tickSimulated(step = { pos, vel ->
+        swarm.tickSimulated(manager, step = { pos, vel ->
             val toCenter = center.subtract(pos)
             val dist = toCenter.length()
             if (dist <= CONSUME_RADIUS) {

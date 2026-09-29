@@ -194,15 +194,19 @@ class EnergyShield : Modifier() {
      * 护盾视觉（ParticleDrawing）：以持有者为**轴心**的淡蓝色球壳 —— 跟随 + 自转，均**零逐 tick 包**。
      *
      * 实现要点：
-     * - 用 `Draw.sphere(...)` 一次性铺出**均匀球壳**（黄金角螺旋取点，即 Fibonacci 球），返回一个
-     *   `ParticleGroup`；成员固定、粒子永存（`lifetime = -1`），**不做周期重建**
-     *   —— 重建（销毁+新建）会让新粒子从生成位置滑到轴心，实机表现就是「粒子每隔一会儿瞬移一下 / 从上方落下」；
+     * - 用 `Draw.sphere(...)` 一次性铺出**均匀球壳**（黄金角螺旋取点，即 Fibonacci 球）；成员固定、
+     *   粒子永存（`lifetime = -1`），**不做周期重建** —— 重建（销毁+新建）会让新粒子从生成位置滑到轴心，
+     *   实机表现就是「粒子每隔一会儿瞬移一下 / 从上方落下」；
      * - `.followEntity(uuid, offset)` 把轴心交给客户端本地解析（每 tick 读实体位置）→ **0 包/tick 且天然刚性**；
      * - `.spin(axis, radiansPerTick)` 是**组级编排**：客户端本地求值累加旋转角 → 同样 **0 包/tick**
      *   （旧写法「每 tick `trackAll` 下发旋转后的偏移」是 1 包/tick，且位置指令会解除实体锚点）；
-     * - ⚠️ **轴心偏移必须包含「身体中段」那一段**：`followEntity` 的偏移基准是实体脚底（`Entity.position()`），
-     *   只给球面偏移会让球壳贴在脚上（实机表现为「球在玩家下方、粒子像在往下掉」）；
-     *   反过来说，**这一段只能加一次**（球心坐标 + 轴心偏移两处都加就高了 ≈1 格，新粒子会「从上方滑入」，见第 8 轮）；
+     * - ⚠️ **轴心偏移必须含「身体中段」那一段**：`followEntity` 的偏移基准是实体脚底（`Entity.position()`），
+     *   不给这段球壳就贴在脚上（「球在玩家下方、粒子像在往下掉」）；但**这一段只能出现一次**，
+     *   见下面对「绑定顺序」的说明（第 8 轮是「spawn 位置加了两次」，第 13 轮是「相对偏移被抵消一次」）；
+     * - ⚠️ **顺序：先 `createGroup`+`followEntity` 绑定轴心，再用 `Draw.sphere` 铺成员** ——
+     *   客户端 arm 时用「成员 spawn 位置 − 当时的组 pivot 字段」重算相对偏移，所以成员必须相对
+     *   **绑定后的轴心**铺开；顺序反了（先铺成员再偏移轴心）会让相对偏移与预期差一个身体中段，
+     *   实机表现是「出现时位置正确、arm 之后整壳掉到脚下」；
      * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建；放下法杖的延迟清理见 [onPassiveIdle]。
      */
     private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
@@ -210,20 +214,25 @@ class EnergyShield : Modifier() {
         if (shell != null && shellLevel === level && shellHolder == holder.uuid) return
         clearShieldVisual() // 跨维度 / 换实体：先销毁旧的，避免球壳留在旧维度或挂在已消失的实体上
 
+        val manager = wand.pdParticles(level)
         val bodyOffset = shellCenterOffset(holder)
-        // 球心 = 脚底 + 身体中段；粒子按「相对球心的球面偏移」登记，所以 spin 会绕球心转
-        shell = Draw.sphere(
-            wand.pdParticles(level),
-            holder.position().add(0.0, bodyOffset, 0.0),
-            SHELL_RADIUS,
-            SHELL_PARTICLES,
-            ColorSource.of(SHELL_COLOR),
-            SHELL_SCALE,
-        )
-            // 轴心跟随持有者（偏移基准是脚底 → 补上身体中段，球心才落在身体中间）
-            .followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
-            // 持续自转：无限循环、客户端本地求值
-            .spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+        val feet = holder.position()
+        val center = feet.add(0.0, bodyOffset, 0.0)
+
+        // ⚠️ 「先绑轴心、再铺成员」的顺序是硬要求（PD 的轴心是**程序级状态**，调用顺序即语义）：
+        //   1) createGroup：轴心先落在脚底；
+        //   2) followEntity：轴心改成「实体 + 身体中段」—— 此后组内 pivot 字段就是球心，
+        //      客户端每 tick 解析出的轴心 = 实体位置 + 该偏移；
+        //   3) Draw.sphere：成员相对**当前轴心**铺开 —— 所以 center 必须等于绑定后的轴心。
+        // 客户端 arm 时是按「成员 spawn 位置 − 当时的 pivot 字段」重算每颗粒子的相对偏移的
+        // （服务端写进粒子的 offsetFromPivot 只是记账）。若第 2 步没先做、或 center 与轴心不一致，
+        // 相对偏移就会与预期差一个身体中段：实机表现是**出现时位置正确、arm 之后整壳掉到脚下**（第 13 轮修）。
+        val group = manager.createGroup(feet)
+        group.followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
+        Draw.sphere(manager, center, SHELL_RADIUS, SHELL_PARTICLES, ColorSource.of(SHELL_COLOR), SHELL_SCALE, group = group)
+        // 持续自转：绕**当前轴心**（= 球心）无限匀速转；客户端本地求值 → 0 包/tick
+        group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+        shell = group
         shellLevel = level
         shellHolder = holder.uuid
     }

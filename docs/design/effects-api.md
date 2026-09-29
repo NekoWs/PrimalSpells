@@ -25,6 +25,26 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 区分清楚：「**不得自行另写一套实现**」这条红线**始终有效**（只要工作碰了 PD API）；
 > 有时机限制的只是「产出末尾的清单」与「登记到 known-issues §7」。
 
+### 0.1 现有接线范式（2026-09 实测，接线前先看这张表）
+
+| 需求 | 用哪套 API | 本项目落点 |
+|---|---|---|
+| 粒子固定在一个点 / 跟随一个非实体点 | `create()…spawn()` + `handle.track(pos)` | `ProjectileBody`、`Trajectory` |
+| 粒子按「力」运动（被吸引、下坠、绕转） | `create()…spawn()`（可给初速 `setVelocity`）+ 每 N tick 用 `setVelocity` 改速度 | `ParticleSwarm`、`BlackHole`、`GravityField` |
+| 粒子锚在一个实体身上（护盾球壳） | `create()…spawn()`（给有限寿命）+ 每 tick `handle.track(锚点 + 偏移)`，`ParticleSwarm.trackAround` | `EnergyShield` |
+| 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | **尚未接线** |
+
+四条硬要点：
+
+1. **不要自己积分位置**：引擎每 tick 自己执行 `pos += velocity`（见 `ServerParticleEngine.tick`），
+   使用方只提供速度或位置；本模组也不维护「镜像位置」，避免与引擎状态漂移。
+2. **`track` 与 `setVelocity` 不互斥但会叠加**：`track` 直设位置、velocity 仍每 tick 自增位置，
+   同一粒子**二选一**（跟随用 `track`，物理用 `setVelocity`）。
+3. **每次 `setVelocity`/`track` 都会向可见玩家广播一次** → 「粒子数 × 更新频率」要有预算
+   （黑洞因此改成每 3 tick 施力一次；相关 API 需求见 [../known-issues.md](../known-issues.md) §7）。
+4. **引擎有每维度粒子上限**：超限时 `spawn()` 返回 `null`，使用方必须能接受「丢粒子」而不是当成错误。
+   `ParticleHandle.data()` 返回的是 `core.server.ParticleData`（非 api 类型）——已在 §7 提出 API 需求。
+
 **硬性要求**：
 
 1. **不要尝试自行编写另一套实现**（这是本政策的红线）。禁止的做法包括：

@@ -11,13 +11,13 @@
 
 | 我想… | 主要文件 | 关联文件 |
 |---|---|---|
-| 改施法节奏 / 牌堆抽牌规则 | `wand/Wand.kt`（`spell`/`draw`/`castHand`/`reloadIfNeeded`） | `item/WandItem.kt`（触发时机） |
+| 改施法节奏 / 牌堆抽牌规则 | `wand/Wand.kt`（`spell`/`draw`/`castHand`/`reloadIfNeeded`） | `item/WandItem.kt`（触发时机）、`wand/WandManager.kt`（持有者/回收/懒加载） |
 | 改法力上限 / 回复速率 | `wand/Wand.kt`（`mana`/`charge` 字段与 `tick`） | `item/WandItem.kt`（`syncStats`） |
 | 改投射物飞行 / 碰撞 | `magic/effect/geometry/Move.kt` | `magic/projectile/Projectile.kt`（`hitBlock`/`hitEntity`） |
 | 改命中伤害 | `magic/effect/lifecycle/Hurt.kt` | `magic/core/MagicStatus.kt`（`damage`） |
 | 改爆炸表现 / 范围 | `magic/effect/lifecycle/Explosion.kt` | `magic/core/MagicStatus.kt`（`explosion*`） |
-| 改区域场（黑洞 / 重力场） | `magic/effect/lifecycle/AreaFieldEffect.kt` | `BlackHole.kt` / `GravityField.kt`（参数） |
-| 改投射物外观（粒子） | `magic/effect/visual/ProjectileBody.kt`（本体）、`Trajectory.kt`（拖尾） | `util/ParticleShapes.kt`（原版粒子）、`lib/particledrawing` |
+| 改区域场（黑洞 / 重力场） | `magic/effect/lifecycle/AreaFieldEffect.kt`（半径/迟缓/拉拽/投射物施力钩子） | `BlackHole.kt` / `GravityField.kt`（参数与 PD 粒子）、`magic/effect/visual/ParticleSwarm.kt` |
+| 改投射物外观（粒子） | `magic/effect/visual/ProjectileBody.kt`（本体）、`Trajectory.kt`（拖尾） | `magic/effect/visual/ParticleSwarm.kt`（力驱动粒子）、`util/PdParticles.kt`（管理器）、`lib/particledrawing` |
 | 改「效果谁先跑」 | `magic/core/EffectPhase.kt`（阶段表） | `magic/core/Magic.kt`（排序执行） |
 | 加一个新的法术 | 见 [spell-development.md](spell-development.md) | `magic/core/MagicManager.kt`（注册） |
 | 改某法术的数值 | `magic/projectile/<类>.kt` 或 `magic/modifier/<类>.kt` 的字段 | id ↔ 类见 §3 |
@@ -78,15 +78,15 @@
 | `modifier/`（26 个，逐个见 §3） | 修饰器实现 |
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
-| `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类） |
-| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing） |
+| `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
+| `effect/visual/{ProjectileBody,Trajectory,ParticleSwarm}.kt` | 粒子表现（particledrawing）：本体、拖尾，以及「本模组施力 + PD 积分」的粒子群工具 |
 
 ### 法杖、物品、实体
 
 | 文件 | 内容 |
 |---|---|
-| `wand/Wand.kt` | 牌堆/手牌/弃牌堆、施法结算、法力与冷却、被动驱动、NBT 序列化（空槽占位保序） |
-| `wand/WandManager.kt` | `wandId → Wand` 实例表、`createWand`、每 tick 维护、启动/停止时读写存档（load 先清空） |
+| `wand/Wand.kt` | 牌堆/手牌/弃牌堆、施法结算、法力与冷却、被动驱动、NBT 序列化（槽位保序 + 牌堆 + `magic_states` 运行期状态）、`saveRuntimeState` 钩子的调用方 |
+| `wand/WandManager.kt` | `wandId → Wand` 实例表 + **持有者记录**（`markHeld`/`holderOf`/`lastHeldTick`）+ 每 100 tick 回收无人持有的内存实例 + 按需懒加载（`get` 会从存档重建）；存档条目永不删除 |
 | `wand/WandSavedData.kt` | `SavedData`：`wandId → CompoundTag` 的持久化容器 |
 | `item/WandItem.kt` | 法杖物品：长按施法、被动 tick、属性同步、容器内右键装卸、`getWand`/`getWandData`/`syncStats`/`forgetCastState` |
 | `item/SpellPouchItem.kt` | 法术小包：16 格内容 + 选中槽，右键装入/取出（与法杖同一套交互），服务端补 `pouchId` |
@@ -110,7 +110,8 @@
 | `event/WandEventHandler.kt` | 公共侧：右键拦截（不与方块/实体交互但可施法）、登录补发同步、登出清理施法记录 |
 | `util/HitResult.kt` | 命中结果（`HitType`、`pos`、`normal`、`entity`） |
 | `util/Lore.kt` | 词条类型枚举（本地化 key）+ `LoreEntry` |
-| `util/ParticleShapes.kt` | 球面/球体均匀粒子采样（爆炸、黑洞、重力场共用） |
+| `util/ParticleShapes.kt` | 球体采样：球面/球内均匀取点、随机切向（原版粒子撒点 + PD 粒子生成共用） |
+| `util/PdParticles.kt` | `Wand.pdParticles(level)`：取/兜底创建 ParticleDrawing 粒子管理器 |
 
 ### 客户端 `client/`
 

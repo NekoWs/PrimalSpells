@@ -26,6 +26,11 @@ import work.nekow.primalspells.registry.ModItems
 class WandItem(properties: Properties) : Item(properties) {
 
     companion object {
+        /**
+         * 「玩家 UUID → 最近一次施法用的法杖」，**只**用来把法杖数值同步给正在施法的玩家
+         * （见 [inventoryTick] 末尾），它不是持有者记录：
+         * 权威的持有者记录（含生物持有者）在 [WandManager.markHeld] / [WandManager.holderOf]。
+         */
         private val lastCastWand: MutableMap<UUID, WandID> = hashMapOf()
 
         fun getWand(stack: ItemStack): Wand? {
@@ -83,6 +88,10 @@ class WandItem(properties: Properties) : Item(properties) {
 
     override fun inventoryTick(stack: ItemStack, level: ServerLevel, owner: Entity, slot: EquipmentSlot?) {
         if (!stack.has(ModItems.WAND_ID)) WandManager.createWand(stack)
+        // 持有者记录入口 1/2：法杖在**任何实体**（玩家或生物）的背包里被 tick 时都记 owner ——
+        // 玩家走这条（覆盖背包/护甲/副手/主手全部槽位），供 WandManager 的回收判定使用。
+        // 手持法杖的**生物**施法时不经过这里，那边由 Wand.spell 补记（入口 2/2）。
+        stack.get(ModItems.WAND_ID)?.let { WandManager.markHeld(it, owner.uuid, level.gameTime) }
         tickSync(stack)
         // 法杖持于主手/副手时驱动被动法术（Wand.tick 内部按游戏 tick 去重）
         if (slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) {

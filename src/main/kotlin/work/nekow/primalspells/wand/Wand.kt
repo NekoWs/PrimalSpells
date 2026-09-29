@@ -6,6 +6,7 @@ import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import work.nekow.particledrawing.api.ParticleManager
 import kotlin.math.min
+import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.magic.core.Magic
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
@@ -31,6 +32,21 @@ class Wand(var id: String) {
 
     /** 已装载法术缓存（innate + magics），由 [load] 重建；被动驱动与牌堆重置共用 */
     val loadedMagics = arrayListOf<Magic>()
+
+    /**
+     * 法术**运行期状态**容器：法术 id → 该法术在这根法杖上的状态 NBT。
+     *
+     * 由 [saveTag] 在序列化时**先清空再重建**（逐个问 [loadedMagics] 里的法术要一份，
+     * 见 [Magic.saveRuntimeState]），由 [fromTag] 读档时经 [Magic.loadRuntimeState] 逐个回灌；
+     * 具体存什么由法术自己决定（例如 `EnergyShield` 存当前耐久与破盾暂停剩余 tick）。
+     *
+     * ⚠️ 键是**法术 id**，不是槽位：[magics] 里同一个法术 id 可以出现多次（重复卡），
+     * 这些重复卡在存档层面**共享同一份**运行期状态 —— 保存时后写的覆盖先写的，
+     * 读档时同一份值回灌给所有同 id 的卡。对当前唯一的用户（`EnergyShield` 是按法杖生效的被动）
+     * 这是可接受的行为（重复装两个护盾，重登后两边取同一个耐久值）；
+     * 若将来出现「每张卡各自计时」的法术，需要把键从法术 id 换成槽位索引。
+     */
+    val magicStates = hashMapOf<String, CompoundTag>()
 
     data class Status(
         var mana: Double = 0.0,
@@ -60,6 +76,10 @@ class Wand(var id: String) {
      * @return true 如果施法成功，false 如果因 delay/recharge 被阻止
      */
     fun spell(caster: Entity): Boolean {
+        // 持有者记录入口 2/2：任何实体主动施法都算一次「确认持有」。
+        // 手持法杖的**生物**不走 WandItem.inventoryTick 的被动驱动路径，只能在这里补记，
+        // 否则 WandManager 的回收判定会把它当成无人持有；玩家两处都会记，重复写同一张表无副作用。
+        WandManager.markHeld(WandID(id), caster.uuid, caster.level().gameTime)
         status.failedReason.clear()
         if (status.delay > 0) {
             status.failedReason.add("Delay ${status.delay}/${delay}")
@@ -182,6 +202,9 @@ class Wand(var id: String) {
         discardPile += hand
         discardPile += discarded
         hand.clear()
+        // 并入后必须清空暂存表：否则每次施法都会把历史上所有被丢弃的卡**重复**并进弃牌堆，
+        // 弃牌堆会无界膨胀（并随 restorePiles 一起写进存档）。
+        discarded.clear()
         reloadIfNeeded()
     }
 
@@ -270,7 +293,13 @@ class Wand(var id: String) {
     /**
      * 将法杖完整状态序列化为 NBT。
      *
-     * @return 包含所有属性和法术列表的 CompoundTag
+     * 除属性与法术槽（`innate`/`magics`，空槽写空串保序）外，还写出：
+     * - `magic_states`：法术运行期状态（法术 id → NBT，见 [magicStates]）；
+     * - `draw_pile` / `hand` / `discard_pile`：三条牌堆的法术 id 序列。
+     *
+     * 后两者是「内存实例可被回收 + 懒加载」不丢状态的前提，见 [WandManager] 的 KDoc。
+     *
+     * @return 包含所有属性、法术列表、法术运行期状态与牌堆的 CompoundTag
      */
     fun saveTag(): CompoundTag {
         val tag = CompoundTag()
@@ -295,12 +324,102 @@ class Wand(var id: String) {
             magicsList.add(StringTag.valueOf(magics.getOrNull(i)?.id ?: ""))
         }
         tag.put("magics", magicsList)
+        // 法术运行期状态：逐个问 loadedMagics（innate + magics）要一份，按法术 id 落盘。
+        // 先清空再重建 —— 容器始终只反映「当前装在这根杖上」的法术：法术被取下、或法术自己不写内容时，
+        // 都不会留下上一轮的陈旧条目（否则那些状态会跟着存档一直漂）。
+        // 重复卡（同一 id 出现多次）在容器里天然合并成一份，所以下面按容器写列表、而不是按卡写。
+        magicStates.clear()
+        loadedMagics.forEach { magic ->
+            val state = CompoundTag()
+            magic.saveRuntimeState(state)
+            if (!state.isEmpty) magicStates[magic.id] = state
+        }
+        val stateList = ListTag()
+        // 按 id 排序：落盘结果不依赖哈希顺序，便于比对存档差异
+        magicStates.entries.sortedBy { it.key }.forEach { (magicId, state) ->
+            val entry = CompoundTag()
+            entry.putString("id", magicId)
+            entry.put("state", state)
+            stateList.add(entry)
+        }
+        tag.put("magic_states", stateList)
+        // 牌堆：只存法术 id 序列（法术实例本身是一次性的，不入库）。
+        // 必须存：WandManager 会把无人持有的法杖内存实例回收掉、之后按需从存档懒加载，
+        // 不存牌堆就会变成「放下再捡起 = 重新洗牌」。
+        tag.put("draw_pile", pileTag(drawPile))
+        tag.put("hand", pileTag(hand))
+        tag.put("discard_pile", pileTag(discardPile))
         return tag
+    }
+
+    /**
+     * 把一张牌堆序列化成法术 id 列表。
+     *
+     * @param pile 牌堆（[drawPile] / [hand] / [discardPile]），顺序即抽牌顺序
+     */
+    private fun pileTag(pile: List<Magic>): ListTag {
+        val list = ListTag()
+        pile.forEach { list.add(StringTag.valueOf(it.id)) }
+        return list
+    }
+
+    /**
+     * 把法术 id 列表还原成法术实例。
+     *
+     * id 已不在注册表里的牌直接跳过：法术被移除后旧存档仍可读，等价于那张牌消失。
+     */
+    private fun magicsFrom(list: ListTag): List<Magic> =
+        list.mapNotNull { MagicManager.create((it as StringTag).asString().get()) }
+
+    /**
+     * 读档：把 [magicStates] 里的状态回灌给 [loadedMagics] 里对应 id 的实例。
+     *
+     * 必须在 [load] 之后调用（要先有实例），且此时 `wand`/`caster`/`status` 都还没被设置 ——
+     * 这正是 [Magic.loadRuntimeState] 里禁止访问它们的约定所对应的时机。
+     */
+    private fun applyMagicStates(tag: CompoundTag) {
+        magicStates.clear()
+        tag.getListOrEmpty("magic_states").forEach { element ->
+            val entry = element as? CompoundTag ?: return@forEach
+            val id = entry.getStringOr("id", "")
+            if (id.isNotEmpty()) magicStates[id] = entry.getCompoundOrEmpty("state")
+        }
+        loadedMagics.forEach { magic ->
+            magicStates[magic.id]?.let { magic.loadRuntimeState(it) }
+        }
+    }
+
+    /**
+     * 读档：按 id 还原三条牌堆。
+     *
+     * 存档里没有这些键时（旧存档、或新建的空法杖）保持 [load] 重建出来的初始牌堆；
+     * 这样既兼容旧档，也不会让「编辑法术槽」后的重建逻辑失效。
+     *
+     * [discarded]（一次施法内部的暂存表）不入库：它的内容在每次施法末尾已经并进 [discardPile]，
+     * 存了反而会在恢复后再并一次。
+     */
+    private fun restorePiles(tag: CompoundTag) {
+        if (!tag.contains("draw_pile")) return
+        val draw = magicsFrom(tag.getListOrEmpty("draw_pile"))
+        val inHand = magicsFrom(tag.getListOrEmpty("hand"))
+        val discard = magicsFrom(tag.getListOrEmpty("discard_pile"))
+        // 兜底：三条牌堆都空、但法杖明明装着法术 —— 这种状态恢复出来会让法杖永远抽不到牌，
+        // 按存档异常处理，退回 load() 重建的初始牌堆（宁可重新洗牌，也不要一把锁死的杖）。
+        if (draw.isEmpty() && inHand.isEmpty() && discard.isEmpty() && loadedMagics.isNotEmpty()) return
+        drawPile.clear()
+        drawPile += draw
+        hand.clear()
+        hand += inHand
+        discardPile.clear()
+        discardPile += discard
     }
 
     companion object {
         /**
          * 从 NBT 反序列化重建法杖对象。
+         *
+         * 顺序有讲究：先按 `innate`/`magics` 建实例并 [load]（含牌堆初始重建），
+         * 再回灌法术运行期状态（[applyMagicStates]），最后按存档覆盖牌堆（[restorePiles]）。
          *
          * @param tag 包含法杖序列化数据的 CompoundTag
          * @return 已初始化并 load() 过的 Wand 实例
@@ -324,7 +443,14 @@ class Wand(var id: String) {
                 val id = (it as StringTag).asString().get()
                 wand.magics += if (id.isEmpty()) null else MagicManager.create(id)
             }
-            return wand.also { wand.load() }
+            return wand.also {
+                it.load()
+                // 运行期状态要在 load() 之后（要先有 loadedMagics 里的实例可灌），
+                // 且在任何施法/被动驱动之前：此刻 wand/caster 还是未初始化的 lateinit，
+                // 所以钩子里不得访问它们（见 Magic.loadRuntimeState 的约定）。
+                it.applyMagicStates(tag)
+                it.restorePiles(tag)
+            }
         }
     }
 }

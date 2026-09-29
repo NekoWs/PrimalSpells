@@ -1,9 +1,11 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import net.minecraft.server.level.ServerLevel
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleHandle
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.pdParticles
 
 /**
  * 投射物本体粒子：表示投射物当前所在位置的一个粒子，每 tick 跟随 `status.pos` 移动。
@@ -40,7 +42,8 @@ class ProjectileBody(
     /** 惰性生成：在首个 onTick（此时位置积分已完成）生成，避免读到未初始化的原点。 */
     private fun ensureSpawned() {
         if (handle != null) return
-        val manager = wand.status.particleManager ?: return
+        val level = caster.level() as? ServerLevel ?: return
+        val manager = wand.pdParticles(level)
         val pos = status.pos
         handle = manager.create()
             .position(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())

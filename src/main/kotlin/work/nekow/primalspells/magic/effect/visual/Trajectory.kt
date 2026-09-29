@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
@@ -7,6 +8,7 @@ import work.nekow.particledrawing.api.ParticleManager
 import kotlin.random.Random
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.pdParticles
 
 /**
  * 拖尾特效：用 ParticleDrawing 程序化粒子在投射物后方喷出拖尾（替换原版 sendParticles 拖尾）。
@@ -25,7 +27,8 @@ class Trajectory(
     override val phase = EffectPhase.VISUAL
 
     override fun onTick() {
-        val manager = wand.status.particleManager ?: return
+        val level = caster.level() as? ServerLevel ?: return
+        val manager = wand.pdParticles(level)
         val pos = status.pos
         val velocity = status.velocity
         val speed = velocity.length()

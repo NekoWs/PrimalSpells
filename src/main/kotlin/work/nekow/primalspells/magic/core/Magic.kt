@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.core
 
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.entity.Entity
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.util.Lore
@@ -31,6 +32,32 @@ abstract class Magic {
      * 由 [Wand.tick] 每 tick 调用一次（调用前已设置好 [caster]/[wand]）。
      */
     open fun onInventoryTick() { }
+
+    /**
+     * 【持久化钩子·写】把本法术需要跨存档保留的**运行期状态**写进给定 NBT（默认什么都不写）。
+     *
+     * 运行期状态 = 只活在内存里的进度/资源，例如 `EnergyShield` 的当前耐久与破盾暂停剩余 tick；
+     * 法术的构造参数（伤害、半径…）不算运行期状态，它们由代码/资源决定，不必入库。
+     *
+     * 调用方：[Wand.saveTag] 对 [Wand.loadedMagics]（innate + magics）逐个调用，
+     * 结果按法术 id 存进 [Wand.magicStates] 一并落盘。写空 NBT 的法术不会留下条目。
+     *
+     * ⚠️ 键是法术 id：同一 id 的重复卡共享同一份状态，见 [Wand.magicStates]。
+     *
+     * @param tag 调用方新建的空 NBT，往里写自己的键（建议用 snake_case 短键名）
+     */
+    open fun saveRuntimeState(tag: CompoundTag) { }
+
+    /**
+     * 【持久化钩子·读】从给定 NBT 读回运行期状态（默认什么都不做），与 [saveRuntimeState] 成对。
+     *
+     * ⚠️ **调用时机**：`Wand.fromTag` 读档期间、[Wand.load] 之后立刻执行。
+     * 此时 [wand] / [caster] 这些 `lateinit` 字段**还没有被设置**（[status] 也还没有意义），
+     * 因此钩子里**只能**读写自己的字段，不得访问 [wand]/[caster]/[status]。
+     *
+     * @param tag 存档里该法术 id 对应的状态 NBT（缺失时为空 NBT，实现需给默认值兜底）
+     */
+    open fun loadRuntimeState(tag: CompoundTag) { }
 
     /**
      * 快捷添加提示

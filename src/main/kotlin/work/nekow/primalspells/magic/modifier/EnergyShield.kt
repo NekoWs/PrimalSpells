@@ -1,15 +1,21 @@
 package work.nekow.primalspells.magic.modifier
 
 import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.network.PacketDistributor
 import org.joml.Vector3f
+import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
+import work.nekow.primalspells.magic.effect.visual.ParticleSwarm
 import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
+import work.nekow.primalspells.util.ParticleShapes
+import work.nekow.primalspells.util.pdParticles
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -20,6 +26,10 @@ import kotlin.math.sin
  * 为持有者提供一层能量护盾：进入护盾范围的敌方法术会被弹开（反射其速度），
  * 每次弹开消耗耐久；耐久归零后护盾破碎，暂停恢复一段时间（[breakPauseTicks]），
  * 之后以 [regenPerSecond] 的速度恢复耐久。
+ *
+ * 当前耐久与破盾暂停剩余 tick 是**运行期状态**，随法杖存档持久化
+ * （见 [saveRuntimeState]/[loadRuntimeState]）：重登/重启/被 `WandManager` 回收后再懒加载，
+ * 护盾都不会回满。数值与手感本身仍是待调项（`docs/known-issues.md` §1.1）。
  *
  * 不弹开持有者自己施放的法术（投射物出生点在施法者面前，会被瞬间弹回）。
  */
@@ -47,6 +57,49 @@ class EnergyShield : Modifier() {
     /** 破盾暂停剩余 tick */
     var pauseTicks: Int = 0
 
+    /** 护盾球壳粒子（ParticleDrawing）：以持有者为锚点的淡蓝色球壳，见 [updateShieldVisual]。 */
+    private val shieldSwarm = ParticleSwarm()
+
+    /** 球壳粒子的球面偏移（首次生成时随机采样一次，之后复用并缓慢自转）。 */
+    private var shellOffsets: List<Vec3> = emptyList()
+
+    /** 球壳维护计数器（用于按周期整圈重建） */
+    private var shellTick = 0
+
+    /** 球壳绕 Y 轴的自转角（弧度） */
+    private var shellSpin = 0f
+
+    /**
+     * 运行期状态持久化（写）：把「当前耐久」与「破盾暂停剩余 tick」交给法杖存档。
+     *
+     * 这两个字段是仅有的、无法由构造参数重算的护盾进度 —— 不入库就会出现
+     * 「重登/重启后护盾回满、破盾暂停被清空」（原 `docs/known-issues.md` §1.1 缺口 1，现已解决）。
+     *
+     * 数值本身（[maxDurability]/[regenPerSecond]/[breakPauseTicks]/[bounceCost]/[shieldRadius]）
+     * 是构造参数，由代码决定，不入库。
+     *
+     * @param tag 空 NBT，写 `durability`（double）与 `pause_ticks`（int）
+     */
+    override fun saveRuntimeState(tag: CompoundTag) {
+        tag.putDouble("durability", durability)
+        tag.putInt("pause_ticks", pauseTicks)
+    }
+
+    /**
+     * 运行期状态持久化（读）：恢复 [durability] 与 [pauseTicks]。
+     *
+     * ⚠️ 本钩子由 `Wand.fromTag` 在读档期间调用，此时 `wand`/`caster`/`status` **还不能访问**
+     * （见 `Magic.loadRuntimeState` 的约定），所以这里只碰自己的字段。
+     * 恢复后的值不用主动同步客户端：法杖回到手上后 [onInventoryTick] 第一次 [syncClient]
+     * 就会把恢复值推给 HUD（`lastSent` 初始值是空壳 payload，必然不同）。
+     *
+     * @param tag 存档状态；键缺失时退回「满耐久、无暂停」（旧档/首次入库）
+     */
+    override fun loadRuntimeState(tag: CompoundTag) {
+        durability = tag.getDoubleOr("durability", maxDurability).coerceIn(0.0, maxDurability)
+        pauseTicks = tag.getIntOr("pause_ticks", 0).coerceAtLeast(0)
+    }
+
     override var needInventory: Boolean = true
 
     override fun onInventoryTick() {
@@ -62,7 +115,12 @@ class EnergyShield : Modifier() {
             durability = min(maxDurability, durability + regenPerSecond / 20.0)
         }
         val shieldUp = durability > 0
-        if (shieldUp) spawnShieldParticles(level, player)
+        if (shieldUp) {
+            updateShieldVisual(level, player)
+        } else {
+            // 破盾：球壳立即消失（暂停恢复期间不再重建）
+            clearShieldVisual()
+        }
 
         if (!shieldUp) {
             syncClient()
@@ -123,19 +181,54 @@ class EnergyShield : Modifier() {
         syncClient()
     }
 
-    /** 护盾激活期间每 tick 在护盾表面密集生成粒子（便于观察护盾是否生效） */
-    private fun spawnShieldParticles(level: ServerLevel, player: Entity) {
-        val eye = player.getEyePosition()
-        val r = 1.25
-        repeat(6) {
-            val theta = RANDOM.nextDouble() * Math.PI * 2
-            val phi = (RANDOM.nextDouble() - 0.5) * Math.PI
-            val x = eye.x + cos(theta) * cos(phi) * r
-            val y = eye.y + sin(phi) * r * 0.8
-            val z = eye.z + sin(theta) * cos(phi) * r
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, x, y, z, 1, 0.0, 0.0, 0.0, 0.02)
+    /**
+     * 护盾视觉（ParticleDrawing）：以持有者为锚点的**淡蓝色球壳**。
+     *
+     * 实现要点：
+     * - 位置由我们算（锚点 + 球面偏移 + 绕 Y 缓慢自转），PD 负责渲染与客户端插值；
+     *   用 `track` 直设位置（`move` 缓动会永远慢一拍）；
+     * - 粒子的寿命是有限的（[SHELL_LIFETIME_TICKS]），每 [SHELL_REFRESH_TICKS] tick 整圈重建一次。
+     *   这样做的原因：法杖一旦不再被持有（放下/丢进箱子/卸下法术），`onInventoryTick` 就不再被调用，
+     *   我们**没有**「被动停止」的回调可用来清理 —— 有限寿命让粒子自行过期，不会在世界里留下孤儿粒子；
+     * - 破盾时立即 [clearShieldVisual]（球壳消失），暂停恢复期间不再重建。
+     *
+     * 网络开销：每 tick 对 [SHELL_PARTICLES] 个粒子各广播一次位置包，因此粒子数保持克制（见 `docs/known-issues.md` §7）。
+     */
+    private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
+        shellTick++
+        if (shellOffsets.isEmpty()) {
+            val random = level.random
+            shellOffsets = (0 until SHELL_PARTICLES).map {
+                ParticleShapes.randomUnitVector(random).scale(SHELL_RADIUS)
+            }
+        }
+        if (shieldSwarm.size == 0 || shellTick % SHELL_REFRESH_TICKS == 0) {
+            shieldSwarm.clear()
+            val manager = wand.pdParticles(level)
+            val center = shellCenter(holder)
+            for (offset in shellOffsets) {
+                shieldSwarm.spawn(manager, center.add(offset), SHELL_COLOR, SHELL_SCALE, SHELL_LIFETIME_TICKS)
+            }
+        }
+        shellSpin += SHELL_SPIN_PER_TICK
+        val cosSpin = cos(shellSpin)
+        val sinSpin = sin(shellSpin)
+        shieldSwarm.trackAround(shellCenter(holder)) { index ->
+            val offset = shellOffsets[index % shellOffsets.size]
+            // 绕 Y 轴缓慢自转，让球壳看起来是「活的」
+            Vec3(offset.x * cosSpin - offset.z * sinSpin, offset.y, offset.x * sinSpin + offset.z * cosSpin)
         }
     }
+
+    /** 破盾/失效：立即销毁球壳粒子。 */
+    private fun clearShieldVisual() {
+        shieldSwarm.clear()
+        shellTick = 0
+    }
+
+    /** 球壳球心：持有者身体中段（脚 + 身高 55%），比眼睛位置更贴近「包裹全身」的观感。 */
+    private fun shellCenter(holder: Entity): Vec3 =
+        holder.position().add(0.0, holder.bbHeight * 0.55, 0.0)
 
     /** 同步护盾状态到持有者客户端（仅状态变化时发包，避免每 tick 空包） */
     private fun syncClient() {
@@ -149,20 +242,46 @@ class EnergyShield : Modifier() {
     private var lastSent = SyncShieldPayload("", -1.0, -1.0, -1, -1)
 
     companion object {
-        private val RANDOM = java.util.Random()
-
         /**
          * 玩家碰撞箱相对其位置中心的最大半边长（宽 0.6 / 高 1.8 → 最远角 ≈ 1.0）。
          * 用于把「点到中心距离」的球面粗筛放宽到绝不比精确 AABB 判定更严格。
          */
         private const val PLAYER_BOX_MAX_HALF_EXTENT = 1.0
+
+        // ---- 球壳粒子（ParticleDrawing）参数 ----
+
+        /** 球壳粒子数：每 tick 每个粒子各广播一次位置包，别开太大 */
+        private const val SHELL_PARTICLES = 24
+
+        /** 球壳半径（方块）：略小于 [shieldRadius] + 玩家体积，视觉上包住身体 */
+        private const val SHELL_RADIUS = 0.85
+
+        /** 粒子尺寸 */
+        private const val SHELL_SCALE = 0.4f
+
+        /** 粒子寿命（tick）：有限寿命让「法杖不再被持有时」粒子自行过期，不留孤儿 */
+        private const val SHELL_LIFETIME_TICKS = 20
+
+        /** 整圈重建周期（tick）：必须 < [SHELL_LIFETIME_TICKS]，否则球壳会闪断 */
+        private const val SHELL_REFRESH_TICKS = 10
+
+        /** 球壳自转角速度（弧度/tick）：约 0.03 rad ≈ 1.7°/tick，慢速旋转 */
+        private const val SHELL_SPIN_PER_TICK = 0.03f
+
+        /** 淡蓝色 */
+        private val SHELL_COLOR: Color = Color.ofInt(120, 200, 255)
     }
 
     /**
      * 能量盾的 tooltip：基础信息用 `super`（法术名/法力/延迟/充能），再补护盾专属数值。
      *
-     * 注意：护盾仍是**未完成**特性 —— 耐久只存在内存里（不参与 `Wand.saveTag`），
-     * 重登/重启后回满；反射与破盾暂停的手感也还没调平（见 `docs/known-issues.md`）。
+     * 这里列的是护盾的**数值设定**（上限耐久/回复/破盾暂停/弹开消耗），不含当前耐久
+     * ——当前耐久是每根法杖各自的运行期状态，只由服务端掌握，客户端 tooltip 拿不到权威值，
+     * 它显示在 HUD 上（`SyncShieldPayload` → `client/hud/ShieldHudRenderer`）。
+     *
+     * 耐久持久化已完成：「重登/重启后护盾回满」这条缺口（原 `docs/known-issues.md` §1.1 缺口 1）
+     * 由 [saveRuntimeState]/[loadRuntimeState] 解决，见那两个钩子的 KDoc。
+     * 剩下的缺口只有**数值与手感**（反射强度/破盾暂停/耐久曲线/粒子量）尚未调平（同节缺口 2、3）。
      */
     override fun initLore() {
         super.initLore()

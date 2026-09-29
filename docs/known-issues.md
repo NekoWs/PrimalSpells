@@ -12,12 +12,19 @@
 ### 🟠 1.1 能量护盾 `EnergyShield`（你已确认：后续继续开发）
 
 - 现状：`magic/modifier/EnergyShield.kt` 是 `needInventory` 被动，能反射敌方法术、按耐久破盾/恢复；
-  `initLore()` 已修复为调用 `super`（此前缺少法术名/法力等基础词条）。
-- 缺口：
-  1. `durability` 只存在内存里，不参与 `Wand.saveTag`/`fromTag` → 重登/重启后护盾回满；
-  2. 数值与手感（反射强度、破盾暂停、耐久曲线）尚未调平；
-  3. 结构上它是被动法术却继承 `Modifier`、放在 `magic/modifier/`（你已明确暂不处理命名/结构债）。
-- 建议：给 `Wand` 增一个通用的「法术运行期状态」存储（按法术 id 存 NBT），护盾耐久写进去。
+  `initLore()` 已修复为调用 `super`。
+- 已解决：耐久/破盾暂停已通过「法术运行期状态」存储纳入法杖存档（见 §6 第 3 轮），重登不再回满。
+- 仍缺口：
+  1. 数值与手感（反射强度、破盾暂停、耐久曲线）尚未调平；
+  2. 结构上它是被动法术却继承 `Modifier`、放在 `magic/modifier/`（你已明确暂不处理命名/结构债）。
+
+### 🟡 1.2 能量护盾的粒子表现（已改用 ParticleDrawing，仅剩调参）
+
+- 现状：球壳已改为 **PD 粒子**（`EnergyShield.updateShieldVisual`）——24 个淡蓝色粒子铺在半径 0.85 的球壳上，
+  以持有者身体中段为锚点、每 tick `track` 位置并绕 Y 轴缓慢自转；破盾立即清除。
+- 实现要点：粒子寿命 20 tick、每 10 tick 整圈重建 —— 这样「法杖不再被持有」时（`onInventoryTick` 不再被调用、
+  我们**没有**被动停止回调）粒子会自行过期，不会在世界里留下孤儿粒子。
+- 仍可优化：粒子数与跟踪频率（每 tick 24 次位置广播）；若 PD 提供实体锚点 API 可省掉这些广播（见 §7）。
 
 ---
 
@@ -25,11 +32,11 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟡 | 黑洞每 tick 生成 256 个静止粒子 | `magic/effect/lifecycle/BlackHole.kt` | **当前粒子只是用来观察黑洞范围**，你已确认后续会优化（分层降频/按可见性削减） |
+| 🟠 | 黑洞粒子：每 tick 生成 32 个 PD 粒子，寿命最长 60 tick（峰值约 1900 个） | `magic/effect/lifecycle/BlackHole.kt` | 已做两件事：①落到中心即销毁（`CONSUME_DISTANCE`）；②**施力每 3 tick 一次**（PD 每次 `setVelocity` 都会广播，每 tick 对上千粒子广播代价过大）。若仍嫌重：降 `PARTICLES_PER_TICK`/`LIFETIME_TICKS`，或按玩家可见性削减 |
+| 🟡 | 重力场粒子：每 tick 1 个、寿命 60 tick（峰值约 60 个） | `magic/effect/lifecycle/GravityField.kt` | 开销很小；若要更密可调 `SPAWN_RADIUS`/寿命 |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 已加两道剪枝：场上无投射物直接返回；先按「到玩家中心的距离球」粗筛（半径 = 护盾半径 + 玩家包围盒最远角 1.0 + 该投射物碰撞半径，保证不漏判）。法术数量再上量级时可考虑空间分桶/网格 |
-| 🟡 | `WandManager.wands` 只增不减（法杖物品被销毁后条目仍在） | `wand/WandManager.kt` | 定期按「玩家背包中是否还存在该 wandId」回收 |
-| 🟡 | `EnergyShield` 护盾表面粒子每 tick 6 个 | `magic/modifier/EnergyShield.kt` | 与 §1.1 一并调优 |
+| 🟡 | `EnergyShield` 护盾球壳：24 个 PD 粒子，每 tick 各广播一次位置包 | `magic/modifier/EnergyShield.kt` | 有限寿命（20 tick）+ 每 10 tick 重建，粒子不再被驱动时自行过期。要省广播就得等 PD 的实体锚点 API（§7） |
 
 ---
 
@@ -61,6 +68,9 @@
 | 小包没有右键界面 | 编辑与法杖一致：滚轮选槽 + 物品对上物品装卸 | `item/SpellPouchItem.kt` |
 | 蛇形与往复运动可叠加 | 蛇形只施加方向**旋转增量**，不再覆写方向 | `magic/modifier/Serpentine.kt` |
 | 区域魔法每 tick 结算、离开即解除 | 离开范围**立刻**撤销迟缓（不等效果到期）；撤销时只清等级相同的迟缓 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
+| 区域场**会影响魔法投射物** | 黑洞把范围内投射物吸向中心、重力场给投射物持续的向下力；**区域弹自身除外**（否则会被自己往下压/吸住）。这是刻意的：黑洞就该「把飞进来的法术吸掉」 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
+| 区域/本体粒子的「力」在本模组算，积分与渲染归 ParticleDrawing | `ParticleSwarm` 只负责生成句柄、写速度、到点销毁；位置积分（引擎 `pos += velocity`）、同步、可见性、寿命、渲染全由 PD 负责 | `magic/effect/visual/ParticleSwarm.kt` |
+| PD 粒子管理器由 `wand.pdParticles(level)` 兜底创建 | 管理器原本只在「持有者背包物品被 tick」时建立；未来的生物施法者不走 `inventoryTick`，不兜底就会出现「有伤害没粒子」 | `util/PdParticles.kt` |
 
 ---
 
@@ -70,13 +80,22 @@
 2. 对着**方块/生物**长按右键：不交互，但仍能施法。
 3. 无人机行为：朝向/位置是否不再抖动（只服务端扰动 + 12°/tick 限速转向）。
 4. 法术小包：滚轮选槽 + 右键放入/取出（含交换）、tooltip 高亮与法杖一致。
-5. 能量护盾：反射、破盾暂停、HUD 条（见 §1.1）。
+5. 能量护盾：反射、破盾暂停、HUD 条；重登后耐久不再回满（见 §6 第 3 轮）。
 6. 轨道类修正（`self_orbit`/`sphere_orbit`/`quantum_entanglement`）在 `OVERRIDE` 阶段不再漂移。
 7. 触发法术链（`trigger_fireball` + `delayed_cast`）释放表现与一次性语义。
 8. **蛇形 + 往复运动**：往复反向不再被蛇形抹掉；蛇形与追踪/随机路径也能叠加。
-9. **区域场**：黑洞吸力力度是否与之前相当（改为每 tick 施加，强度 0.12/(距离+0.5)）；
+9. **区域场**：黑洞吸力力度是否与之前相当（每 tick 施加，强度 0.12/(距离+0.5)）；
    重力场离开范围后迟缓是否**立刻**消失；场结束后（投射物死亡）是否同样立刻消失。
 10. 命中一致性：`Move` 改为宽相位后，快速目标（奔跑的玩家/坐骑）是否仍能被正常命中。
+11. **黑洞吸附投射物**：把法术打进黑洞范围，是否被明显吸向中心（含自己的法术）。
+12. **重力场压投射物**：法术穿过重力场时是否可见下坠（与 `gravity` 修正同量级 0.03/tick）。
+13. **黑洞粒子**：紫色、每 tick 32 个、起始绕中心切向旋转，随后被吸入并在中心消失；密度是否合适
+    （峰值约 1900 个，若卡顿就调 `PARTICLES_PER_TICK`/`LIFETIME_TICKS`）。
+14. **重力场粒子**：球体内每 tick 1 个淡灰色粒子，匀速下落、不跟随投射物。
+15. **法杖持有者记录与回收**（见 §6 第 3 轮）：放下/丢弃法杖一段时间后再拿起，法力、牌堆、冷却、
+    护盾耐久是否都不丢。
+16. **护盾球壳粒子**：淡蓝色球体是否跟随持有者移动并缓慢自转；破盾是否立即消失；
+    放下法杖（或卸下 `energy_shield`）后约 1 秒内粒子是否自行消失（不留孤儿）。
 
 ---
 
@@ -143,6 +162,20 @@
 | 9.9 | 「ParticleDrawing API 修改需求」清单出现时机太宽 | 收窄为：**只在本次功能要求涉及 ParticleDrawing API 时**才在产出末尾附该清单并登记 §7（纯配置/版本号/其它系统的改动不附）；「不得自行另写一套」的红线保持始终有效。同步更新 [conventions.md](conventions.md) §9、[design/effects-api.md](design/effects-api.md) §0、`AGENTS.md` 第 6 条 | `docs/conventions.md`、`docs/design/effects-api.md`、`AGENTS.md`、`docs/known-issues.md` |
 | 9.10 | 规范 git 提交信息格式 | 定为 `<目的>：<简短描述>`（目的取自 `新增/修复/优化/重构/文档/测试/构建/杂项`；全角冒号；一句 ≤ 20 字；只写大概干了什么，不复述具体改动与文件名）；写入 [conventions.md](conventions.md) §10 + 提交前清单 + `AGENTS.md` 第 7 条 | `docs/conventions.md`、`AGENTS.md` |
 
+### 第 3 轮（同日晚，黑洞/重力场/粒子表现/法杖持有者）
+
+| 编号 | 裁决 | 处理方式 | 主要落点 |
+|---|---|---|---|
+| 3.1 | 修复黑洞无法吸引投射物 | `AreaFieldEffect` 新增「对半径内魔法投射物每 tick 施力」的钩子（含距离平方剪枝、排除区域弹自身）；`BlackHole` 用吸力 `0.12/(距离+0.5)` 沿指向中心方向给投射物加速 | `effect/lifecycle/AreaFieldEffect.kt`、`BlackHole.kt` |
+| 3.2 | 重力场对投射物附加向下的力 | `GravityField` 覆写钩子，给范围内投射物每 tick `velocity.y -= 0.03`（与 `gravity` 修正同量级） | `effect/lifecycle/GravityField.kt` |
+| 3.3 | 黑洞粒子改为 PD：每 tick 32 个、紫色、初始切向力、逐渐被吸入、到中心消失 | 新增 `ParticleSwarm`（只有句柄表 + 施力 + 销毁；积分/同步/渲染全归 PD）；黑洞粒子在 5 格球壳生成、初速度取随机切向 `0.22`，每 3 tick 施加 `0.022×3` 的向心加速度，进入 `0.35` 格即销毁 | `effect/visual/ParticleSwarm.kt`、`BlackHole.kt`、`util/ParticleShapes.kt`（新增球面/球内/切向采样） |
+| 3.4 | 重力场粒子改为 PD：每 tick 1 个、淡灰色、不动、中速下落 | 每 tick 在 2.5 格球体内随机位置生成 1 个淡灰粒子，初速度竖直向下 `0.18` 后不再施力（世界空间下落，不跟随投射物）；只做句柄清理 | `effect/lifecycle/GravityField.kt` |
+| 3.5 | 护盾粒子改为 PD 锚点球体 | **已实现**：24 个淡蓝色 PD 粒子铺在半径 0.85 的球壳上，锚点为持有者身体中段，每 tick `track` + 绕 Y 缓慢自转；有限寿命（20t）+ 每 10t 重建，避免法杖不再被持有时留下孤儿粒子；破盾立即清除。仅剩调参（粒子数/跟踪频率） | `modifier/EnergyShield.kt`、`effect/visual/ParticleSwarm.kt`（新增 `trackAround`） |
+| 3.6 | 记录「持有法杖实体」，无实体持有时回收 | **已实现**：`WandManager` 持有者表 `wandId → (实体 UUID, 最近确认 tick)`（唯一写入口 `markHeld`，入口 = `WandItem.inventoryTick` 与 `Wand.spell`）；每 100 tick 回收「在线玩家背包里没有 + 超过 200 tick 未被确认」的内存实例，回收前先写回存档；`get` 按需从存档懒加载；**存档条目永不删除**。 为了让「丢杖→捡起」不丢牌堆，`saveTag/fromTag` 增加了 `draw_pile`/`hand`/`discard_pile` | `wand/WandManager.kt`、`wand/Wand.kt`、`item/WandItem.kt` |
+| 3.7 | 采取 known-issues 1.1 建议 | **已实现**：`Wand.magicStates`（法术 id → NBT）纳入存档；`Magic.saveRuntimeState/loadRuntimeState` 钩子；`EnergyShield` 持久化 `durability`/`pause_ticks`（读档 clamp，未动战斗数值）。重复卡按法术 id 共享一份状态（KDoc 写明，将来要每卡计时需换槽位键） | `wand/Wand.kt`、`magic/core/Magic.kt`、`magic/modifier/EnergyShield.kt` |
+| 3.8 | PD 粒子管理器兜底 | 新增 `wand.pdParticles(level)`：管理器缺失/跨维度时现场建立并缓存，保证未来的生物施法者也有粒子表现；`Trajectory`/`ProjectileBody`/区域场统一走它 | `util/PdParticles.kt`、`effect/visual/{Trajectory,ProjectileBody}.kt`、`effect/lifecycle/AreaFieldEffect.kt` |
+| 3.9 | 施法时弃牌堆会无界重复累积 | 顺带修：`Wand.discard()` 把暂存表 `discarded` 并进弃牌堆后**从不清空**，导致每次施法都把历史弃牌重复并入（并随新加的 `discard_pile` 写进存档）。现已在并入后 `discarded.clear()` | `wand/Wand.kt` |
+
 ---
 
 ## 7. ParticleDrawing API 需求（待对方实现）
@@ -157,7 +190,42 @@
 > 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.8-ALPHA`
 > （`lib/particledrawing-1.0.8-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
 
-**未决需求：无。**
+**未决需求：3 条**（均由第 3 轮的黑洞/护盾粒子接线暴露出来，见下）。
+
+### [需求] `ParticleHandle` 缺少 api 级的只读位置查询
+
+- 状态：未决
+- 目标能力：黑洞粒子要「每 tick 朝中心施力」，因此必须知道 PD 引擎里该粒子的**权威当前位置**
+- 现有 API 为什么不够：`ParticleHandle.velocity()` 属于 api 包，但**位置**只能通过 `data(): ParticleData?` 取，
+  而 `ParticleData` 在 `work.nekow.particledrawing.core.server`（非 api 包）——使用方被迫依赖 core 内部类型
+- 期望 API 形态：`fun position(): Vec3?`（与 `velocity()` 对称，内部转调 engine 的 `getParticle(id)?.position()`）；
+  若不想暴露单粒子查询，也可在 api 包提供只读快照类型
+- 影响面：`magic/effect/visual/ParticleSwarm.kt`
+- 临时降级：用 `handle.data()?.position()`（能跑，但绑定了 core 类型，PD 内部重命名/移动包会波及本模组）
+
+### [需求] 缺少「力/加速度」与批量更新，只能逐粒子每 tick 广播速度
+
+- 状态：未决
+- 目标能力：黑洞需要持续修正**上千个**粒子的速度（每 tick 32 个生成、寿命最长 60 tick）
+- 现有 API 为什么不够：`setVelocity` 是**单粒子即时广播**（`ParticleVelocityPayload`）。
+  逐粒子逐 tick 广播，网络量与对象分配都过高；为此我们不得不每 3 tick 才施力一次（牺牲轨迹精度）
+- 期望 API 形态（任一即可）：
+  1. `applyForce(particleId, accel: Vec3, ticks: Int)`：服务端权威加速度，客户端按同一规则积分，只在开始时广播一次；
+  2. 批量接口 `setVelocity(ids: Collection<UUID>, velocities: ...)`：一个包覆盖多粒子；
+  3. 「速度缓动版 `move`」：`setVelocity(target: Vec3, durationTicks: Int, easing)`，一次下发、N tick 内插值到位
+- 影响面：`magic/effect/visual/ParticleSwarm.kt`、`magic/effect/lifecycle/BlackHole.kt`
+- 临时降级：`BlackHole.FORCE_INTERVAL_TICKS = 3`（每 3 tick 施一次力，加速度按 tick 数补齐）
+
+### [需求] 原始粒子缺少「实体锚点」绑定
+
+- 状态：未决（**不阻塞**：护盾已用 `trackAround` 每 tick 钉位置实现，只是广播开销偏高）
+- 目标能力：能量护盾的淡蓝色球体（§1.2）以持有者为锚点，随实体移动/转向；理想情况下服务端只更新锚点一次
+- 现有 API 为什么不够：`Anchor.Entity(entityId)` 只服务 `.pdrawc` **动画播放**路径；
+  原始粒子要跟随实体，使用方只能每 tick 对**每个**粒子 `track(...)`（同样是一次广播/粒子/tick）
+- 期望 API 形态：`ParticleHandle.attachTo(entityId: Int, offsetFromPivot: Vec3)`，
+  或让 `ParticleGroup` 支持实体锚点（服务端只更新锚点一次，客户端本地解析实体位置与朝向）
+- 影响面：`magic/modifier/EnergyShield.kt`（现用降级方案）、`magic/effect/visual/ParticleSwarm.kt`
+- 临时降级：用 `trackAround` 每 tick 钉位置，粒子数控制在数十个（当前 24）
 
 已知的**能力边界**（不是缺陷，但接线前必须知道）：
 

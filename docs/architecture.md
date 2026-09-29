@@ -99,9 +99,9 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 | | `DelayedTrigger` | `onDie` 沿施法方向一次性释放 payload（`DelayedCastProjectile` 用） |
 | | `Hurt` | 命中实体造成伤害（临时清零 `invulnerableTime`；伤害类型缺失时跳过而不是崩服） |
 | | `Explosion` | 自定义爆炸：音效 + 粒子 + 距离衰减伤害与击退（**不破坏方块**，见 [known-issues.md](known-issues.md) §1.3） |
-| | `AreaFieldEffect` | 区域场基类：**每 tick** 结算 —— 范围内刷新迟缓 + 按半径拉拽 + 球壳粒子；实体离开范围立即撤销迟缓（供下面两者继承） |
-| | `BlackHole` | 半径 5 的引力场：迟缓 I + 拉向中心（吸力 `0.6/(距离+0.5)`）+ 256 个传送门粒子 |
-| | `GravityField` | 半径 5 的减速场：迟缓 IV（10 tick），粒子环半径 2.5 |
+| | `AreaFieldEffect` | 区域场基类：**每 tick** 结算 —— 范围内刷新迟缓 + 按半径拉拽 + **对半径内投射物施力（黑洞口把法术吸进去、重力场往下压）**；实体离开范围立即撤销迟缓。视觉由子类用 PD 粒子实现（`spawnVisuals`/`updateVisuals`/`clearVisuals` 三个钩子） |
+| | `BlackHole` | 半径 5 引力场：迟缓 I + 把生物与**魔法投射物**拉向中心；PD 粒子每 tick 32 个（紫色、随机切向初速、被吸入后销毁） |
+| | `GravityField` | 半径 5 重力场：迟缓 IV + 给**魔法投射物**向下的力；PD 粒子每 tick 1 个（淡灰、竖直匀速下落） |
 | `visual/` | `ProjectileBody` | 一个永存粒子贴在投射物当前位置（`track`，天然带客户端插值） |
 | | `Trajectory` | 在投射物后方喷拖尾粒子（发射点反向偏移）；速度≈0 时退化为原地氛围粒子 |
 
@@ -213,10 +213,18 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 ```
 
 - 物品栈只存「身份 + 展示副本」，权威状态在 `WandManager`（`wand/WandManager.kt`）；`wandId` 不存在时由 `WandManager.createWand` 现场分配。
-- 落盘：`WandManager.onServerStopping → save(overworld)` → `Wand.saveTag()`；读档：`onServerStarted → load()`（**先清空** `wands`，避免整合服务器换世界时残留上一个世界的法杖）→ `Wand.fromTag()`。
+- 落盘：`WandManager.onServerStopping → save(overworld)` → `Wand.saveTag()`；读档：`onServerStarted → load()`（**先清空** `wands` 与持有者记录，避免整合服务器换世界时残留上一个世界的法杖）→ `Wand.fromTag()`。
 - **槽位保序**：`saveTag` 固定写满到 `max(size, 已用槽数)`，空槽写空串占位；`fromTag` 把空串还原为 `null` —— 读档后槽位索引不会前移。
+- **牌堆也入库**：`draw_pile`/`hand`/`discard_pile`（法术 id 序列）随存档保存并在读档后覆盖还原。
+  这是「内存实例可被回收 + 懒加载」的前提 —— 不存就会出现「放下法杖再捡起 = 重新洗牌」。
+- **法术运行期状态**：`magic_states`（法术 id → NBT），由 `saveTag` 逐个问 `loadedMagics` 要（`Magic.saveRuntimeState`），
+  读档时经 `Magic.loadRuntimeState` 回灌。当前用户是 `EnergyShield`（当前耐久 + 破盾暂停），因此重登/重启/被回收后再懒加载都不再回满。
+  注意键是**法术 id**：同一 id 的重复卡共享一份状态。
+- **持有者记录与回收**（`WandManager`）：`markHeld(wandId, 实体 UUID, gameTime)` 是唯一写入口，
+  由 `WandItem.inventoryTick`（任何实体的背包/装备槽 tick）与 `Wand.spell`（任何实体主动施法，覆盖生物施法）调用；
+  每 100 tick 回收一次「在线玩家背包里没有 + 超过宽松 TTL 未被确认」的法杖**内存实例**（回收前先写回存档），
+  `WandManager.get` 会按需从存档**懒加载**重建。**存档条目永不删除**（法杖可能躺在箱子里）。
 - 小包的内容与选中槽都存物品组件（`SPELL_POUCH_CONTENTS` / `POUCH_SELECTED_SLOT`），以 `pouchId` 定位，不依赖容器菜单槽位。
-- `EnergyShield` 的耐久目前只存在内存里（未完成特性，见 [known-issues.md](known-issues.md) §1.1）。
 
 ## 6. 网络
 
@@ -272,8 +280,14 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 ## 9. 与 ParticleDrawing 的接口现状
 
 - 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.8-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
-- 已接线：`Trajectory`（拖尾粒子）、`ProjectileBody`（本体粒子），均用 `manager.create()…spawn()` Builder。
+- 已接线（三种用法）：
+  1. **跟随类**：`Trajectory`（拖尾）、`ProjectileBody`（本体）——`manager.create()…spawn()` + `track(pos)`；
+  2. **力驱动粒子**：`ParticleSwarm` + `BlackHole`（每 tick 32 个紫色粒子，随机切向初速、被吸向中心后销毁）、
+     `GravityField`（每 tick 1 个淡灰粒子，竖直向下匀速）——**本模组只算力（`setVelocity`），
+     位置积分 `pos += velocity`、寿命、跨端同步、可见性与渲染全部由 PD 负责**；
+  3. **管理器获取**：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备。
+- 由实际接线暴露出的 **PD API 需求**（位置查询、批量/加速度、实体锚点）登记在 [known-issues.md](known-issues.md) §7。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：
   不得在本模组自行另写一套替代实现，应停止尝试并列出 API 修改需求。

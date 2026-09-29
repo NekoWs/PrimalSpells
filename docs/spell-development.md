@@ -178,9 +178,22 @@ override fun onTick() {
 
 ### 三条铁律
 
-1. **`status` 是所有 effect 共享的可变状态**，你的写入顺序取决于 effect 在列表中的位置——列表顺序是 `[…修饰器注入的…, Position, Velocity, Move, ProjectileBody]`（详见 [architecture.md](architecture.md#8-关键不变量与陷阱改代码前必读)）。
-2. **`onTick` 里改写 `status.pos` 会被 `Move` 覆盖**（`Move` 在列表末位，每 tick 末尾 `status.pos = newPos`）。要做轨道运动就把 `velocity` 置零或反向补偿。
+1. **执行顺序由 `EffectPhase` 决定，不要依赖插入顺序**：改速度留在默认的 `MODIFIER`；
+   要在位置积分后**绝对定位**（轨道类）请声明 `OVERRIDE`；要读本 tick 的最终位置发粒子请声明 `VISUAL`。
+   详见 [architecture.md](architecture.md#27-effectphase效果执行顺序magiccoreeffectphasekt)。
+2. **写 `status` 只允许可交换运算**（累加/累乘/乘零）：修饰器之间没有先后顺序（见 `magic/core/Modifier.kt` 的 KDoc）；
+   禁止 `coerceAtLeast` 这类钳制与「重设绝对值」的写法。
 3. **不要在多实例间共享可变字段**：`BaseEffect.clone()` 是浅拷贝，`private var` 字段会被同一枚子弹的多个克隆共享。
+
+### 粒子表现：一律走 ParticleDrawing（PD）
+
+- **跟随类**（固定点 / 跟随投射物）：`manager.create()…spawn()` + `handle.track(pos)`（直设位置，客户端插值，不滞后）；
+- **力驱动类**（被吸引、下坠、绕转）：用 `ParticleSwarm` 生成粒子并**每隔几 tick** 用 `setVelocity` 施力
+  —— 位置积分（引擎 `pos += velocity`）、寿命、同步、渲染全部由 PD 负责；
+  **不要自己积分位置、不要另写粒子系统**（红线见 [conventions.md](conventions.md) §9）；
+- **管理器**统一用 `wand.pdParticles(level)` 获取（缺失/跨维度时兜底创建，未来的生物施法者也有粒子）；
+- 采样工具在 `util/ParticleShapes.kt`（球面/球内均匀取点、随机切向）；
+- 参考实现：`BlackHole.kt`（随机切向初速 + 向心吸入 + 到中心销毁）、`GravityField.kt`（每 tick 1 个匀速下落）。
 
 ### 骨架
 

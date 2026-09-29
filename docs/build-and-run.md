@@ -30,7 +30,8 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 
 - `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.8-ALPHA,)`）、`ordering="AFTER"`。
 - jar 以**本地文件**形式签入 `lib/`，不走 Maven；文件名与版本区间都由 `gradle.properties` 驱动（`particledrawing_version` / `particledrawing_version_range`），`build.gradle` 与 `mods.toml` 不再硬编码。
-- 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：现用 `ParticleManager`、`ParticleHandle`、`Color`；1.0.8-ALPHA 另有 `EffectCallbacks`、`EffectVarStore`（动画特效接线时用）。
+- 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：现用 `ParticleManager`、`ParticleHandle`
+  （`setVelocity`/`track`/`remove`/`velocity`/`data`）、`Color`；1.0.8-ALPHA 另有 `EffectCallbacks`、`EffectVarStore`（动画特效接线时用）。
 - ⚠️ **预发布版本的版本区间（踩过一次的坑）**：FML 用 Maven 版本语义比较，`1.0.8-ALPHA` 排序**低于** `1.0.8`，
   所以下限写 `[1.0.8,)` 会报 `Mod primalspells requires particledrawing 1.0.8 or above / Currently, particledrawing is 1.0.8-ALPHA`。
   下限必须带上预发布标识：`[1.0.8-ALPHA,)`（实测接受 `1.0.8-ALPHA`/`1.0.8`/`1.0.8-beta`/`1.0.9-ALPHA`，拒绝 `1.0.7`；比较大小写不敏感）。

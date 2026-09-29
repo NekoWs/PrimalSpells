@@ -33,14 +33,16 @@ import java.util.UUID
  *
  * ## 位置由本模组积分，用一次 `trackAll` 批量下发
  *
- * 吸力**随距离变化**，用 PD 的 `applyForce`（一次下发的恒定加速度）表达不了：逐 tick 为每颗粒子重发一次力
- * 是 N 包/tick，而位置批量下发只要 1 包/tick（与粒子数无关）。所以位置由本模组算好后用
- * [ParticleBatch.trackAll] 写出。好处：轨迹确定、「进入中心 0.1 格才消失」这类判定可以精确表达，
+ * 吸力**随距离变化**，所以本模组每 tick 自己算好位置后用 [ParticleBatch.trackAll] 写出
+ * （1 包/tick，与粒子数无关）。好处：轨迹确定、「进入中心 0.1 格才消失」这类判定可以精确表达，
  * 且服务端暂停时不会因客户端外推而飘出范围。渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
  *
+ * 备选（PD 1.0.10-ALPHA 起可用）：`ParticleBatch.applyForceAll(加速列表, ticks = 1)` 能把
+ * 「每颗粒子各自的力」一包下发、位置交回 PD 两端积分（同样 1 包/tick）。当前没换，是因为这里
+ * 需要精确的中心判定与确定的轨迹，不是 PD 表达不了 —— 见 `docs/issues/resolved.md` 附录 B.2。
+ *
  * 代价：PD 的**位置指令会清掉粒子上的速度与力**（`ServerParticleEngine.takeOverPosition`），
- * 所以速度只能记在本模组（[velocities]）—— 见 `docs/issues/pd-api-requests.md` 第 4 条
- * （「批量施力/批量设速」在 PD 落地后，这张表也可以删掉）。
+ * 所以速度只能记在本模组（[velocities]）。
  */
 class BlackHole : AreaFieldEffect(
     radius = EFFECT_RADIUS,

@@ -2,7 +2,7 @@
 
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
-ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.9-ALPHA**）。
+ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.10-ALPHA**）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
 **触发条件**（满足任一即进入本政策）：
@@ -33,7 +33,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 **⚠️ 结论：`ParticleGroup` 与「程序化粒子流」不是同一种抽象。**
 `ParticleGroup` 面向**编排式动画**（成员基本固定、组级统一变换、指令流一次下发、客户端本地求值 —— 适合 `.pdrawc` 那类"播放"），
 而本模组要的是**程序化粒子流**（成员逐 tick 增删、每粒子独立速度/轨迹/寿命、按位置条件回收）。
-差异与由此产生的 PD 侧需求见 [../issues/README.md](../issues/pd-api-requests.md) —— 其中第 1 条已由 PD 以 **`ParticleBatch`** 落地（1.0.9-ALPHA），本模组已迁移完毕。
+差异与由此产生的 PD 侧需求见 [../issues/README.md](../issues/pd-api-requests.md) —— 其中「程序化粒子集」一条已由 PD 以 **`ParticleBatch`** 落地（1.0.9-ALPHA），本模组已迁移完毕。
 
 | 维度 | `ParticleGroup`（PD，编排式动画） | `ParticleBatch`（PD，程序化粒子集） | 这套用在哪 |
 |---|---|---|---|
@@ -50,7 +50,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 |---|---|---|
 | **属于 PD**（用现成 API，别再自己写） | 与「粒子集合的通用机制」有关：批量成员管理、组跟随实体/旋转/淡出/延时、寿命与可见性、上限与拒绝处理、带宽优化 | `ParticleBatch`（成员簿记）、`ParticleGroup` 的组级编排、`trackAll`、`attachTo`、`applyForce` |
 | **属于本模组**（玩法语义，PD 不该知道） | 只有游戏知道的东西：半径/数量/颜色/寿命取值、力的公式、回收判据、被动的持有/放下时机与淡出时长 | `BlackHole` 的吸力与阻尼、`GravityField` 的下落与下半球回收、`EnergyShield` 的 4 tick 延迟、`ParticleShapes.fibonacciSphere` 的选点 |
-| **灰区（当前留在使用方）** | **随距离变化的每粒子受力**：PD 的 `applyForce` 是「一次下发的恒定加速度」，逐 tick 变力只能逐粒子重发（N 包/tick） | `BlackHole` 自算位置 + 一次 `trackAll`（并自持一张「粒子 id → 速度」表）；已在 §7.3 第 4 条提出「批量施力 / 批量设速」需求 |
+| **灰区（当前留在使用方）** | **随距离变化的每粒子受力**：PD 的 `applyForce` 是「一次下发的恒定加速度」，逐 tick 变力只能逐粒子重发（N 包/tick）。PD 1.0.10-ALPHA 已补批量入口 `applyForceAll(加速列表, ticks)`（1 包/tick），该需求已闭环 | `BlackHole` 仍是「自算积分 + 一次 `trackAll`」并自持一张「粒子 id → 速度」表；换不换只影响带宽口径（都是 1 包/tick），见 [../issues/resolved.md](../issues/resolved.md) 附录 B.2 |
 
 ⚠️ **判定顺序**：先查 PD 是否已有现成能力（`api/` 全量方法见 `ParticleHandle`/`ParticleGroup`/`ParticleBatch`/`ParticleManager` 的 KDoc，或 `lib/*-sources.jar`），
 再决定要不要在本模组写封装。**「自己维护句柄表 + 逐粒子操作」通常意味着漏看了组/集 API** ——
@@ -130,21 +130,26 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > **文档状态（2026-09 结构重构时补记，2026-09-29 更新版本）**
 > - 本文件原在仓库根（`effects-api-design.md`），现已归入 `docs/design/`。
-> - 依赖版本：**1.0.9-ALPHA**（`lib/particledrawing-1.0.9-ALPHA.jar`，附 `-sources.jar`），
+> - 依赖版本：**1.0.10-ALPHA**（`lib/particledrawing-1.0.10-ALPHA.jar`，附 `-sources.jar`），
 >   由 `gradle.properties` 的 `particledrawing_version` 驱动；下方正文中出现的 1.0.6 等版本号是**当时的历史记录**。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
 > - 1.0.9-ALPHA 相对 1.0.8 的 API 增量：**`api/ParticleBatch`**（程序化粒子集：`add`/`trackAll`/`trackEach`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）、
 >   `ParticleGroup.followEntity(..., local)`（组级跟随可选随朝向）、`ParticleHandle.position()/applyForce()/attachTo()` 等（1.0.8 起）。`.pdrawc` 动画特效在 PrimalSpells 侧的接线仍未落地。
+> - 1.0.10-ALPHA 相对 1.0.9 的 API 增量：批量运动指令 **`ParticleBatch.setVelocityAll(速度列表)` / `applyForceAll(加速列表, ticks = 1)`**
+>   （各列表与 `handles()` 顺序一一对应，一包覆盖全组，逐玩家按可见性裁剪；`ParticleManager` 同名的 id 列表版本），
+>   以及修正「`setVelocity`/`applyForce` 未解除实体锚点」（现在与 `move`/`track` 一致：运动指令接管位置）。
+>   本模组尚未改用（黑洞仍是自算积分 + 一包/tick `trackAll`，见 [../issues/resolved.md](../issues/resolved.md) 附录 B.2）。
 > - **2026-09-30（第 10 轮）**：本模组已按 §0.2/§0.3 完成迁移 —— 自研 `ParticleSwarm`（273 行）**已删除**，
 >   三处接线（`BlackHole`/`GravityField`/`EnergyShield`）改用 `ParticleBatch`，生成入口收敛为 `util/PdParticles.kt` 的
->   `ParticleManager.spawnParticle(...)`；随距离变化的每粒子受力仍留在使用方（§7.3 第 4 条已提需求）。
+>   `ParticleManager.spawnParticle(...)`；随距离变化的每粒子受力仍留在使用方（该需求已由 1.0.10 的
+>   `applyForceAll` 闭环，本模组暂未迁移）。
 > - 本文引用的包路径按重构前书写，现对应关系：`magic/effect/Trajectory.kt` → `magic/effect/visual/Trajectory.kt`；`magic/effect/*` 其余类分入 `magic/effect/{geometry,lifecycle}`；`magic/Revise.kt` → `magic/core/Modifier.kt`（类 `Revise` → `Modifier`）；`magic/Projectile.kt` → `magic/projectile/Projectile.kt`；`magic/{Magic,MagicStatus,MagicManager}.kt` → `magic/core/`；`item/ModItems.kt` → `registry/ModItems.kt`。完整对照见 [../conventions.md](../conventions.md) 第 8 节。
 
 
 > 状态：**播放器侧 API 轮子已实现**（`particledrawing` 仓库，§5 全部落地并通过 `gradlew build` + 单测）。
 > 魔法模组端（`primalspells`）动画/特效接线**后续再做**。
 > 涉及仓库：
-> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.9-ALPHA）
+> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.10-ALPHA）
 > - 魔法模组：`D:\Backup\IDEA Projects\PrimalSpells`（`primalspells`，MC 26.2 / NeoForge 26.2.0.59 / Java 25）
 
 ---

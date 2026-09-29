@@ -300,7 +300,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 9. 与 ParticleDrawing 的接口现状
 
-- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.9-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.10-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 集合类粒子（球壳、被吸入粒子、下落粒子、护盾球壳）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
@@ -319,15 +319,18 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
      回收判定只读 `ParticleBatch.forEach/removeIf` 给的权威位置；另 `Trajectory`（拖尾）同样只发一次速度。
 - 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
   生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
-- 未使用：`applyForce(accel, ticks)`（黑洞吸力随距离变化，用 `trackAll` 更省也更可控；`applyForce` 只能表达
-  一次下发的恒定加速度，见 [issues/pd-api-requests.md](issues/pd-api-requests.md) 第 1 条）、
-  `attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
+- 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）。
+  1.0.10 起「每颗粒子各自的力」有了批量入口 `ParticleBatch.applyForceAll(加速列表, ticks)` / `setVelocityAll(速度列表)`
+  （各列表与 `handles()` 顺序一一对应，一次包覆盖全组，逐玩家按可见性裁剪）；黑洞目前仍是
+  「本模组积分 + 一包/tick `trackAll`」，要交回 PD 积分时改用它即可（见 [issues/resolved.md](issues/resolved.md) 附录 B.2）。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
-  1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份。
+  1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份；
+  1.0.10-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。
 - 历史 problem 记录：未决需求见 [issues/pd-api-requests.md](issues/pd-api-requests.md)，已闭环条目见 [issues/resolved.md](issues/resolved.md) 附录 B
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
-- ✅ **依赖构建口径（已解决）**：PD 把 `mod_version` 提到 **1.0.9-ALPHA** 后，本模组的
-  `particledrawing_version_range=[1.0.9-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
-  `attachTo`/`trackAll`，或 §7.3 的 `ParticleBatch`/三入口锚点）会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
+- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.10-ALPHA**），本模组的
+  `particledrawing_version_range=[1.0.10-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
+  `attachTo`/`trackAll`，或 §7.3 的 `ParticleBatch`/三入口锚点，或 1.0.10 的 `setVelocityAll`/`applyForceAll`）
+  会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：
   不得在本模组自行另写一套替代实现，应停止尝试并列出 API 修改需求。

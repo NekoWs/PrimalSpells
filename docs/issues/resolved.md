@@ -221,3 +221,20 @@
   `attachToLocal`（随实体朝向旋转）暂未使用 —— 需要「贴在身前/身侧」的粒子时可用
 - 落点：`magic/modifier/EnergyShield.kt`
 
+#### [需求 ✓已加] 批量施力 / 批量设速（一次网络包覆盖多粒子）
+
+- 当初的困难：黑洞「被吸入粒子」每 tick 需要**每颗粒子各自**的加速度（`0.12/(距离+0.5)` 指向中心，
+  再由本模组积分），而 `ParticleBatch.applyForce(handle, accel, ticks)` / `setVelocity(handle, v)`
+  都是**单粒子**入口 —— 一颗粒子一个包（峰值约 34 包/tick）；唯一稳定的批量入口 `trackAll` 是**位置**指令，
+  `takeOverPosition` 会清零速度与力，于是每颗粒子的速度只能由本模组自持一张表。
+- PD 侧落地（`e0cbd5d`，1.0.10-ALPHA）：`ParticleBatch.setVelocityAll(速度列表)` /
+  `applyForceAll(加速列表, ticks = 1)`（列表与 `handles()` 顺序一一对应，长度不同按短的截断；
+  一次包覆盖全组，逐玩家按可见性裁剪后再发；`ParticleManager` 另有同名的 id 列表版本），
+  以及新载荷 `ParticleVelocityBatchPayload`/`ParticleForceBatchPayload`（`MAX_BATCH = 512`，
+  载荷集合变化 → 网络注册版本提到 `"4"`，两端必须同一个 jar）。
+  同批还修掉了「`setVelocity`/`applyForce` 未解除实体锚点」——此前先 `attachTo` 再设速度/力，
+  位置每 tick 仍被锚点覆盖，现在与 `move`/`track` 统一为「运动指令接管位置」。
+- 本侧现状：**暂未迁移**。黑洞仍是「本模组积分 + 一包/tick `trackAll`」——两者带宽同为 1 包/tick，
+  而自算积分能给确定的轨迹与精确的「进入中心才销毁」判定；要交回 PD 积分时改用它即可（恢复条件已满足）。
+- 落点：`magic/effect/lifecycle/BlackHole.kt`
+

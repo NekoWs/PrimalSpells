@@ -31,7 +31,7 @@
 | 语言 | Kotlin（主）+ 2 个 Java mixin |
 | Java / Gradle | 25（toolchain）/ 9.6.1（wrapper） |
 | modId / 包根 | `primalspells` / `work.nekow.primalspells` |
-| 关键前置 | `particledrawing`（粒子，本地 `lib/particledrawing-<particledrawing_version>.jar`，现为 `1.0.9-ALPHA`） |
+| 关键前置 | `particledrawing`（粒子，本地 `lib/particledrawing-<particledrawing_version>.jar`，现为 `1.0.10-ALPHA`） |
 | 许可证 | GNU AGPLv3 |
 
 细节见 [build-and-run.md](build-and-run.md)。
@@ -42,7 +42,7 @@
 PrimalSpells/
 ├─ build.gradle / gradle.properties / settings.gradle   构建与版本
 ├─ gradlew, gradlew.bat, gradle/wrapper/                Gradle wrapper（9.6.1）
-├─ lib/particledrawing-1.0.9-ALPHA.jar                 本地前置模组 jar（版本由 gradle.properties 指定）
+├─ lib/particledrawing-1.0.10-ALPHA.jar                本地前置模组 jar（版本由 gradle.properties 指定）
 ├─ src/main/kotlin/work/nekow/primalspells/             模组源码（包结构见 conventions.md）
 ├─ src/main/java/work/nekow/primalspells/mixin/         Java mixin
 ├─ src/main/resources/                                  资源：assets（模型/贴图/语言/物品）、data（伤害类型）、META-INF

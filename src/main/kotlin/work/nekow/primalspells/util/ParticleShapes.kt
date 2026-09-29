@@ -12,10 +12,13 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * 球体采样工具 —— 爆炸/黑洞/重力场等共用同一套采样与撒点逻辑。
+ * 球体采样工具 —— 原版粒子撒点（`Explosion`）与 PD 粒子取点（黑洞/重力场/护盾）共用的采样逻辑。
  *
  * 采样用 `phi = acos(2u - 1)` 保证球面**面积均匀**；若直接对 phi 均匀取值，
  * 粒子会在两极堆积成两团。球内取点再乘 `cbrt(u)` 保证**体积均匀**。
+ *
+ * 两类用法的取舍：需要「看起来均匀」的**固定球壳标识**用 [fibonacciSphere]（确定性、点距近似相等），
+ * 需要随机感的一次性撒点用 [randomUnitVector] / [randomPointInSphere]（配 [sphereVolume]）。
  */
 object ParticleShapes {
 
@@ -68,16 +71,6 @@ object ParticleShapes {
         return points
     }
 
-    /** 在**球壳**上均匀撒点（粒子都落在半径 [radius] 的球面上）。 */
-    fun sphereSurface(
-        level: ServerLevel,
-        center: Vec3,
-        radius: Double,
-        count: Int,
-        particle: ParticleOptions,
-        speed: Double = 0.0,
-    ) = emit(level, center, radius, count, particle, speed, volume = false)
-
     /** 在**球体内部**均匀撒点（爆炸这类需要填充体积的效果用）。 */
     fun sphereVolume(
         level: ServerLevel,
@@ -86,20 +79,10 @@ object ParticleShapes {
         count: Int,
         particle: ParticleOptions,
         speed: Double = 0.0,
-    ) = emit(level, center, radius, count, particle, speed, volume = true)
-
-    private fun emit(
-        level: ServerLevel,
-        center: Vec3,
-        radius: Double,
-        count: Int,
-        particle: ParticleOptions,
-        speed: Double,
-        volume: Boolean,
     ) {
         val random = level.random
         for (i in 0 until count) {
-            val offset = if (volume) randomPointInSphere(random, radius) else randomUnitVector(random).scale(radius)
+            val offset = randomPointInSphere(random, radius)
             level.sendParticles(particle, center.x + offset.x, center.y + offset.y, center.z + offset.z, 1, 0.0, 0.0, 0.0, speed)
         }
     }

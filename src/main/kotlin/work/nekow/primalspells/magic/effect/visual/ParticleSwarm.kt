@@ -11,20 +11,17 @@ import java.util.UUID
  *
  * ## ⚠️ 定位：临时薄封装，**不是**应该长期留在本模组的东西
  *
- * 「一组粒子的通用机制」（批量生成、整组跟随实体、组级旋转/淡出/延时、带宽优化）**属于 PD**，
- * 而且 PD **已经有现成 API** —— `ParticleGroup`（`followEntity` / `offsetFromPivot` / `spin` /
- * `fadeOut` / `destroyAfter` / `remove`）。本类当初是在没查组 API 的情况下写的，
- * 因此重复了它的能力并踩了一串坑（捕获偏移、索引配对、重复身体偏移、重建滑入 ——
- * 见 `docs/known-issues.md` §6 第 5–8 轮）。
+ * 「一组粒子的通用机制」（批量生成/更新、动态成员、整组跟随实体、组级旋转/淡出、带宽优化）**属于 PD**。
+ * PD 已有 `ParticleGroup`，但它面向**编排式动画**（成员基本固定、组级统一变换、指令流一次下发），
+ * 与本类服务的**程序化粒子流**（成员逐 tick 增删、每粒子独立受力、按位置条件回收）取向不同 ——
+ * **不能直接迁移**，差异与需要 PD 补的能力见 `docs/known-issues.md` §7.3 与
+ * `docs/design/effects-api.md` §0.2。
  *
- * 判定准则见 `docs/design/effects-api.md` §0.2：**先查 PD 有没有现成能力，再决定要不要在本模组写封装**。
- *
- * 本类**只保留 PD 组 API 尚未覆盖的部分**（灰区：需要逐 tick 自定义受力/轨迹时，本模组算位置）：
- * - [spawn]：单体生成（PD 无「批量按分布生成」入口，但组 + `offsetFromPivot` 可用于刚体形壳）；
+ * 本类**只保留 PD 当前未覆盖的部分**（灰区：需要逐 tick 自定义受力/轨迹时，本模组算位置）：
+ * - [spawn]：单体生成；
  * - [spawnSimulated] / [tickSimulated]：本模组积分 + 一次 [ParticleManager.trackAll]（黑洞的吸力随距离变化）；
- * - [removeWhere]：按位置判据回收（重力场下落粒子碰到下半球面）。
- *
- * **锚定模式（[ensureAttached]）预期在护盾迁移到 `ParticleGroup.followEntity` 后删除** —— 见 known-issues §1.3。
+ * - [removeWhere]：按位置判据回收（重力场下落粒子碰到下半球面）；
+ * - [ensureAttached]：护盾球壳的锚定+补量 —— **待 §7.3 第 1/2 条在 PD 落地后删除**（见 known-issues §1.3）。
  *
  * ## 职责边界（改动前先读 `docs/conventions.md` §9）
  *

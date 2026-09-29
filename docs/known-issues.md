@@ -32,25 +32,19 @@
 - 历史更正：第 5 轮曾把「球壳塌成一圈」误报为 PD 缺陷，实为**本模组 bug**（`tickAnchored` 在 spawn 时捕获 offset
   → 自转变成错峰剪切），第 6 轮修正；第 7 轮又修了「球壳贴在脚上、像在往下掉」的偏移坐标系问题（见 §6 第 7 轮）。
 
-### 🟡 1.3 用 PD 的 `ParticleGroup` 替换自研的 `ParticleSwarm`（本模组技术债，**不是** PD 缺陷）
+### 🟡 1.3 用 PD 的「程序化粒子集」入口替换自研的 `ParticleSwarm`（本模组技术债，**不是** PD 缺陷）
 
-- 背景：`ParticleSwarm` 是在**没查 PD 组 API** 的情况下写的，重复了 PD 已有的能力，
-  并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（§6 第 5–8 轮）。
-  判定准则见 [design/effects-api.md](design/effects-api.md) §0.2。
-- 迁移映射（护盾优先）：
-
-  | 现在（`ParticleSwarm`） | 迁移到 |
-  |---|---|
-  | `ensureAttached`（40 个 `attachTo` + 补量） | `ParticleManager.createGroup(pivot)` + `Builder.offsetFromPivot(球面偏移)` + `group.add(handle)` + **`group.followEntity(holder.uuid)`** |
-  | 「自转要每 tick `trackAll`」（1 包/tick） | **`group.spin(axis, radiansPerTick)`**（指令流一次下发、客户端本地求值 → **零带宽**） |
-  | 4 tick 延迟销毁（留给淡出） | **`group.fadeOut(ticks, removeAfter)` / `group.destroyAfter(ticks)`** |
-  | `clear()` | **`group.remove()`** |
-  | 黑洞/重力场范围球壳（一次性 spawn） | `createGroup` + `offsetFromPivot` + `add`（顺带获得 `pulse`/`rotate` 等编排能力） |
-
-- **保留**在 `ParticleSwarm` 的部分（PD 组 API 未覆盖、确属使用方逻辑）：单体 `spawn`、
-  自定义受力的 `spawnSimulated`/`tickSimulated`（一次 `trackAll`）、按位置判据的 `removeWhere`。
-- 收益：删掉整套句柄/寿命簿记（少一类 bug 源）；护盾自转 1 包/tick → 0 包；淡出动画开箱可用。
-- 代价：护盾视觉需要再进游戏确认一次（跟随语义改由 PD 客户端解析）。
+- 背景：`ParticleSwarm` 是在**没查 PD 组 API** 的情况下写的。但逐条比对后确认：
+  **不能直接迁移到 `ParticleGroup`** —— 它是「编排式动画」抽象（成员基本固定、组级统一变换），
+  而本项目要的是「程序化粒子流」（成员逐 tick 增删、每粒子独立受力、按位置条件回收）。
+  差异总表见 [design/effects-api.md](design/effects-api.md) §0.2，**待 PD 侧补的能力见 §7.3**。
+- 因此本项的**前置条件**是 §7.3 第 1 条（`ParticleBatch` 之类）与第 2 条（统一锚定身份/坐标）落地；
+  在那之前，`ParticleSwarm` 保留为薄封装（只算位置/速度与销毁，不含渲染/同步逻辑）。
+- 迁移后能顺带拿到的能力（属于 `ParticleGroup` 已有的强项，**现在就可以用**，与迁移解耦）：
+  组级编排零带宽 —— `spin(axis, radiansPerTick)`（护盾自转不必再每 tick `trackAll`，1 包/tick → 0 包）、
+  `fadeOut(ticks, removeAfter)` / `destroyAfter(ticks)`（正在预留的"消失动画"窗口可以直接用它做）。
+- 收益（迁移完成后）：删掉整套句柄/寿命簿记（少一类 bug 源）、锚定语义由 PD 统一定义。
+- 代价：护盾视觉需要再进游戏确认一次（跟随语义由 PD 客户端解析）。
 
 ---
 
@@ -269,7 +263,7 @@
 > 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.8-ALPHA`
 > （`lib/particledrawing-1.0.8-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
 
-**当前状态：6 条全部闭环**（PD 侧 2 个提交 + 本模组 1 处自己的 bug）。
+**当前状态：原 6 条全部闭环**（PD 侧 2 个提交 + 本模组 1 处自己的 bug）；**新增 3 条需求未决**（§7.3）。
 
 | # | 条目 | 结论 | 落点 |
 |---|---|---|---|
@@ -355,6 +349,73 @@
 - 现状：护盾球壳用 `attachTo`（世界空间偏移，刚性平移、零逐 tick 包）；
   `attachToLocal`（随实体朝向旋转）暂未使用 —— 需要「贴在身前/身侧」的粒子时可用
 - 落点：`magic/modifier/EnergyShield.kt`、`magic/effect/visual/ParticleSwarm.kt`
+
+### 7.3 新需求（ParticleGroup 与「程序化粒子流」的差异，2026-09-30）
+
+> 起因：本模组一度打算把自研的 `ParticleSwarm` 直接迁移到 PD 的 `ParticleGroup`。
+> 逐条比对后确认**不能直接迁移**：两者是不同取向的抽象 ——
+> `ParticleGroup` = **编排式动画**（成员基本固定、组级统一变换、指令流一次下发、客户端本地求值）；
+> 本项目要的是**程序化粒子流**（成员逐 tick 增删、每粒子独立速度/轨迹/寿命、按位置条件回收）。
+> 差异总表见 [design/effects-api.md](design/effects-api.md) §0.2。下列需求供 PD 侧决定补哪些。
+
+#### [需求] 面向「程序化粒子集」的泛用入口（Batch / 动态成员）
+
+- 状态：未决
+- 目标能力（全部是真实用例）：
+  1. **黑洞**：每 tick 在球壳上新增 1 个粒子（各自随机切向初速、各自寿命 60），**每 tick 对每个粒子施加随距离变化的向心力**，粒子进入中心 0.1 格内立即销毁；
+  2. **重力场**：每 tick 在上半球表面新增 3 个匀速下落粒子，**碰到下半球表面（按位置判定的几何面）立即销毁**；
+  3. **护盾**：40 个粒子钉在玩家身上、永存、破盾/放下时整批销毁。
+- 现有 API 为什么不够：
+  - `ParticleGroup` 的成员管理是**一次性录制**模型：`add()` 会把 `armed` 置回 false → **重发全量受控清单**，
+    不适合「每 tick 增删 1~3 个成员」的持续流；
+  - 组级变换（`spin/rotate/scale/pulse/move/movePath`）是**整组统一变换**，表达不了「每个粒子沿各自轨迹被吸向中心」；
+  - **没有**「按每粒子位置/速度的条件移除」；
+  - `ParticleManager.trackAll(ids, positions)` 可用，但要求**使用方自己维护 id ↔ 每粒子状态（pos/vel）表** ——
+    这正是本模组 `ParticleSwarm` 在做的事，也是第 5–8 轮四个 bug 的来源
+    （捕获偏移、索引配对、重复偏移、重建滑入）。
+- 期望 API 形态（任一或组合，命名仅供参考）：
+  1. **`ParticleBatch`**：`add(handle)` 增量登记、`track(handle, pos)` 与批量 `trackAll(map)`（一次包）、
+     `velocity(handle, v)`、`removeIf { handle, pos, vel -> … }`、`size()`、`clear()`；
+     成员可随时增删且**不重发全量**；组内粒子 `lifetime` 到点自动出列（对使用方透明）；
+  2. 或给 `trackAll` 加**按句柄列表**的重载：`trackAll(handles: List<ParticleHandle>, positions: List<Vec3>)`
+     （省掉使用方维护 UUID 列表）；
+  3. 或给 `ParticleGroup` 补 `removeIf(predicate)` 与「增量成员变更（不重发全量）」。
+- 影响面：`magic/effect/visual/ParticleSwarm.kt`、`effect/lifecycle/BlackHole.kt`、`GravityField.kt`
+- 临时降级：本模组自研 `ParticleSwarm`（薄封装：只算位置/速度与销毁，不含渲染/同步逻辑）
+
+#### [需求] 统一「锚定 / 跟随」的身份体系与坐标系
+
+- 状态：未决
+- 目标能力：**一个入口**表达「这 N 个粒子钉在实体 E 上，偏移相对 E（可选随朝向）」，并能换实体/解除 ——
+  即护盾球壳需要的「刚性、零逐 tick 包、跟随实体」。
+- 现有 API 为什么不够（**三套身份 + 两套偏移语义**，使用方得自己挑）：
+
+  | 入口 | 身份 | 偏移语义 | 覆盖面 |
+  |---|---|---|---|
+  | `ParticleHandle.attachTo(entityId: Int, offset)` | 实体**网络 id** | 世界空间（相对 `Entity.position()` 脚底） | 单粒子 |
+  | `ParticleHandle.attachToLocal(entityId, offset)` | 实体网络 id | 实体局部（随朝向） | 单粒子 |
+  | `ParticleGroup.followEntity(uuid: UUID, offset)` | 实体 **UUID** | 组轴心相对实体的偏移（**仅位置、不含朝向**） | 整组（粒子靠 `offsetFromPivot` 表达） |
+  | `ParticleGroup.defineEntity(handle, uuid)` | UUID | 供 `.pdrawc` 表达式引用 | 动画 |
+
+  另外：`followEntity` 只跟随位置，「随朝向」在组上没有对应入口；两种身份（Int / UUID）需要使用方各存一份。
+- 期望 API 形态：
+  1. **统一身份**：`attachTo` / `followEntity` 各提供 `uuid` 与 `entityId` 两个重载（内部同一实现），
+     并在 KDoc 写明生命周期语义（实体不在场 / 换维度 / 死亡时的行为）；
+  2. **统一偏移语义**：明确 `offsetFromPivot`（相对轴心）与 `attachTo`（相对实体脚底）的组合关系，
+     给出「相对实体 + 相对轴心」的推荐写法（现在是隐式两段相加，正是我们踩坑的地方）；
+  3. 让组也能随朝向：`followEntity(uuid, offset, local = true)`（等价 `attachToLocal`）；
+  4. 可选：`ParticleGroup.ensureSize(n) { spawner }` —— 把「补齐到 N + 上限拒绝重试」做成通用能力。
+- 影响面：`modifier/EnergyShield.kt`（球壳）、未来的跟随型特效；`ParticleSwarm.ensureAttached` 可随之删除
+- 临时降级：本模组用「逐粒子 `attachTo` + 每 tick 补量」实现（0 包/tick，但簿记是自己写的）
+
+#### [需求] 文档：区分「编排式动画」与「程序化粒子流」两条路径
+
+- 状态：未决
+- 背景：本项目接线时只看了 `ParticleManager` / `ParticleHandle`，**没意识到 `ParticleGroup` 的存在与取向**，
+  于是自研了一整套集合簿记（并接连踩坑）。若在 `ParticleGroup` 的 KDoc 顶部（或 `doc/`）用一两句话说明
+  「成员固定的编排动画用 Group；逐 tick 增删 / 每粒子独立受力的粒子流请用 X」，
+  下一个人就不会重走这条路。
+- 期望：`ParticleGroup` 类注释补一句适用边界 + 指向程序化路径的入口（7.3 第 1 条落地后即 `ParticleBatch`）。
 已知的**能力边界**（不是缺陷，但接线前必须知道）：
 
 | 项 | 现状 | 影响 | 我们的处理 |

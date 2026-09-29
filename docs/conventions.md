@@ -207,7 +207,7 @@ magic/modifier  ──→ magic/core, magic/effect
 ## 9. 外部依赖政策：ParticleDrawing（硬性）
 
 `particledrawing` 是本模组的**必需前置**（`neoforge.mods.toml`：`required` + `AFTER`），
-仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.8-ALPHA`）。
+仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.9-ALPHA`）。
 它是粒子能力的**唯一实现方**，PrimalSpells 只负责接线。
 
 **红线：遇到它的 API 缺陷 / 签名不符 / 能力缺失时，不得在本模组自行编写另一套实现。**

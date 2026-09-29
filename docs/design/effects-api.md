@@ -125,7 +125,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > **文档状态（2026-09 结构重构时补记，2026-09-29 更新版本）**
 > - 本文件原在仓库根（`effects-api-design.md`），现已归入 `docs/design/`。
-> - 依赖版本：**1.0.8-ALPHA**（`lib/particledrawing-1.0.8-ALPHA.jar`，附 `-sources.jar`），
+> - 依赖版本：**1.0.9-ALPHA**（`lib/particledrawing-1.0.9-ALPHA.jar`，附 `-sources.jar`），
 >   由 `gradle.properties` 的 `particledrawing_version` 驱动；下方正文中出现的 1.0.6 等版本号是**当时的历史记录**。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
 > - 1.0.8-ALPHA 相对 1.0.6 的 API 增量：新增 `api/EffectCallbacks`（播放结束/参数变更回调）与 `api/EffectVarStore`（`setParam` 覆盖值记忆，`getParam` 的诚实实现），**无删除、无签名破坏**；`.pdrawc` 动画特效在 PrimalSpells 侧的接线仍未落地。

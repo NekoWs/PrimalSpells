@@ -282,7 +282,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 9. 与 ParticleDrawing 的接口现状
 
-- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.8-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.9-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 已接线（三种用法，均对应 PD 的低带宽写法）：
   1. **锚定**：`attachTo(实体, 世界空间偏移)`——护盾球壳，服务端只在挂载时发一次，客户端本地解析实体位置，
      **0 包/tick** 且天然刚性；
@@ -297,7 +297,8 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备。
 - 历史 problem 记录：API 缺陷/需求清单与闭环情况见 [known-issues.md](known-issues.md) §7
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
-- ⚠️ **依赖构建口径**：`lib/particledrawing-1.0.8-ALPHA.jar` 在 2026-09-30 被同名替换为新构建
-  （旧构建没有上述新 API，且 `versionRange` 无法区分）——**必须使用该日期或更新的构建**。
+- ✅ **依赖构建口径（已解决）**：PD 把 `mod_version` 提到 **1.0.9-ALPHA** 后，本模组的
+  `particledrawing_version_range=[1.0.9-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
+  `attachTo`/`trackAll`，或 §7.3 的 `ParticleBatch`/三入口锚点）会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：
   不得在本模组自行另写一套替代实现，应停止尝试并列出 API 修改需求。

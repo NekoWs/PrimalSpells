@@ -260,10 +260,12 @@
 > **出现时机**：需求清单与本章节的登记**只在本次功能要求涉及 ParticleDrawing API 时**才出现
 > （特效接线、升级导致 API 变化、需求要求用它的能力）；与之无关的工作不要在这里添条目。
 >
-> 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.8-ALPHA`
-> （`lib/particledrawing-1.0.8-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
+> 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.9-ALPHA`
+> （`lib/particledrawing-1.0.9-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
 
-**当前状态：原 6 条全部闭环**（PD 侧 2 个提交 + 本模组 1 处自己的 bug）；**新增 3 条需求未决**（§7.3）。
+**当前状态：原 6 条全部闭环**（PD 侧 2 个提交 + 本模组 1 处自己的 bug）；**新增 3 条需求（§7.3）PD 侧已落地**
+（提交 `52534d5`，随 **1.0.9-ALPHA** 发布：`ParticleBatch`、`attachTo` 的 `Entity`/`uuid`/`entityId` 三入口、
+`followEntity(uuid, offset, local)`、两条路径的文档边界）；本模组尚未据此改接线。
 
 | # | 条目 | 结论 | 落点 |
 |---|---|---|---|
@@ -286,12 +288,11 @@
 `applyForce` 暂未使用：黑洞吸力**随距离变化**，逐几 tick 重发力的包量（约 20 包/tick）高于 `trackAll`（1 包/tick），
 且位置驱动能保证「抵达中心 0.1 格才消失」完全可控。理由写在 `ParticleSwarm` 的类注释里。
 
-> ⚠️ **依赖版本卫生（建议 PD 侧处理）**：新 jar 沿用了同一个版本号字符串 `1.0.8-ALPHA`
-> （`lib/particledrawing-1.0.8-ALPHA.jar` 于 2026-09-30 00:10 被替换），而本模组的
-> `particledrawing_version_range=[1.0.8-ALPHA,)` **无法区分「没有新 API 的旧构建」**——
-> 用旧构建启动会在运行期报 `NoSuchMethodError`（`attachTo` / `trackAll` / `position`）。
-> 建议 PD 把 `mod_version` 提到 `1.0.9-ALPHA`（或加构建后缀），本模组才能真正声明「最低可用构建」。
-> 本模组口头约定：**必须使用 2026-09-30 或更新的 1.0.8-ALPHA 构建**（见 [build-and-run.md](build-and-run.md) §2）。
+> ✅ **依赖版本卫生（已解决）**：PD 已把 `mod_version` 提到 **1.0.9-ALPHA**（本节原先的建议），本模组同步为
+> `particledrawing_version=1.0.9-ALPHA` / `particledrawing_version_range=[1.0.9-ALPHA,)`——
+> 依赖区间现在能表达「最低可用构建」：缺 `position`/`trackAll`/`applyForce`/`attachTo`/
+> `ParticleBatch` 的旧构建会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
+> `lib/` 下的 `particledrawing-1.0.8-ALPHA.jar` 已删除，只留当前版本；`particledrawing-1.0.6.jar` 是历史遗留（未被引用）。
 
 ### 7.1 历史条目（备查）
 

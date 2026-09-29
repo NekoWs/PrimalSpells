@@ -23,24 +23,23 @@ JDK 由 `foojay-resolver-convention` 插件按 toolchain 自动下载；本机�
 ## 2. 依赖
 
 ```groovy
-// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.8-ALPHA）
+// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.9-ALPHA）
 compileOnly  files("lib/particledrawing-${particledrawing_version}.jar")   // 编译期接口
 localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // 开发环境运行时（不传递给下游）
 ```
 
-- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.8-ALPHA,)`）、`ordering="AFTER"`。
+- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.9-ALPHA,)`）、`ordering="AFTER"`。
 - jar 以**本地文件**形式签入 `lib/`，不走 Maven；文件名与版本区间都由 `gradle.properties` 驱动（`particledrawing_version` / `particledrawing_version_range`），`build.gradle` 与 `mods.toml` 不再硬编码。
 - 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：`ParticleManager`（`create`/`trackAll`）、
   `ParticleHandle`（`setVelocity`/`track`/`position`/`applyForce`/`attachTo`/`attachToLocal`/`remove`）、`Color`；
   另有 `EffectCallbacks`、`EffectVarStore`（动画特效接线时用）。
-- ⚠️ **构建口径（同名换 jar 的坑）**：`lib/particledrawing-1.0.8-ALPHA.jar` 在 **2026-09-30** 被**同名**替换为新构建
-  （新增 `position`/`applyForce`/`attachTo`/`trackAll`，并修复三处位置链路问题）。
-  **必须使用该日期或更新的构建**：旧构建下 `versionRange` 拦不住（版本号字符串相同），
-  一旦运行到相关代码就报 `NoSuchMethodError`。建议 PD 侧把 `mod_version` 提到 `1.0.9-ALPHA` 或加构建后缀，
-  让依赖区间能表达「最低可用构建」。
-- ⚠️ **预发布版本的版本区间（踩过一次的坑）**：FML 用 Maven 版本语义比较，`1.0.8-ALPHA` 排序**低于** `1.0.8`，
-  所以下限写 `[1.0.8,)` 会报 `Mod primalspells requires particledrawing 1.0.8 or above / Currently, particledrawing is 1.0.8-ALPHA`。
-  下限必须带上预发布标识：`[1.0.8-ALPHA,)`（实测接受 `1.0.8-ALPHA`/`1.0.8`/`1.0.8-beta`/`1.0.9-ALPHA`，拒绝 `1.0.7`；比较大小写不敏感）。
+- ✅ **构建口径（同名换 jar 的坑，已解决）**：2026-09-30 当天曾在**同一版本号字符串**下替换过 `lib/` 里的 jar，
+  旧构建缺 `position`/`applyForce`/`attachTo`/`trackAll` 而 `versionRange` 拦不住。
+  现在 PD 已把 `mod_version` 提到 **1.0.9-ALPHA**，本模组的下限同步为 `[1.0.9-ALPHA,)`，
+  旧构建在加载期就会被拒绝，**不需要再靠日期约定**。
+- ⚠️ **预发布版本的版本区间（踩过一次的坑）**：FML 用 Maven 版本语义比较，`1.0.9-ALPHA` 排序**低于** `1.0.9`，
+  所以下限写 `[1.0.9,)` 会报 `Mod primalspells requires particledrawing 1.0.9 or above / Currently, particledrawing is 1.0.9-ALPHA`。
+  下限必须带上预发布标识：`[1.0.9-ALPHA,)`（规则在 1.0.8-ALPHA 那次实测过：带标识的下限接受该预发布版与之后的版本，拒绝对应更低的版本；比较大小写不敏感）。
 - **升级依赖的三步**（都只改 `gradle.properties` + 放 jar）：
   1. 新 jar（含 `-sources.jar` 更好）放进 `lib/`；
   2. 改 `gradle.properties` 的 `particledrawing_version`（= jar 文件名里的版本段）与 `particledrawing_version_range`（下限 = 该版本，预发布要带标识）；
@@ -48,7 +47,7 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 - ⚠️ **若第 3 步失败**：不要在本模组绕过或自研替代实现 —— 按
   [conventions.md](conventions.md) 第 9 节的政策停下，并把 API 修改需求登记到
   [known-issues.md](known-issues.md#7-particledrawing-api-需求待对方实现)（政策全文见 [design/effects-api.md](design/effects-api.md) 第 0 节）。
-- 当前锁定版本为 **1.0.8-ALPHA**（1.0.8 相对 1.0.6 只新增 API，无破坏性变更）；
+- 当前锁定版本为 **1.0.9-ALPHA**（含 §7.3 的 `ParticleBatch` 与实体锚点三入口；1.0.8 → 1.0.9 只新增 API，无破坏性变更——`attachTo(entityId, offset)` 等旧签名保留）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
 - `lib/` 里可能残留不再被引用的旧版本 jar（如 `particledrawing-1.0.6.jar`）：**对照 API 请以当前版本的 `-sources.jar` 为准**。
 

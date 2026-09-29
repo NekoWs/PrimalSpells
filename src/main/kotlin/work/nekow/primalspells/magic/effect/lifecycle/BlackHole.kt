@@ -8,7 +8,6 @@ import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.spawnParticle
-import java.util.UUID
 
 /**
  * 黑洞 —— 半径 5 的引力场：
@@ -20,8 +19,8 @@ import java.util.UUID
  *   2. **被吸入的粒子**：每 tick 在球壳上生成 [PARTICLES_PER_TICK] 个紫色粒子，初速度取**随机切向**
  *      （绕中心旋转），随后被吸向中心，抵达中心（[CONSUME_RADIUS] 内）即销毁。
  *
- * 成员簿记全部交给 PD 的 [ParticleBatch]（增量登记、过期自动出列、`removeIf` 按条件回收、
- * `ensureSize` 补齐球壳）；本模组只算**数值**：位置、速度、颜色、寿命与回收判据。
+ * 成员簿记交给 PD 的 [ParticleBatch]（增量登记、过期自动出列、`removeIf` 按条件回收、`ensureSize` 补齐球壳）；
+ * **运动状态也全在 PD 手里**（见下），本模组只算「本 tick 每颗粒子该有的速度」。
  *
  * ## 吸力：越近越强 + 阻尼（阻尼系数是「能否落到中心」的唯一开关）
  *
@@ -31,18 +30,16 @@ import java.util.UUID
  * 现用的 **[DAMPING_PER_TICK] = 0.9** → **100%** 抵达中心，平均 **34 tick**（峰值存量随之从 60 降到 ~34）。
  * 参数取值过程见 `docs/issues/resolved.md` 第 11 轮。
  *
- * ## 位置由本模组积分，用一次 `trackAll` 批量下发
+ * ## 运动：速度每 tick 由本模组重算，位置积分归 PD
  *
- * 吸力**随距离变化**，所以本模组每 tick 自己算好位置后用 [ParticleBatch.trackAll] 写出
- * （1 包/tick，与粒子数无关）。好处：轨迹确定、「进入中心 0.1 格才消失」这类判定可以精确表达，
- * 且服务端暂停时不会因客户端外推而飘出范围。渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
+ * 吸力**随距离变化**，PD 的 `applyForce` 那种「一次下发的恒定加速度」表达不了 —— 每 tick 都得重算每颗粒子
+ * 该有的速度。但**位置不再由本模组积分**：`ParticleBatch.setVelocityAll(velocities)` 一次包覆盖全组
+ * （**1 包/tick，与粒子数无关**），之后由 PD 逐 tick 做 `pos += vel`（服务端权威；暂停时客户端不再外推）。
  *
- * 备选（PD 1.0.10-ALPHA 起可用）：`ParticleBatch.applyForceAll(加速列表, ticks = 1)` 能把
- * 「每颗粒子各自的力」一包下发、位置交回 PD 两端积分（同样 1 包/tick）。当前没换，是因为这里
- * 需要精确的中心判定与确定的轨迹，不是 PD 表达不了 —— 见 `docs/issues/resolved.md` 附录 B.2。
- *
- * 代价：PD 的**位置指令会清掉粒子上的速度与力**（`ServerParticleEngine.takeOverPosition`），
- * 所以速度只能记在本模组（[velocities]）。
+ * 好处：位置与速度都读 PD 的权威值（`forEach` / `removeIf`），**本模组不持有任何跨 tick 的粒子状态**
+ * （第 11 轮之前这里挂着一张「粒子 id → 速度」表，那是当时 PD 缺批量设速/施力的临时降级；
+ * 1.0.10-ALPHA 补上 `setVelocityAll` / `applyForceAll` 后已删除 —— 见 `docs/issues/resolved.md` 第 12 轮）。
+ * 渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
  */
 class BlackHole : AreaFieldEffect(
     radius = EFFECT_RADIUS,
@@ -52,16 +49,8 @@ class BlackHole : AreaFieldEffect(
     /** 范围球壳：永存粒子，首 tick 铺满，之后只在 PD 侧有损耗时补齐（[ParticleBatch.ensureSize]）。 */
     private var shell: ParticleBatch? = null
 
-    /** 被吸入的粒子：成员由 PD 簿记，位置每 tick 由本模组积分后用一次 `trackAll` 下发。 */
+    /** 被吸入的粒子：成员、速度、位置全部由 PD 维护，本模组只每 tick 重算一次速度。 */
     private var sucked: ParticleBatch? = null
-
-    /**
-     * 被吸入粒子的速度（本模组持有，键 = 粒子 id）。
-     *
-     * 键集每 tick 按「[ParticleBatch.forEach] 见到的存活成员」重建，所以 PD 侧寿命到点/被上限挤掉的
-     * 成员不会在这里留下残项；不依赖任何下标配对（历史上一类 bug 的来源，见 `docs/known-issues.md` §6）。
-     */
-    private var velocities = HashMap<UUID, Vec3>()
 
     /** 球壳偏移（相对中心，半径 [EFFECT_RADIUS]）：Fibonacci 球结果确定，算一次即可。 */
     private val shellOffsets: List<Vec3> by lazy {
@@ -82,50 +71,38 @@ class BlackHole : AreaFieldEffect(
         repeat(PARTICLES_PER_TICK) {
             val radial = ParticleShapes.randomUnitVector(random)
             val pos = center.add(radial.scale(EFFECT_RADIUS))
-            // 生成时不设速度：位置每条 tick 由本模组算好下发（速度指令会被位置指令清掉，见类注释）
-            val handle = manager.spawnParticle(pos, COLOR, SCALE, LIFETIME_TICKS) ?: return@repeat
-            suckedBatch.add(handle)
-            velocities[handle.id] = ParticleShapes.randomTangent(radial, random).scale(TANGENTIAL_SPEED)
+            // 初速度取随机切向（绕中心转）：一次速度包，之后每 tick 由 updateVisuals 重算
+            val tangent = ParticleShapes.randomTangent(radial, random).scale(TANGENTIAL_SPEED)
+            suckedBatch.add(manager.spawnParticle(pos, COLOR, SCALE, LIFETIME_TICKS, tangent))
         }
     }
 
-    /** 每 tick 施力 + 积分 + **一次 `trackAll` 批量写回位置**，并把抵达中心的粒子销毁。 */
+    /**
+     * 每 tick 重算每颗粒子的速度并**一次包**下发；位置由 PD 积分，抵达中心的粒子销毁。
+     *
+     * 顺序：`forEach` 读 PD 的权威 pos/vel 算出本 tick 速度 → `setVelocityAll` 一包下发 →
+     * 再按位置回收（读 PD 权威位置，读不产包）。全程本模组不留跨 tick 状态。
+     */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
         val batch = sucked ?: return
-        if (batch.isEmpty()) {
-            velocities.clear()
-            return
-        }
+        if (batch.isEmpty()) return
 
-        // 1) 按 PD 的权威位置推进本模组的速度，并算出这一 tick 的新位置
-        val positions = ArrayList<Vec3>(batch.size())
-        val advanced = HashMap<UUID, Vec3>(velocities.size)
-        batch.forEach { _, handle, pos, _ ->
-            val vel = velocities[handle.id] ?: Vec3.ZERO
+        // 速度迭代：v ← v·阻尼 + 向心加速度（随距离增强）。位置由 PD 做 pos += v，与这里一一对应
+        val velocities = ArrayList<Vec3>(batch.size())
+        batch.forEach { _, _, pos, vel ->
             val toCenter = center.subtract(pos)
-            val dist = toCenter.length()
-            // 随距离增强的向心加速度 + 轻微阻尼：越接近中心吸得越狠，切向速度逐渐衰减
-            val next = vel.scale(DAMPING_PER_TICK).add(toCenter.normalize().scale(PULL_PER_TICK / (dist + 0.5)))
-            advanced[handle.id] = next
-            positions.add(pos.add(next))
+            velocities += vel.scale(DAMPING_PER_TICK)
+                .add(toCenter.normalize().scale(PULL_PER_TICK / (toCenter.length() + 0.5)))
         }
-        velocities = advanced
+        batch.setVelocityAll(velocities)
 
-        // 2) 一次包下发全部位置（与粒子数无关）
-        batch.trackAll(positions)
-
-        // 3) 抵达中心的粒子销毁。放在 trackAll 之后：中途出列会打乱「成员顺序 ↔ positions」的对应关系
-        batch.removeIf { handle, pos, _ ->
-            val consumed = pos.distanceTo(center) <= CONSUME_RADIUS
-            if (consumed) velocities.remove(handle.id)
-            consumed
-        }
+        // 抵达中心即销毁（读 PD 的权威位置）
+        batch.removeIf { _, pos, _ -> pos.distanceTo(center) <= CONSUME_RADIUS }
     }
 
     override fun clearVisuals() {
         shell?.clear()
         sucked?.clear()
-        velocities.clear()
     }
 
     /** 投射物：每 tick 沿指向中心的方向加速（吸力随距离衰减）。 */
@@ -154,7 +131,7 @@ class BlackHole : AreaFieldEffect(
         /** 抵达中心判定半径（方块）：进入这个范围就销毁粒子 */
         const val CONSUME_RADIUS = 0.1
 
-        /** 每次积分的阻尼系数。**这是「能否落到中心」的唯一开关**：0.995 太弱（实测 0/500 到中心，只在 r≈2.2~5.0 绕圈），现用 0.9 → 100% 抵达、平均 34 tick（见类注释） */
+        /** 每次积分的阻尼系数。**这是「能否落到中心」的唯一开关**：0.995 太弱（实测 0/500 到中心，只在 r≈2.2~5.0 绕圈），0.9 → 100% 抵达、平均 34 tick（见类注释） */
         const val DAMPING_PER_TICK = 0.9
 
         /** 粒子尺寸与寿命上限（0.9 阻尼下平均 34 tick 就抵达中心被销毁，这条寿命只是兜底） */

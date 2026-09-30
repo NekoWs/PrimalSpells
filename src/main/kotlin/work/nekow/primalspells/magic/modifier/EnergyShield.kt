@@ -1,6 +1,5 @@
 package work.nekow.primalspells.magic.modifier
 
-import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
@@ -240,17 +239,9 @@ class EnergyShield : Modifier() {
             p.status.velocity.normalize().reflect(normal).mul(speed)
             p.status.pos = Vector3f(normal).mul(0.05f).add(pos)
 
-            // 弹开命中粒子（密集爆闪，便于观察弹开效果）
-            level.sendParticles(
-                ParticleTypes.ELECTRIC_SPARK,
-                pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble(),
-                14, 0.3, 0.3, 0.3, 0.12
-            )
-            level.sendParticles(
-                ParticleTypes.END_ROD,
-                pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble(),
-                5, 0.15, 0.15, 0.15, 0.02
-            )
+            // 第 24 轮按实机反馈删掉了这里原来那两簇原版粒子（ELECTRIC_SPARK + END_ROD）：
+            // 一簇白色粒子堆和「玻璃护盾」的语汇冲突，而且位置在投射物处、不如玻璃板贴合受击点。
+            // 现在受击反馈**只由那块玻璃板承担**（见 spawnHitPanel：整块玻璃在受击瞬间是白的）。
 
             durability -= bounceCost
             if (durability <= 0) {
@@ -459,8 +450,8 @@ class EnergyShield : Modifier() {
         private const val RECOVERY_FADE_TICKS = 6
         private const val GLASS_RECOVERY_SCALE = 0.22f
 
-        /** 亮边颜色：淡蓝白（比旧的常驻球壳更亮 —— 它只在受击那一瞬出现） */
-        private val GLASS_EDGE_COLOR: Color = Color.ofInt(190, 232, 255, 235)
+        /** 受击那块玻璃的亮边：**接近白**（冷白）—— 实机反馈「击中要变白」，白色粒子堆则已删除 */
+        private val GLASS_EDGE_COLOR: Color = Color.ofInt(226, 242, 255, 245)
 
         /** 破盾那一下的亮边：更白 */
         private val GLASS_BREAK_COLOR: Color = Color.ofInt(226, 246, 255, 245)
@@ -468,8 +459,8 @@ class EnergyShield : Modifier() {
         /** 恢复时的亮边：很淡（只是「闪一下」） */
         private val GLASS_RECOVERY_COLOR: Color = Color.ofInt(140, 200, 255, 95)
 
-        /** 填充：极淡的淡蓝（≈15% 不透明度） */
-        private val GLASS_FILL_COLOR: Color = Color.ofInt(150, 205, 255, 38)
+        /** 填充：极淡的冷白（≈18% 不透明度）：整块玻璃在受击瞬间读起来是「白了一下」 */
+        private val GLASS_FILL_COLOR: Color = Color.ofInt(206, 232, 255, 46)
     }
 
     /**

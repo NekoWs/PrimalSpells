@@ -115,6 +115,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 **同类效果叠加**：统一用 `BaseEffect.stackScale`（√N）与 `isStackPrimary`（只有首个同类实例改写状态），
 `Tracking`/`Reciprocate`/`Serpentine`/`GradualAccelerate`/`GradualDecelerate` 都改用了这两个辅助属性。
 
+**球面几何**分两处：`util/ParticleShapes`（怎么撒点）与 `util/Polyhedra`（撒在什么拓扑上——截角二十面体的面板/边界点，护盾球壳在用）。
 **球体采样**统一走 `util/ParticleShapes`：原版粒子的一次性撒点（`sphereVolume`，`Explosion` 在用），以及 PD 粒子共用的**取点工具**（`fibonacciSphere` 均匀球壳、`randomUnitVector`、`randomTangent`——黑洞/重力场/护盾在用）。已无调用方的 `sphereSurface` 在第 11 轮删除。
 
 ### 2.5 `MagicStatus`（`magic/core/MagicStatus.kt`）
@@ -309,31 +310,44 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
   [issues/resolved.md](issues/resolved.md) 第 10 轮与 [design/effects-api.md](design/effects-api.md) §0.3。
-- **护盾球壳**（`EnergyShield`）现状：一个 `ParticleGroup` —— `Draw.sphere` 一次性铺出 40 个淡蓝粒子
-  （黄金角螺旋 = Fibonacci 球，半径 1.7，粒子永存），`.followEntity(uuid, 偏移)` 让**轴心跟随持有者**、
-  `.spin(轴, 弧度/tick)` 让它**持续自转**；这两件事都在**客户端本地求值**，服务端只在建立时下发一次，
-  之后 **0 包/tick**。⚠️ 轴心偏移的基准是脚底 `Entity.position()`，所以偏移里必须含「身体中段（身高 55%）」，
-  且**只能加一次**（球心坐标与轴心偏移两处都加就高了 ≈1 格 → 新粒子「从上方滑入」，见第 8 轮）；
-  ⚠️ **调用顺序是硬要求**：必须**先** `createGroup(脚底)` + `followEntity(uuid, 身体中段)` 绑定轴心，
-  **再**让 `Draw.sphere` 的 `center` 等于绑定后的轴心（= 球心）铺成员 —— 客户端的相对偏移是按
-  「成员 spawn 位置 − arm 时的组 `pivot` 字段」重算的，而 `followEntity(offset)` 会顺手改那个字段，
-  顺序反了就会差一整个身体中段（实机：出现时对、arm 后掉到脚下，见 `issues/resolved.md` 第 13 轮）；
-  **不做周期重建**（重建必带滑入动画）；法杖不再被持有 **4 tick** 后由 `Magic.onPassiveIdle` 清除
-  （这段时长是留给「消失动画」的窗口，组 API 现成：`.fadeOut(ticks, removeAfter)`，尚未接）。
-- 已接线（四种用法，均对应 PD 的低带宽写法）：
-  1. **组级编排**：`Draw.sphere(...).followEntity(uuid, offset).spin(axis, radPerTick)`——护盾球壳；
-     跟随与旋转都由客户端每 tick 本地求值，**0 包/tick** 且天然刚性；
+- **护盾球壳**（`EnergyShield`）现状（第 15 轮重做）：球壳是**截角二十面体**（足球）——
+  12 个五边形 + 20 个六边形共 32 块面板（几何由 `util/Polyhedra.kt` 生成，带 `require` 自检），
+  **每块面板一个 `ParticleGroup`**，沿自身边界铺一圈粒子（每条棱 2 点 → 共 360 颗、永存）。
+  为什么不是「一个组」：组级编排只能整组平移/旋转/淡入淡出，而「各面板从球心飞向自己的位置」这种
+  **逐面板**动画必须每块面板各自成组。展开 = 每块面板先 `move(-面板中心, 0)` 折到球心、再
+  `move(+面板中心, 14 tick, EASE_OUT)` 飞回位 + `fadeIn`；收起 = `delay(已存在 tick)` +
+  `move(-面板中心, 12 tick, EASE_IN)` + `fadeOut(12, removeAfter = true)`（PD 自己做延迟销毁，
+  本模组不必回来清理）；稳态 `spin` 持续自转 + `followEntity` 跟随，**0 包/tick**。
+  ⚠️ **调用顺序是硬要求（两条）**：① **先** `createGroup(脚底)` + `followEntity(uuid, 身体中段)` 绑定轴心，
+  **再**铺成员，且成员坐标相对**绑定后的轴心**（= 球心）—— 客户端按「成员 spawn 位置 − arm 时的组 `pivot` 字段」
+  重算相对偏移，顺序反了会差一整个身体中段（实机：出现时对、arm 后掉到脚下，`issues/resolved.md` 第 13 轮）；
+  ② **第一条录进组里的指令不能是 `move`**：`move` 在 emit 前会 `pivot = pivot.add(delta)`，而 arm 用的正是
+  那一刻的 `pivot` 字段 —— 先 move 再 arm 会让 `rel` 整体多出一个面板中心（实机：整壳半径翻倍）。
+  所以本模组把 `fadeIn` 排在两条 `move` **之前**（已登记 PD 侧需求，见 `issues/pd-api-requests.md`）。
+  法杖不再被持有 **4 tick** 后由 `Magic.onPassiveIdle` 播**收起**动画；破盾与「法术被取下」同样走收起；
+  只有跨维度/换实体才立即销毁（旧面板在旧维度上，动画没有意义）。
+- 已接线（六种用法，均对应 PD 的低带宽写法）：
+  1. **组级编排**：`Draw.<形状>(...)` 铺形状 + `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` /
+     `.fadeIn/.fadeOut` / `.move`——护盾的 32 块面板组、黑洞球壳、重力场的波环与井环；
+     跟随/旋转/淡入淡出/平移都由客户端每 tick 本地求值，**0 包/tick**；
   2. **锚定**：`ParticleHandle.attachTo(实体, 世界空间偏移)`——需要「一堆各自独立的粒子钉在实体上」时用
      （当前没有使用者；护盾已改用第 1 条）；
   3. **批量设速**：`ParticleBatch.setVelocityAll(velocities)`——黑洞被吸入粒子（吸力**随距离变化**，
      每 tick 重算每颗粒子的速度），之后由 PD 逐 tick 做 `pos += vel`，**1 包/tick、与粒子数无关**；
-  4. **速度驱动（一次设速）**：生成时一次 `setVelocity`，之后交给 PD 积分——重力场下落粒子（**0 包/tick**），
-     回收判定只读 `ParticleBatch.forEach/removeIf` 给的权威位置；另 `Trajectory`（拖尾）同样只发一次速度。
+  4. **速度驱动（一次设速）**：生成时一次 `setVelocity`，之后交给 PD 积分——`Trajectory`（拖尾）与
+     黑洞进/退场那两批「向心收拢」粒子（速度 = 距离/寿命，到点正好抵达中心并自行过期，**0 包/tick**）；
+     回收判定只读 `ParticleBatch.forEach/removeIf` 给的权威位置；
+  5. **恒定力（一次施力）**：生成时一次 `applyForce(加速度, ticks = -1)`（`spawnParticle(..., acceleration = ...)`），
+     两端逐 tick 同为 `v += a; pos += v`——重力场下坠粒子（**0 包/tick**，起步慢落地快，这才是「重力」的样子）；
+  6. **一次性向心爆发**：`spawnParticle(pos, color, scale, lifetime, velocity)`，不进任何集合
+     （自带寿命、不需回收）——黑洞的进/退场粒子。
 - 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
   生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
-- 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）、`applyForce`/`applyForceAll`
-  （黑洞要的是「每 tick 重算速度」，用 `setVelocityAll` 直接表达更清楚；恒定或分段恒定的力才用施力入口）、
-  `ParticleGroup.fadeOut/destroyAfter`（护盾的消失动画窗口已留好）。
+- 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）、`applyForceAll`（需要每颗各自的力时才有意义；
+  恒定的力已用逐粒子 `applyForce` 接入重力场）、`ParticleGroup.pulse`/`recolor`/`movePath`/`expression`、
+  `ParticleGroup.destroyAfter`（收起动画用 `fadeOut(removeAfter = true)` 即可）。
+  ⚠️ `ParticleGroup.scale`/`pulse` 目前**只缩粒子的视觉尺寸，不缩粒子到轴心的距离**（与它们的 KDoc 不符），
+  所以「整壳胀大/塌缩」这条最直觉的写法不可用，已登记需求；现在的径向动画用「每面板独立组 + `move`」表达。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份；
   1.0.11-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。

@@ -65,8 +65,8 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
 | 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleBatch.trackAll(positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）。本模组没有「自己算位置」的批量使用者了 |
 | **每 tick 变化的每粒子速度**（受力随位置变化） | **`ParticleBatch.setVelocityAll(velocities)`**（1.0.10 起）：速度每 tick 重算、一包下发，**位置积分归 PD**（`pos += vel`） | **1 包/tick**（与粒子数无关） | `BlackHole` 被吸入粒子（`v ← v·阻尼 + 向心加速度`） |
-| **组级编排：跟随 + 持续旋转/淡出** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeOut(ticks, removeAfter)`；都在**客户端本地求值**。⚠️ **顺序即语义**：轴的绑定（`setPivot`/`followEntity`）对**其后**的旋转/缩放生效，且成员必须相对**绑定后的轴心**铺开（`followEntity(offset)` 会同步改组的 `pivot` 字段，而客户端按「spawn 位置 − 该字段」算相对偏移） | **0 包/tick** | `EnergyShield` 球壳（第 12 轮接入；第 13 轮修正轴心顺序） |
-| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | 暂未使用（黑洞的力随距离变化，用 `setVelocityAll` 直接表达） |
+| **组级编排：跟随 + 旋转/淡入淡出/平移** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeIn` / `.fadeOut(ticks, removeAfter)` / `.move(delta, ticks, easing)`；都在**客户端本地求值**。⚠️ **顺序即语义**：轴的绑定（`setPivot`/`followEntity`）对**其后**的旋转/缩放生效，成员必须相对**绑定后的轴心**铺开（`followEntity(offset)` 会同步改组的 `pivot` 字段，客户端按「spawn 位置 − 该字段」算相对偏移）；⚠️ **`move` 也会改那个字段**，而 arm 用的正是那一刻的值 → 铺完成员后的第一条指令不要用 `move`；⚠️ `scale`/`pulse` 只缩视觉尺寸、**不缩到轴心的距离** | **0 包/tick** | `EnergyShield`（第 15 轮起：**每块五/六边形面板一个组**，`move` 展开/收起、`fadeIn/fadeOut` 进出场、`spin` 自转）、`BlackHole` 球壳（fadeIn/fadeOut/spin）、`GravityField` 波环与井环 |
+| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | `GravityField` 下坠粒子（第 15 轮：`spawnParticle(..., acceleration = Vec3(0,-0.01,0))` → 一次施力、两端逐 tick 积分，**0 逐 tick 包**）；黑洞的力随距离变化，仍用 `setVelocityAll` |
 | 锚在一个实体身上（形状刚性） | 整组用 `ParticleGroup.followEntity(uuid, offset, local)`；零散粒子用 `handle.attachTo(Entity/uuid/entityId, 偏移)`（1.0.9 起身份统一） | **0** | `EnergyShield` 球壳已改用**组**（要自转）；`attachTo` 当前无使用者 |
 | **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起，1.0.10 补批量设速/施力）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity(All)`/`applyForce(All)`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll`/`setVelocityAll` 为 1 包/tick） | **已在用**：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）。见 [../issues/resolved.md](../issues/resolved.md) 第 10/12 轮 |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
@@ -141,6 +141,11 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 >   （各列表与 `handles()` 顺序一一对应，一包覆盖全组，逐玩家按可见性裁剪；`ParticleManager` 同名的 id 列表版本），
 >   以及修正「`setVelocity`/`applyForce` 未解除实体锚点」（现在与 `move`/`track` 一致：运动指令接管位置）。
 >   **第 12 轮已接入**：黑洞改用 `setVelocityAll`（速度每 tick 重算、位置积分交回 PD，删掉了自持的「粒子 id → 速度」表）。
+> - **2026-09-30（第 15 轮）**：黑洞球壳改用 `ParticleGroup`（144 粒、`fadeIn`+`spin`）并在进/退场各撒一批
+>   「向心收拢」的一次性粒子；重力场下坠改用**恒定力**（一次施力、越落越快）并补了加速下压的波环与地面井环；
+>   护盾球壳改成 `util/Polyhedra.kt` 的**截角二十面体**（12 五边形 + 20 六边形 = **32 个面板组**，`move` 展开/收起）。
+>   本轮登记的 PD 需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)：
+>   **`scale`/`pulse` 只缩尺寸不缩到轴心的距离**（与 KDoc 不符）、**`move` 会改 arm 基准轴心**（编排顺序陷阱）。
 > - **2026-09-30（第 10 轮）**：本模组已按 §0.2/§0.3 完成迁移 —— 自研 `ParticleSwarm`（273 行）**已删除**，
 >   三处接线改用 `ParticleBatch`，生成入口收敛为 `util/PdParticles.kt` 的
 >   `ParticleManager.spawnParticle(...)`；随距离变化的每粒子受力当时仍留在使用方（该需求已由 1.0.10 的

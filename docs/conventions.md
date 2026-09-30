@@ -62,7 +62,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  │                           PouchTooltip/ClientPouchTooltip, SpellSlotTracker
 │  ├─ input/                    SpellSlotScrollHandler（滚轮选槽，法杖/小包共用）, ClientContainerDragHandler（Ctrl+左键拖拽交换）
 │  └─ render/                   DroneEntityModel/DroneEntityRenderer
-├─ util/                        无状态工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）、PdParticles.kt（PD 管理器兜底 + spawnParticle）
+├─ util/                        无状态工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）、Polyhedra.kt（球面多面体几何：截角二十面体面板）、PdParticles.kt（PD 管理器兜底 + spawnParticle）
 └─ mixin/                       Java mixin；包名被 primalspells.mixins.json 引用，**不要改**
 ```
 

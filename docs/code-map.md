@@ -79,7 +79,7 @@
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
-| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**集合类粒子已全部改用 PD 的 `ParticleBatch`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [issues/resolved.md](issues/resolved.md) 第 10 轮、[design/effects-api.md](design/effects-api.md) §0.3 |
+| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**程序化粒子集用 PD 的 `ParticleBatch`、刚性形状/编排动画用 `ParticleGroup`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [issues/resolved.md](issues/resolved.md) 第 10/15 轮、[design/effects-api.md](design/effects-api.md) §0.3 |
 
 ### 法杖、物品、实体
 
@@ -111,6 +111,7 @@
 | `util/HitResult.kt` | 命中结果（`HitType`、`pos`、`normal`、`entity`） |
 | `util/Lore.kt` | 词条类型枚举（本地化 key）+ `LoreEntry` |
 | `util/ParticleShapes.kt` | 球体采样：Fibonacci 均匀球壳取点（`fibonacciSphere`）、随机单位方向/球内取点、随机切向；原版一次性撒点 `sphereVolume`（`Explosion` 用）。**无调用方的 `sphereSurface` 已于第 11 轮删除** |
+| `util/Polyhedra.kt` | 球面多面体几何：**截角二十面体**（足球 = 12 五边形 + 20 六边形，60 顶点 / 90 棱）的面板中心与边界点，供护盾球壳取点（第 15 轮新增）。构造过程带 `require` 自检（棱数/面数/顶点度数不对直接抛错），数值离线自检见 [issues/resolved.md](issues/resolved.md) 第 15 轮 |
 | `util/PdParticles.kt` | PD 接线入口：`Wand.pdParticles(level)`（取/兜底创建粒子管理器）、`ParticleManager.spawnParticle(...)`（生成一颗粒子）、`PD_IMMORTAL`（永存寿命 `-1`） |
 
 ### 客户端 `client/`
@@ -180,7 +181,7 @@
 | `sphere_orbit` | `SphereOrbit` | 修饰器（`OVERRIDE` 定位） | `magic/modifier/SphereOrbit.kt` |
 | `teleport` | `TeleportProjectile` | 投射物 | `magic/projectile/TeleportProjectile.kt` |
 | `quantum_entanglement` | `QuantumEntanglement` | 修饰器（生成子弹） | `magic/modifier/QuantumEntanglement.kt` |
-| `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`；功能可用，数值/手感待调，见 [issues/open.md](issues/open.md) 1.1） | `magic/modifier/EnergyShield.kt` |
+| `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`；功能可用，数值/手感待调，见 [issues/open.md](issues/open.md) 1.1；球壳为五/六边形面板 + 展开/收起，第 15 轮） | `magic/modifier/EnergyShield.kt`、`util/Polyhedra.kt` |
 
 **非法术物品**（`registry/ModItems.kt` 直接注册）：`wand`、`spell_pouch`、`test_dummy`。
 

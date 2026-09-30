@@ -100,7 +100,25 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 | Parchment 参数名缺失 | MC 26.2 尚无 Pascal 版本，`gradle.properties` 里相关行保持注释状态（见其中说明）。 |
 | 想看中文/英文界面文本 | 语言键在 `src/main/resources/assets/primalspells/lang/{zh_cn,en_us}.json`。 |
 
-## 7. 建议的工作流
+## 7. 离线数值自检（不启动游戏，直接跑实现）
+
+纯几何/数值逻辑（选点、拓扑、轨迹递推）可以**不启动游戏**直接执行真实实现：用 Gradle 缓存里的
+Kotlin 编译器手工编译「目标文件 + 一个同语义的最小替身」，再用 `java` 跑一个 `main` 打印断言结果。
+第 15 轮的截角二十面体几何就是这么验的（`util/Polyhedra.kt`：32 面板 / 60 顶点 / 90 棱 / 棱长一致 / 共面 / 邻接分类）。
+
+要点（脚本与输出都在 `build/verify/`，**`build/` 不入库**，需要时按下面五步重建）：
+
+1. 从 `~/.gradle/caches/modules-2/files-2.1/` 找齐这几个 jar（缺哪个补哪个，版本取本机最新的 2.x）：
+   `org.jetbrains.kotlin:kotlin-compiler-embeddable`、`kotlin-stdlib`、`kotlin-reflect`、`kotlin-script-runtime`、
+   `org.jetbrains:annotations`、`org.jetbrains.intellij.deps:trove4j`、`org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm`
+   （把 jar 拷到一个目录里，用 `java -cp "libs/*"` 加载，避免 Git Bash 下 Windows 类路径分隔符被转换）。
+2. 写一个 `net.minecraft.world.phys.Vec3` 替身（只实现目标文件用到的方法，语义与 MC 一致）。
+3. 写 `Main.kt`：调用真实实现，把不变量写成断言，失败项计数后以非零退出。
+4. 编译：`java -cp "libs/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -cp "libs/kotlin-stdlib-<版本>.jar" -d out <目标.kt> Vec3Stub.kt Main.kt`
+5. 运行：`java -Dstdout.encoding=UTF-8 -cp "out;libs/kotlin-stdlib-<版本>.jar" harness.MainKt`
+   （不加 `-Dstdout.encoding` 时重定向到文件会按 GBK 写出，中文断言会变乱码）。
+
+## 8. 建议的工作流
 
 1. 改代码 → `./gradlew compileKotlin`（快速反馈）。
 2. 功能可用性 → `./gradlew runClient`，进开发世界实测；崩溃看 `run/client/crash-reports/`，告警看 `run/client/logs/latest.log`。

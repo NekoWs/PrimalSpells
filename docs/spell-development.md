@@ -196,16 +196,30 @@ override fun onTick() {
 - **匀速直线** → 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分（**0 包/tick**）；
 - **逐 tick 变化的轨迹**（被吸引、绕转） → 本模组算好位置，用 `ParticleBatch.trackAll(positions)`
   一次包下发（**1 包/tick，与粒子数无关**）；单体可用 `handle.track(pos)`；
-- **恒定 / 分段恒定的力** → `handle.applyForce(accel, ticks)`（两端同规则积分，只在施力时发一次）；
-  ⚠️ 随距离变化的力表达不了，只能自算位置（见 `BlackHole` 的说明）；
+- **恒定 / 分段恒定的力** → 生成时一次施力：`ParticleManager.spawnParticle(..., acceleration = Vec3(0, -0.01, 0))`
+  （内部一次 `applyForce(accel, ticks = -1)`），之后两端逐 tick 同为 `v += a; pos += v` —— **0 逐 tick 包**。
+  `GravityField` 的下坠粒子在用（初速 0 + 恒定向下加速度 = 「越落越快」，雪花式的匀速下落是它的反面）；
+  ⚠️ **随距离变化**的力表达不了，只能每 tick 重算速度（见 `BlackHole` 的说明）；
 - **成员簿记一律用 PD 的 `ParticleBatch`**（`add`/`ensureSize`/`forEach`/`removeIf`/`clear`）——
   别再自己存句柄表或寿命表（原 `ParticleSwarm` 已在第 10 轮删除，见 [issues/resolved.md](issues/resolved.md) 第 10 轮）；
 - **生成**一颗粒子统一用 `ParticleManager.spawnParticle(pos, color, scale, lifetime, velocity?)`；
 - **管理器**统一用 `wand.pdParticles(level)` 获取（缺失/跨维度时兜底创建，未来的生物施法者也有粒子）；
-- 采样工具在 `util/ParticleShapes.kt`（`fibonacciSphere` 均匀球壳取点、随机单位方向/球内取点、随机切向）；
-- 参考实现：`BlackHole.kt`（`ensureSize` 铺球壳；切向初速 → 自己积分 → `trackAll` 批量写回 → 抵达中心销毁）、
-  `GravityField.kt`（球壳 `ensureSize`；下落粒子一次 `setVelocity` + `removeIf` 判定回收）、
-  `EnergyShield.kt`（`attachTo` 刚性球壳 + `ensureSize` 补齐、不做周期重建）。
+- **编排动画（进入 / 退出 / 展开 / 收起）** → `ParticleGroup`：`fadeIn`/`fadeOut(removeAfter = true)` 做进出场、
+  `move`/`rotate`/`spin` 做位移与旋转，都在**客户端本地求值（0 包/tick）**。三条约束：
+  ① **退场动画要把时间线对齐到「现在」**：指令时间是「相对程序起点」的毫秒数，所以先 `delay(已存在 tick)`
+  再录 `fadeOut`（`BlackHole`/`EnergyShield` 都在用）；
+  ② **铺完成员后，第一条录进去的指令不能是 `move`** —— `move` 会改组的 `pivot` 字段，而客户端 arm 时
+  用它反算每颗粒子的相对偏移，先 move 会让整体偏移错一个位移（详见 `EnergyShield.updateShieldVisual`）；
+  ③ 「整壳从中心胀开 / 缩回中心」这类**径向**动画当前**不能用 `scale`**（PD 只缩视觉尺寸、不缩到轴心的距离，
+  见 [issues/pd-api-requests.md](issues/pd-api-requests.md)）：要么**每块面板各自成组**用 `move`
+  （`EnergyShield` 的 32 个面板组），要么撒一圈**带向心初速的一次性粒子**（`BlackHole` 的进/退场）；
+- 采样/几何工具：`util/ParticleShapes.kt`（`fibonacciSphere` 均匀球壳取点、随机单位方向/球内取点、随机切向）、
+  `util/Polyhedra.kt`（截角二十面体 = 五/六边形球体的面板与边界点，护盾在用）；
+- 参考实现：`BlackHole.kt`（组球壳 `fadeIn`+`spin`；进/退场各一批向心粒子；被吸入粒子切向初速 + 每 tick
+  `setVelocityAll` 批量设速 + 抵达中心 `removeIf`）、
+  `GravityField.kt`（范围球壳 `ensureSize`；下坠粒子**一次施力**；波环 `move`+`EASE_IN` 加速下压；
+  地面井环 `Draw.circle` + `spin`；回收只读 PD 权威位置）、
+  `EnergyShield.kt`（32 个面板组：`followEntity` 跟随 + `spin` 自转 + `move` 展开/收起 + `fadeIn/fadeOut`）。
 - ⚠️ 两条铁律：**不要自己写粒子系统**；**不要按列表索引给粒子配对偏移**（有粒子被拒/重建就会错位）——
   PD 缺能力时停下并提需求（[conventions.md](conventions.md) §9）。
 

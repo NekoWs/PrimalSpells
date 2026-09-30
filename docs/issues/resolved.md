@@ -179,6 +179,57 @@
 
 ---
 
+## 第 15 轮（2026-09-30，黑洞 / 重力场 / 护盾的视觉重做）
+
+用户要求：① 黑洞加粒子、球体加**进入/退出**动画；② 重力场「完全不像重力、更像下雪」，重做表现；
+③ 护盾改成**五/六边形构成的球体** + **展开/收起**动画。
+
+- **黑洞**（`magic/effect/lifecycle/BlackHole.kt`）
+  - 球壳从 `ParticleBatch`（96 颗灰黑单色、`ensureSize` 补齐）换成 `ParticleGroup`：`Draw.sphere` 铺 **144** 颗，
+    `ColorSource` 做「上偏紫、下近黑 + 每 5 颗一个亮紫星点」的渐变，`fadeIn(14)` 淡入 + 慢速 `spin` 自转
+    （**0 包/tick**）。代价：球壳成了**固定成员集**，不再有 `ensureSize` 的缺量补齐（个别生成被上限拒绝时留空缺）。
+  - **进入动画**：外球面（1.45 倍半径）撒 72 颗粒子，初速**指向中心**、大小 = `距离/寿命`（14 tick）
+    → 到点正好落进中心并自行过期；**退出动画**：球壳 `delay(已存在 tick)` + `fadeOut(16, removeAfter = true)`，
+    同时在球壳半径撒 96 颗向心粒子 → 「整个场塌进奇点」。两批都是**一次性常量速度**粒子（0 包/tick、自带寿命、
+    不需要簿记，即使黑洞提前消失也只是多飞不到一秒）。
+  - 被吸入粒子 1 → **每 tick 3 颗**（第一颗亮紫小点、其余暗紫大点），峰值存量约 100。
+- **重力场**（`magic/effect/lifecycle/GravityField.kt`）视觉重做。诊断：旧表现是「上半球生成 + **匀速**垂直下落」，
+  **匀速下落正是雪花的运动特征**；而且回收面取「下半球表面」，场心常在半空，粒子是在看不见的地方凭空消失的。
+  - **加速度**（重力的第一特征）：下坠粒子初速 0，生成时一次 `applyForce(Vec3(0,-0.01,0), ticks = -1)`
+    （`spawnParticle(..., acceleration = ...)`），之后两端逐 tick `v += a; pos += v` —— 10 格约 45 tick、
+    末速 0.45 格/tick，**起步慢、落地快**，且 **0 逐 tick 包**。
+  - **方向感**：每 22 tick 从场顶压下一层**重力波环**（`Draw.circle` + `move(..., EASE_IN)` 加速下坠 + `fadeOut(removeAfter)`），
+    场地结束时把还在下坠的环一并 `remove()`。
+  - **地面**（重力的第二特征）：首 tick 向下逐格探测 5 格求出**场底平面**（全探空则退化为球体最底端），
+    粒子落到该平面即回收，并在平面上铺一条缓慢自转的**井环**标出「重力井口径」—— 砸在地上而不是消失在半空。
+- **护盾**（`magic/modifier/EnergyShield.kt`）：球壳换成**截角二十面体**（足球）。新增 `util/Polyhedra.kt`：
+  由正二十面体（12 顶点 / 30 棱 / 20 面）截断顶点得到 **32 块面板（12 五边形 + 20 六边形）/ 60 顶点 / 90 棱**，
+  所有棱等长；面板边界点按「每条棱 N 点」细分并投回球面，绕向统一为**逆时针**。
+  - **每块面板一个 `ParticleGroup`**（32 个组）：组级编排只能整组动，而「各面板从球心飞向自己的位置」是逐面板动画，
+    只能用「一面板一组」表达。成员 = 沿边界的粒子（每条棱 2 点 → 360 颗永存）。
+  - **展开**：`fadeIn(14)` → `move(-面板中心, 0)`（瞬时折到球心）→ `move(+面板中心, 14, EASE_OUT)`（飞回球面）
+    → `spin`（持续自转）；**收起**：`delay(已存在 tick)` + `move(-面板中心, 12, EASE_IN)` + `fadeOut(12, removeAfter = true)`
+    —— 破盾、放下法杖（4 tick 缓冲后）、取下法术都走收起；**只有跨维度/换实体**才立即销毁（旧面板在旧维度上，
+    动画没有意义）。稳态仍是 **0 包/tick**；代价是建立时刻一次性 32 份程序包 + 360 个生成包。
+  - ⚠️ **本轮新踩到的 PD 语义坑（已登记需求）**：`ParticleGroup.move()` 在 `emit` 之前会 `pivot = pivot.add(delta)`，
+    而客户端 `arm` 时用**收到全量程序那一刻的组轴心字段**反算每颗粒子的相对偏移 —— 所以**第一条录进组里的指令
+    决定了 arm 基准**。对实体轴心（`followEntity`）尤其致命：渲染用的是「实体当前坐标 + 绑定偏移」，与 arm 时
+    的字段无关，误差不会抵消。本模组把 `fadeIn` 排在两条 `move` **之前**（代码里写明了原因）。
+    这与第 13 轮「先绑轴心、再铺成员」是同一族约束（都是「arm 基准必须等于预期原点」）。
+- **数值自检**：`build/verify/geom/` 用 Kotlin 编译器（`kotlin-compiler-embeddable` +
+  `kotlin-stdlib`，都在 Gradle 缓存里）+ 一个同语义的 `Vec3` 替身，**直接执行真实的 `util/Polyhedra.kt`**
+  （不是另写一份 JS 复刻），断言 19 项：32 面板（12 五 + 20 六）、60 顶点、90 棱、顶点度数 3、棱度数 2、
+  棱长一致（0.686031961 @ 半径 1.7）、面板共面、环上点等角距且绕向统一、五-五不相邻 / 五-六棱 60 / 六-六棱 30、
+  每个五边形邻 5 个六边形、每个六边形邻 3 五 + 3 六 —— 全绿（输出：`build/verify/geometry-selfcheck.txt`；
+  自检脚本本身不入库（`build/` 已 gitignore），复跑方法见 [build-and-run.md](../build-and-run.md) §7）。
+  **第一次运行就抓到一个真 bug**：截断点用了**无向**键，`cut(a→b)` 与 `cut(b→a)` 撞成同一个点，
+  60 个顶点只剩 30 个（`require` 直接抛错）。修法是给「有向顶点对」单独一个键。
+- 落点：`magic/effect/lifecycle/{BlackHole,GravityField,AreaFieldEffect}.kt`、`magic/modifier/EnergyShield.kt`、
+  `util/{Polyhedra,PdParticles}.kt`
+- PD 侧新增需求 2 条（见 [pd-api-requests.md](pd-api-requests.md)）：`scale`/`pulse` 不缩放到轴心的距离；
+  `move` 会改 arm 基准轴心。
+- 构建：`./gradlew build --no-build-cache` **0 warning**；开发服务端冒烟 `Done (0.203s)!`，0 `ERROR`/`Exception`。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

@@ -157,6 +157,7 @@ class BlackHole : AreaFieldEffect(
      * 再按位置回收（读 PD 权威位置，读不产包）。全程本模组不留跨 tick 状态。
      */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
+        rumbleInside(manager, center)
         val batch = sucked ?: return
         if (batch.isEmpty()) return
 
@@ -171,6 +172,34 @@ class BlackHole : AreaFieldEffect(
 
         // 抵达中心即销毁（读 PD 的权威位置）
         batch.removeIf { _, pos, _ -> pos.distanceTo(center) <= CONSUME_RADIUS }
+    }
+
+    /**
+     * **站在范围里就一直极轻微地抖**（第 20 轮按实机反馈加的）：以前是「进/退场各撞一下」，
+     * 退场那两下太抢戏；现在改成持续的、几乎察觉不到的低幅抖动 —— 力量感交给「你被一个场包着」这件事本身，
+     * 而不是几记重锤。
+     *
+     * 口径：
+     * - 只在**玩家**位于球壳半径内时发（每 tick 一条 8 字节包、只发给该玩家，见 `ScreenShake.shake`），
+     *   离开范围立刻停（下一条 shake 不再续期，客户端 3 tick 内衰减到 0）；
+     * - 越靠近中心略强：`RUMBLE_MIN + RUMBLE_RANGE × (1 − 距离/半径)`（振幅量级 0.05~0.13，
+     *   换算到视角只有零点几度，属于「画面在轻微呼吸」而不是「镜头在晃」）；
+     * - `ticks = 3` 持续续期，所以表现为**连续**的低幅抖动，而不是一顿一顿的脉冲。
+     */
+    private fun rumbleInside(manager: ParticleManager, center: Vec3) {
+        val level = manager.level
+        for (player in level.players()) {
+            val dist = player.position().distanceTo(center)
+            if (dist > EFFECT_RADIUS) continue
+            val depth = (1.0 - dist / EFFECT_RADIUS).coerceIn(0.0, 1.0)
+            ScreenShake.shake(
+                level,
+                player.position(),
+                radius = 1.0,
+                amplitude = (RUMBLE_MIN + RUMBLE_RANGE * depth).toFloat(),
+                ticks = RUMBLE_TICKS,
+            )
+        }
     }
 
     /**
@@ -195,6 +224,7 @@ class BlackHole : AreaFieldEffect(
             }
             // 第二拍：整壳刚砸到中心，就地反弹出一颗小球（Deferred 的到期判定带一 tick 余量，故 -1）
             Deferred.after(level, EXIT_TICKS - 1) { spawnReboundBall(manager, center) }
+            // 退场全程不再给镜头冲击：实机反馈「最后两下抖动」太抢戏，改成「人在范围内就一直很轻微地抖」
         }
         shell = null
         sucked?.clear()
@@ -221,12 +251,8 @@ class BlackHole : AreaFieldEffect(
                 acceleration = dir.scale(-REBOUND_ACCEL),
             )
         }
-        ScreenShake.shake(level, center, radius = REBOUND_SHAKE_RADIUS, amplitude = 0.5f, ticks = 8)
         // 第三拍：小球被吸回中心、收成一点（Deferred 同样带一 tick 余量）
-        Deferred.after(level, REBOUND_TICKS - 1) {
-            spawnFinalSnap(manager, center)
-            ScreenShake.shake(level, center, radius = IMPLODE_SHAKE_RADIUS, amplitude = 0.95f, ticks = 14)
-        }
+        Deferred.after(level, REBOUND_TICKS - 1) { spawnFinalSnap(manager, center) }
     }
 
     /**
@@ -291,11 +317,16 @@ class BlackHole : AreaFieldEffect(
         /** 开场冲击的生效半径（方块）：比效果半径大一圈，站在外面也看得见 */
         const val OPEN_SHAKE_RADIUS = 24.0
 
-        /** 收尾那一拍的镜头冲击半径（0.95 = 最强档） */
-        const val IMPLODE_SHAKE_RADIUS = 28.0
+        // ---- 范围内持续轻抖（第 20 轮：取代原来的进/退场「重锤」） ----
 
-        /** 反弹小球那一拍的镜头冲击半径（比收尾轻） */
-        const val REBOUND_SHAKE_RADIUS = 24.0
+        /** 球壳边缘处的振幅（0.05 ≈ 视角零点几度，几乎察觉不到） */
+        const val RUMBLE_MIN = 0.05
+
+        /** 从边缘到球心振幅的增量（球心处 0.05 + 0.08 = 0.13） */
+        const val RUMBLE_RANGE = 0.08
+
+        /** 每次续期的持续 tick 数：每 tick 续一次 = 连续抖动 */
+        const val RUMBLE_TICKS = 3
 
         // ---- 第二拍：反弹小球 ----
 

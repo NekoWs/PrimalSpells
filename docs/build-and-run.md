@@ -47,7 +47,11 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 - ⚠️ **若第 3 步失败**：不要在本模组绕过或自研替代实现 —— 按
   [conventions.md](conventions.md) 第 9 节的政策停下，并把 API 修改需求登记到
   [issues/pd-api-requests.md](issues/pd-api-requests.md)（政策全文见 [design/effects-api.md](design/effects-api.md) 第 0 节）。
-- 当前锁定版本为 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
+- 当前锁定版本为 **1.0.12-ALPHA**（一次实现四个历史需求：增量追加按「从现在起」读、旋转可叠加、
+  `scale`/`pulse` 连到轴心的距离一起缩放、`move` 不再改 arm 基准轴心 —— 详见
+  [issues/resolved.md](issues/resolved.md) 附录 B 与第 20 轮）。升级时**务必重审本侧「自己补偿时钟」的写法**：
+  第 17~19 轮为绕开旧语义自己算过游标，新版语义下会重复计时（第 20 轮踩过）。
+- 上一版本为 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
 - `lib/` 只保留当前版本的 jar（`particledrawing-1.0.11-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
 

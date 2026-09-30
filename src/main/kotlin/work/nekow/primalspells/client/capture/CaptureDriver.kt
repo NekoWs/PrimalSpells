@@ -306,6 +306,9 @@ object CaptureDriver {
             }
         }
         if (!recording) return
+        // 上一 tick 的帧还没被渲染线程取走就又被覆盖 = 这一 tick 根本没渲染出帧（帧率掉到 20fps 以下）。
+        // 不记这一笔的话，产出会静默少几帧、视频里凭空少一段动画。
+        if (pendingCaptureTick >= 0 && pendingCaptureTick != lastCapturedTick) framesDropped++
         pendingCaptureTick = t
     }
 

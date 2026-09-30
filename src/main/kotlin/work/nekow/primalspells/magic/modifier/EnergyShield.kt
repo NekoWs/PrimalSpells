@@ -16,13 +16,9 @@ import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
-import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.util.PD_IMMORTAL
-import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.Polyhedra
-import work.nekow.primalspells.util.ScreenShake
 import work.nekow.primalspells.util.pdParticles
-import work.nekow.primalspells.util.spawnParticle
 import java.util.UUID
 import kotlin.math.PI
 import kotlin.math.min
@@ -61,10 +57,9 @@ import kotlin.math.min
  * - **构建**：`updateShieldVisual` 每 tick 建 [BUILD_PANELS_PER_TICK] 块面板（各自的组 + 一圈粒子 +
  *   `fadeIn([BUILD_FADE_TICKS])`）；[shieldPanels] 已按**面板中心高度由低到高**排序，于是整颗球像被
  *   **从脚下往上搭起来**，共约 16 tick；
- * - **消散**：反向（最后搭起来的最先拆）对**原来的组**追加 `delay(已运行时长 + 阶梯) + fadeOut`，
- *   自转一路不停（第 18 轮：之前重建组会让旋转停住、观感也变细）；
- *   销毁由 `util/Deferred`（服务端延迟队列）在淡出结束后执行，所以**即使本实例此后不再被 tick
- *   （法术被取下 / 法杖被回收）动画照样放完**，不留孤儿粒子（细节见 [foldShieldVisual]）；
+ * - **消散**：反向（最后搭起来的最先拆）对**原来的组**追加 `delay(阶梯) + fadeOut`，自转一路不停；
+ *   `removeAfter = true` 由 PD 排销毁，所以**即使本实例此后不再被 tick（法术被取下 / 法杖被回收）
+ *   动画照样放完**，不留孤儿粒子（PD 1.0.12 起增量指令按「从现在起」读，这里才能写回朴素形式）；
  * - **不再使用 `move`**：面板不位移，也就不碰 PD 的「第一条指令不能是 `move`」那条坑
  *   （`move` 会改组的轴心字段，而客户端 arm 时拿它反算相对偏移，见 `docs/issues/pd-api-requests.md`）。
  *
@@ -108,14 +103,18 @@ class EnergyShield : Modifier() {
     private val shell = ArrayList<ShellPanel>()
 
     /**
+     * 已经交给 PD 淡出、但还没被销毁的面板组（[foldShieldVisual] 期间）。
+     *
+     * 留这份引用是为了**重建时先把它们清掉**：淡出要持续约 1 秒，这期间若球壳被重建
+     * （重新握杖 / 法杖被回收后重新加载），旧壳还在淡出就会和新壳重叠成「两层球」。
+     * 第 20 轮实机反馈「护盾的外壳似乎不止一个球体」正是这么来的。
+     */
+    private val fading = ArrayList<ParticleGroup>()
+
+    /**
      * 球壳的一块面板：粒子组 + 它的几何（几何要留到消散时用，见 [foldShieldVisual]）。
      */
-    private class ShellPanel(
-        val group: ParticleGroup,
-        val panel: Polyhedra.Panel,
-        /** 建组时的 `gameTime`：消散时要用它算出「组已经运行了多久」，把指令游标推到现在（见 [foldShieldVisual]）。 */
-        val bornAt: Long,
-    )
+    private class ShellPanel(val group: ParticleGroup, val panel: Polyhedra.Panel)
 
     /** 已经建到第几块面板（0 = 还没开始）：构建被摊到多 tick 上，见 [buildShieldPanels]。 */
     private var buildCursor = 0
@@ -296,7 +295,6 @@ class EnergyShield : Modifier() {
             if (durability <= 0) {
                 durability = 0.0
                 pauseTicks = breakPauseTicks
-                shatterVisual(level, player)
                 break
             }
         }
@@ -354,61 +352,13 @@ class EnergyShield : Modifier() {
             // 第一条指令必须是「不挪轴心」的：fadeIn 只做透明度编排，arm 时轴心仍是球心
             group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
             group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
-            shell += ShellPanel(group, shieldPanels[index], level.gameTime)
+            shell += ShellPanel(group, shieldPanels[index])
         }
         buildCursor = end
-        // 最后一块搭上 = 整颗球合拢的那一刻：向外炸一圈亮环 + 镜头轻撞，把「搭完了」变成一记重音
-        if (buildCursor >= shieldPanels.size) deployShockwave(level, holder)
     }
 
-    /**
-     * 展开完成的**冲击波**：从球心向外炸开一圈亮粒子（一次性，自带寿命 → 零逐 tick 包）+ 镜头轻撞。
-     *
-     * 为什么放在「最后一块面板」而不是每块都放：构建波本身已经是一段连续动作，
-     * 重音只该有一个落点 —— 全部合拢那一拍。每块都炸就变成噪音了。
-     */
-    private fun deployShockwave(level: ServerLevel, holder: Entity) {
-        val center = holder.position().add(0.0, shellCenterOffset(holder), 0.0)
-        spawnBurst(level, center, DEPLOY_PARTICLES, DEPLOY_SCALE, DEPLOY_LIFETIME, DEPLOY_SPEED, DEPLOY_COLOR, SHELL_RADIUS * 0.5)
-        ScreenShake.shake(level, center, radius = DEPLOY_SHAKE_RADIUS, amplitude = 0.35f, ticks = 6)
-    }
-
-    /**
-     * 破盾的**炸裂**：球壳碎掉那一刻向外炸出一圈碎片 + 强镜头冲击。
-     *
-     * 与 [foldShieldVisual] 的分工：这里只负责「碎」的那一下的冲击感（一次性粒子 + 镜头），
-     * 球壳本身由 [foldShieldVisual] 逐块淡出收掉（第 17 轮改成原地重建组，见那里的注释）。
-     */
-    private fun shatterVisual(level: ServerLevel, holder: Entity) {
-        val center = holder.position().add(0.0, shellCenterOffset(holder), 0.0)
-        spawnBurst(level, center, SHATTER_PARTICLES, SHATTER_SCALE, SHATTER_LIFETIME, SHATTER_SPEED, SHATTER_COLOR, SHELL_RADIUS * 0.45)
-        ScreenShake.shake(level, center, radius = SHATTER_SHAKE_RADIUS, amplitude = 0.85f, ticks = 12)
-    }
-
-    /** 从 [center] 外扩一圈一次性粒子（生成后交给 PD 积分，本模组不再维护它们）。 */
-    private fun spawnBurst(
-        level: ServerLevel,
-        center: Vec3,
-        count: Int,
-        scale: Float,
-        lifetime: Int,
-        speed: Double,
-        color: Color,
-        startRadius: Double,
-    ) {
-        val manager = wand.pdParticles(level)
-        val random = level.random
-        repeat(count) {
-            val dir = ParticleShapes.randomUnitVector(random)
-            manager.spawnParticle(
-                center.add(dir.scale(startRadius)),
-                color,
-                scale,
-                lifetime,
-                dir.scale(speed),
-            )
-        }
-    }
+    // 第 20 轮按实机反馈移除：展开完成与破盾的**外扩爆开**（以及配套的镜头冲击）都不要了 ——
+    // 球壳是「一条线画出来的干净球体」，往外炸一圈粒子反而让轮廓变糊、看起来像叠了两层球。
 
     /**
      * 消散动画：**反向**（最后搭起来的最先拆）逐块 `fadeOut`，每块之间用 `delay` 错开一个阶梯。
@@ -432,22 +382,18 @@ class EnergyShield : Modifier() {
             return
         }
 
-        // 第 18 轮起**不再重建球壳**（旧写法要重铺一遍全部粒子，实机反馈「收起时不再旋转、看着更细」——
-        // 因为新组没有 `spin`；而 PD 的 `spin` 与一次性 `rotate` 是「各自按自己的基准写 rel、后者覆盖前者」，
-        // 想在新组上补回旧相位是补不出来的）。现在直接对**旧组**追加淡出，自转自然延续：
-        //
-        // 唯一要自己算的是**指令游标**：组的游标是从建组时刻起累加的绝对时间，而客户端对
-        // 「startMs 已过去」的指令是下一帧立即完成 —— 所以这里把它推到「本组已经运行了多久（+ 阶梯）」，
-        // 客户端才会在正确的时刻开始淡出（PD 侧需求见 `docs/issues/pd-api-requests.md`）。
-        // `removeAfter` 则不能用：它拿同一个绝对游标去排**相对 now** 的销毁，会把销毁推后一整段已运行时长
-        // （留下看不见但还活着的粒子）；销毁改由**我们自己的延迟队列**在淡出结束后执行，
-        // 所以「法术被取下 / 法杖被回收、本实例再也不 tick」时，消散动画照样放完、也不会留孤儿。
+        // **不重建球壳**，直接对**旧组**追加淡出：自转因此自然延续（第 19 轮实机反馈「收起时不再旋转」——
+        // 重建出来的新组没有 `spin`）。PD 1.0.12 起增量指令按「从现在起」读，所以这里不需要算游标、
+        // 也不需要自己排销毁；`removeAfter = true` 由 PD 按同一口径处理，
+        // 于是「法术被取下 / 法杖被回收、本实例再也不 tick」时动画照样放完、也不会留孤儿。
+        // PD 1.0.12 起：程序下发之后录制的指令按「**从现在起**」读（`ParticleGroup.delay` 的 KDoc
+        // 与 `GroupClock`），所以这里就是最朴素的写法 —— 不用自己把游标推到 now，
+        // `removeAfter = true` 的销毁时刻也按同一口径从当下起算（1.0.12 的 `scheduleDestroy`）。
         for ((order, entry) in shell.reversed().withIndex()) {
-            val elapsed = (level.gameTime - entry.bornAt).coerceAtLeast(0L).toInt()
             val stagger = (order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS
-            entry.group.delay(elapsed + stagger)
-            entry.group.fadeOut(FOLD_FADE_TICKS, removeAfter = false)
-            Deferred.after(level, stagger + FOLD_FADE_TICKS + 1) { entry.group.remove() }
+            entry.group.delay(stagger)
+            entry.group.fadeOut(FOLD_FADE_TICKS, removeAfter = true)
+            fading += entry.group
         }
         shell.clear()
         buildCursor = 0
@@ -484,6 +430,9 @@ class EnergyShield : Modifier() {
     private fun clearShieldVisual() {
         for (p in shell) p.group.remove()
         shell.clear()
+        // 还在淡出中的旧壳也要立刻清掉：否则重建期间会看到「两层球」重叠
+        for (group in fading) group.remove()
+        fading.clear()
         buildCursor = 0
         shellLevel = null
         shellHolder = null
@@ -525,16 +474,27 @@ class EnergyShield : Modifier() {
 
         /**
          * 每条棱上放几个点（含起点，见 [Polyhedra.truncatedIcosahedron]）：
-         * 棱长 0.686 格 ÷ 本值 = 点间距，点间距要 ≲ [SHELL_SCALE] 才连得成实线。
-         * 3 → 点距 0.229、共 540 颗（第 16 轮从 2 提到 3：太稀时看不出五/六边形）；4 → 点距 0.171、720 颗。
+         * **棱长 1.166 格（半径 1.7）/ 本值 = 点间距（格）**，点间距要 ≈ 粒子实际尺寸才连成实线。
+         *
+         * ⚠️ 粒子「实际尺寸」不是 [SHELL_SCALE] 本身：PD 的 `quadSize = scale × 0.1 × texScale`
+         * （`BridgeParticle.EDITOR_TO_MC_SCALE`，实机/录制实测 `texScale ≈ 2.1`），
+         * 也就是**实际格数 ≈ scale × 0.21**。第 20 轮之前按「scale 就是格数」估的密度是错的：
+         * 3 点/棱（点距 0.229）配 scale 0.3（实际只有 0.063 格宽）→ 画出来是一串断点，
+         * 实机反馈「还有两条线条」就是指这个（前后半球的断点交错看着像两条线）。
+         *
+         * 现在 14 点/棱 → 点距 **0.083 格**，配 [SHELL_SCALE] 0.40（实际 ≈0.085 格）→ 相邻粒子刚好叠住、
+         * 棱是一条连续细线（线宽 ≈ 0.085 格，约为球半径的 5%）；共 **2520 颗**
+         * （每块面板 70/84 颗 —— 共享棱由两块面板各画一遍，位置完全重合，这是刻意的：
+         * 这样每块面板都是**闭合轮廓**，构建波里先出现的那块不会缺边）。
          */
-        private const val SHELL_POINTS_PER_EDGE = 3
+        private const val SHELL_POINTS_PER_EDGE = 14
 
         /**
-         * 单颗粒子尺寸：点距 0.229 时，**0.3 左右刚好连成一条细线**（离线投影对比过：
-         * 0.4 → 棱变成粗管、0.25 → 略稀但最清晰、0.3 → 兼顾实线与细度）。
+         * 单颗粒子尺寸：**实际格数 ≈ scale × 0.213**（见上）。
+         * 0.40 → ≈0.085 格，与 0.083 格的点距刚好咬合；调小 = 棱断成点、调大 = 棱糊成实心球
+         * （第 20 轮先试 0.95 直接糊成一个蓝球，就是这个原因）。
          */
-        private const val SHELL_SCALE = 0.3f
+        private const val SHELL_SCALE = 0.40f
 
         /** 每 tick 构建几块面板：32 ÷ 本值 = 构建波的总时长（2 → 16 tick ≈ 0.8 秒） */
         private const val BUILD_PANELS_PER_TICK = 2
@@ -576,24 +536,7 @@ class EnergyShield : Modifier() {
         /** 淡蓝色 */
         private val SHELL_COLOR: Color = Color.ofInt(120, 200, 255)
 
-        // ---- 重音：展开完成 / 破盾 ----
 
-        /** 展开完成的冲击波：粒子数 / 尺寸 / 寿命 / 外扩速度 */
-        private const val DEPLOY_PARTICLES = 44
-        private const val DEPLOY_SCALE = 0.5f
-        private const val DEPLOY_LIFETIME = 10
-        private const val DEPLOY_SPEED = 0.30
-        private const val DEPLOY_SHAKE_RADIUS = 12.0
-
-        /** 破盾炸裂：更快更亮（比展开重得多 —— 这是「被打碎」） */
-        private const val SHATTER_PARTICLES = 60
-        private const val SHATTER_SCALE = 0.6f
-        private const val SHATTER_LIFETIME = 13
-        private const val SHATTER_SPEED = 0.45
-        private const val SHATTER_SHAKE_RADIUS = 14.0
-
-        private val DEPLOY_COLOR: Color = Color.ofInt(196, 236, 255, 215)
-        private val SHATTER_COLOR: Color = Color.ofInt(236, 250, 255, 235)
     }
 
     /**

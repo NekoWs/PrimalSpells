@@ -112,6 +112,21 @@ class EnergyShield : Modifier() {
     private val fading = ArrayList<ParticleGroup>()
 
     /**
+     * **整壳统一的相位基准**（建壳第一块面板那一刻的 `gameTime`）。
+     *
+     * ⚠️ 这是第 21 轮修掉的一个真 bug：球壳是**分批**建的（每 tick 2 块、共 16 tick），
+     * 而 `spin` 是每块面板**从自己的组建立那一刻**开始累计角度的 —— 于是相邻面板的相位差最多
+     * 16 tick × 3°/tick ≈ **48°**，整颗球变成「一堆各自转过不同角度的面板」：
+     * 棱从别的格子中间穿过去、多边形互相错位（实机反馈「像是两个错位的五/六边形混在一起」，
+     * 而单看正在淡出的某一块又是正常的多边形 —— 这正是「不是几何错、是相位错」的指纹）。
+     *
+     * 修法：每块面板建立时按「它比整壳晚生了多久」补一段**一次性旋转**（PD 1.0.12 起
+     * `rotate` 与 `spin` 的角度**累加**，所以「先补相位、再继续自转」写得出来），
+     * 于是所有面板在任何时刻都处在**同一个全局相位**上。
+     */
+    private var shellBornAt: Long = 0L
+
+    /**
      * 球壳的一块面板：粒子组 + 它的几何（几何要留到消散时用，见 [foldShieldVisual]）。
      */
     private class ShellPanel(val group: ParticleGroup, val panel: Polyhedra.Panel)
@@ -336,6 +351,7 @@ class EnergyShield : Modifier() {
         val center = feet.add(0.0, bodyOffset, 0.0)
         val end = min(shieldPanels.size, buildCursor + BUILD_PANELS_PER_TICK)
 
+        if (buildCursor == 0) shellBornAt = level.gameTime
         for (index in buildCursor until end) {
             val group = manager.createGroup(feet)
             group.followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
@@ -352,6 +368,10 @@ class EnergyShield : Modifier() {
             // 第一条指令必须是「不挪轴心」的：fadeIn 只做透明度编排，arm 时轴心仍是球心
             group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
             group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+            // 补上「本块比整壳晚生了多久」对应的角度（durationTicks = 0 = 瞬时补相位）：
+            // 这样每块面板都落在同一个全局相位上，整球始终是一致多面体
+            val lateBy = (level.gameTime - shellBornAt).coerceAtLeast(0L)
+            group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)
             shell += ShellPanel(group, shieldPanels[index])
         }
         buildCursor = end
@@ -397,6 +417,7 @@ class EnergyShield : Modifier() {
         }
         shell.clear()
         buildCursor = 0
+        shellBornAt = 0L
         shellLevel = null
         shellHolder = null
         idleTicks = 0
@@ -433,6 +454,7 @@ class EnergyShield : Modifier() {
         // 还在淡出中的旧壳也要立刻清掉：否则重建期间会看到「两层球」重叠
         for (group in fading) group.remove()
         fading.clear()
+        shellBornAt = 0L
         buildCursor = 0
         shellLevel = null
         shellHolder = null

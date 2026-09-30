@@ -83,7 +83,7 @@ object CaptureDriver {
     private const val HARD_TIMEOUT_TICKS = 20 * 60 * 8
 
     /** 同时在写的帧数上限：超过就跳帧（宁可少一帧，也不要堆积几百 MB 内存）。 */
-    private const val MAX_INFLIGHT_WRITES = 12
+    private const val MAX_INFLIGHT_WRITES = 24
 
     /** 跑完后退出的等待 tick 数（等尾部几帧写完）。 */
     private const val STOP_GRACE_TICKS = 20

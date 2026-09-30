@@ -198,7 +198,14 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     total_px = Image.open(frames[0]).size[0] * Image.open(frames[0]).size[1]
     empty = max(1, int(peak * EMPTY_RATIO))
 
-    result["asserts"].append(("帧数完整", len(frames) == length, f"{len(frames)}/{length} 帧"))
+    # 「完整」= 每个 tick 要么出了帧、要么被如实记为丢帧：录制是同步回读帧缓冲，
+    # 偶发一次 GPU 同步 stall 就会少一两帧（那是录制环境的问题，不是动画的问题）；
+    # 丢帧率另有预算（MAX_DROP_RATIO）单独卡，丢成片段才会 FAIL。
+    result["asserts"].append((
+        "帧数完整",
+        len(frames) + dropped == length,
+        f"{len(frames)}/{length} 帧 + 丢帧 {dropped}",
+    ))
     drop_budget = max(1, int(length * MAX_DROP_RATIO))
     result["asserts"].append(
         ("丢帧在预算内", dropped <= drop_budget, f"framesDropped={dropped}（预算 ≤{drop_budget}）"),

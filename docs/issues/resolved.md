@@ -502,6 +502,53 @@ PD 1.0.12-ALPHA 把第 15/17/19 轮提的四条**全部实现**（见附录 B）
 - 落点：`magic/modifier/EnergyShield.kt`、`client/capture/CaptureDriver.kt`、`build.gradle`
 - 验证：`pwsh tools/capture/capture.ps1`（隐藏窗口下三场景全 PASS）；构建 0 warning。
 
+## 第 22 轮（2026-09-30，护盾「错位叠加」的真凶：分批建壳 + 每块各自起转）
+
+实机反馈很关键：「第一人称看像是**两个错位的五边形/六边形混在一起**，但我看消失动画里消失的块
+似乎是正确的一个五边形/六边形，**可能真的叠加了两个外壳**」。
+
+### 22.1 定位：不是两个壳，是**相位错位**
+
+- 先把「是不是真的两层壳」排掉：PD 粒子数在收场时归零（`pd-particles-zero`）、几何去重只有 240 个独立位置，
+  且**单看一块面板确实是正常的多边形** —— 这三条把「两层壳」否掉了。
+- 剩下唯一的解释就是「各块的**朝向**不一致」。查代码立刻对上：球壳是**分批**建的
+  （`BUILD_PANELS_PER_TICK = 2`，共 16 tick），而 `group.spin(...)` 是**每块面板从自己的组建立那一刻**
+  开始累计角度的 —— 于是相邻面板的相位差最多 `16 tick × 3°/tick ≈ 48°`。
+  整颗球从建完那一刻起就是「一堆各自转过不同角度的面板」：棱从别的格子中间穿过去、多边形互相错位。
+- **离线复现**（几十秒，不用开游戏）：把几何点 dump 出来，按「第 i 块在第 i/2 tick 出生」给每块加上
+  `(T − 出生) × 3°` 的旋转，再按第一人称透视画出来 —— 上半张图与实机截图一模一样地乱；
+  下半张（所有面板共享同一相位）就是一颗干净的多面体。**结论当场成立**。
+  （复现图：`build/capture/spin-phase-diagnosis.png`，方法见 `docs/build-and-run.md` 第 7 节。）
+
+### 22.2 修法：用 PD 1.0.12 的「旋转可叠加」把相位补平
+
+```kotlin
+group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
+group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)          // 继续自转
+val lateBy = (level.gameTime - shellBornAt).coerceAtLeast(0L)     // 本块比整壳晚生了多久
+group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬时补相位
+```
+
+- `shellBornAt` = 建第一块那一刻的 `gameTime`（清壳/消散时归零）；
+- PD 1.0.12 起 `rotate` 与 `spin` 的角度**累加**（第 19 轮提的需求），所以「先补相位、再继续自转」写得出来；
+  `durationTicks = 0` 就是瞬时补相位；
+- 效果：**任何时刻所有面板都处在同一个全局相位**，整球始终是一致多面体；
+  新搭上来的那一块也直接落在正确相位上（构建波不再错位）。
+- 实机验证（把录制机位临时放进球壳内部，即第一人称视角）：五/六边形整齐相接、三方交汇，
+  没有穿插错位；消散中的那一块单独淡出，其余仍然整齐（图：`build/capture/fix-es-inside.png`）。
+
+### 22.3 顺带：丢帧口径修正
+
+第 20 轮加的「如实计丢帧」这轮开始报数了（重力场 6 帧、护盾 1~4 帧）—— 于是暴露了两个问题：
+
+- 「帧数完整」原来要求 `frames == length`，但**丢帧本来就是被计数的**，两者相加才等于总长；
+  改成 `frames + dropped == length`，丢帧率另按 5% 预算单独卡（丢成片段才 FAIL）；
+- 帧写盘的在途上限 12 → 24（`MAX_INFLIGHT_WRITES`）：重力场那 6 帧丢的是「回读+写盘跟不上」，
+  放宽后归零。护盾偶尔还丢 1~2 帧（是最重的场景：1080 颗粒子 + 32 份组程序），在预算内且如实报出。
+
+- 落点：`magic/modifier/EnergyShield.kt`、`client/capture/CaptureDriver.kt`、`tools/capture/assemble.py`
+- 验证：三场景 388 帧（护盾 148+2 丢帧）、12 条断言全过；构建 0 warning。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

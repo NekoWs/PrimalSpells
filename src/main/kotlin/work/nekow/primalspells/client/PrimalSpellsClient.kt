@@ -20,6 +20,7 @@ import work.nekow.primalspells.client.render.DroneEntityModel
 import work.nekow.primalspells.client.render.DroneEntityRenderer
 import work.nekow.primalspells.client.tooltip.ClientPouchTooltip
 import work.nekow.primalspells.client.tooltip.ClientTooltipHandler
+import work.nekow.primalspells.client.capture.CaptureDriver
 import work.nekow.primalspells.client.tooltip.ClientWandSpellTooltip
 import work.nekow.primalspells.client.tooltip.PouchTooltip
 import work.nekow.primalspells.client.tooltip.SpellSlotTracker
@@ -43,13 +44,18 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
         ClientPayloadSink.shield = { ShieldHudRenderer.putShield(it) }
 
-        // 2. 纯客户端事件与功能注册
+        // 2. 实机录制驱动（开发期自动化测试的「眼睛」）：
+        //    只在「非生产环境 + 显式系统属性 primalspells.capture」下注册；
+        //    生产包里 shouldInstall() 恒为 false，CaptureDriver 整个类不会被加载。
+        if (CaptureDriver.shouldInstall()) CaptureDriver.install()
+
+        // 3. 纯客户端事件与功能注册
         NeoForge.EVENT_BUS.register(ClientTooltipHandler)
         NeoForge.EVENT_BUS.register(ClientContainerDragHandler)
         NeoForge.EVENT_BUS.register(SpellSlotScrollHandler)
 
         NeoForge.EVENT_BUS.addListener<ClientPlayerNetworkEvent.LoggingOut> {
-            // 3. 清理只增不减的客户端缓存
+            // 4. 清理只增不减的客户端缓存
             WandHudRenderer.clear()
             ShieldHudRenderer.clear()
             SpellSlotTracker.clear()

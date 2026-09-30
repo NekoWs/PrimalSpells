@@ -84,6 +84,21 @@ runs {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
     }
 
+    // 实机录制（开发期自动化测试的「眼睛」，见 docs/build-and-run.md 第 9 节）：
+    // 专用工作目录 run/capture（不碰 run/client 的存档与配置），固定窗口尺寸，
+    // 场景由 -Pcapture=<name|all> 选择；驱动代码在 src/main/kotlin/.../client/capture/，
+    // 只在「开发环境 + 显式系统属性」下注册，生产 jar 里完全不激活。
+    capture {
+        // 运行名不是内置类型名，必须显式指向 client 类型（否则 NeoGradle 会按同名类型去找 "capture" 并报错）
+        runType 'client'
+        systemProperty 'primalspells.capture', (project.findProperty('capture') ?: 'all').toString()
+        systemProperty 'primalspells.capture.out',
+                project.layout.projectDirectory.dir('build/capture/out').asFile.absolutePath
+        // 1280×720：够看清棱/点，单帧 PNG 又小到能一次录几百帧
+        arguments '--width', '1280', '--height', '720'
+        arguments '--username', 'Capturer'
+    }
+
     clientData {
         // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it
         // workingDirectory project.file('run-data')
@@ -91,6 +106,13 @@ runs {
         // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
         arguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
     }
+}
+
+// 录制工作目录必须存在：NeoGradle 的 run 任务不会替我们创建它（而 capture.ps1 每次会清空 run/capture）
+tasks.matching { it.name == 'runCapture' }.configureEach {
+    // 目录文件在配置期取值，执行期只用它 —— 否则 configuration cache 会拒绝（Task.project 不可用）
+    def captureRunDir = project.layout.projectDirectory.dir('run/capture').asFile
+    doFirst { captureRunDir.mkdirs() }
 }
 
 // Sets up a dependency configuration called 'localRuntime'.

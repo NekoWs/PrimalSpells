@@ -222,6 +222,9 @@
   棱长一致（0.686031961 @ 半径 1.7）、面板共面、环上点等角距且绕向统一、五-五不相邻 / 五-六棱 60 / 六-六棱 30、
   每个五边形邻 5 个六边形、每个六边形邻 3 五 + 3 六 —— 全绿（输出：`build/verify/geometry-selfcheck.txt`；
   自检脚本本身不入库（`build/` 已 gitignore），复跑方法见 [build-and-run.md](../build-and-run.md) §7）。
+  另外把真实几何数据正交投影成线框做了一次**目视核对**（`build/verify/shield-wireframe.png`：五/六边形
+  严格边对边铺满球面，与数值断言一致）；顺带确认了「不连线只看点」在这个密度下不像球 —— 这也解释了
+  为什么球壳必须靠「每条棱 2 点 + 粒子尺寸 0.4（≈点距 0.345）」把边界画成接近实线。
   **第一次运行就抓到一个真 bug**：截断点用了**无向**键，`cut(a→b)` 与 `cut(b→a)` 撞成同一个点，
   60 个顶点只剩 30 个（`require` 直接抛错）。修法是给「有向顶点对」单独一个键。
 - 落点：`magic/effect/lifecycle/{BlackHole,GravityField,AreaFieldEffect}.kt`、`magic/modifier/EnergyShield.kt`、

@@ -1,6 +1,7 @@
 package work.nekow.primalspells.client.capture
 
 import net.minecraft.world.entity.Entity
+import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.modifier.EnergyShield
@@ -134,7 +135,7 @@ object CaptureScenes {
                     MagicManager.projectiles.filter { it.id == "black_hole" }.forEach { it.alive = false }
                 }
             },
-            checksAt = { _, t -> projectileChecks(name, t, "black_hole", lengthTicks - 1) },
+            checksAt = { ctx, t -> projectileChecks(name, t, "black_hole", lengthTicks - 1, ctx) },
         )
     }
 
@@ -187,7 +188,7 @@ object CaptureScenes {
                     MagicManager.projectiles.filter { it.id == "gravity_field" }.forEach { it.alive = false }
                 }
             },
-            checksAt = { _, t -> projectileChecks(name, t, "gravity_field", lengthTicks - 1) },
+            checksAt = { ctx, t -> projectileChecks(name, t, "gravity_field", lengthTicks - 1, ctx) },
         )
     }
 
@@ -250,7 +251,7 @@ object CaptureScenes {
                 }
             },
             finish = { holder?.remove(Entity.RemovalReason.DISCARDED) },
-            checksAt = { _, t ->
+            checksAt = { ctx, t ->
                 val w = wand
                 val s = shield
                 when {
@@ -264,6 +265,7 @@ object CaptureScenes {
                         // 放下之后耐力仍在（收起球壳不代表破盾）
                         Check(name, t, "durability-after-fold", s != null && s.durability > 0.0, "durability=${s?.durability}"),
                     )
+                    t == SHIELD_HOLD_TICKS + 42 -> listOf(pdParticleCheck(name, t, ctx))
                     else -> emptyList()
                 }
             },
@@ -317,14 +319,36 @@ object CaptureScenes {
      *
      * 第三条是第 16 轮的重点（「退场要自己收干净」）：最后一帧还有投射物/粒子残留就是回归。
      */
-    private fun projectileChecks(scene: String, tick: Int, id: String, endTick: Int): List<Check> {
+    private fun projectileChecks(
+        scene: String,
+        tick: Int,
+        id: String,
+        endTick: Int,
+        ctx: CaptureDriver.SceneCtx,
+    ): List<Check> {
         val alive = MagicManager.projectiles.count { it.id == id && it.alive }
         val total = MagicManager.projectiles.size
         return when (tick) {
             2 -> listOf(Check(scene, tick, "spawned", alive == 1, "alive=$alive total=$total"))
             DEATH_TICK - 2 -> listOf(Check(scene, tick, "alive-before-death", alive == 1, "alive=$alive"))
-            endTick -> listOf(Check(scene, tick, "cleaned-up", total == 0, "total=$total"))
+            endTick -> listOf(
+                Check(scene, tick, "cleaned-up", total == 0, "total=$total"),
+                pdParticleCheck(scene, tick, ctx),
+            )
             else -> emptyList()
         }
+    }
+
+    /**
+     * **粒子级**的「收干净了」断言：直接问 PD 这个维度里还剩多少颗粒子。
+     *
+     * 为什么需要它：像素判定只能证明「屏幕上没有亮点了」，证明不了「没有 alpha=0 的孤儿粒子还活着」
+     * （第 15/16/17 轮反复踩过残留：球壳粒子是永存的，漏一次 `remove` 就是永久泄漏）。
+     * `ParticleManager.getEngine().particleCount()` 是 PD 的公开入口，这里只读一个数字；
+     * 它属于 dev-only 的录制工具（`client/capture/`），万一 PD 改名也只影响录制，不影响发布产物。
+     */
+    private fun pdParticleCheck(scene: String, tick: Int, ctx: CaptureDriver.SceneCtx): Check {
+        val count = runCatching { ParticleManager.of(ctx.level).getEngine().particleCount() }.getOrDefault(-1)
+        return Check(scene, tick, "pd-particles-zero", count == 0, "remaining=$count")
     }
 }

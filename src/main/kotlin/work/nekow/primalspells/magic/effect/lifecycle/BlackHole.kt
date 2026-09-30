@@ -30,15 +30,20 @@ import work.nekow.primalspells.util.spawnParticle
  * - **进场**：整壳粒子先在球心附近（[ENTER_START_RADIUS_SCALE] 倍半径）生成，随即逐粒子下发
  *   `ParticleHandle.move(自己的球面位置, [ENTER_TICKS], EASE_OUT)` —— **PD 在客户端逐帧缓动**，
  *   服务端只发一次指令。观感是「这颗球**从中心长出来**」；
- * - **退场**：把整壳粒子按**原位置、原颜色**重新生成一次，**初速为 0**、每颗粒子各给一个
- *   **向心加速度** `a = 2d / (T(T+1))`、寿命 = [EXIT_TICKS]。位置由 PD 两端按 `v += a; pos += v` 积分，
- *   于是 `d(n) = a·n(n+1)/2`，**第 T tick 正好抵达中心**、同刻寿命到点消失。
- *   形状上就是「先悬一下、最后几 tick 猛地砸进中心」：前 1/3 时间只走掉约 10% 距离，
- *   最后 3 tick 走完剩下 25%（对照旧写法：速度 = 距离/寿命的**匀速**直线收缩，观感是「慢慢缩回去」，
- *   实机反馈「没有力量感」就是这一段）。
- *   为什么是「重新生成」而不是给旧粒子设速度：球壳粒子是永存的，而 `ParticleHandle` 没有改寿命的入口 ——
+ * - **退场分三拍**（第 18 轮按实机反馈重做：原来是一段匀速直线收缩「慢慢缩回去」）：
+ *   1. **整壳砸进去**（[EXIT_TICKS] = 8 tick）：整壳粒子按原位置/原颜色重新生成，初速 0、
+ *      每颗粒子各给**向心加速度** `a = 2d/(T(T+1))`（PD 两端按 `v += a; pos += v` 积分，
+ *      `d(n) = a·n(n+1)/2` → 第 T tick 正好抵达中心、寿命同刻到点）。观感：几乎不动地悬一下，
+ *      最后 2~3 tick 猛砸进中心；
+ *   2. **反弹出一个小球**（[REBOUND_TICKS]）：在中心生成一颗**小得多**的球（半径约 0.3），
+ *      给**向外的初速 + 向内的加速度** —— 它先弹开、在约 0.95 格处停住、再被吸回去；
+ *   3. **收成一点**：小球回到中心时一次性收尾（[FINAL_PARTICLES] 颗微光 + 镜头冲击）。
+ *      曾经这里是一记 40 颗的白色爆闪，实机反馈「看起来有点廉价」—— 爆闪换成「再吸回去」，
+ *      力量感来自**塌缩本身**而不是炸一下。
+ *
+ *   为什么每拍都「重新生成」而不是给旧粒子设速度：球壳粒子是永存的，而 `ParticleHandle` 没有改寿命的入口 ——
  *   不重新生成就会在抵达中心后继续飞出去，变成永远留在世界里的粒子。
- *   塌到中心那一拍还有**中心爆闪 + 镜头冲击**（[Deferred] 排到 T tick 后触发，因为那时本效果已经死了）。
+ *   三拍之间的衔接（此刻本效果已经死了）由 `util/Deferred` 排到点触发。
  *
  * 两条路径都是**一次性**的：进场 1 包/粒子（缓动移动）、退场 2 包/粒子（销毁 + 重新生成 + 初速），
  * 稳态 **0 包/tick**。（第 15 轮的组级 `fadeIn`/`spin` 随之去掉：组要额外维护程序与生命周期，
@@ -81,6 +86,9 @@ class BlackHole : AreaFieldEffect(
 
     /** 球壳取点（单位方向，Fibonacci 均匀分布）：结果确定，算一次即可。 */
     private val shellOffsets: List<Vec3> by lazy { ParticleShapes.fibonacciSphere(SHELL_PARTICLES) }
+
+    /** 反弹小球的取点（均匀球面，算一次即可）。 */
+    private val reboundOffsets: List<Vec3> by lazy { ParticleShapes.fibonacciSphere(REBOUND_PARTICLES) }
 
     /**
      * 球壳每颗粒子的颜色：`fibonacciSphere` 由 +y 往 −y 排，所以下标 i 直接对应「从顶到底」的渐变参数；
@@ -185,12 +193,8 @@ class BlackHole : AreaFieldEffect(
                 val accel = toCenter.normalize().scale(2.0 * toCenter.length() / (t * (t + 1.0)))
                 manager.spawnParticle(pos, shellColors[i], SHELL_SCALE, EXIT_TICKS, acceleration = accel)
             }
-            // 塌到中心那一拍的重音：爆闪 + 镜头冲击（此刻本效果已死，只能靠延迟队列）
-            // EXIT_TICKS - 1：Deferred 的到期判定带一 tick 余量，这样爆闪与「整壳消失」落在同一 tick
-            Deferred.after(level, EXIT_TICKS - 1) {
-                spawnImplosionFlash(manager, center)
-                ScreenShake.shake(level, center, radius = IMPLODE_SHAKE_RADIUS, amplitude = 0.95f, ticks = 14)
-            }
+            // 第二拍：整壳刚砸到中心，就地反弹出一颗小球（Deferred 的到期判定带一 tick 余量，故 -1）
+            Deferred.after(level, EXIT_TICKS - 1) { spawnReboundBall(manager, center) }
         }
         shell = null
         sucked?.clear()
@@ -198,22 +202,50 @@ class BlackHole : AreaFieldEffect(
     }
 
     /**
-     * 塌缩落地那一拍的**中心爆闪**：一圈亮紫白粒子从中心向外炸开、很快就过期。
+     * 第二拍：**反弹小球** —— 整壳砸进中心之后，一颗小得多的球从中心弹出来、停一下、再被吸回去。
      *
-     * 为什么需要它：整壳粒子是「收进去消失」，收完画面会突然空掉；补一记向外的爆闪，
-     * 观感才从「缩没了」变成「被压缩到一点后炸了一下」—— 这一下是整段退场的落点。
+     * 一颗粒子的位置曲线是 `d(n) = d₀ + v₀·n − a·n(n+1)/2`（初速向外、加速度向内，两者都是**一次性**下发、
+     * 由 PD 两端逐 tick 积分）：`v₀/a ≈ 5` → 第 4~5 tick 弹到最远约 0.95 格、短暂停住，
+     * 第 [REBOUND_TICKS] tick 回到中心、寿命同刻到点。选这组数字就是为了让它「停一下再被吸走」，
+     * 而不是一路弹飞或者弹不出来。
      */
-    private fun spawnImplosionFlash(manager: ParticleManager, center: Vec3) {
-        val random = manager.level.random
-        repeat(FLASH_PARTICLES) {
-            val dir = ParticleShapes.randomUnitVector(random)
-            // 起点略偏离中心，避免所有粒子在同一像素上互相盖住
+    private fun spawnReboundBall(manager: ParticleManager, center: Vec3) {
+        val level = manager.level
+        for (dir in reboundOffsets) {
             manager.spawnParticle(
-                center.add(dir.scale(0.35)),
-                FLASH_COLOR,
-                FLASH_SCALE,
-                FLASH_LIFETIME,
-                dir.scale(FLASH_SPEED),
+                center.add(dir.scale(REBOUND_START_RADIUS)),
+                REBOUND_COLOR,
+                REBOUND_SCALE,
+                REBOUND_TICKS,
+                velocity = dir.scale(REBOUND_SPEED),
+                acceleration = dir.scale(-REBOUND_ACCEL),
+            )
+        }
+        ScreenShake.shake(level, center, radius = REBOUND_SHAKE_RADIUS, amplitude = 0.5f, ticks = 8)
+        // 第三拍：小球被吸回中心、收成一点（Deferred 同样带一 tick 余量）
+        Deferred.after(level, REBOUND_TICKS - 1) {
+            spawnFinalSnap(manager, center)
+            ScreenShake.shake(level, center, radius = IMPLODE_SHAKE_RADIUS, amplitude = 0.95f, ticks = 14)
+        }
+    }
+
+    /**
+     * 第三拍的收尾：**一撮很小的微光**（不是爆炸）。
+     *
+     * 实机反馈原来那记 40 颗白色爆闪「看起来有点廉价」—— 力量感应该来自塌缩过程本身；
+     * 这里只留 14 颗、尺寸更小、寿命极短，颜色也避开纯白（偏紫），作用是给「收成一点」一个落点，
+     * 而不是再炸一朵花出来。
+     */
+    private fun spawnFinalSnap(manager: ParticleManager, center: Vec3) {
+        val random = manager.level.random
+        repeat(FINAL_PARTICLES) {
+            val dir = ParticleShapes.randomUnitVector(random)
+            manager.spawnParticle(
+                center.add(dir.scale(FINAL_START_RADIUS)),
+                FINAL_COLOR,
+                FINAL_SCALE,
+                FINAL_LIFETIME,
+                dir.scale(FINAL_SPEED),
             )
         }
     }
@@ -249,27 +281,46 @@ class BlackHole : AreaFieldEffect(
         const val ENTER_TICKS = 14
 
         /**
-         * 退场时长（tick）：整壳**向心加速**塌缩的总时长（不是速度 —— 速度由 `a = 2d/(T(T+1))` 推出）。
-         * 调大 = 悬停更久、砸得更狠；调小 = 更干脆。
+         * 第一拍（整壳砸进中心）的时长：**不是速度** —— 速度由 `a = 2d/(T(T+1))` 推出。
+         * 调大 = 悬停更久、砸得更狠；调小 = 更干脆。第 18 轮从 14 收到 8（实机反馈「还是慢了一点」）。
          */
-        const val EXIT_TICKS = 14
+        const val EXIT_TICKS = 8
 
         // ---- 重音（镜头冲击 + 爆闪） ----
 
         /** 开场冲击的生效半径（方块）：比效果半径大一圈，站在外面也看得见 */
         const val OPEN_SHAKE_RADIUS = 24.0
 
-        /** 塌缩冲击的生效半径；强度见 `clearVisuals`（0.95 = 最强档） */
+        /** 收尾那一拍的镜头冲击半径（0.95 = 最强档） */
         const val IMPLODE_SHAKE_RADIUS = 28.0
 
-        /** 中心爆闪：粒子数 / 尺寸 / 寿命 / 外扩速度 */
-        const val FLASH_PARTICLES = 40
-        const val FLASH_SCALE = 0.62f
-        const val FLASH_LIFETIME = 9
-        const val FLASH_SPEED = 0.34
+        /** 反弹小球那一拍的镜头冲击半径（比收尾轻） */
+        const val REBOUND_SHAKE_RADIUS = 24.0
 
-        /** 爆闪颜色：接近白的亮紫（比球壳星点更狠一点） */
-        val FLASH_COLOR: Color = Color.ofInt(238, 218, 255, 225)
+        // ---- 第二拍：反弹小球 ----
+
+        /** 小球粒子数 / 起始半径 / 尺寸 / 初速（向外）/ 加速度（向内）/ 总时长 */
+        const val REBOUND_PARTICLES = 48
+        const val REBOUND_START_RADIUS = 0.30
+        const val REBOUND_SCALE = 0.45f
+        const val REBOUND_SPEED = 0.325
+        const val REBOUND_ACCEL = 0.065
+        const val REBOUND_TICKS = 10
+
+        /** 小球颜色：比球壳星点更亮更实（它是被压出来的那个「核」） */
+        val REBOUND_COLOR: Color = Color.ofInt(214, 176, 255, 230)
+
+        // ---- 第三拍：收成一点（刻意做小、做短，不做成爆炸） ----
+
+        /** 粒子数 / 起始半径 / 尺寸 / 寿命 / 外扩速度 */
+        const val FINAL_PARTICLES = 14
+        const val FINAL_START_RADIUS = 0.12
+        const val FINAL_SCALE = 0.34f
+        const val FINAL_LIFETIME = 5
+        const val FINAL_SPEED = 0.10
+
+        /** 避开纯白：偏紫的微光（纯白爆闪实机反馈「有点廉价」） */
+        val FINAL_COLOR: Color = Color.ofInt(196, 140, 255, 210)
 
         // ---- 被吸入的粒子 ----
 

@@ -88,6 +88,14 @@ class GravityField : AreaFieldEffect(
     /** 已经压下去几层波：第 1 层是「开场重砸」（落得更快、撞得更狠），之后才是常规节奏。 */
     private var ringsSpawned = 0
 
+    /**
+     * 已排下、但还没到点的落地溅射。
+     *
+     * 必须在 [clearVisuals] 里撤销：环被销毁了，可「N tick 后溅一圈」的任务还在队列里 ——
+     * 不撤销就会看到**地上凭空压出一道环**（实机反馈的原话），因为那时场上已经没有球体了。
+     */
+    private val pendingImpacts = ArrayList<Deferred.Handle>()
+
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = manager.level.random
         val floor = floorY ?: detectFloor(manager.level, center).also { floorY = it }
@@ -145,6 +153,9 @@ class GravityField : AreaFieldEffect(
     }
 
     override fun clearVisuals(manager: ParticleManager, center: Vec3) {
+        // 还没落地的溅射一并作废：场都没了，地面上不该再压出环来
+        pendingImpacts.forEach { it.cancel() }
+        pendingImpacts.clear()
         shell?.remove()
         shell = null
         falling?.clear()
@@ -222,7 +233,7 @@ class GravityField : AreaFieldEffect(
         group.fadeOut(fallTicks, removeAfter = true)
         // 落地那一拍：地面溅起一圈（一次性粒子）+ 镜头被撞一下。
         // 环的下落由 PD 在客户端本地求值，服务端只知道「[fallTicks] 之后落地」，所以这里排进延迟队列。
-        Deferred.after(manager.level, fallTicks) {
+        pendingImpacts += Deferred.after(manager.level, fallTicks) {
             spawnImpactSplash(manager, center, floor, radius)
             ScreenShake.shake(manager.level, center, radius = RING_SHAKE_RADIUS, amplitude = impactAmplitude, ticks = 7)
         }

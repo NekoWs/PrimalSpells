@@ -16,6 +16,7 @@ import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
+import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.util.PD_IMMORTAL
 import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.Polyhedra
@@ -60,10 +61,10 @@ import kotlin.math.min
  * - **构建**：`updateShieldVisual` 每 tick 建 [BUILD_PANELS_PER_TICK] 块面板（各自的组 + 一圈粒子 +
  *   `fadeIn([BUILD_FADE_TICKS])`）；[shieldPanels] 已按**面板中心高度由低到高**排序，于是整颗球像被
  *   **从脚下往上搭起来**，共约 16 tick；
- * - **消散**：反向（最后搭起来的最先拆）把球壳**原地重建成一组新组**，每块各带
- *   `delay(阶梯) + fadeOut([FOLD_FADE_TICKS], removeAfter = true)`；
- *   新组的程序起点就是「现在」，所以阶梯与销毁时刻都精确（细节与 PD 侧的坑见 [foldShieldVisual]），
- *   且**即使本实例此后不再被 tick（法术被取下 / 法杖被回收）动画照样放完**，不留孤儿粒子；
+ * - **消散**：反向（最后搭起来的最先拆）对**原来的组**追加 `delay(已运行时长 + 阶梯) + fadeOut`，
+ *   自转一路不停（第 18 轮：之前重建组会让旋转停住、观感也变细）；
+ *   销毁由 `util/Deferred`（服务端延迟队列）在淡出结束后执行，所以**即使本实例此后不再被 tick
+ *   （法术被取下 / 法杖被回收）动画照样放完**，不留孤儿粒子（细节见 [foldShieldVisual]）；
  * - **不再使用 `move`**：面板不位移，也就不碰 PD 的「第一条指令不能是 `move`」那条坑
  *   （`move` 会改组的轴心字段，而客户端 arm 时拿它反算相对偏移，见 `docs/issues/pd-api-requests.md`）。
  *
@@ -109,7 +110,12 @@ class EnergyShield : Modifier() {
     /**
      * 球壳的一块面板：粒子组 + 它的几何（几何要留到消散时用，见 [foldShieldVisual]）。
      */
-    private class ShellPanel(val group: ParticleGroup, val panel: Polyhedra.Panel)
+    private class ShellPanel(
+        val group: ParticleGroup,
+        val panel: Polyhedra.Panel,
+        /** 建组时的 `gameTime`：消散时要用它算出「组已经运行了多久」，把指令游标推到现在（见 [foldShieldVisual]）。 */
+        val bornAt: Long,
+    )
 
     /** 已经建到第几块面板（0 = 还没开始）：构建被摊到多 tick 上，见 [buildShieldPanels]。 */
     private var buildCursor = 0
@@ -348,7 +354,7 @@ class EnergyShield : Modifier() {
             // 第一条指令必须是「不挪轴心」的：fadeIn 只做透明度编排，arm 时轴心仍是球心
             group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
             group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
-            shell += ShellPanel(group, shieldPanels[index])
+            shell += ShellPanel(group, shieldPanels[index], level.gameTime)
         }
         buildCursor = end
         // 最后一块搭上 = 整颗球合拢的那一刻：向外炸一圈亮环 + 镜头轻撞，把「搭完了」变成一记重音
@@ -416,47 +422,32 @@ class EnergyShield : Modifier() {
     private fun foldShieldVisual() {
         if (shell.isEmpty()) return
         val level = shellLevel
-        val holderUuid = shellHolder
-        val holder = level?.let { holderUuid?.let(it::getEntity) }
-        // 拿不到「当初那块地方」时只能硬销毁（例如持有者已下线）：宁可瞬间消失，也不留孤儿粒子
-        if (level == null || holderUuid == null || holder == null) {
+        // 拿不到维度时只能硬销毁（例如持有者已下线）：宁可瞬间消失，也不留孤儿粒子
+        if (level == null) {
             for (p in shell) p.group.remove()
             shell.clear()
             buildCursor = 0
-            shellLevel = null
             shellHolder = null
             idleTicks = 0
             return
         }
 
-        // ⚠️ 为什么是「原地重建」而不是直接给旧组 `delay + fadeOut`：
-        // 组的指令时间游标（cursorMs）是**从建组时刻起累加的绝对时间**，
-        // 而 `fadeOut` 的 `removeAfter` 又用这个绝对游标去排**相对 now** 的销毁任务（PD 侧两端口径不一致）。
-        // 于是「建组很久之后再追加淡出」这件事：客户端把它当作早已过去的时刻 → 瞬间淡完；
-        // 若把游标推到 now 让客户端正确，服务端销毁又会被推后整段已运行时长（留下看不见的粒子）。
-        // 见 `docs/issues/pd-api-requests.md`。这里的绕法是用**刚建的新组**下发淡出：
-        // 新组的程序起点就是 now，`delay` 与 `fadeOut(removeAfter)` 两个口径同时成立。
-        // 代价是消散时一次性重铺一遍球壳（与构建时同量级的一次性突发），换来精确的逐块淡出 + 自清理。
-        val manager = wand.pdParticles(level)
-        val bodyOffset = shellCenterOffset(holder)
-        val feet = holder.position()
-        val center = feet.add(0.0, bodyOffset, 0.0)
+        // 第 18 轮起**不再重建球壳**（旧写法要重铺一遍全部粒子，实机反馈「收起时不再旋转、看着更细」——
+        // 因为新组没有 `spin`；而 PD 的 `spin` 与一次性 `rotate` 是「各自按自己的基准写 rel、后者覆盖前者」，
+        // 想在新组上补回旧相位是补不出来的）。现在直接对**旧组**追加淡出，自转自然延续：
+        //
+        // 唯一要自己算的是**指令游标**：组的游标是从建组时刻起累加的绝对时间，而客户端对
+        // 「startMs 已过去」的指令是下一帧立即完成 —— 所以这里把它推到「本组已经运行了多久（+ 阶梯）」，
+        // 客户端才会在正确的时刻开始淡出（PD 侧需求见 `docs/issues/pd-api-requests.md`）。
+        // `removeAfter` 则不能用：它拿同一个绝对游标去排**相对 now** 的销毁，会把销毁推后一整段已运行时长
+        // （留下看不见但还活着的粒子）；销毁改由**我们自己的延迟队列**在淡出结束后执行，
+        // 所以「法术被取下 / 法杖被回收、本实例再也不 tick」时，消散动画照样放完、也不会留孤儿。
         for ((order, entry) in shell.reversed().withIndex()) {
-            entry.group.remove()
-            val fading = manager.createGroup(feet)
-            fading.followEntity(holderUuid, Vec3(0.0, bodyOffset, 0.0))
-            for (offset in entry.panel.ring) {
-                manager.create()
-                    .position(center.add(offset))
-                    .color(SHELL_COLOR)
-                    .scale(SHELL_SCALE)
-                    .lifetime(PD_IMMORTAL)
-                    .group(fading.id)
-                    .offsetFromPivot(offset)
-                    .spawn()
-            }
-            fading.delay((order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS)
-            fading.fadeOut(FOLD_FADE_TICKS, removeAfter = true)
+            val elapsed = (level.gameTime - entry.bornAt).coerceAtLeast(0L).toInt()
+            val stagger = (order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS
+            entry.group.delay(elapsed + stagger)
+            entry.group.fadeOut(FOLD_FADE_TICKS, removeAfter = false)
+            Deferred.after(level, stagger + FOLD_FADE_TICKS + 1) { entry.group.remove() }
         }
         shell.clear()
         buildCursor = 0

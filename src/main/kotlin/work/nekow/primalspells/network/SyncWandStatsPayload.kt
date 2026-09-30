@@ -10,7 +10,7 @@ import work.nekow.primalspells.PrimalSpells
  * 服务端 → 客户端：法杖展示数值（Alt 面板与 HUD 用）。
  *
  * 两组数值要分清（**别混成一个**）：
- * - **配置值**（`wandDelayMs` / `wandRechargeMs` / `cast` / `size` / `charge` / `maxMana`）：
+ * - **配置值**（`wandDelaySeconds` / `wandRechargeSeconds` / `cast` / `size` / `charge` / `maxMana`）：
  *   这根杖**是什么数值**，Alt 面板显示的就是它们（第 27 轮补上，之前面板只能显示下面的实时冷却）；
  * - **实时值**（`currentMana` / `currentDelay` / `currentRecharge` / `lastDelay` / `lastRecharge`）：
  *   当前剩多少冷却，HUD 的进度条用它们。
@@ -30,8 +30,8 @@ data class SyncWandStatsPayload(
     val lastDelay: Double,
     val lastRecharge: Double,
     val charge: Double,
-    val wandDelayMs: Double,
-    val wandRechargeMs: Double,
+    val wandDelaySeconds: Double,
+    val wandRechargeSeconds: Double,
     val size: Int,
 ) : CustomPacketPayload {
 
@@ -65,8 +65,8 @@ data class SyncWandStatsPayload(
                     buf.writeDouble(p.lastDelay)
                     buf.writeDouble(p.lastRecharge)
                     buf.writeDouble(p.charge)
-                    buf.writeDouble(p.wandDelayMs)
-                    buf.writeDouble(p.wandRechargeMs)
+                    buf.writeDouble(p.wandDelaySeconds)
+                    buf.writeDouble(p.wandRechargeSeconds)
                     buf.writeVarInt(p.size)
                 }
             }

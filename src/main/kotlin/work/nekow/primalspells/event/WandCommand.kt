@@ -89,7 +89,8 @@ object WandCommand {
             {
                 Component.literal(
                     "已获得 $name：法力 ${Lore.formatDouble(wand.mana)} / 回蓝 ${Lore.formatDouble(wand.charge)}每秒" +
-                        " / 双延迟 ${Lore.formatDouble(wand.delayMs)} ms / ${wand.size} 槽 / 抽牌 ${wand.cast}"
+                        " / 施放延迟 ${Lore.formatDouble(wand.delaySeconds)} s / 充能时间 ${Lore.formatDouble(wand.rechargeSeconds)} s" +
+                        " / ${wand.size} 槽 / 施放数 ${wand.cast}"
                 )
             },
             false,

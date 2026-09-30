@@ -109,14 +109,22 @@ object WandHudRenderer {
                 alphaColor(0xFF_33_99_FF.toInt(), alpha), alpha)
         }
         val yOff = cy + bh + gap
-        if (showDelay) {
-            val alpha = fadeAlpha(s.currentDelay > 0, delayPersistTicks)
-            drawBar(g, cx - bw / 2, yOff, bw, bh, displayDelayProgress,
-                alphaColor(0xFF_FF_AA_00.toInt(), alpha), alpha)
-        } else if (showRecharge) {
+        // 冷却只有一行：**真正卡住施法的是剩余比例更大的那条**
+        // （施法要求 delay 与 recharge 都归零，所以充能时间比施放延迟长时，条必须显示充能那一条）。
+        // ⚠️ 第 28 轮修：修前是 `if (showDelay) … else if (showRecharge)` —— delay 一活跃，
+        // 更长的充能时间就永远显示不出来。
+        val delayRemaining = if (s.lastDelay > 0.0) (s.currentDelay / s.lastDelay).coerceIn(0.0, 1.0) else 0.0
+        val rechargeRemaining =
+            if (s.lastRecharge > 0.0) (s.currentRecharge / s.lastRecharge).coerceIn(0.0, 1.0) else 0.0
+        val drawRecharge = showRecharge && (rechargeRemaining > delayRemaining || !showDelay)
+        if (drawRecharge) {
             val alpha = fadeAlpha(s.currentRecharge > 0, rechargePersistTicks)
             drawBar(g, cx - bw / 2, yOff, bw, bh, displayRechargeProgress,
                 alphaColor(0xFF_33_55_CC.toInt(), alpha), alpha)
+        } else if (showDelay) {
+            val alpha = fadeAlpha(s.currentDelay > 0, delayPersistTicks)
+            drawBar(g, cx - bw / 2, yOff, bw, bh, displayDelayProgress,
+                alphaColor(0xFF_FF_AA_00.toInt(), alpha), alpha)
         }
     }
 

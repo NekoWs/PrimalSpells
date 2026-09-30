@@ -55,28 +55,28 @@ enum class WandTier(
     val itemName: String,
     val maxMana: Double,
     val manaPerSecond: Double,
-    val delayMs: Double,
-    val rechargeMs: Double,
+    val delaySeconds: Double,
+    val rechargeSeconds: Double,
     val size: Int,
     private val castRolls: List<Pair<Int, Int>>,
 ) {
     /** 朽木杖：刚上手的那根，池子浅、节奏慢、槽位少、打完要喘很久 */
-    T1(1, "wand_t1", 80.0, 30.0, 700.0, 2100.0, 6, CAST_LOW),
+    T1(1, "wand_t1", 80.0, 30.0, 0.50, 1.00, 6, CAST_LOW),
 
     /** 见习杖 */
-    T2(2, "wand_t2", 120.0, 45.0, 580.0, 1800.0, 8, CAST_LOW),
+    T2(2, "wand_t2", 120.0, 45.0, 0.46, 0.90, 8, CAST_LOW),
 
     /** 学徒杖：用户口径的"初期"（约 100 法力 / <80 充能 / ≥10 tick 延迟）就落在这里 */
-    T3(3, "wand_t3", 180.0, 60.0, 460.0, 1500.0, 10, CAST_LOW),
+    T3(3, "wand_t3", 180.0, 60.0, 0.42, 0.80, 10, CAST_LOW),
 
     /** 法师杖 */
-    T4(4, "wand_t4", 240.0, 80.0, 340.0, 1200.0, 12, CAST_HIGH),
+    T4(4, "wand_t4", 240.0, 80.0, 0.38, 0.70, 12, CAST_HIGH),
 
     /** 大师杖：用户口径的"中后期"（300 / 100 / ~5 tick） */
-    T5(5, "wand_t5", 300.0, 100.0, 240.0, 900.0, 14, CAST_HIGH),
+    T5(5, "wand_t5", 300.0, 100.0, 0.34, 0.60, 14, CAST_HIGH),
 
     /** 大法师杖 */
-    T6(6, "wand_t6", 450.0, 140.0, 150.0, 600.0, 16, CAST_HIGH),
+    T6(6, "wand_t6", 450.0, 140.0, 0.30, 0.50, 16, CAST_HIGH),
 
     /**
      * **调试杖**（`item.primalspells.wand`）：3000 / 1000 / 0 / 0 / 18 槽全抽 1。
@@ -147,8 +147,8 @@ data class WandStats(
     val variant: WandVariant,
     val maxMana: Double,
     val manaPerSecond: Double,
-    val delayMs: Double,
-    val rechargeMs: Double,
+    val delaySeconds: Double,
+    val rechargeSeconds: Double,
     val size: Int,
     val cast: Int,
 ) {
@@ -159,8 +159,8 @@ data class WandStats(
             variant = variant,
             maxMana = tier.maxMana * variant.manaMul,
             manaPerSecond = tier.manaPerSecond / variant.chargeDiv,
-            delayMs = tier.delayMs * variant.delayMul,
-            rechargeMs = tier.rechargeMs * variant.delayMul,
+            delaySeconds = tier.delaySeconds * variant.delayMul,
+            rechargeSeconds = tier.rechargeSeconds * variant.delayMul,
             size = tier.size,
             cast = tier.rollCast(random),
         )

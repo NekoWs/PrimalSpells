@@ -26,11 +26,11 @@ class Wand(var id: String) {
     /** 法力上限 */
     var mana: Double = 3000.0
 
-    /** **施放延迟**（毫秒）：每发之间的最小间隔，与卡牌自己累加的 delay 取大值，见 [spell] */
-    var delayMs: Double = 0.0
+    /** **施放延迟**（秒）：每发之间的最小间隔，与卡牌自己累加的 delay 取大值，见 [spell] */
+    var delaySeconds: Double = 0.0
 
-    /** **充能时间**（毫秒）：抽牌堆抽空之后的重装时间，见 [reloadIfNeeded] */
-    var rechargeMs: Double = 0.0
+    /** **充能时间**（秒）：抽牌堆抽空之后的重装时间，见 [reloadIfNeeded] */
+    var rechargeSeconds: Double = 0.0
 
     /** 每秒充能（回蓝） */
     var charge: Double = 1000.0
@@ -81,11 +81,11 @@ class Wand(var id: String) {
     )
     var status: Status = Status()
 
-    /** 本杖的**施放延迟**（tick，含小数）：[delayMs] ÷ 50 */
-    fun delayTicks(): Double = delayMs / MS_PER_TICK
+    /** 本杖的**施放延迟**（tick，含小数）：[delaySeconds] × 20 */
+    fun delayTicks(): Double = delaySeconds * TICKS_PER_SECOND
 
-    /** 本杖的**充能时间**（tick，含小数）：[rechargeMs] ÷ 50 */
-    fun rechargeTicks(): Double = rechargeMs / MS_PER_TICK
+    /** 本杖的**充能时间**（tick，含小数）：[rechargeSeconds] × 20 */
+    fun rechargeTicks(): Double = rechargeSeconds * TICKS_PER_SECOND
 
     /**
      * 按掷出的数值初始化一根**新**法杖（等级 + 变体 + 抽牌），见 [WandTier]。
@@ -96,8 +96,8 @@ class Wand(var id: String) {
     fun applyStats(stats: WandStats) {
         mana = stats.maxMana
         charge = stats.manaPerSecond
-        delayMs = stats.delayMs
-        rechargeMs = stats.rechargeMs
+        delaySeconds = stats.delaySeconds
+        rechargeSeconds = stats.rechargeSeconds
         size = stats.size
         cast = stats.cast
     }
@@ -405,8 +405,8 @@ class Wand(var id: String) {
         val tag = CompoundTag()
         tag.putString("id", id)
         tag.putDouble("mana", mana)
-        tag.putDouble("delay_ms", delayMs)
-        tag.putDouble("recharge_ms", rechargeMs)
+        tag.putDouble("delay_sec", delaySeconds)
+        tag.putDouble("recharge_sec", rechargeSeconds)
         tag.putDouble("charge", charge)
         tag.putInt("cast", cast)
         tag.putInt("size", size)
@@ -515,8 +515,8 @@ class Wand(var id: String) {
     }
 
     companion object {
-        /** 1 tick = 50 ms（服务端固定 20 tick/s）：毫秒 ↔ tick 的**唯一**换算点。 */
-        const val MS_PER_TICK = 50.0
+        /** 服务端固定 20 tick/s：秒 ↔ tick 的**唯一**换算点（第 28 轮口径从毫秒改成秒）。 */
+        const val TICKS_PER_SECOND = 20.0
 
         /** 冷却诊断字符串用的格式化（一位小数，够看清余数） */
         private fun fmt(v: Double): String = "%.1f".format(v)
@@ -533,10 +533,16 @@ class Wand(var id: String) {
         fun fromTag(tag: CompoundTag): Wand {
             val wand = Wand(tag.getStringOr("id", ""))
             wand.mana = tag.getDoubleOr("mana", 0.0)
-            // 第 26 轮：双延迟从「整数 tick」改成「毫秒」。旧存档的 `delay`/`recharge` 是整数 tick，
-            // 按 50 ms/tick 迁移；`getDoubleOr` 会接受任意数值型 NBT，所以 `status_*` 的旧 int 也能直接读。
-            wand.delayMs = tag.getDoubleOr("delay_ms", tag.getIntOr("delay", 0) * MS_PER_TICK)
-            wand.rechargeMs = tag.getDoubleOr("recharge_ms", tag.getIntOr("recharge", 0) * MS_PER_TICK)
+            // 单位沿革：`delay`(整数 tick，第 27 轮前) → `delay_ms`(第 27 轮) → `delay_sec`(第 28 轮)。
+            // 两级都往下迁移；`getDoubleOr` 接受任意数值型 NBT，所以旧的 int tick 也能直接读。
+            wand.delaySeconds = tag.getDoubleOr(
+                "delay_sec",
+                tag.getDoubleOr("delay_ms", tag.getIntOr("delay", 0) * 1000.0) / 1000.0,
+            )
+            wand.rechargeSeconds = tag.getDoubleOr(
+                "recharge_sec",
+                tag.getDoubleOr("recharge_ms", tag.getIntOr("recharge", 0) * 1000.0) / 1000.0,
+            )
             wand.charge = tag.getDoubleOr("charge", 0.0)
             wand.cast = tag.getIntOr("cast", 1)
             wand.size = tag.getIntOr("size", 9)

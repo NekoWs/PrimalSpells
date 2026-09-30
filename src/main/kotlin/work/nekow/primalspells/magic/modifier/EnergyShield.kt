@@ -17,8 +17,11 @@ import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.util.Lore
 import work.nekow.primalspells.util.PD_IMMORTAL
+import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.Polyhedra
+import work.nekow.primalspells.util.ScreenShake
 import work.nekow.primalspells.util.pdParticles
+import work.nekow.primalspells.util.spawnParticle
 import java.util.UUID
 import kotlin.math.PI
 import kotlin.math.min
@@ -287,6 +290,7 @@ class EnergyShield : Modifier() {
             if (durability <= 0) {
                 durability = 0.0
                 pauseTicks = breakPauseTicks
+                shatterVisual(level, player)
                 break
             }
         }
@@ -347,6 +351,57 @@ class EnergyShield : Modifier() {
             shell += ShellPanel(group, shieldPanels[index])
         }
         buildCursor = end
+        // 最后一块搭上 = 整颗球合拢的那一刻：向外炸一圈亮环 + 镜头轻撞，把「搭完了」变成一记重音
+        if (buildCursor >= shieldPanels.size) deployShockwave(level, holder)
+    }
+
+    /**
+     * 展开完成的**冲击波**：从球心向外炸开一圈亮粒子（一次性，自带寿命 → 零逐 tick 包）+ 镜头轻撞。
+     *
+     * 为什么放在「最后一块面板」而不是每块都放：构建波本身已经是一段连续动作，
+     * 重音只该有一个落点 —— 全部合拢那一拍。每块都炸就变成噪音了。
+     */
+    private fun deployShockwave(level: ServerLevel, holder: Entity) {
+        val center = holder.position().add(0.0, shellCenterOffset(holder), 0.0)
+        spawnBurst(level, center, DEPLOY_PARTICLES, DEPLOY_SCALE, DEPLOY_LIFETIME, DEPLOY_SPEED, DEPLOY_COLOR, SHELL_RADIUS * 0.5)
+        ScreenShake.shake(level, center, radius = DEPLOY_SHAKE_RADIUS, amplitude = 0.35f, ticks = 6)
+    }
+
+    /**
+     * 破盾的**炸裂**：球壳碎掉那一刻向外炸出一圈碎片 + 强镜头冲击。
+     *
+     * 与 [foldShieldVisual] 的分工：这里只负责「碎」的那一下的冲击感（一次性粒子 + 镜头），
+     * 球壳本身由 [foldShieldVisual] 逐块淡出收掉（第 17 轮改成原地重建组，见那里的注释）。
+     */
+    private fun shatterVisual(level: ServerLevel, holder: Entity) {
+        val center = holder.position().add(0.0, shellCenterOffset(holder), 0.0)
+        spawnBurst(level, center, SHATTER_PARTICLES, SHATTER_SCALE, SHATTER_LIFETIME, SHATTER_SPEED, SHATTER_COLOR, SHELL_RADIUS * 0.45)
+        ScreenShake.shake(level, center, radius = SHATTER_SHAKE_RADIUS, amplitude = 0.85f, ticks = 12)
+    }
+
+    /** 从 [center] 外扩一圈一次性粒子（生成后交给 PD 积分，本模组不再维护它们）。 */
+    private fun spawnBurst(
+        level: ServerLevel,
+        center: Vec3,
+        count: Int,
+        scale: Float,
+        lifetime: Int,
+        speed: Double,
+        color: Color,
+        startRadius: Double,
+    ) {
+        val manager = wand.pdParticles(level)
+        val random = level.random
+        repeat(count) {
+            val dir = ParticleShapes.randomUnitVector(random)
+            manager.spawnParticle(
+                center.add(dir.scale(startRadius)),
+                color,
+                scale,
+                lifetime,
+                dir.scale(speed),
+            )
+        }
     }
 
     /**
@@ -529,6 +584,25 @@ class EnergyShield : Modifier() {
 
         /** 淡蓝色 */
         private val SHELL_COLOR: Color = Color.ofInt(120, 200, 255)
+
+        // ---- 重音：展开完成 / 破盾 ----
+
+        /** 展开完成的冲击波：粒子数 / 尺寸 / 寿命 / 外扩速度 */
+        private const val DEPLOY_PARTICLES = 44
+        private const val DEPLOY_SCALE = 0.5f
+        private const val DEPLOY_LIFETIME = 10
+        private const val DEPLOY_SPEED = 0.30
+        private const val DEPLOY_SHAKE_RADIUS = 12.0
+
+        /** 破盾炸裂：更快更亮（比展开重得多 —— 这是「被打碎」） */
+        private const val SHATTER_PARTICLES = 60
+        private const val SHATTER_SCALE = 0.6f
+        private const val SHATTER_LIFETIME = 13
+        private const val SHATTER_SPEED = 0.45
+        private const val SHATTER_SHAKE_RADIUS = 14.0
+
+        private val DEPLOY_COLOR: Color = Color.ofInt(196, 236, 255, 215)
+        private val SHATTER_COLOR: Color = Color.ofInt(236, 250, 255, 235)
     }
 
     /**

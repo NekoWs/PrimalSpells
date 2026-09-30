@@ -13,8 +13,13 @@ import work.nekow.particledrawing.api.ParticleGroup
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.util.ParticleShapes
+import work.nekow.primalspells.util.ScreenShake
 import work.nekow.primalspells.util.spawnParticle
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -80,6 +85,9 @@ class GravityField : AreaFieldEffect(
     /** 正在下坠的重力波环（自带淡出与销毁，这里只留引用，好在场地提前结束时一并收掉）。 */
     private val rings = ArrayList<ParticleGroup>()
 
+    /** 已经压下去几层波：第 1 层是「开场重砸」（落得更快、撞得更狠），之后才是常规节奏。 */
+    private var ringsSpawned = 0
+
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = manager.level.random
         val floor = floorY ?: detectFloor(manager.level, center).also { floorY = it }
@@ -115,7 +123,16 @@ class GravityField : AreaFieldEffect(
         // 重力波环：每隔 RING_INTERVAL_TICKS 从场顶压下一层（加速下坠 + 边坠边淡出，到地面即消失）
         if (ringCooldown <= 0) {
             ringCooldown = RING_INTERVAL_TICKS
-            spawnGravityRing(manager, center, floor)?.let { rings += it }
+            // 第 1 层是开场那一下：压得最快、落地撞得最狠 —— 场地「砸下来」而不是「淡进来」
+            val first = ringsSpawned == 0
+            val fallTicks = if (first) RING_FIRST_FALL_TICKS else RING_FALL_TICKS
+            val impactAmp = if (first) RING_FIRST_SHAKE else RING_SHAKE
+            ringsSpawned++
+            if (first) {
+                // 开场同时给一记轻冲击，避免「等 13 tick 才第一次有反馈」的空档
+                ScreenShake.shake(manager.level, center, radius = RING_SHAKE_RADIUS, amplitude = 0.35f, ticks = 6)
+            }
+            spawnGravityRing(manager, center, floor, fallTicks, impactAmp)?.let { rings += it }
         } else {
             ringCooldown--
         }
@@ -183,7 +200,13 @@ class GravityField : AreaFieldEffect(
      * 环的起始高度取球心上方 [RING_START_HEIGHT_SCALE]×半径处（该高度的水平截面半径即环半径），
      * 下落距离 = 起点到井环高度。
      */
-    private fun spawnGravityRing(manager: ParticleManager, center: Vec3, floor: Double): ParticleGroup? {
+    private fun spawnGravityRing(
+        manager: ParticleManager,
+        center: Vec3,
+        floor: Double,
+        fallTicks: Int,
+        impactAmplitude: Float,
+    ): ParticleGroup? {
         val startY = center.y + EFFECT_RADIUS * RING_START_HEIGHT_SCALE
         val radius = sqrt(
             (EFFECT_RADIUS * EFFECT_RADIUS - (startY - center.y) * (startY - center.y)).coerceAtLeast(0.0)
@@ -195,9 +218,41 @@ class GravityField : AreaFieldEffect(
             manager, Vec3(center.x, startY, center.z), radius, RING_PARTICLES,
             colorFn = RING_COLOR, scale = RING_SCALE, group = group,
         )
-        group.move(0.0, -fall, 0.0, RING_FALL_TICKS, EasingType.EASE_IN)
-        group.fadeOut(RING_FALL_TICKS, removeAfter = true)
+        group.move(0.0, -fall, 0.0, fallTicks, EasingType.EASE_IN)
+        group.fadeOut(fallTicks, removeAfter = true)
+        // 落地那一拍：地面溅起一圈（一次性粒子）+ 镜头被撞一下。
+        // 环的下落由 PD 在客户端本地求值，服务端只知道「[fallTicks] 之后落地」，所以这里排进延迟队列。
+        Deferred.after(manager.level, fallTicks) {
+            spawnImpactSplash(manager, center, floor, radius)
+            ScreenShake.shake(manager.level, center, radius = RING_SHAKE_RADIUS, amplitude = impactAmplitude, ticks = 7)
+        }
         return group
+    }
+
+    /**
+     * 波环砸到地面那一拍的**溅射**：沿井环圆周向外、略微向上炸开一圈短命粒子。
+     *
+     * 为什么需要它：波环自己只是「淡出消失」，落点没有反馈，下压感就断在半空。
+     * 补上这一圈，观感才是「砸在地上、溅起来」—— 这是「重力」这套特效的落点重音。
+     *
+     * 一次性生成（自带寿命与外扩速度，不进任何集合）→ 之后**零逐 tick 包**。
+     */
+    private fun spawnImpactSplash(manager: ParticleManager, center: Vec3, floor: Double, radius: Double) {
+        val random = manager.level.random
+        val y = floor + WELL_RING_LIFT
+        repeat(IMPACT_PARTICLES) {
+            val angle = random.nextDouble() * PI * 2.0
+            val out = Vec3(cos(angle), 0.0, sin(angle))
+            val pos = Vec3(center.x + out.x * radius, y, center.z + out.z * radius)
+            manager.spawnParticle(
+                pos,
+                IMPACT_COLOR,
+                IMPACT_SCALE,
+                IMPACT_LIFETIME,
+                // 向外 + 向上：斜着溅出去才像被砸起来，纯水平看着像环在扩
+                out.scale(IMPACT_OUT_SPEED).add(0.0, IMPACT_UP_SPEED, 0.0),
+            )
+        }
     }
 
     private companion object {
@@ -255,6 +310,30 @@ class GravityField : AreaFieldEffect(
 
         /** 一层波从场顶落到地面的时长（tick）：配合 EASE_IN 就是「越落越快」 */
         const val RING_FALL_TICKS = 26
+
+        /** 第 1 层（开场重砸）的下落时长：比常规快一倍，落地就有反馈 */
+        const val RING_FIRST_FALL_TICKS = 13
+
+        // ---- 落地重音：溅射 + 镜头冲击 ----
+
+        /** 落地溅射的粒子数 / 尺寸 / 寿命 / 外扩速度 / 上抛速度 */
+        const val IMPACT_PARTICLES = 30
+        const val IMPACT_SCALE = 0.5f
+        const val IMPACT_LIFETIME = 11
+        const val IMPACT_OUT_SPEED = 0.17
+        const val IMPACT_UP_SPEED = 0.11
+
+        /** 溅射颜色：比波环更亮更白，落地那一下才「亮得出来」 */
+        val IMPACT_COLOR: Color = Color.ofInt(226, 244, 255, 215)
+
+        /** 镜头冲击的生效半径 */
+        const val RING_SHAKE_RADIUS = 22.0
+
+        /** 常规波环落地的冲击强度（轻：每 22 tick 来一次，重了会烦） */
+        const val RING_SHAKE = 0.30f
+
+        /** 开场重砸的冲击强度 */
+        const val RING_FIRST_SHAKE = 0.65f
 
         /** 环的颜色（偏亮的天蓝白：与淡灰下坠粒子区分开，才看得出是「一层」在压下来） */
         val RING_COLOR: ColorSource = ColorSource { t -> RING_TINT.lerp(RING_TINT_BRIGHT, t.toFloat()) }

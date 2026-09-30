@@ -549,6 +549,69 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 - 落点：`magic/modifier/EnergyShield.kt`、`client/capture/CaptureDriver.kt`、`tools/capture/assemble.py`
 - 验证：三场景 388 帧（护盾 148+2 丢帧）、12 条断言全过；构建 0 warning。
 
+## 第 23 轮（2026-09-30，护盾重做成「受击处展开的玻璃护盾」+ 登记程序化粒子贴图需求）
+
+实机反馈：护盾**太挡视野**、**一直在转容易让晕 3D 的玩家晕**。使用方提出按《葬送的芙莉莲》那种设计：
+**只在要被击中的位置展开**、且是**半透明玻璃质感**。这一轮先按「三轮问答」把设计谈定，再动手。
+
+### 23.1 谈定的设计（全部是使用方拍的板）
+
+| 决策 | 结论 |
+|---|---|
+| 玩法语义 | **只改表现**：全向格挡、耐久、破盾、回复全部照旧（定向格挡以后单独一轮再谈） |
+| 自转 | **完全停止** |
+| 常驻外观 | **完全不可见**（「护盾在不在」由 HUD 盾条告知） |
+| 受击表现 | 在**受击方向上最近的那一块面板**处展开一块玻璃板：亮边 + 极淡填充（≈15%） |
+| 停留时长 | 约 0.35 秒淡出；**每次命中各出一片、不限片数** |
+| 破盾 | 整颗玻璃罩现形**一闪而碎**（面板沿各自法线向外飘散 + 淡出） |
+| 恢复 | 暂停结束重新上线时，全身轮廓**极淡地闪一下** |
+| 触发出玻璃的范围 | **只在格挡真的生效时**（本模组投射物被弹开、扣了耐久）；原版箭/近战不反应 |
+
+### 23.2 代码：删掉常驻球壳那一整套
+
+`EnergyShield` 里删掉：`shell`/`ShellPanel`/`fading`/`buildCursor`/`shellBornAt`/`shellLevel`/`shellHolder`/
+`idleTicks` 与 `updateShieldVisual`/`buildShieldPanels`/`foldShieldVisual`/`clearShieldVisual`/
+`onPassiveIdle`/`onUnloaded`，以及自转轴/角速度、构建波/消散波、放下延迟（`SHELL_LINGER_TICKS`）等常量
+（**第 22 轮那套「分批建组补相位」也随之不再需要** —— 整壳只在破盾/恢复两个瞬间整体出现，天然同相位）。
+
+新增：`shieldWasUp`（捕捉破盾/恢复两个翻转瞬间）、`spawnHitPanel`/`spawnBreakFlash`/`spawnRecoveryFlash`
+共用一个 `spawnGlassPanel`（先 `followEntity` 再铺成员、`offsetFromPivot` 用相对球心的偏移、`delay + fadeOut(removeAfter)`），
+`fillOffsets` 用「从面板中心向边界点连线扇形采样再归一化回球面」铺出极淡填充。
+
+`shieldPanels` 保留但从「球壳成员表」变成**方向索引**：受击时 `maxByOrNull { it.center.dot(受击方向) }` 找最近那块。
+
+### 23.3 录制场景：旧场景作废，新场景能**证明**「不挡视野」
+
+旧场景期望「常驻球壳」，新设计下会**全黑**，所以重写成一条完整时间线（196 帧）：
+静止 20 tick → 四次点射（每次一处玻璃板）→ 连射破盾 → 破盾暂停 50 tick → 恢复闪一下。
+攻击者是**第二个测试木桩**（`caster` 必须不是持有者，否则投射物会被 `p.caster === player` 排除），
+拿一根只装火球、`delay/mana = 0` 的法杖，站在 7 格外平射 —— 走真实施法与真实弹开路径。
+
+新增两条判定（`assemble.py`）：
+- **`平时完全不可见`**：静止窗口（帧 2-18）最大覆盖必须 ≤「空场阈值」—— 实测 **0 像素**，
+  这正是「太挡视野」被解决的可复核证据；
+- **`受击才亮起（多次亮点）`**：受击窗口里检出多处「亮起→消失」（实测 8 个亮点）。
+另外因为单块玻璃板只有破盾整罩的约 4%，这一场景的「空场阈值」单独调到峰值的 2%。
+
+**踩到的两个坑**（都记在代码注释里）：
+1. **攻击者的法杖要按两条路径各推一次**：`Wand.tick(caster)` 只跑被动（该分支直接 return），
+   `status.delay` 的递减只在 `tick(caster = null)` 的闲置分支里 —— 少推一次就只能开出第一发（实测后面全是 `[Delay 1/0]`）；
+2. 破盾后的**残余火球**挂着自己的粒子，会让收尾的「粒子归零」断言误报 —— 场景在连射段结束时把在飞的火球收掉
+   （与 `setup` 清残留同一套做法）。
+
+### 23.4 登记新的 PD 需求：程序化粒子也要能指定贴图 / UV
+
+做玻璃质感时确认：程序化粒子的贴图是**写死的 8×8 纯白方块**（`TextureCache.defaultWhite()`），
+`ParticleHandle.Builder` 与 `ParticleSpawnPayload` 里连贴图字段都没有；而自定义贴图 + 逐粒子 UV
+**只对 `.pdrawc` 动画开放**（`Animation.Builder.texture` / `ParticleBuilder.uv` / `groupUV`），
+底层那套「解码 + 注册 + UV 归一化」其实是现成的。已按政策登记为需求（第 23 轮，当前未决 1 条），
+本侧临时降级＝用密集小方块做出「磨砂玻璃」（做不到清透玻璃）。
+
+- 落点：`magic/modifier/EnergyShield.kt`、`client/capture/CaptureScenes.kt`、`tools/capture/assemble.py`、
+  `docs/issues/pd-api-requests.md`
+- 验证：三场景 434 帧、13 条断言全过（含「平时完全不可见 0 像素」「受击 8 个亮点」「收尾粒子归零」）；
+  构建 0 warning。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

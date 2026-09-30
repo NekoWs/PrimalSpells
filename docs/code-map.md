@@ -212,7 +212,7 @@
 | 客户端事件 / 渲染 / tooltip | `client/` 对应子包 | `PrimalSpellsClient`（或 `@EventBusSubscriber(CLIENT)`） |
 | 录一个特效的实机表现 | `client/capture/CaptureScenes.kt` 加场景 + `tools/capture/assemble.py` 的 `SCENES` 表加帧数/退场口径 | `pwsh tools/capture/capture.ps1` |
 | 改护盾自转轴/角速度 | `EnergyShield` 的 `SHELL_SPIN_AXIS` / `SHELL_SPIN_RADIANS_PER_TICK`。⚠️ 面板是**分批**建的：每块必须用 `rotate(轴, 晚生时长 × 角速度, 0)` 补到同一相位，否则整球错位（`resolved.md` 第 22 轮） |
-| 调护盾球壳的疏密/点大小 | `EnergyShield` 的 `SHELL_POINTS_PER_EDGE`（6，点距 = 棱长 1.166 ÷ 点数）与 `SHELL_SCALE`（0.25，粒子实际尺寸 ≈ `scale × 0.213` 格）。现在点距是粒径的 3.7 倍 —— 这是刻意的「粒子感」，不是没连上 |
+| 调护盾玻璃板的样子/时长 | `EnergyShield` 的常量段：`GLASS_EDGE_SCALE`/`GLASS_EDGE_COLOR`（亮边）、`GLASS_FILL_SCALE`/`GLASS_FILL_COLOR`（≈15% 填充）、`HIT_*`（受击停留与淡出）、`BREAK_*`（破盾飘散）、`RECOVERY_*`（恢复一闪）；面板密度由 `SHELL_POINTS_PER_EDGE`（6，点距 = 棱长 1.166 ÷ 点数）决定，粒子实际尺寸 ≈ `scale × 0.213` 格 |
 | 给某个特效加「重音」（震屏 / 爆闪 / 落地溅射） | 特效里调 `util/ScreenShake.shake(...)` + 一次性 `spawnParticle(...)`；**晚于特效死亡**的重音用 `util/Deferred.after(level, ticks) { ... }` | 参数抄 `BlackHole`/`GravityField`/`EnergyShield` 的常量段 |
 | 语言键 | `resources/assets/primalspells/lang/{zh_cn,en_us}.json` | — |
 | 资源三件套 | `resources/assets/primalspells/{items,models/item,textures/item}/` | — |

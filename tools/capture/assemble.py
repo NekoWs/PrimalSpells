@@ -61,7 +61,15 @@ SCENES = {
         "length": 130, "title": "重力场：球形范围 + 下坠粒子 + 落地波环", "decay": "instant",
     },
     "energy_shield": {
-        "length": 150, "title": "能量盾：逐块搭起 → 稳态 → 逐块消散", "decay": "gradual",
+        "length": 196, "title": "玻璃护盾：平时不可见 → 受击玻璃板 → 破盾一闪而碎 → 恢复闪一下",
+        # 「一闪而碎」设计上就是干脆的收场：不要求长尾渐变（像素判据看到的是 alpha 跨过亮度阈值的悬崖）
+        "decay": "instant",
+        # 单块玻璃板只有整罩破盾的百分之几，阈值按峰值 5% 会把它判成「空」——这里单独调低到 2%
+        "empty_ratio": 0.02,
+        # 静止窗口：护盾平时必须**完全不可见**（这正是实机反馈「太挡视野」要解决的）
+        "quiet": (2, 18),
+        # 受击窗口：应当出现多次「亮起 → 消失」（每次命中各出一片）
+        "hits": (28, 68), "min_peaks": 3,
     },
 }
 
@@ -196,7 +204,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     peak = max(cover)
     peak_idx = cover.index(peak)
     total_px = Image.open(frames[0]).size[0] * Image.open(frames[0]).size[1]
-    empty = max(1, int(peak * EMPTY_RATIO))
+    empty = max(1, int(peak * spec.get("empty_ratio", EMPTY_RATIO)))
 
     # 「完整」= 每个 tick 要么出了帧、要么被如实记为丢帧：录制是同步回读帧缓冲，
     # 偶发一次 GPU 同步 stall 就会少一两帧（那是录制环境的问题，不是动画的问题）；
@@ -232,10 +240,23 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             ("退场立即且干净", span <= INSTANT_DECAY_MAX_FRAMES, f"50%→5% 跨 {span} 帧（要求 ≤{INSTANT_DECAY_MAX_FRAMES}）"),
         )
 
-    # 构建阶段也应该看得见「从无到有」的过程（第 8 帧左右还在长）
-    if scene == "energy_shield":
+    # 护盾专属：静止窗口必须干净、受击窗口必须有多次「亮起→消失」
+    if "quiet" in spec:
+        lo, hi = spec["quiet"]
+        mx = max(cover[lo:hi]) if cover[lo:hi] else 0
         result["asserts"].append(
-            ("构建是逐块的", cover[2] < cover[20] * 0.6, f"帧2={cover[2]} 帧20={cover[20]}"),
+            ("平时完全不可见", mx <= empty, f"静止窗口 {lo}-{hi} 帧最大覆盖 {mx} 像素（阈值 ≤{empty}）"),
+        )
+    if "hits" in spec:
+        lo, hi = spec["hits"]
+        seg = cover[lo:hi]
+        peaks = sum(
+            1 for i in range(1, len(seg) - 1)
+            if seg[i] > empty * 1.5 and seg[i] >= seg[i - 1] and seg[i] > seg[i + 1]
+        )
+        need = spec.get("min_peaks", 2)
+        result["asserts"].append(
+            ("受击才亮起（多次亮点）", peaks >= need, f"受击窗口 {lo}-{hi} 帧检出 {peaks} 个亮点（要求 ≥{need}）"),
         )
 
     # 视频/动图/拼图

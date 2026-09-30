@@ -203,21 +203,41 @@ object CaptureScenes {
      * 被动驱动走真实路径：`Wand.tick(caster, level)`（= `WandItem.inventoryTick` 里的那次调用）。
      * t=100 起改调 `Wand.tick(null, level)`，也就是**放下法杖**：闲置 4 tick 后开始消散。
      */
+    /**
+     * 玻璃护盾（第 23 轮重做）：**平时完全不可见** → 受击处展开一块玻璃板 → 破盾一闪而碎 → 恢复闪一下。
+     *
+     * 攻击者是**第二个测试木桩**（`caster` 必须不是护盾持有者，否则投射物会被
+     * `p.caster === player` 排除），拿一根只装火球、`delay = 0` 的法杖，站在 +X 方向 6.5 格外平射 ——
+     * 走真实施法路径，护盾走真实弹开路径。
+     *
+     * 时间线（tick）：
+     * ```
+     *  0-19   静止：屏幕上应当**一个粒子都没有**（这正是实机反馈「太挡视野」要解决的问题）
+     * 22/30/38/46  四次点射：每次命中处亮起一块玻璃板、约 0.35 秒后消失（帧序列里是四个亮点）
+     * 62-130 每 2 tick 一发，直到耐久归零 → 整罩一闪而碎
+     * 之后   破盾暂停 50 tick → 护盾恢复时全身轮廓极淡地闪一下
+     * ```
+     */
     private fun energyShield(): Scene = run {
         val name = "energy_shield"
         var wand: Wand? = null
         var shield: EnergyShield? = null
         var holder: TestDummyEntity? = null
+        var shooterWand: Wand? = null
+        var attacker: TestDummyEntity? = null
+        var full = 0.0
+        var firstDrop = -1
+        var brokeAt = -1
         Scene(
             name = name,
-            title = "能量盾：固定球体逐块搭起(16t) → 稳态 → 逐块消散（绕球壳公转）",
+            title = "玻璃护盾：平时不可见 → 受击玻璃板 → 破盾一闪而碎 → 恢复闪一下",
             warmupTicks = 24,
-            lengthTicks = 150,
+            lengthTicks = SHIELD_SCENE_TICKS,
             thirdPerson = false,
             moveCamera = true,
             fov = 60,
             camera = { ctx, t ->
-                orbit(ctx, centerLift = SHIELD_CENTER_LIFT, radius = 7.0, lift = 2.2, degPerTick = 2.5, tick = t)
+                orbit(ctx, centerLift = SHIELD_CENTER_LIFT, radius = 6.0, lift = 2.0, degPerTick = 2.0, tick = t)
             },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
@@ -238,53 +258,106 @@ object CaptureScenes {
                 }
                 wand = w
                 shield = card
-                ctx.log("$name prepared: loaded=${w.loadedMagics.map { it.id }}")
+                full = card.maxDurability
+                // 攻击者：+X 方向 6.5 格，yaw=90 → 朝 -X 正对护盾持有者
+                attacker = ctx.spawnDummy(CX + 7.0, floorY + 1.0, CZ + 0.5, yaw = 90f)
+                // 只装一发火球、且 delay/mana 归零：让攻击者能按场景时间线连续开火
+                val bolt = MagicManager.create("fireball")!!
+                bolt.delay = 0
+                bolt.mana = 0.0
+                val sw = Wand("capture-shooter").also {
+                    it.magics += bolt
+                    it.load()
+                }
+                shooterWand = sw
+                ctx.log(
+                    "$name prepared: shield=${w.loadedMagics.map { m -> m.id }} " +
+                        "shooter=${sw.loadedMagics.map { m -> m.id }} full=$full"
+                )
             },
             tick = { ctx, t ->
-                val w = wand!!
-                if (t < SHIELD_HOLD_TICKS) {
-                    // 「拿在手上」：被动每 tick 驱动 → 逐块搭建并保持
-                    w.tick(holder!!, ctx.level)
-                } else {
-                    // 「放下法杖」：闲置分支 → 4 tick 后开始逐块消散
-                    w.tick(null, ctx.level)
-                }
+                val w = wand ?: return@Scene
+                val h = holder ?: return@Scene
+                val sw = shooterWand ?: return@Scene
+                val atk = attacker ?: return@Scene
+                w.tick(h, ctx.level)
+                // ⚠️ 攻击者的法杖要按**两条路径**各推一次：
+                // `tick(caster)` 只跑被动（`Wand.tick` 在该分支里直接 return），
+                // 而冷却 `status.delay` 的递减只在 `tick(caster = null)` 的闲置分支里 ——
+                // 少推一次就只能开出第一发（实测后续全是 `[Delay 1/0]`）。
+                // 场景里的法杖没有实体物品、不会被 `WandManager` 收进表里，所以得自己推。
+                sw.tick(atk, ctx.level)
+                sw.tick(null, ctx.level)
+                val s = shield
+                if (firstDrop < 0 && s != null && s.durability < full) firstDrop = t
+                if (brokeAt < 0 && s != null && s.durability <= 0.0) brokeAt = t
+                val single = t == SHIELD_SHOT_A || t == SHIELD_SHOT_B || t == SHIELD_SHOT_C || t == SHIELD_SHOT_D
+                // 破盾之后就停火：否则残余火球会一直挂着自己的粒子，最后那条「粒子归零」断言就没法严卡
+                val rapidFire = brokeAt < 0 && t >= SHIELD_BREAK_START && t < SHIELD_BREAK_END && t % 2 == 0
+                if (single || rapidFire) sw.spell(atk)
+                // 连射段结束后把还在飞的火球收掉（与 setup 里清残留同一套做法）：
+                // 它们的粒子要跟着走完自己的销毁路径，这样收尾的「粒子归零」断言才是干净的
+                if (t == SHIELD_BREAK_END) MagicManager.projectiles.forEach { it.alive = false }
             },
-            finish = { holder?.remove(Entity.RemovalReason.DISCARDED) },
+            finish = {
+                holder?.remove(Entity.RemovalReason.DISCARDED)
+                attacker?.remove(Entity.RemovalReason.DISCARDED)
+            },
             checksAt = { ctx, t ->
                 val w = wand
                 val s = shield
-                when {
-                    t == 1 -> listOf(
-                        Check(name, t, "wand-loaded", w != null && w.loadedMagics.any { it is EnergyShield }, "loadedMagics=${w?.loadedMagics?.size}"),
+                when (t) {
+                    1 -> listOf(
+                        Check(
+                            name, t, "wand-loaded",
+                            w != null && w.loadedMagics.any { it is EnergyShield },
+                            "loadedMagics=${w?.loadedMagics?.size}",
+                        ),
                     )
-                    t == SHIELD_HOLD_TICKS - 5 -> listOf(
-                        Check(name, t, "shield-alive", s != null && s.durability > 0.0, "durability=${s?.durability}"),
+                    SHIELD_IDLE_END - 1 -> listOf(
+                        Check(name, t, "shield-full", s != null && s.durability >= full, "durability=${s?.durability}"),
                     )
-                    t == SHIELD_HOLD_TICKS + 20 -> listOf(
-                        // 放下之后耐力仍在（收起球壳不代表破盾）
-                        Check(name, t, "durability-after-fold", s != null && s.durability > 0.0, "durability=${s?.durability}"),
+                    SHIELD_SHOT_D + 20 -> listOf(
+                        // 四次点射后至少挨过一次：耐久掉过（回复 10/s 很快，所以断言「曾经掉过」而非「此刻低于满」）
+                        Check(name, t, "hits-absorbed", firstDrop > 0, "firstDrop=$firstDrop durability=${s?.durability}"),
                     )
-                    t == SHIELD_HOLD_TICKS + 42 -> listOf(pdParticleCheck(name, t, ctx))
+                    SHIELD_SCENE_TICKS - 3 -> listOf(
+                        Check(name, t, "broke-then-recovered", brokeAt > 0 && s != null && s.durability > 0.0 && s.pauseTicks == 0,
+                            "brokeAt=$brokeAt durability=${s?.durability} pause=${s?.pauseTicks}"),
+                        pdParticleCheck(name, t, ctx),
+                    )
                     else -> emptyList()
                 }
             },
         )
     }
 
-    // ---------------------------------------------------------------- 公共件
-
-    /** 玩家眼高（1.8 格身高的标准值）：施法时要让眼睛正好落在球心，脚底就得往下让这么多。 */
-    private const val EYE_HEIGHT = 1.62
-
-    /** 触发「正常死亡路径」的录制 tick（onDie → 退场动画）。 */
     private const val DEATH_TICK = 70
 
     /** 护盾被「拿在手上」的 tick 数，之后改走闲置分支触发消散。 */
     private const val SHIELD_HOLD_TICKS = 100
 
     /** 护盾球心相对持有者脚底的高度（`EnergyShield` 里是 `bbHeight * 0.55`）。 */
+    /** 玩家眼睛相对脚底的高度：施法点与机位都按它算 */
+    private const val EYE_HEIGHT = 1.62
+
     private const val SHIELD_CENTER_LIFT = 1.1
+
+    /** 护盾场景总长（tick）：静止 20 + 四次点射 40 + 连射破盾 + 破盾暂停 50 + 恢复闪一下 + 余量 */
+    private const val SHIELD_SCENE_TICKS = 196
+
+    /** 静止段（不挨打）：屏幕上应当一个粒子都没有 */
+    private const val SHIELD_IDLE_END = 20
+
+    /** 四次点射的 tick：每次在受击处亮起一块玻璃板 */
+    private const val SHIELD_SHOT_A = 22
+    private const val SHIELD_SHOT_B = 30
+    private const val SHIELD_SHOT_C = 38
+    private const val SHIELD_SHOT_D = 46
+
+    /** 连射段：每 2 tick 一发，直到耐久归零触发破盾 */
+    private const val SHIELD_BREAK_START = 62
+    private const val SHIELD_BREAK_END = 130
 
     /** 绕球心的水平公转机位，看向球心。 */
     private fun orbit(

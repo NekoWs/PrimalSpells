@@ -24,50 +24,33 @@ import kotlin.math.PI
 import kotlin.math.min
 
 /**
- * 能量盾（被动法术）：编入法杖后，只要法杖位于玩家手上（主手/副手）即自动生效。
+ * 能量护盾（修饰器）：把**敌方法术**弹开并消耗耐久；耐久耗尽进入破盾暂停，暂停结束自动回复。
  *
- * 为持有者提供一层能量护盾：进入护盾范围的敌方法术会被弹开（反射其速度），
- * 每次弹开消耗耐久；耐久归零后护盾破碎，暂停恢复一段时间（[breakPauseTicks]），
- * 之后以 [regenPerSecond] 的速度恢复耐久。
+ * ## 玩法（数值与判定：未随第 23 轮的视觉重做改动）
  *
- * ## 多张护盾卡：一层球壳 + 叠加耐久
+ * - 逐 tick 扫描场上的本模组投射物：进入 `shieldRadius` 外扩的玩家包围盒、且**正朝玩家飞来**时，
+ *   以玩家中心为法线**反射速度**、并把投射物推出 0.05 格（下一 tick 必然离开判定范围，不会反复触发）；
+ * - 每次弹开扣 `bounceCost` 耐久；耐久归零 → `breakPauseTicks` 冻结（期间既不回复也不弹开）；
+ * - 耐久上限 = `maxDurability` × 本杖护盾卡数，回复 `regenPerSecond`/秒；
+ * - **不弹自己施放的法术**（投射物出生在施法者面前，否则出生即被弹回）；
+ * - 摔落/中毒/虚空这类**没有投射物**的伤害护盾不响应（既不扣耐久也不弹开）—— 既有口径，不是缺口。
  *
- * 同一根法杖上装几张 `energy_shield` 都**只出一层球壳**（否则球壳会重叠得很难看），
- * 但**耐久上限叠加**：容量 = 每张的 [maxDurability] × 卡数，共用一个耐久池。
- * 由 `loadedMagics` 里的**第一张**（[primaryShield]）负责球壳、弹开结算与 HUD，其余卡只做镜像；
- * 主卡被取下后，下一张自动接任（它下一 tick 就会铺出自己的球壳）。
- * ⚠️ 容量变大**不会白送耐久**（池子原样保留、只在超过新容量时才被钳下去）——
- * 否则「反复拔插第二张卡」就能刷满耐久。
+ * ## 视觉（第 23 轮按实机反馈重做成「受击处展开的玻璃护盾」）
  *
- * ## 持久化
+ * 旧版是**常驻的足球状球壳 + 自转 + 逐块构建/消散**。实机反馈两条：**太挡视野**、
+ * **一直在转容易让人晕 3D**。现在改成（三轮确认后的设计）：
  *
- * 当前耐久与破盾暂停剩余 tick 是**运行期状态**，随法杖存档持久化
- * （见 [saveRuntimeState]/[loadRuntimeState]）：重登/重启/被 `WandManager` 回收后再懒加载，
- * 护盾都不会回满（没读到耐久时按**当前容量**补满，见 [durabilityLoaded]）。
- * 数值与手感本身仍是待调项（`docs/issues/open.md` 1.1 —— 含 [regenPerSecond] 是否随卡数放大）。
+ * - **平时完全不可见** —— 屏幕上没有任何常驻粒子，「护盾在不在」由 HUD 盾条告知；
+ * - **格挡生效时**（投射物被弹开、扣了耐久）在**受击方向上最近的那一块面板**处展开一块**玻璃板**：
+ *   亮边 + 极淡填充（≈15% 不透明度），约 0.35 秒淡出；每次命中各出一片、不限片数；
+ * - **破盾**（耐久归零）→ 整颗玻璃罩现形**一闪而碎**（面板沿各自法线向外飘散 + 淡出）；
+ * - **护盾恢复**（暂停结束重新上线）→ 全身轮廓**极淡地闪一下**；
+ * - **不再自转**（晕 3D 的根源），于是也没有「分批建组要补自转相位」那个问题（第 22 轮）——
+ *   整壳只在破盾/恢复两个瞬间**整体**出现，天然同相位。
  *
- * ## 视觉：五/六边形球体 + **逐块构建 / 逐块消散**（第 16 轮按实机反馈重做）
- *
- * 球壳是**截角二十面体**（足球：12 个五边形 + 20 个六边形，共 60 个顶点、90 条棱，几何见 [Polyhedra]），
- * **每块面板一个 [ParticleGroup]**，沿自己的边界铺一圈粒子（每条棱 [SHELL_POINTS_PER_EDGE] 个点）。
- *
- * 第 15 轮的展开/收起是「每块面板从球心飞出去 / 缩回球心」，实机反馈是**不好看**（整颗球在位移）。
- * 第 16 轮改成**球体位置固定、一块一块地出现与消失**：
- *
- * - **构建**：`updateShieldVisual` 每 tick 建 [BUILD_PANELS_PER_TICK] 块面板（各自的组 + 一圈粒子 +
- *   `fadeIn([BUILD_FADE_TICKS])`）；[shieldPanels] 已按**面板中心高度由低到高**排序，于是整颗球像被
- *   **从脚下往上搭起来**，共约 16 tick；
- * - **消散**：反向（最后搭起来的最先拆）对**原来的组**追加 `delay(阶梯) + fadeOut`，自转一路不停；
- *   `removeAfter = true` 由 PD 排销毁，所以**即使本实例此后不再被 tick（法术被取下 / 法杖被回收）
- *   动画照样放完**，不留孤儿粒子（PD 1.0.12 起增量指令按「从现在起」读，这里才能写回朴素形式）；
- * - **不再使用 `move`**：面板不位移，也就不碰 PD 的「第一条指令不能是 `move`」那条坑
- *   （`move` 会改组的轴心字段，而客户端 arm 时拿它反算相对偏移，见 `docs/issues/pd-api-requests.md`）。
- *
- * 代价：32 个组意味着建立时要发 32 份程序包 + 每块面板一圈粒子的生成包；构建被摊到 16 tick 上
- * （每 tick 约 2 块面板），所以瞬时突发比第 15 轮小得多。稳态仍是 **0 包/tick**
- * （跟随 / 自转 / 淡入淡出都在客户端本地求值）。
- *
- * 不弹开持有者自己施放的法术（投射物出生点在施法者面前，会被瞬间弹回）。
+ * 三处玻璃都挂在持有者身上（`followEntity`，随人移动），淡出结束由 PD 自行销毁
+ * （`fadeOut(removeAfter = true)`），所以**本实例此后不再被 tick（法杖被收起/回收）也不留孤儿粒子**
+ * —— 因此旧版那套「放下法杖后延迟收起球壳」的处理整个不再需要。
  */
 class EnergyShield : Modifier() {
     override val id = "energy_shield"
@@ -94,62 +77,26 @@ class EnergyShield : Modifier() {
     var pauseTicks: Int = 0
 
     /**
-     * 护盾球壳（ParticleDrawing）：**每个五/六边形面板一个粒子组**（见类注释「视觉」一节）。
-     *
-     * 用 `ParticleGroup`（**编排式动画**）而不是 `ParticleBatch`：面板成员固定、变换是整组统一的
-     * 「跟随 + 自转 + 展开/收起」，这些在组里都由**客户端本地求值**（每 tick 零网络包），
-     * 服务端只在建立与录制新指令时下发。
+     * **上一 tick 护盾是否在线**：只用来捕捉「破盾」与「恢复」两个状态翻转的瞬间
+     * （翻转的那一 tick 才播整罩玻璃动画）。第一次结算时按当时的耐久补种，避免读档进游戏误播一次。
      */
-    private val shell = ArrayList<ShellPanel>()
+    private var shieldWasUp = true
+
+    /** [shieldWasUp] 是否已按实际耐久补种过。 */
+    private var shieldStateInitialised = false
 
     /**
-     * 已经交给 PD 淡出、但还没被销毁的面板组（[foldShieldVisual] 期间）。
+     * 面板几何（截角二十面体：12 五边形 + 20 六边形，坐标**相对球心**、长度 = [SHELL_RADIUS]，见 [Polyhedra]）。
      *
-     * 留这份引用是为了**重建时先把它们清掉**：淡出要持续约 1 秒，这期间若球壳被重建
-     * （重新握杖 / 法杖被回收后重新加载），旧壳还在淡出就会和新壳重叠成「两层球」。
-     * 第 20 轮实机反馈「护盾的外壳似乎不止一个球体」正是这么来的。
-     */
-    private val fading = ArrayList<ParticleGroup>()
-
-    /**
-     * **整壳统一的相位基准**（建壳第一块面板那一刻的 `gameTime`）。
-     *
-     * ⚠️ 这是第 21 轮修掉的一个真 bug：球壳是**分批**建的（每 tick 2 块、共 16 tick），
-     * 而 `spin` 是每块面板**从自己的组建立那一刻**开始累计角度的 —— 于是相邻面板的相位差最多
-     * 16 tick × 3°/tick ≈ **48°**，整颗球变成「一堆各自转过不同角度的面板」：
-     * 棱从别的格子中间穿过去、多边形互相错位（实机反馈「像是两个错位的五/六边形混在一起」，
-     * 而单看正在淡出的某一块又是正常的多边形 —— 这正是「不是几何错、是相位错」的指纹）。
-     *
-     * 修法：每块面板建立时按「它比整壳晚生了多久」补一段**一次性旋转**（PD 1.0.12 起
-     * `rotate` 与 `spin` 的角度**累加**，所以「先补相位、再继续自转」写得出来），
-     * 于是所有面板在任何时刻都处在**同一个全局相位**上。
-     */
-    private var shellBornAt: Long = 0L
-
-    /**
-     * 球壳的一块面板：粒子组 + 它的几何（几何要留到消散时用，见 [foldShieldVisual]）。
-     */
-    private class ShellPanel(val group: ParticleGroup, val panel: Polyhedra.Panel)
-
-    /** 已经建到第几块面板（0 = 还没开始）：构建被摊到多 tick 上，见 [buildShieldPanels]。 */
-    private var buildCursor = 0
-
-    /**
-     * 球壳面板几何（截角二十面体：12 五边形 + 20 六边形，坐标**相对球心**，见 [Polyhedra]），
-     * **按面板中心高度从低到高排序** —— 这个顺序就是构建波（由下往上搭）与消散波（由上往下拆）的顺序。
+     * 第 23 轮起不再拿来铺常驻球壳，而是当**方向索引**用：
+     * - 受击时用 `maxByOrNull { it.center.dot(受击方向) }` 找最近的那一块，只展开那一块玻璃板；
+     * - 破盾 / 恢复时整体遍历一遍，铺出「整罩」的玻璃。
+     * `sortedBy { center.y }` 保留着（由下往上），是为了破盾/恢复时粒子生成顺序稳定、观感一致。
      */
     private val shieldPanels: List<Polyhedra.Panel> by lazy {
         Polyhedra.truncatedIcosahedron(SHELL_RADIUS, SHELL_POINTS_PER_EDGE).sortedBy { it.center.y }
     }
 
-    /** [shell] 建立时所在的维度：跨维度后旧粒子组留在旧维度，需要重建（见 [updateShieldVisual]）。 */
-    private var shellLevel: ServerLevel? = null
-
-    /** [shell] 建立时锚定的实体：换实体（重生等）后 uuid 对不上，同样重建。 */
-    private var shellHolder: UUID? = null
-
-    /** 「未被持有」持续的 tick 数：达到 [SHELL_LINGER_TICKS] 就收起球壳（见 [onPassiveIdle]）。 */
-    private var idleTicks = 0
 
     /**
      * 是否已从存档读到过耐久（`durability` 键存在）。
@@ -163,10 +110,10 @@ class EnergyShield : Modifier() {
      * 本杖上的**主卡**：`loadedMagics` 里第一张护盾卡。
      *
      * 多张护盾卡**只出一层球壳、共用一个耐久池**（容量 = 每张的 [maxDurability] × 卡数）：
-     * 主卡负责球壳、弹开结算与 HUD 同步，其余卡只做镜像（见 [onInventoryTick]），不铺球壳也不结算。
+     * 主卡负责弹开结算、玻璃表现与 HUD 同步，其余卡只做镜像（见 [onInventoryTick]），不铺粒子也不结算。
      *
      * 顺序确定（`innate` + 槽位顺序），所以「谁是主卡」不需要额外状态：主卡被取下后，
-     * 下一张自动接任（它下一 tick 就会铺出自己的球壳）。
+     * 下一张自动接任（它下一 tick 就会照常结算与出玻璃板）。
      */
     private fun primaryShield(): EnergyShield? =
         wand.loadedMagics.firstOrNull { it is EnergyShield } as? EnergyShield
@@ -231,9 +178,6 @@ class EnergyShield : Modifier() {
         val level = player.level()
         if (level !is ServerLevel) return
 
-        // 重新被持有：复位「放下倒计时」（见 onPassiveIdle）
-        idleTicks = 0
-
         // 耐久上限随「本杖有几张护盾卡」变化；首次结算（旧档/新装）直接补满到当前容量
         val capacity = shieldCapacity()
         if (!durabilityLoaded) {
@@ -249,12 +193,14 @@ class EnergyShield : Modifier() {
         } else {
             durability = min(capacity, durability + regenPerSecond / 20.0)
         }
+        // 护盾平时**不可见**：只在「破盾」与「恢复」两个状态翻转的瞬间播一次整罩玻璃动画
         val shieldUp = durability > 0
-        if (shieldUp) {
-            updateShieldVisual(level, player)
-        } else {
-            // 破盾：球壳**收起**（面板向心收拢 + 淡出，PD 动画结束后自行销毁）；暂停恢复期间不再重建
-            foldShieldVisual()
+        if (!shieldStateInitialised) {
+            shieldWasUp = shieldUp
+            shieldStateInitialised = true
+        } else if (shieldUp != shieldWasUp) {
+            if (shieldUp) spawnRecoveryFlash(level, player) else spawnBreakFlash(level, player)
+            shieldWasUp = shieldUp
         }
 
         if (!shieldUp) {
@@ -308,157 +254,138 @@ class EnergyShield : Modifier() {
 
             durability -= bounceCost
             if (durability <= 0) {
+                // 破盾的那一发不再出受击玻璃：整罩「一闪而碎」接手（由上面的状态翻转触发）
                 durability = 0.0
                 pauseTicks = breakPauseTicks
                 break
             }
+            // 格挡真的生效（扣了耐久）才在受击处展开玻璃板 —— 不放「表演性」的反应
+            spawnHitPanel(level, player, Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()))
         }
         syncClient()
     }
 
+    // ---------------------------------------------------------------- 玻璃护盾（第 23 轮）
+
     /**
-     * 护盾视觉（ParticleDrawing）：以持有者为**轴心**的五/六边形球壳，**分多 tick 逐块构建**。
+     * **格挡生效**：在受击方向上**最近的那块面板**处展开一块玻璃板。
      *
-     * 每 tick 调 [buildShieldPanels] 建一小批面板，直到 32 块建满（之后这个函数就是空转）。
-     * 跨维度 / 换实体（重生）时**立即**销毁旧球壳再从头构建：旧面板组挂在旧实体上，淡出没有意义。
+     * @param hitPos 受击点（投射物的世界坐标 —— 弹开判定已经算过，直接用，不额外换算）
      */
-    private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
-        if (shellLevel === level && shellHolder == holder.uuid) {
-            buildShieldPanels(level, holder) // 还在构建中：继续搭下一批（已建满则直接返回）
-            return
+    private fun spawnHitPanel(level: ServerLevel, holder: Entity, hitPos: Vec3) {
+        val center = holder.position().add(0.0, shellCenterOffset(holder), 0.0)
+        val dir = hitPos.subtract(center)
+        if (dir.lengthSqr() < 1e-6) return
+        // 面板的 `center` 就是「相对球心、长度 = 半径」的方向向量（见 [Polyhedra] 的 KDoc），
+        // 所以「给定方向找最近面板」= 点积取最大。护盾不再自转，因此不需要反旋相位（第 22 轮那套已删）。
+        val unit = dir.normalize()
+        val panel = shieldPanels.maxByOrNull { it.center.dot(unit) } ?: return
+        spawnGlassPanel(
+            level, holder, panel,
+            edgeColor = GLASS_EDGE_COLOR, edgeScale = GLASS_EDGE_SCALE,
+            withFill = true, holdTicks = HIT_HOLD_TICKS, fadeTicks = HIT_FADE_TICKS, drift = null,
+        )
+    }
+
+    /** **破盾**瞬间：整颗玻璃罩现形一闪，随即面板沿各自法线向外飘散、淡出。 */
+    private fun spawnBreakFlash(level: ServerLevel, holder: Entity) {
+        for (panel in shieldPanels) {
+            spawnGlassPanel(
+                level, holder, panel,
+                edgeColor = GLASS_BREAK_COLOR, edgeScale = GLASS_EDGE_SCALE,
+                withFill = true, holdTicks = BREAK_HOLD_TICKS, fadeTicks = BREAK_FADE_TICKS,
+                drift = panel.center.normalize().scale(BREAK_DRIFT),
+            )
         }
-        clearShieldVisual()
-        shellLevel = level
-        shellHolder = holder.uuid
-        buildCursor = 0
-        buildShieldPanels(level, holder)
+    }
+
+    /** **护盾恢复**：整壳轮廓极淡地闪一下（不带填充 —— 否则又变成一层看得见的罩子）。 */
+    private fun spawnRecoveryFlash(level: ServerLevel, holder: Entity) {
+        for (panel in shieldPanels) {
+            spawnGlassPanel(
+                level, holder, panel,
+                edgeColor = GLASS_RECOVERY_COLOR, edgeScale = GLASS_RECOVERY_SCALE,
+                withFill = false, holdTicks = RECOVERY_HOLD_TICKS, fadeTicks = RECOVERY_FADE_TICKS,
+                drift = null,
+            )
+        }
     }
 
     /**
-     * 建下一批面板（[BUILD_PANELS_PER_TICK] 块）：每块一个组 —— 先绑轴心、再铺成员，最后录
-     * `fadeIn` + `spin` 两条指令（两条都不挪组的轴心字段，满足 PD 的 arm 基准约束，见类注释）。
+     * 铺一块玻璃面板：**亮边**（面板轮廓上的点）+ 可选**极淡填充**（面板内部的稀疏点），
+     * 挂在持有者身上，[holdTicks] 后开始淡出、[fadeTicks] 内淡完并由 PD 销毁整组。
      *
-     * 成员坐标 = 「绑定后的轴心（= 球心）+ 面板边界偏移」，`offsetFromPivot` 用**相对球心**的偏移：
-     * 客户端 arm 时按「成员 spawn 位置 − 当时的组 `pivot` 字段」重算相对偏移，而 `followEntity(offset)`
-     * 会顺手改那个字段 —— 所以**先 `followEntity` 再铺成员**是硬要求（第 13 轮踩过，见 `resolved.md`）。
-     * 面板位置固定不动（不做位移动画），所以不会再碰到 `move` 相关的坑。
+     * ⚠️ 顺序：**先 `followEntity` 再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
+     * 反算相对偏移，而 `followEntity` 会顺手改那个字段（第 13 轮踩过）；成员用**相对球心**的偏移
+     * （`offsetFromPivot`），于是面板随人移动、形状刚性。
+     * ⚠️ 指令顺序：`delay` 必须录在 `fadeOut` 之前（游标语义），而本组是**新建**的 ——
+     * 游标从 0 起算 = 从现在起（PD 1.0.12 的增量语义），所以这里不需要任何时钟补偿。
      */
-    private fun buildShieldPanels(level: ServerLevel, holder: Entity) {
-        if (buildCursor >= shieldPanels.size) return
+    private fun spawnGlassPanel(
+        level: ServerLevel,
+        holder: Entity,
+        panel: Polyhedra.Panel,
+        edgeColor: Color,
+        edgeScale: Float,
+        withFill: Boolean,
+        holdTicks: Int,
+        fadeTicks: Int,
+        drift: Vec3?,
+    ) {
         val manager = wand.pdParticles(level)
         val bodyOffset = shellCenterOffset(holder)
         val feet = holder.position()
         val center = feet.add(0.0, bodyOffset, 0.0)
-        val end = min(shieldPanels.size, buildCursor + BUILD_PANELS_PER_TICK)
-
-        if (buildCursor == 0) shellBornAt = level.gameTime
-        for (index in buildCursor until end) {
-            val group = manager.createGroup(feet)
-            group.followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
-            for (offset in shieldPanels[index].ring) {
+        val group = manager.createGroup(feet)
+        group.followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
+        for (offset in panel.ring) {
+            manager.create()
+                .position(center.add(offset))
+                .color(edgeColor)
+                .scale(edgeScale)
+                .lifetime(PD_IMMORTAL)
+                .group(group.id)
+                .offsetFromPivot(offset)
+                .spawn()
+        }
+        if (withFill) {
+            for (offset in fillOffsets(panel)) {
                 manager.create()
                     .position(center.add(offset))
-                    .color(SHELL_COLOR)
-                    .scale(SHELL_SCALE)
+                    .color(GLASS_FILL_COLOR)
+                    .scale(GLASS_FILL_SCALE)
                     .lifetime(PD_IMMORTAL)
                     .group(group.id)
                     .offsetFromPivot(offset)
                     .spawn()
             }
-            // 第一条指令必须是「不挪轴心」的：fadeIn 只做透明度编排，arm 时轴心仍是球心
-            group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
-            group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
-            // 补上「本块比整壳晚生了多久」对应的角度（durationTicks = 0 = 瞬时补相位）：
-            // 这样每块面板都落在同一个全局相位上，整球始终是一致多面体
-            val lateBy = (level.gameTime - shellBornAt).coerceAtLeast(0L)
-            group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)
-            shell += ShellPanel(group, shieldPanels[index])
         }
-        buildCursor = end
-    }
-
-    // 第 20 轮按实机反馈移除：展开完成与破盾的**外扩爆开**（以及配套的镜头冲击）都不要了 ——
-    // 球壳是「一条线画出来的干净球体」，往外炸一圈粒子反而让轮廓变糊、看起来像叠了两层球。
-
-    /**
-     * 消散动画：**反向**（最后搭起来的最先拆）逐块 `fadeOut`，每块之间用 `delay` 错开一个阶梯。
-     *
-     * `fadeOut(removeAfter = true)` 会在淡出结束后由 PD 排任务销毁整组，所以这里把引用丢掉即可 ——
-     * **即使本实例之后不再被 tick（法术被取下 / 法杖被回收）动画也能放完**，且不留孤儿粒子。
-     *
-     * ⚠️ 用 `delay` 做阶梯在这里是安全的：`fadeOut` 在指令生效前默认「还没开始淡出」（因子 0，不影响 alpha），
-     * 所以后面的面板在被轮到之前保持完全可见；而 `fadeIn` 的默认值相反（1），用它做阶梯会「先闪一下」。
-     */
-    private fun foldShieldVisual() {
-        if (shell.isEmpty()) return
-        val level = shellLevel
-        // 拿不到维度时只能硬销毁（例如持有者已下线）：宁可瞬间消失，也不留孤儿粒子
-        if (level == null) {
-            for (p in shell) p.group.remove()
-            shell.clear()
-            buildCursor = 0
-            shellHolder = null
-            idleTicks = 0
-            return
-        }
-
-        // **不重建球壳**，直接对**旧组**追加淡出：自转因此自然延续（第 19 轮实机反馈「收起时不再旋转」——
-        // 重建出来的新组没有 `spin`）。PD 1.0.12 起增量指令按「从现在起」读，所以这里不需要算游标、
-        // 也不需要自己排销毁；`removeAfter = true` 由 PD 按同一口径处理，
-        // 于是「法术被取下 / 法杖被回收、本实例再也不 tick」时动画照样放完、也不会留孤儿。
-        // PD 1.0.12 起：程序下发之后录制的指令按「**从现在起**」读（`ParticleGroup.delay` 的 KDoc
-        // 与 `GroupClock`），所以这里就是最朴素的写法 —— 不用自己把游标推到 now，
-        // `removeAfter = true` 的销毁时刻也按同一口径从当下起算（1.0.12 的 `scheduleDestroy`）。
-        for ((order, entry) in shell.reversed().withIndex()) {
-            val stagger = (order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS
-            entry.group.delay(stagger)
-            entry.group.fadeOut(FOLD_FADE_TICKS, removeAfter = true)
-            fading += entry.group
-        }
-        shell.clear()
-        buildCursor = 0
-        shellBornAt = 0L
-        shellLevel = null
-        shellHolder = null
-        idleTicks = 0
+        if (drift != null) group.move(drift, fadeTicks, EasingType.EASE_OUT)
+        group.delay(holdTicks)
+        // EASE_OUT：透明度先快后慢 —— 长尾才像「碎开后飘散」，EASE_IN 会在最后一帧啪一下消失
+        group.fadeOut(fadeTicks, removeAfter = true, easing = EasingType.EASE_OUT)
     }
 
     /**
-     * 被动「未被持有」时的每 tick 回调（由 `Wand.tick` 的闲置分支驱动）。
+     * 面板内部的**填充点**：从面板中心向边界点连线采样（扇形），再把结果归一化回球面
+     * （与 [Polyhedra.truncatedIcosahedron] 的取点口径一致，所以填充点与边缘点贴在同一个球面上）。
      *
-     * 放下法杖后**保留 [SHELL_LINGER_TICKS] tick** 再开始消散球壳 —— 这段窗口是给「刚放下又马上拿起来」
-     * 留的缓冲（重新握杖时 [onInventoryTick] 会把倒计时归零，还没拆完的面板会连同构建进度一起重建）。
+     * 隔 [FILL_STRIDE] 个边界点采一条射线、每条射线取 [FILL_FRACTIONS] 里的几个比例：
+     * 点距与「粒子实际尺寸 ≈ scale × 0.213 格」配平后，叠出来正好是一层均匀的极淡薄雾。
      */
-    override fun onPassiveIdle() {
-        if (shell.isEmpty()) return
-        idleTicks++
-        if (idleTicks >= SHELL_LINGER_TICKS) foldShieldVisual()
-    }
-
-    /**
-     * 从法杖上取下（或槽位被替换）时调用：**立刻开始消散球壳**。
-     *
-     * 必须做：取下之后本实例不再出现在 `Wand.loadedMagics` 里，[onInventoryTick] 与 [onPassiveIdle]
-     * **都不会再被调用** —— 而面板是 `lifetime = -1` 的永存粒子组，不在这里处理就会一直留在世界里。
-     * 消散动画不依赖本实例继续 tick（销毁由 PD 的调度器负责），所以取下后动画照样能放完。
-     * 若取下的只是「多张护盾卡」中的一张，接任的主卡会重新构建自己的球壳。
-     */
-    override fun onUnloaded() {
-        foldShieldVisual()
-    }
-
-    /** 立即销毁整个球壳（不播动画）：跨维度/换实体/重建时用 —— 旧面板挂在旧实体上，动画没有意义。 */
-    private fun clearShieldVisual() {
-        for (p in shell) p.group.remove()
-        shell.clear()
-        // 还在淡出中的旧壳也要立刻清掉：否则重建期间会看到「两层球」重叠
-        for (group in fading) group.remove()
-        fading.clear()
-        shellBornAt = 0L
-        buildCursor = 0
-        shellLevel = null
-        shellHolder = null
-        idleTicks = 0
+    private fun fillOffsets(panel: Polyhedra.Panel): List<Vec3> {
+        val c = panel.center
+        val radius = c.length()
+        val out = ArrayList<Vec3>(panel.ring.size / FILL_STRIDE * FILL_FRACTIONS.size)
+        var i = 0
+        while (i < panel.ring.size) {
+            val v = panel.ring[i]
+            for (t in FILL_FRACTIONS) {
+                out += c.add(v.subtract(c).scale(t)).normalize().scale(radius)
+            }
+            i += FILL_STRIDE
+        }
+        return out
     }
 
     /** 球壳球心相对脚底的偏移：身体中段（身高 55%），比眼睛位置更贴近「包裹全身」的观感。 */
@@ -487,79 +414,62 @@ class EnergyShield : Modifier() {
          */
         private const val PLAYER_BOX_MAX_HALF_EXTENT = 1.0
 
-        // ---- 球壳（ParticleDrawing）：五/六边形面板 ----
+        // ---- 面板几何（玻璃护盾与旧的常驻球壳共用同一套截角二十面体） ----
 
-        /**
-         * 球壳半径（方块）：`followEntity` 的偏移相对脚底，球心还要再加「身体中段」那一段。
-         */
+        /** 球壳半径（方块）：面板方向向量的长度，也就是玻璃板离球心的距离 */
         private const val SHELL_RADIUS = 1.7
 
         /**
          * 每条棱上放几个点（含起点，见 [Polyhedra.truncatedIcosahedron]）：
-         * **棱长 1.166 格（半径 1.7）/ 本值 = 点间距（格）**。
+         * **棱长 1.166 格（半径 1.7）/ 本值 = 点间距 0.194 格**。
          *
-         * ⚠️ 粒子「实际尺寸」不是 [SHELL_SCALE] 本身：PD 的 `quadSize = scale × 0.1 × texScale`
+         * ⚠️ 粒子「实际尺寸」**不是 `scale` 本身**：PD 的 `quadSize = scale × 0.1 × texScale`
          * （`BridgeParticle.EDITOR_TO_MC_SCALE`，录制实测 `texScale ≈ 2.1`）→ **实际格数 ≈ scale × 0.213**。
-         * 密度就是靠这个换算配的。
-         *
-         * 现在是 **6 点/棱 → 点距 0.194 格，配 [SHELL_SCALE] 0.25（实际 ≈0.053 格）**：
-         * 粒子是**颗颗分明的点**（间距约为粒子宽度的 3.7 倍），五/六边形的轮廓清晰，
-         * 共 **1080 颗**（每块面板 30/36 颗 —— 共享棱由两块面板各画一遍，位置逐位重合）。
-         *
-         * 第 20 轮曾算成「14 点/棱 + scale 0.40」想把棱做成**连续实线**：从球外看是干净的线框，
-         * 但从**球内第一人称**看，最近处一颗方块要占 80+ 像素，糊成一条粗带、多边形也看不清
-         * （实机反馈「不完美的形状很丑」）。现在的取向是**保留粒子感**、点距明显大于粒径，
-         * 靠点阵读出形状 —— 不要再往「连续实线」调（那需要成倍粒子，且近看必然糊）。
+         * 6 点/棱 → 点距是粒径的 3.7 倍，这是**刻意的点阵观感**；不要再往「连续实线」调
+         * （球内第一人称近看会糊成一条粗带，第 20/21 轮踩过）。
          */
         private const val SHELL_POINTS_PER_EDGE = 6
 
-        /**
-         * 单颗粒子尺寸：**实际格数 ≈ scale × 0.213**（见上）。
-         * 0.25 → ≈0.053 格；调大 = 点变大、变糊，调小 = 点变细、轮廓更疏。
-         */
-        private const val SHELL_SCALE = 0.25f
+        // ---- 玻璃板（受击 / 破盾 / 恢复三种时机共用一套铺法） ----
 
-        /** 每 tick 构建几块面板：32 ÷ 本值 = 构建波的总时长（2 → 16 tick ≈ 0.8 秒） */
-        private const val BUILD_PANELS_PER_TICK = 2
-
-        /** 单块面板的淡入时长（tick）：与构建波叠加，最后一块在 16+6 tick 后完全出现 */
-        private const val BUILD_FADE_TICKS = 6
-
-        /** 消散时每几块面板共用同一个起始时刻：32 ÷ 本值 × [FOLD_STAGGER_TICKS] ≈ 消散波总时长 */
-        private const val FOLD_PANELS_PER_STEP = 2
-
-        /** 消散波相邻两级的间隔（tick） */
-        private const val FOLD_STAGGER_TICKS = 1
-
-        /** 单块面板的淡出时长（tick）：PD 在淡出结束后销毁该组 */
-        private const val FOLD_FADE_TICKS = 5
+        /** 亮边的粒子尺寸：边缘细一点才像玻璃的棱 */
+        private const val GLASS_EDGE_SCALE = 0.26f
 
         /**
-         * 自转轴：略微倾斜（不是纯 Y 轴）。
-         *
-         * 纯 Y 轴下粒子只沿纬线滑动，倾斜一点会让它们走出大圆、更像「能量场在流动」。
-         * 想改成「只绕竖直轴转」就把这里换成 `Vec3(0.0, 1.0, 0.0)`。
+         * 填充的粒子尺寸：比边缘大、**极淡**（alpha ≈15%），靠重叠叠出一层均匀薄雾。
+         * 0.55 → 约 0.12 格，与填充点距同量级，刚好连成一片。
          */
-        private val SHELL_SPIN_AXIS: Vec3 = Vec3(0.25, 1.0, 0.12).normalize()
+        private const val GLASS_FILL_SCALE = 0.55f
 
-        /**
-         * 自转速度（弧度/tick）：`PI / 60 ≈ 3°/tick`，约 **6 秒一圈**。
-         *
-         * 调大 = 转得更快（`PI / 30` 约 3 秒一圈）；调小 = 更慢。组级 spin 是客户端本地累加，
-         * 改这个值只影响观感，不增加带宽。
-         */
-        private const val SHELL_SPIN_RADIANS_PER_TICK = PI / 60.0
+        /** 填充采样：隔几个边界点采一条射线 / 每条射线上取哪几个比例 */
+        private const val FILL_STRIDE = 2
+        private val FILL_FRACTIONS = doubleArrayOf(0.62, 0.88)
 
-        /**
-         * 放下法杖后球壳保留的 tick 数（= [onPassiveIdle] 的倒计时阈值）：
-         * 先等这么久（防止「放下又立刻拿起」闪一下），再开始消散动画。
-         */
-        private const val SHELL_LINGER_TICKS = 4
+        /** **受击**玻璃：停留 + 淡出 ≈ 0.35 秒 */
+        private const val HIT_HOLD_TICKS = 2
+        private const val HIT_FADE_TICKS = 5
 
-        /** 淡蓝色 */
-        private val SHELL_COLOR: Color = Color.ofInt(120, 200, 255)
+        /** **破盾**：一闪之后面板向外飘散 + 淡出 ≈ 0.5 秒；[BREAK_DRIFT] 是飘散距离（方块） */
+        private const val BREAK_HOLD_TICKS = 2
+        private const val BREAK_FADE_TICKS = 12
+        private const val BREAK_DRIFT = 0.35
 
+        /** **恢复**：极淡轮廓闪一下 ≈ 0.35 秒（不带填充） */
+        private const val RECOVERY_HOLD_TICKS = 1
+        private const val RECOVERY_FADE_TICKS = 6
+        private const val GLASS_RECOVERY_SCALE = 0.22f
 
+        /** 亮边颜色：淡蓝白（比旧的常驻球壳更亮 —— 它只在受击那一瞬出现） */
+        private val GLASS_EDGE_COLOR: Color = Color.ofInt(190, 232, 255, 235)
+
+        /** 破盾那一下的亮边：更白 */
+        private val GLASS_BREAK_COLOR: Color = Color.ofInt(226, 246, 255, 245)
+
+        /** 恢复时的亮边：很淡（只是「闪一下」） */
+        private val GLASS_RECOVERY_COLOR: Color = Color.ofInt(140, 200, 255, 95)
+
+        /** 填充：极淡的淡蓝（≈15% 不透明度） */
+        private val GLASS_FILL_COLOR: Color = Color.ofInt(150, 205, 255, 38)
     }
 
     /**

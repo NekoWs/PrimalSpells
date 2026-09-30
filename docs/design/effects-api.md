@@ -2,6 +2,8 @@
 
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
+> **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。当前卡在「程序化粒子的贴图/UV/各向异性/朝向/加色」这一组能力上，需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
+
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.12-ALPHA**）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 

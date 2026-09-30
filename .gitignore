@@ -46,3 +46,6 @@ net/
 opencode.json
 package-lock.json
 test_img/
+
+# 参考素材（第三方截图，不入库）
+.refs/

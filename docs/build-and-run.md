@@ -156,7 +156,10 @@ python tools/capture/assemble.py          # 合成 + 判定
 法力不够时会打穿，受击那一圈碎裂并留下 3 秒粉色破口。
 想看**第一视角**（自己的护盾被持续攻击）就用 `/primalspells shielddummy attack [法术] [间隔tick]`，
 它每 N tick 朝 32 格内最近的玩家打一发（默认火球 / 20 tick，可指定 `laser` 等）。
-清理用 `/primalspells shielddummy clear`。实现见 `event/ShieldDummyCommand.kt` 与 `TestDummyEntity.tick`。
+清理用 `/primalspells shielddummy clear`。
+**想直接拿到某一级法杖**（六级曲线见 [design/wand-tiers.md](design/wand-tiers.md)）用
+`/primalspells wand t5`（可加 `charged` 拿蓄能型，`debug` 拿调试杖）——它会把这一根掷出的数值回报出来。
+实现见 `event/ShieldDummyCommand.kt`、`event/WandCommand.kt` 与 `TestDummyEntity.tick`。
 
 **录制不会打扰你**：客户端窗口默认被隐藏（`CaptureDriver.hideWindow` 走 `GLFW.glfwHideWindow` 并关掉
 `FOCUS_ON_SHOW`），并且每 tick 兜底释放鼠标抓取 —— 不会弹窗、抢焦点、锁鼠标。
@@ -207,7 +210,10 @@ python tools/capture/assemble.py          # 合成 + 判定
 3. **空场起飞**：开头 2 帧几乎没有任何特效像素；
 4. **真的渲染了**：峰值特效像素超过阈值（证明粒子确实上了屏幕，而不是只有服务端状态对）；
 5. **收干净了**：最后 3 帧几乎没有任何特效像素；
-6. **退场是渐变的**（设计上有退场动画的效果：黑洞/护盾）或**立即且干净**（设计上没有的：重力场）；
+6. **退场是渐变的**（设计上有退场动画的效果：黑洞）或**立即且干净**（设计上没有的：重力场），
+   或者**声明交给专属判据**（`decay: none`）——当一个场景混了两套互不相干的视觉系统
+   （护盾 = 受击玻璃板 + 大爆原版烟，全局峰值会逐次运行翻转），全局退场判定就不可靠了；
+   这时 spec 必须另有对应断言（护盾用的是粉色 `breach_fade`），脚本会校验它存在；
 7. **护盾破口**（第 26 轮）：破口窗口里应有**常驻**的粉色轮廓，且到期是**淡出**而不是一帧消失。
 
 特效像素的判据是「偏蓝的亮像素」——黑底摄影棚里只有粒子满足（木桩、地面、天空都不满足），

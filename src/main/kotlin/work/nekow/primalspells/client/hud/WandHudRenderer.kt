@@ -77,11 +77,11 @@ object WandHudRenderer {
         if (s.currentRecharge > 0) rechargePersistTicks = resetTarget
         if (s.maxMana > 0 && s.currentMana < s.maxMana) manaPersistTicks = resetTarget
 
-        val targetDelay = if (s.currentDelay > 0) {
-            1f - (s.currentDelay.toFloat() / s.lastDelay).coerceIn(0f, 1f)
+        val targetDelay = if (s.currentDelay > 0.0) {
+            1f - (s.currentDelay / s.lastDelay).coerceIn(0.0, 1.0).toFloat()
         } else 1f
-        val targetRecharge = if (s.currentRecharge > 0) {
-            1f - (s.currentRecharge.toFloat() / s.lastRecharge).coerceIn(0f, 1f)
+        val targetRecharge = if (s.currentRecharge > 0.0) {
+            1f - (s.currentRecharge / s.lastRecharge).coerceIn(0.0, 1.0).toFloat()
         } else 1f
         val targetMana = if (s.maxMana > 0) (s.currentMana / s.maxMana).toFloat() else 1f
 

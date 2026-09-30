@@ -12,7 +12,7 @@
 | 我想… | 主要文件 | 关联文件 |
 |---|---|---|
 | 改施法节奏 / 牌堆抽牌规则 | `wand/Wand.kt`（`spell`/`draw`/`castHand`/`reloadIfNeeded`） | `item/WandItem.kt`（触发时机）、`wand/WandManager.kt`（持有者/回收/懒加载） |
-| 改法力上限 / 回复速率 | `wand/Wand.kt`（`mana`/`charge` 字段与 `tick`） | `item/WandItem.kt`（`syncStats`） |
+| 改法杖等级数值（法力/回蓝/双延迟/槽位/抽牌权重） | `wand/WandTier.kt`（**等级表 = 唯一事实源**） | [design/wand-tiers.md](design/wand-tiers.md)（口径）、`wand/Wand.kt`（消耗与冷却） |
 | 改投射物飞行 / 碰撞 | `magic/effect/geometry/Move.kt` | `magic/projectile/Projectile.kt`（`hitBlock`/`hitEntity`） |
 | 改命中伤害 | `magic/effect/lifecycle/Hurt.kt` | `magic/core/MagicStatus.kt`（`damage`） |
 | 改爆炸表现 / 范围 | `magic/effect/lifecycle/Explosion.kt` | `magic/core/MagicStatus.kt`（`explosion*`） |
@@ -88,7 +88,8 @@
 | 文件 | 内容 |
 |---|---|
 | `wand/Wand.kt` | 牌堆/手牌/弃牌堆、施法结算、法力与冷却、被动驱动、NBT 序列化（槽位保序 + 牌堆 + `magic_states` 运行期状态）、`saveRuntimeState` 钩子的调用方 |
-| `wand/WandManager.kt` | `wandId → Wand` 实例表 + **持有者记录**（`markHeld`/`holderOf`/`lastHeldTick`）+ 每 100 tick 回收无人持有的内存实例 + 按需懒加载（`get` 会从存档重建）；存档条目永不删除 |
+| `wand/WandTier.kt` | **法杖等级**：六级曲线（法力/回蓝/双延迟(ms)/槽位/抽牌权重）+ 蓄能型变体 + 创建时掷点（`WandStats.roll`），见 [design/wand-tiers.md](design/wand-tiers.md) |
+| `wand/WandManager.kt` | `wandId → Wand` 实例表 + **持有者记录**（`markHeld`/`holderOf`/`lastHeldTick`）+ 每 100 tick 回收无人持有的内存实例 + 按需懒加载（`get` 会从存档重建）；法杖创建时按物品的等级掷数值并写 LORE；存档条目永不删除 |
 | `wand/WandSavedData.kt` | `SavedData`：`wandId → CompoundTag` 的持久化容器 |
 | `item/WandItem.kt` | 法杖物品：长按施法、被动 tick、属性同步、容器内右键装卸、`getWand`/`getWandData`/`syncStats`/`forgetCastState` |
 | `item/SpellPouchItem.kt` | 法术小包：16 格内容 + 选中槽，右键装入/取出（与法杖同一套交互），服务端补 `pouchId` |

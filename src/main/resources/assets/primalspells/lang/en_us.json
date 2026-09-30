@@ -1,6 +1,5 @@
 {
   "itemGroup.primalspells": "Primal Spells",
-
   "item.primalspells.wand": "Primal Wand",
   "item.primalspells.spell_pouch": "Spell Pouch",
   "item.primalspells.test_dummy": "Test Dummy",
@@ -34,7 +33,6 @@
   "item.primalspells.large_explosion": "Large Explosion",
   "item.primalspells.self_orbit": "Self Orbit",
   "item.primalspells.sphere_orbit": "Sphere Orbit",
-
   "item.primalspells.drone_swarm": "Drone Swarm",
   "item.primalspells.drone_bolt": "Drone Bolt",
   "item.primalspells.gravity_field": "Gravity Field",
@@ -42,15 +40,12 @@
   "item.primalspells.teleport": "Teleport",
   "item.primalspells.quantum_entanglement": "Quantum Entanglement",
   "item.primalspells.energy_shield": "Energy Shield",
-
-
-  "tooltip.primalspells.mana": "Mana: %s\u00a0/ %s",
-  "tooltip.primalspells.delay": "Cast Delay: %s\u00a0",
-  "tooltip.primalspells.recharge": "Recharge Time: %s\u00a0",
+  "tooltip.primalspells.mana": "Mana: %s / %s",
+  "tooltip.primalspells.delay": "Cast Delay: %s ",
+  "tooltip.primalspells.recharge": "Recharge Time: %s ",
   "tooltip.primalspells.cast": "Casts: %s",
   "tooltip.primalspells.charge": "Recharge Speed: %s/s",
   "tooltip.primalspells.hold_alt": "Hold [Alt] to view wand stats",
-
   "lore.primalspells.mana": "Mana Cost: %s",
   "lore.primalspells.delay": "Cast Delay: %st",
   "lore.primalspells.recharge": "Recharge Time: %st",
@@ -99,10 +94,20 @@
   "lore.primalspells.bounce_cost": "Block Cost: %s MP",
   "lore.primalspells.extra_cost": "Per Point Over: %s MP",
   "lore.primalspells.breach": "Breach Duration: %ss",
-
   "death.attack.primalspells_projectile": "%1$s was struck by a spell",
   "death.attack.primalspells_projectile.player": "%1$s was slain by %2$s's spell",
-
   "entity.primalspells.drone": "Combat Drone",
-  "entity.primalspells.test_dummy": "Test Dummy"
+  "entity.primalspells.test_dummy": "Test Dummy",
+  "item.primalspells.wand_t1": "Rotten Wand",
+  "item.primalspells.wand_t2": "Apprentice Wand",
+  "item.primalspells.wand_t3": "Journeyman Wand",
+  "item.primalspells.wand_t4": "Mage Wand",
+  "item.primalspells.wand_t5": "Master Wand",
+  "item.primalspells.wand_t6": "Archmage Wand",
+  "wand.primalspells.variant.charged": "Charged %s",
+  "wand.primalspells.stat.mana": "Max Mana: %s",
+  "wand.primalspells.stat.regen": "Mana Regen: %s/s",
+  "wand.primalspells.stat.delay": "Delay / Recharge: %s ms",
+  "wand.primalspells.stat.size": "Slots: %s",
+  "wand.primalspells.stat.cast": "Draw: %s"
 }

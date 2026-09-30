@@ -2,6 +2,7 @@ package work.nekow.primalspells.registry
 
 import com.mojang.serialization.Codec
 import net.minecraft.core.component.DataComponentType
+import net.minecraft.core.component.DataComponents
 import net.minecraft.core.registries.Registries
 import net.minecraft.network.chat.Component
 import net.minecraft.network.codec.ByteBufCodecs
@@ -17,6 +18,8 @@ import work.nekow.primalspells.item.TestDummyItem
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.item.component.WandID.Companion.TYPE
 import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.wand.WandTier
+import work.nekow.primalspells.wand.WandVariant
 
 class ModItems {
     companion object {
@@ -41,6 +44,11 @@ class ModItems {
                 .icon { ItemStack(WAND.get()) }
                 .displayItems { _, output ->
                     output.accept(WAND)
+                    // 六级法杖：每级两项（普通 / 蓄能型），方便直接拿来对比
+                    WandTier.LADDER.forEach { tier ->
+                        output.accept(wandStack(tier, WandVariant.NORMAL))
+                        output.accept(wandStack(tier, WandVariant.CHARGED))
+                    }
                     output.accept(SPELL_POUCH)
                     output.accept(TEST_DUMMY)
                     MAGICS.values.forEach { output.accept(it) }
@@ -75,6 +83,15 @@ class ModItems {
                 .build()
         }
 
+        /** 蓄能型变体标记（见 [WandVariant.CHARGED]）：打在物品栈上，创建法杖时读一次。 */
+        val WAND_CHARGED = COMPONENTS.register("wand_charged") { _ ->
+            DataComponentType.builder<Boolean>()
+                .persistent(Codec.BOOL)
+                .networkSynchronized(ByteBufCodecs.BOOL)
+                .cacheEncoding()
+                .build()
+        }
+
         val SPELL_POUCH_CONTENTS = COMPONENTS.register("spell_pouch_contents") { _ ->
             DataComponentType.builder<List<String>>()
                 .persistent(Codec.STRING.listOf())
@@ -92,8 +109,48 @@ class ModItems {
                 .build()
         }
 
+        /**
+         * **调试杖**（3000 法力 / 1000 回蓝 / 0 双延迟 / 18 槽）：开发期用来隔离变量的那根，
+         * 不在六级曲线里，正常玩法拿不到（创造模式物品栏 + `/primalspells wand debug`）。
+         */
         val WAND = ITEMS.registerItem("wand") { props ->
             WandItem(props.stacksTo(1))
+        }
+
+        /**
+         * **六级法杖物品**（与 [WandTier.LADDER] 一一对应，注册名 = `WandTier.itemName`）。
+         *
+         * 数值不在物品上：物品只决定"是哪一级"，真正的数值由 `WandManager.createWand` 在**首次 tick**
+         * 时按等级掷出（[work.nekow.primalspells.wand.WandStats.roll]）并落进法杖实例、随 NBT 存档。
+         * 见 [docs/design/wand-tiers.md]。
+         */
+        val WAND_TIERS = WandTier.LADDER.associateWith { tier ->
+            ITEMS.registerItem(tier.itemName) { props ->
+                WandItem(props.stacksTo(1))
+            }
+        }
+
+        /** 物品 → 等级（含调试杖）；不是法杖物品时返回 null。创建法杖时用它决定数值。 */
+        fun wandTierOf(item: Item): WandTier? =
+            WAND_TIERS.entries.firstOrNull { it.value.get() === item }?.key
+                ?: if (item === WAND.get()) WandTier.DEBUG else null
+
+        /**
+         * 造一根**指定等级 + 变体**的法杖物品栈。
+         *
+         * 蓄能型（[WandVariant.CHARGED]）用组件 + 自定义名表达（"大师杖·蓄能"），
+         * 数值仍由创建时统一掷出 —— 这样掉落/指令/创造模式三条路只有一套逻辑。
+         */
+        fun wandStack(tier: WandTier, variant: WandVariant = WandVariant.NORMAL): ItemStack {
+            val stack = ItemStack(WAND_TIERS[tier]?.get() ?: WAND.get())
+            if (variant != WandVariant.NORMAL && variant.suffixKey != null) {
+                stack.set(WAND_CHARGED, true)
+                stack.set(
+                    DataComponents.CUSTOM_NAME,
+                    Component.translatable(variant.suffixKey!!, Component.translatable(tier.displayKey))
+                )
+            }
+            return stack
         }
 
         val SPELL_POUCH = ITEMS.registerItem("spell_pouch") { props ->

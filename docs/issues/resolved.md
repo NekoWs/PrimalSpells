@@ -695,6 +695,37 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
   打穿后**一圈粉色点阵多边形轮廓**挂在受击方向（读得懂「这里能打」✓）、末帧干净。
 - 构建 **0 warning**。
 
+## 第 27 轮（2026-09-30，法杖等级：六级曲线 + 蓄能型变体 + 毫秒双延迟）
+
+**起因是用户对上一轮基准的纠正**：`Wand.kt` 里写死的 3000 法力 / 1000 每秒回蓝 / 0 双延迟是
+**创造模式专用**的调试杖，正常中后期杖是 300 / 100 / ~5 tick 量级、初期是 100 / <80 / ≥10 tick。
+第 26 轮拿调试杖当基准定 DPS 与护盾消耗，结论虽然成立（伤害值与池子无关），但"法力是否够用"这一层是失真的。
+
+| # | 问题 | 结论 | 落点 |
+|---|---|---|---|
+| 27.1 | 法杖没有等级概念，数值写死在 `Wand.kt` | 新增 [design/wand-tiers.md](../design/wand-tiers.md) 作为**法杖数值的唯一事实源**：六级曲线（T1 80/30/700ms/6 槽 → T5 300/100/240ms/14 → T6 450/140/150ms/16，调试杖 3000/1000/0/18 留在曲线外）+ **蓄能型变体**（蓝 ×3、回蓝 ÷3、延迟 ×1.5） | `wand/WandTier.kt`（新：等级表 + `WandStats.roll`）、`wand/Wand.kt`（`applyStats`） |
+| 27.2 | **`wand.delay` 根本没接进冷却**（只出现在一句诊断字符串里）——"等级表里的延迟"如果不管它，就只是展示数字 | 语义定为：`delayMs` = **最小施法间隔**（与卡牌累加值取大）、`rechargeMs` = **重装代价**（抽牌堆空时加一次，保持原语义） | `Wand.spell()` / `Wand.reloadIfNeeded()` |
+| 27.3 | "单次间隔被 50 ms 卡住，数值很难受" + 用户追问 "OnceUse/Holding 包能不能做到真毫秒" | **真毫秒做不到**：包被处理时仍落在同一个游戏 tick 内（世界没推进、两发同 tick 的弹完全重合），而客户端驱动的施法包必须由服务端限速、上限还是每 tick 一次。**长期平均可以做到毫秒**：冷却计数器改小数 tick 并**保留 ≤0 的零头**（`status.delay = max(卡牌累加, delayTicks) + 余数`） | `Wand.Status.delay`/`recharge` → `Double`、`Wand.spell()`、`Wand.MS_PER_TICK`、`SyncWandStatsPayload`（Int → Double）、`WandHudRenderer` |
+| 27.4 | 抽牌数怎么分等级 | 用户口径：**带权重随机** —— `≤T3` 出 1~3（60/25/15），`>T3` 出 1~6（40/20/15/10/8/7），**1 的权重最高**（抽牌 > 1 会让某些法术链难以回绕，所以它是"抽到的惊喜"）。掷点在**创建时**一次，随 NBT 存档 | `WandTier.rollCast` / `WandStats.roll` |
+| 27.5 | 等级在物品层怎么体现 | 用户选择**六个独立物品**（各自贴图/名字）+ 蓄能型用组件（`wand_charged`）与自定义名（"大师杖·蓄能"）；数值不在物品上，物品只决定"是哪一级" | `registry/ModItems.kt`、`assets/.../{items,models/item,textures/item}/wand_t*.json|png`、语言键 |
+| 27.6 | 怎么拿到各级法杖 | 本轮只做"拿得到"：创造模式物品栏（六级 × 2 变体 + 调试杖）+ `/primalspells wand <t1..t6\|debug> [charged]`（会把掷出的数值回报出来）。**自然生成（战利品掉落）按用户口径放到下一轮** | `event/WandCommand.kt`（新）、`ModItems.wandStack` |
+| 27.7 | 掷出的数值玩家看不到（尤其抽牌数是随机的） | 创建法杖时把**这一根**的数值写进物品 LORE（法力上限/回蓝/双延迟/槽位/抽牌，用可翻译组件）；实时值仍由 HUD 走 `SyncWandStatsPayload` | `WandManager.createWand` + `writeStatsLore` |
+
+**验证（实机探针 + 全量录制）**：
+
+- 临时探针（写在护盾场景里、**空牌堆**驱动一根 T5 法杖 → 不生成任何投射物/粒子，验完已 revert）：
+  - `probe-stats ok=true mana=300.0 charge=100.0 delayMs=240.0 size=14 cast=4`
+  - `probe-cadence-average ok=true casts=34 gaps_avg=4.818 min=4 max=5` —— **240 ms = 4.8 tick 的毫秒平均节奏成立**
+    （间隔只有 4 与 5 交替，长期平均 4.818；如果冷却直接归零，这里会是恒定的 5.0）
+  - `probe-charged-variant ok=true mana=900.0 delayMs=360.0`
+  - `probe-tier-lookup` 第一次 **FAIL**：`byName("t5")` 返回 null —— 探针当场抓出的真 bug
+    （`"t5".toIntOrNull()` 为 null，而 `itemName` 是 `wand_t5`）。修法是先剥掉等级前缀 `t`，复跑 `ok=true byName(t5)=T5 byLevel(7)=null`。
+- 撤探针后全量重录：三场景 **434 帧 / 丢帧 0 / 场景内断言 16-16 全过 / 像素判定全过 / 运行日志 0 异常**，
+  构建 **0 warning** —— 等级改动对护盾、黑洞、重力场三个场景**无回归**（护盾场景用的仍是调试杖）。
+- 判定脚本顺带修掉一处脆弱判据：护盾场景的蓝色峰值会在"受击玻璃板"与"大爆原版烟"之间**逐次运行翻转**
+  （烟是随机粒子），全局退场判定因此不稳定 → 给 spec 增加 `decay: none` 显式出口
+  （声明"本场退场由专属判据负责"，并校验该判据存在），护盾的收场改由粉色 `breach_fade` 卡住。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

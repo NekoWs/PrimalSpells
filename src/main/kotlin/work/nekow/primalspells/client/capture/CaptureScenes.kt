@@ -378,7 +378,8 @@ object CaptureScenes {
                     SHIELD_SCENE_TICKS - 3 -> listOf(
                         Check(name, t, "breach-expired", s != null && !s.breached, "breached=${s?.breached}"),
                         pdParticleCheck(name, t, ctx),
-                    )                    else -> emptyList()
+                    )
+                    else -> emptyList()
                 }
             },
         )

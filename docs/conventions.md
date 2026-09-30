@@ -42,7 +42,8 @@ src/main/kotlin/work/nekow/primalspells/
 │     ├─ lifecycle/             时机与结算：Trigger, DelayedTrigger, Hurt, Explosion, AreaFieldEffect, BlackHole, GravityField
 │     └─ visual/                粒子表现：ProjectileBody（本体）, Trajectory（拖尾）
 ├─ wand/                        法杖运行时状态
-│  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却、NBT 序列化（槽位保序）
+│  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（小数 tick + 余数累加）、NBT 序列化（槽位保序）
+│  ├─ WandTier.kt               法杖等级表（六级 + 调试杖）+ 蓄能型变体 + 创建时掷点，见 design/wand-tiers.md
 │  ├─ WandManager.kt            法杖实例表（wandId → Wand）、每 tick 维护、世界存档读写
 │  └─ WandSavedData.kt          SavedData：法杖 NBT 的持久化容器
 ├─ item/                        物品（编辑交互一律走原版「物品对上物品」，没有容器菜单）
@@ -55,7 +56,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  ├─ SyncWandStatsPayload.kt / ScreenShakePayload.kt    S→C
 │  ├─ SelectSpellSlotPayload.kt                           C→S（法杖/小包共用的选槽同步）
 │  └─ ClientPayloadSink.kt                               公共侧→客户端的可空回调（专用服务器安全）
-├─ event/                       公共侧事件处理器：WandEventHandler（右键屏蔽、登录同步、登出清理）、ShieldDummyCommand（测试指令 `/primalspells shielddummy`，见 build-and-run.md §9）
+├─ event/                       公共侧事件处理器：WandEventHandler（右键屏蔽、登录同步、登出清理）、ShieldDummyCommand（测试指令 `/primalspells shielddummy`）、WandCommand（`/primalspells wand <等级>`，见 build-and-run.md §9）
 ├─ client/                      仅在客户端加载（Dist.CLIENT）的代码
 │  ├─ PrimalSpellsClient.kt     客户端入口：安装 ClientPayloadSink、注册渲染器/tooltip/输入、登出清缓存
 │  ├─ hud/                      WandHudRenderer

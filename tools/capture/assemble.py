@@ -53,7 +53,9 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
-    # decay: gradual = 该效果**设计上**有退场动画（必须逐帧衰减）；instant = 设计上就是立刻消失
+    # decay: gradual = 该效果**设计上**有退场动画（必须逐帧衰减）；instant = 设计上就是立刻消失；
+    #        none    = 这一场有**两套互不相干的视觉系统**（玻璃板 + 爆炸烟）或收场不是蓝色像素，
+    #                  全局峰值不可靠，退场交给场景专属判据（必须在 spec 里另有对应断言）
     "black_hole": {
         "length": 108, "title": "黑洞：进场长出 → 稳态 → 向心塌缩", "decay": "gradual",
     },
@@ -62,10 +64,11 @@ SCENES = {
     },
     "energy_shield": {
         "length": 196, "title": "玻璃护盾：平时不可见 → 受击玻璃板 → 大爆抵扣 → 法力不足打穿 + 破口",
-        # 蓝色判据下的退场是**瞬灭**：这一场的蓝色峰值现在是「大爆」的原版烟（一次性粒子，寿命到就没了），
-        # 而玻璃板的 alpha 淡出在像素判据里表现为「跨过亮度阈值的悬崖」——两者都不是长尾渐变。
-        # 护盾**自己设计上的**淡出由粉色判据单独卡（见下面 `breach_fade`）。
-        "decay": "instant",
+        # 蓝色判据下**没有**可用的全局退场：这一场混了两套视觉系统 —— 受击玻璃板（一次性、alpha 淡出在
+        # 像素判据里就是跨阈值的悬崖）与大爆的原版烟（随机粒子，峰值会与玻璃板逐次运行翻转）。
+        # 护盾真正的收场是**粉色**破口轮廓，由下面的 `breach_fade` 单独卡；蓝色这边只保留
+        # 「退场无残留」（末 3 帧）与空场起飞。
+        "decay": "none",
         # 单块玻璃板只有整罩破盾的百分之几，阈值按峰值 5% 会把它判成「空」——这里单独调低到 2%
         "empty_ratio": 0.02,
         # 静止窗口：护盾平时必须**完全不可见**（这正是实机反馈「太挡视野」要解决的）
@@ -262,6 +265,12 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     if spec.get("decay", "gradual") == "gradual":
         result["asserts"].append(
             ("退场是渐变而非闪现", span >= MIN_DECAY_FRAMES, f"50%→5% 跨 {span} 帧（要求 ≥{MIN_DECAY_FRAMES}）"),
+        )
+    elif spec.get("decay", "gradual") == "none":
+        # 这一场的退场由专属判据负责（spec 里必须有对应断言，见 `breach_fade`）
+        result["asserts"].append(
+            ("退场判定交由专属判据", "breach_fade" in spec or "quiet" in spec,
+             "本场的收场不是蓝色像素（见「破口是淡出而不是一帧消失」/「退场无残留」）"),
         )
     else:
         # 这类效果的退场**设计上**就是立刻清理（没有退场动画）：只要求别拖泥带水

@@ -1,13 +1,18 @@
 package work.nekow.primalspells.wand
 
+import net.minecraft.core.component.DataComponents
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.network.chat.Component
+import net.minecraft.util.RandomSource
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.component.ItemLore
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStartedEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.item.component.WandID
+import work.nekow.primalspells.util.Lore
 import java.util.*
 
 /**
@@ -240,7 +245,7 @@ object WandManager {
         return Wand.fromTag(tag).also { wands[key] = it }
     }
 
-    fun createWand(stack: ItemStack): WandID {
+    fun createWand(stack: ItemStack, random: RandomSource = RandomSource.create()): WandID {
         val existing = stack.get(ModItems.WAND_ID)
         if (existing != null) {
             // 已被回收的法杖在这里也走懒加载：直接造空白实例会把存档里的牌堆/法力盖掉。
@@ -249,8 +254,44 @@ object WandManager {
         }
         val wandId = WandID(UUID.randomUUID().toString())
         stack.set(ModItems.WAND_ID, wandId)
-        wands[wandId] = Wand(wandId.wandId)
+        val wand = Wand(wandId.wandId)
+        // 等级 + 变体 → 掷出一组数值（只有抽牌数是随机的，见 [WandStats.roll]）。
+        // 认不出等级的物品（例如代码里手搓的 `Wand("...")`）保持调试杖默认值。
+        val tier = ModItems.wandTierOf(stack.item)
+        if (tier != null) {
+            val variant = if (stack.getOrDefault(ModItems.WAND_CHARGED, false)) {
+                WandVariant.CHARGED
+            } else {
+                WandVariant.NORMAL
+            }
+            val stats = WandStats.roll(tier, variant, random)
+            wand.applyStats(stats)
+            writeStatsLore(stack, stats)
+        }
+        wands[wandId] = wand
         return wandId
+    }
+
+    /**
+     * 把**这一根杖掷出的数值**写进物品 LORE（法力上限/回蓝/双延迟/槽位/抽牌）。
+     *
+     * 为什么要写在物品上：数值里有**掷点**（抽牌数），不能只靠等级名表达；
+     * 而物品栏/tooltip 是最直接的展示位。实时值（当前法力/冷却）仍由 HUD 走
+     * `SyncWandStatsPayload` 显示，两者不冲突。
+     */
+    private fun writeStatsLore(stack: ItemStack, stats: WandStats) {
+        stack.set(
+            DataComponents.LORE,
+            ItemLore(
+                listOf(
+                    Component.translatable("wand.primalspells.stat.mana", Lore.formatDouble(stats.maxMana)),
+                    Component.translatable("wand.primalspells.stat.regen", Lore.formatDouble(stats.manaPerSecond)),
+                    Component.translatable("wand.primalspells.stat.delay", Lore.formatDouble(stats.delayMs)),
+                    Component.translatable("wand.primalspells.stat.size", stats.size.toString()),
+                    Component.translatable("wand.primalspells.stat.cast", stats.cast.toString()),
+                )
+            )
+        )
     }
 
     fun remove(key: WandID) = wands.remove(key)

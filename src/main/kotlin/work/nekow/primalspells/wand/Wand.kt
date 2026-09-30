@@ -6,6 +6,7 @@ import net.minecraft.nbt.StringTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import work.nekow.particledrawing.api.ParticleManager
+import kotlin.math.max
 import kotlin.math.min
 import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.magic.core.Magic
@@ -18,11 +19,26 @@ class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
 
     val magics = arrayListOf<Magic?>()
+
+    // ---- 数值（这里的默认值 = 调试杖 3000/1000/0/18，见 [WandTier.DEBUG]）----
+    // 正常获取的法杖由 [WandTier] 的等级表在**创建时**掷出（[WandStats.roll]），之后随 NBT 存档。
+
+    /** 法力上限 */
     var mana: Double = 3000.0
-    var delay: Int = 0
-    var recharge: Int = 0
+
+    /** 施法后的**最小间隔**（毫秒）：与卡牌自己累加的 delay 取大值，见 [spell] */
+    var delayMs: Double = 0.0
+
+    /** 抽牌堆抽空时的**重装代价**（毫秒），见 [reloadIfNeeded] */
+    var rechargeMs: Double = 0.0
+
+    /** 每秒回蓝 */
     var charge: Double = 1000.0
+
+    /** 每回抽几张牌（创建时按等级权重掷出，1 的权重最高） */
     var cast = 1
+
+    /** 法术槽位数 */
     var size: Int = 18
 
     val drawPile = arrayListOf<Magic>()
@@ -52,14 +68,39 @@ class Wand(var id: String) {
 
     data class Status(
         var mana: Double = 0.0,
-        var delay: Int = 0,
-        var recharge: Int = 0,
-        var lastDelay: Int = 0,
-        var lastRecharge: Int = 0,
+        /**
+         * 施法冷却（**小数 tick**）：卡牌贡献整数 tick，法杖自己的 [delayMs]/[rechargeMs] 折成小数，
+         * 两者取大/累加。每 tick 递减 1.0，`≤ 0` 表示可以施法；**负的零头会被保留**用于余数累加（见 [spell]）。
+         */
+        var delay: Double = 0.0,
+        var recharge: Double = 0.0,
+        var lastDelay: Double = 0.0,
+        var lastRecharge: Double = 0.0,
         var particleManager: ParticleManager? = null,
         var failedReason: ArrayList<String> = arrayListOf()
     )
     var status: Status = Status()
+
+    /** 本杖的**最小施法间隔**（tick，含小数）：[delayMs] ÷ 50 */
+    fun delayTicks(): Double = delayMs / MS_PER_TICK
+
+    /** 本杖的**重装代价**（tick，含小数）：[rechargeMs] ÷ 50 */
+    fun rechargeTicks(): Double = rechargeMs / MS_PER_TICK
+
+    /**
+     * 按掷出的数值初始化一根**新**法杖（等级 + 变体 + 抽牌），见 [WandTier]。
+     *
+     * ⚠️ 只应在**创建时**调用一次：创建后数值随 NBT 存档，再调一次就会覆盖玩家手里那根杖的数值。
+     * 正常的创建入口是 `WandManager.createWand(stack)`（它从物品的等级组件读）。
+     */
+    fun applyStats(stats: WandStats) {
+        mana = stats.maxMana
+        charge = stats.manaPerSecond
+        delayMs = stats.delayMs
+        rechargeMs = stats.rechargeMs
+        size = stats.size
+        cast = stats.cast
+    }
 
     fun load() {
         val previous = loadedMagics.toList()
@@ -101,18 +142,28 @@ class Wand(var id: String) {
         // 否则 WandManager 的回收判定会把它当成无人持有；玩家两处都会记，重复写同一张表无副作用。
         WandManager.markHeld(WandID(id), caster.uuid, caster.level().gameTime)
         status.failedReason.clear()
-        if (status.delay > 0) {
-            status.failedReason.add("Delay ${status.delay}/${delay}")
+        if (status.delay > 0.0) {
+            status.failedReason.add("Delay ${fmt(status.delay)}/${fmt(delayTicks())}")
             return false
         }
-        if (status.recharge > 0) {
-            status.failedReason.add("Recharge ${status.recharge}/${recharge}")
+        if (status.recharge > 0.0) {
+            status.failedReason.add("Recharge ${fmt(status.recharge)}/${fmt(rechargeTicks())}")
             return false
         }
-        status.delay = 0
-        status.recharge = 0
+        // 余数累加（第 26 轮加等级表时引入）：冷却**不归零**，而是保留「已经过去的零头」。
+        // 计数器是小数 tick，一次 240 ms 的间隔（4.8 tick）会走成 5/5/5/5/4 tick 交替、长期平均正好 4.8
+        // ——单次间隔仍是整数 tick（客户端每 tick 只能施法一次，这是硬底线），但**平均节奏精确到毫秒**。
+        val delayResidual = min(0.0, status.delay)
+        val rechargeResidual = min(0.0, status.recharge)
+        status.delay = 0.0
+        status.recharge = 0.0
         draw(cast)
         castHand(caster, hand)
+        // 法杖自己的 delay 是**最小间隔**（与卡牌累加出来的值取大），再叠上余数
+        status.delay = max(status.delay, delayTicks()) + delayResidual
+        status.recharge += rechargeResidual
+        status.lastDelay = status.delay
+        status.lastRecharge = status.recharge
         return true
     }
 
@@ -282,7 +333,7 @@ class Wand(var id: String) {
 
     private fun reloadIfNeeded() {
         if (drawPile.isEmpty() && discardPile.isNotEmpty()) {
-            status.recharge += recharge
+            status.recharge += rechargeTicks()
             drawPile.clear()
             discardPile.clear()
             drawPile.addAll(loadedMagics)
@@ -323,8 +374,9 @@ class Wand(var id: String) {
             }
             return
         }
-        if (status.delay > 0) status.delay--
-        if (status.recharge > 0) status.recharge--
+        // 小数 tick：>0 才递减，因此 ≤0 的负余数会一直留到下一次施法（见 [spell] 的余数累加）
+        if (status.delay > 0.0) status.delay -= 1.0
+        if (status.recharge > 0.0) status.recharge -= 1.0
         if (status.mana < mana) status.mana = min(mana, status.mana + charge / 20)
 
         // 被动「未被持有」通知：闲置分支跑在 ServerTickEvent.Pre（实体 tick 之前），
@@ -353,14 +405,14 @@ class Wand(var id: String) {
         val tag = CompoundTag()
         tag.putString("id", id)
         tag.putDouble("mana", mana)
-        tag.putInt("delay", delay)
-        tag.putInt("recharge", recharge)
+        tag.putDouble("delay_ms", delayMs)
+        tag.putDouble("recharge_ms", rechargeMs)
         tag.putDouble("charge", charge)
         tag.putInt("cast", cast)
         tag.putInt("size", size)
         tag.putDouble("status_mana", status.mana)
-        tag.putInt("status_delay", status.delay)
-        tag.putInt("status_recharge", status.recharge)
+        tag.putDouble("status_delay", status.delay)
+        tag.putDouble("status_recharge", status.recharge)
         val innateList = ListTag()
         innate.forEach { innateList.add(StringTag.valueOf(it.id)) }
         tag.put("innate", innateList)
@@ -463,6 +515,12 @@ class Wand(var id: String) {
     }
 
     companion object {
+        /** 1 tick = 50 ms（服务端固定 20 tick/s）：毫秒 ↔ tick 的**唯一**换算点。 */
+        const val MS_PER_TICK = 50.0
+
+        /** 冷却诊断字符串用的格式化（一位小数，够看清余数） */
+        private fun fmt(v: Double): String = "%.1f".format(v)
+
         /**
          * 从 NBT 反序列化重建法杖对象。
          *
@@ -475,14 +533,16 @@ class Wand(var id: String) {
         fun fromTag(tag: CompoundTag): Wand {
             val wand = Wand(tag.getStringOr("id", ""))
             wand.mana = tag.getDoubleOr("mana", 0.0)
-            wand.delay = tag.getIntOr("delay", 0)
-            wand.recharge = tag.getIntOr("recharge", 0)
+            // 第 26 轮：双延迟从「整数 tick」改成「毫秒」。旧存档的 `delay`/`recharge` 是整数 tick，
+            // 按 50 ms/tick 迁移；`getDoubleOr` 会接受任意数值型 NBT，所以 `status_*` 的旧 int 也能直接读。
+            wand.delayMs = tag.getDoubleOr("delay_ms", tag.getIntOr("delay", 0) * MS_PER_TICK)
+            wand.rechargeMs = tag.getDoubleOr("recharge_ms", tag.getIntOr("recharge", 0) * MS_PER_TICK)
             wand.charge = tag.getDoubleOr("charge", 0.0)
             wand.cast = tag.getIntOr("cast", 1)
             wand.size = tag.getIntOr("size", 9)
             wand.status.mana = tag.getDoubleOr("status_mana", 0.0)
-            wand.status.delay = tag.getIntOr("status_delay", 0)
-            wand.status.recharge = tag.getIntOr("status_recharge", 0)
+            wand.status.delay = tag.getDoubleOr("status_delay", 0.0)
+            wand.status.recharge = tag.getDoubleOr("status_recharge", 0.0)
             tag.getListOrEmpty("innate").forEach {
                 MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.innate += m }
             }

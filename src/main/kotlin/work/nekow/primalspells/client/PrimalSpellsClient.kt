@@ -12,7 +12,6 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent
 import net.neoforged.neoforge.common.NeoForge
 import work.nekow.primalspells.PrimalSpells
-import work.nekow.primalspells.client.hud.ShieldHudRenderer
 import work.nekow.primalspells.client.hud.WandHudRenderer
 import work.nekow.primalspells.client.input.ClientContainerDragHandler
 import work.nekow.primalspells.client.input.SpellSlotScrollHandler
@@ -42,7 +41,6 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
     init {
         // 1. 网络包的客户端处理器
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
-        ClientPayloadSink.shield = { ShieldHudRenderer.putShield(it) }
         ClientPayloadSink.screenShake = { ScreenShakeClient.onShake(it) }
 
         // 2. 实机录制驱动（开发期自动化测试的「眼睛」）：
@@ -59,7 +57,6 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.addListener<ClientPlayerNetworkEvent.LoggingOut> {
             // 4. 清理只增不减的客户端缓存
             WandHudRenderer.clear()
-            ShieldHudRenderer.clear()
             SpellSlotTracker.clear()
         }
 

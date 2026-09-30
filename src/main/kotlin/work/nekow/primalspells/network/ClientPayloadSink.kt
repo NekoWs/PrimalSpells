@@ -14,9 +14,6 @@ object ClientPayloadSink {
     /** 法杖数值同步（`SyncWandStatsPayload`）的客户端处理；由客户端入口安装。 */
     var wandStats: ((SyncWandStatsPayload) -> Unit)? = null
 
-    /** 护盾状态同步（`SyncShieldPayload`）的客户端处理；由客户端入口安装。 */
-    var shield: ((SyncShieldPayload) -> Unit)? = null
-
     /** 镜头冲击（`ScreenShakePayload`）的客户端处理；由客户端入口安装。 */
     var screenShake: ((ScreenShakePayload) -> Unit)? = null
 }

@@ -4,25 +4,28 @@ import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
 
 /**
- * 穿刺修正 —— 让投射物可以无限穿透（`maxHitTargets = -1`），代价是削减 8 点伤害。
+ * 穿刺修正 —— 让投射物可以无限穿透（`maxHitTargets = -1`）。
  *
- * **伤害是加减法，与装配顺序无关**：所有修饰器都对同一份投射物状态做可交换的累加/累乘，
- * 不存在「谁先应用」的概念。例如「火球 + 伤害强化 + 穿刺」的伤害 =
- * 基础伤害 + 强化 − 8，结果为负时按**无伤害**结算（`Hurt` 只在 `damage > 0` 时结算）——
- * 「穿刺后打不出伤害」是这套定价的预期结果，不是 bug。
+ * **代价是节奏，不是伤害**（第 26 轮重定价，见 [docs/design/combat-pricing.md] §2）：
+ * 原本的「−8 伤害」在旧的 1 点伤害尺度下就把火球压成负数了，新尺度（火球 5）更不行，
+ * 于是改成给法杖加 `delay 4 / recharge 8` —— 无限穿透的代价是「打完这一发要等」。
+ * 200 点法力留在「法杖分等级」那一轮重调。
  *
- * 穿刺真正的收益是穿透 + 每 tick 持续命中（`Move` 每 tick 反复命中同一实体，
- * 配合 `Hurt` 清零无敌帧持续结算）。200 点法力的定价尚未调平。
+ * 穿透真正的收益是穿多个目标 + 每 tick 持续命中（`Move` 每 tick 反复命中同一实体，
+ * 配合 `Hurt` 清零无敌帧持续结算）。
+ *
+ * 另外：穿透弹**完全无视能量护盾**（`EnergyShield` 直接跳过 `maxHitTargets < 0` 的投射物）。
  */
 class Piercing : Modifier() {
     override val id = "piercing"
 
     init {
         mana = 200.0
+        delay = 4
+        recharge = 8
         effects += object : BaseEffect() {
             override fun onActive() {
                 projectile.maxHitTargets = -1
-                status.damage -= 8.0
             }
         }
     }

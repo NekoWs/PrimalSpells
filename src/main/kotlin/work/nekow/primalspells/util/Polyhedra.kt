@@ -88,6 +88,54 @@ object Polyhedra {
         return panels
     }
 
+    /**
+     * 面板邻接表：两块面板**共享一条棱**（= 共用两个角点）即为相邻。
+     *
+     * 角点就是 [truncatedIcosahedron] 里那个全局去重的截断点：每条棱的起点由「有序顶点对」唯一确定，
+     * 相邻两块面板拿到的 `from` 是**同一个**（逐位相同的 [Vec3]），所以用角点当键就能数出共边关系。
+     *
+     * 自检（本模块的一贯口径：几何算错就抛错，不要静默算出错误的拓扑）：
+     * 每块面板必须恰好有 5（五边形）或 6（六边形）个邻居，且总边数 = 90。
+     *
+     * @param panels        面板列表（顺序即返回值的下标顺序）
+     * @param pointsPerEdge 生成面板时用的间距，用来按 stride 取角点
+     * @return 与 [panels] 等长：每项是该面板的相邻面板下标集合（不含自己）
+     */
+    fun adjacency(panels: List<Panel>, pointsPerEdge: Int): List<Set<Int>> {
+        require(pointsPerEdge >= 1) { "每条棱至少要放 1 个点：$pointsPerEdge" }
+
+        // 角点 → 拥有它的面板下标
+        val owners = HashMap<Vec3, MutableList<Int>>()
+        for ((index, panel) in panels.withIndex()) {
+            var k = 0
+            while (k < panel.ring.size) {
+                owners.getOrPut(panel.ring[k]) { ArrayList(3) } += index
+                k += pointsPerEdge
+            }
+        }
+
+        // 两块面板共用 ≥2 个角点 = 共享一条棱
+        val sharedCorners = Array(panels.size) { HashMap<Int, Int>() }
+        for (list in owners.values) {
+            for (a in list) {
+                for (b in list) {
+                    if (a != b) sharedCorners[a][b] = (sharedCorners[a][b] ?: 0) + 1
+                }
+            }
+        }
+        val result = List(panels.size) { i ->
+            sharedCorners[i].filterValues { it >= 2 }.keys.toSet()
+        }
+
+        require(result.all { it.size == 5 || it.size == 6 }) {
+            "每块面板应有 5（五边形）或 6（六边形）个相邻面，实得 ${result.map { it.size }}"
+        }
+        require(result.sumOf { it.size } / 2 == 90) {
+            "截角二十面体应有 90 条棱，实得 ${result.sumOf { it.size } / 2}"
+        }
+        return result
+    }
+
     // ---------- 内部：正二十面体 ----------
 
     private const val PHI = 1.618033988749895 // (1 + √5) / 2

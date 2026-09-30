@@ -9,8 +9,10 @@ class SmallExplosion : Projectile() {
 
     init {
         mana = 2.0
-        delay = 1
-        recharge = 2
+        // 定价见 docs/design/combat-pricing.md §2：AoE 单体 8 DPS → 中心 12 伤害 / 30 tick（1.5 秒一发）。
+        // AoE 能同时打多个目标，所以单体 DPS 刻意比单体弹（10）低一档。
+        delay = 12
+        recharge = 30
         maxAge = 1
         speed = 0f
         hitRadius = 0.0
@@ -19,6 +21,6 @@ class SmallExplosion : Projectile() {
 
     override fun onSpell() {
         status.explosionRadius = 3.0f
-        status.explosionDamage = 4.0
+        status.explosionDamage = 12.0
     }
 }

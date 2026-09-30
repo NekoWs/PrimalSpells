@@ -6,6 +6,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.magic.projectile.DroneSwarm
 import work.nekow.primalspells.magic.projectile.DelayedCastProjectile
 import work.nekow.primalspells.magic.projectile.Fireball
+import work.nekow.primalspells.magic.projectile.DroneBolt
 import work.nekow.primalspells.magic.projectile.immobile.LargeExplosion
 import work.nekow.primalspells.magic.projectile.Laser
 import work.nekow.primalspells.magic.projectile.immobile.SmallExplosion
@@ -54,6 +55,7 @@ object MagicManager {
 
     init {
         register { Fireball() }
+        register { DroneBolt() }
         register { TriggerFireball() }
         register { DelayedCastProjectile() }
         register { DroneSwarm() }

@@ -5,9 +5,11 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
+import work.nekow.primalspells.magic.core.ShieldGuard
 import work.nekow.primalspells.registry.ModDamageTypes
 import kotlin.math.sqrt
 import work.nekow.primalspells.magic.effect.BaseEffect
@@ -117,6 +119,14 @@ class Explosion(
                 // 距离衰减伤害
                 val falloff = (1.0 - dist / r).coerceAtLeast(0.0)
                 val actualDamage = damage * falloff
+
+                // 能量护盾：壳外侧的爆炸可以替持有者吃掉这一份（伤害与击退一起免掉 ——
+                // 抵扣必须在施加伤害之前做，见 ShieldGuard 的 KDoc）
+                if (entity is LivingEntity &&
+                    ShieldGuard.absorbExplosion(level, entity, center, r, actualDamage)
+                ) {
+                    return@forEach
+                }
 
                 // 伤害（伤害类型缺失时跳过本次伤害，而不是崩服务器 tick）
                 if (actualDamage > 0.0) {

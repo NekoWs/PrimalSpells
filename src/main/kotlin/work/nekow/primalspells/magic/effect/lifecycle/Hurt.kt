@@ -2,6 +2,8 @@ package work.nekow.primalspells.magic.effect.lifecycle
 
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.LivingEntity
+import work.nekow.primalspells.magic.core.ShieldGuard
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.registry.ModDamageTypes
 
@@ -22,6 +24,12 @@ class Hurt(private val amount: Double = 0.0) : BaseEffect() {
         val dmg = if (amount > 0.0) amount else status.damage
         if (dmg <= 0.0) return
         val level = target.level() as? ServerLevel ?: return
+
+        // 护盾兜底：投射物的「移动 + 命中 + 到寿死亡」全在 `MagicManager.tick` 里做完，
+        // 而护盾的 tick 末尾扫场在同一 tick 更晚才跑 —— 高速法术（laser 5 格/tick、maxAge 1）
+        // 会在这之间打完并消失。这里在**真正造成伤害之前**再问一次护盾（规则与扫场完全一致）。
+        if (target is LivingEntity && ShieldGuard.absorbProjectile(level, target, projectile)) return
+
         val source = ModDamageTypes.projectileSourceOrNull(level, caster) ?: return
         val invulnerableTime = target.invulnerableTime
         target.invulnerableTime = 0

@@ -9,10 +9,11 @@ enum class Lore(val key: String) {
     DAMAGE("lore.primalspells.damage"),
     SPEED("lore.primalspells.speed"),
     MAX_AGE("lore.primalspells.max_age"),
-    DURABILITY("lore.primalspells.durability"),
-    REGEN("lore.primalspells.regen"),
-    BREAK_PAUSE("lore.primalspells.break_pause"),
-    BOUNCE_COST("lore.primalspells.bounce_cost");
+    RESISTANCE("lore.primalspells.resistance"),
+    RESISTANCE_PER_CARD("lore.primalspells.resistance_per_card"),
+    BOUNCE_COST("lore.primalspells.bounce_cost"),
+    EXTRA_COST("lore.primalspells.extra_cost"),
+    BREACH("lore.primalspells.breach");
 
     companion object {
         fun formatDouble(value: Double): String =

@@ -1,11 +1,18 @@
 package work.nekow.primalspells.client.capture
 
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.item.ItemStack
+import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
+import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.modifier.EnergyShield
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.wand.WandManager
 import java.io.File
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -212,10 +219,12 @@ object CaptureScenes {
      *
      * 时间线（tick）：
      * ```
-     *  0-19   静止：屏幕上应当**一个粒子都没有**（这正是实机反馈「太挡视野」要解决的问题）
-     * 22/30/38/46  四次点射：每次命中处亮起一块玻璃板、约 0.35 秒后消失（帧序列里是四个亮点）
-     * 62-130 每 2 tick 一发，直到耐久归零 → 整罩一闪而碎
-     * 之后   破盾暂停 50 tick → 护盾恢复时全身轮廓极淡地闪一下
+     *  0-19   静止：屏幕上应当**一个粒子都没有**（护盾平时不可见）
+     * 22/34/46/58  四次点射：每次格挡成功都在受击处亮起一块白玻璃、约 0.35 秒后消失（四个亮点）
+     * 76     大爆（中心摆在壳外 3 格）：抵扣成功 → 扣一大笔 MP，护盾不破
+     * 96     同样的大爆，但先把法力压到不够：打穿 → 受击一圈碎裂 + 3 秒淡红破口轮廓
+     * 156    破口到期，护盾回到「平时不可见」
+     * 168    激光（5 格/tick）：验证「命中兜底」拦得住单 tick 内穿壳贴脸的高速法术
      * ```
      */
     private fun energyShield(): Scene = run {
@@ -225,12 +234,10 @@ object CaptureScenes {
         var holder: TestDummyEntity? = null
         var shooterWand: Wand? = null
         var attacker: TestDummyEntity? = null
-        var full = 0.0
-        var firstDrop = -1
-        var brokeAt = -1
+        var manaBeforeBlast = 0.0
         Scene(
             name = name,
-            title = "玻璃护盾：平时不可见 → 受击玻璃板 → 破盾一闪而碎 → 恢复闪一下",
+            title = "玻璃护盾：平时不可见 → 受击玻璃板 → 大爆抵扣 → 法力不足打穿 + 破口",
             warmupTicks = 24,
             lengthTicks = SHIELD_SCENE_TICKS,
             thirdPerson = false,
@@ -250,29 +257,35 @@ object CaptureScenes {
                     yaw = 0f,
                     pitch = 0f,
                 )
-                holder = ctx.spawnDummy(CX + 0.5, floorY + 1.0, CZ + 0.5)
+                val guardDummy = ctx.spawnDummy(CX + 0.5, floorY + 1.0, CZ + 0.5)
+                holder = guardDummy
+                // 护盾挂在**真实法杖物品**上：`ShieldGuard` 是按「手上的法杖」找护盾的
+                // （爆炸抵扣那条路要从实体反查到护盾），裸 `Wand` 实例它找不到。
+                val stack = ItemStack(ModItems.WAND.get())
+                val w = WandManager.createWand(stack).let { id -> WandManager[id] }
                 val card = MagicManager.create("energy_shield") as EnergyShield
-                val w = Wand("capture-shield").also {
-                    it.magics += card
-                    it.load()
-                }
+                w.magics += card
+                w.load()
+                // 测试台设置：满法力 + **关掉回复**（`charge = 0`）。默认 1000/s 的回复会在两次大爆之间
+                // 把法力补满，「MP 不足 → 打穿」这条分支永远逼不出来。
+                w.status.mana = SHIELD_START_MANA
+                w.charge = 0.0
                 wand = w
                 shield = card
-                full = card.maxDurability
-                // 攻击者：+X 方向 6.5 格，yaw=90 → 朝 -X 正对护盾持有者
-                attacker = ctx.spawnDummy(CX + 7.0, floorY + 1.0, CZ + 0.5, yaw = 90f)
-                // 只装一发火球、且 delay/mana 归零：让攻击者能按场景时间线连续开火
+                guardDummy.setItemInHand(InteractionHand.MAIN_HAND, stack)
+                // 攻击者：+X 方向 5.5 格，yaw=90 → 朝 -X 正对护盾持有者
+                attacker = ctx.spawnDummy(CX + 5.5, floorY + 1.0, CZ + 0.5, yaw = 90f)
                 val bolt = MagicManager.create("fireball")!!
-                bolt.delay = 0
-                bolt.mana = 0.0
                 val sw = Wand("capture-shooter").also {
                     it.magics += bolt
                     it.load()
+                    it.status.mana = 1000.0
                 }
                 shooterWand = sw
                 ctx.log(
                     "$name prepared: shield=${w.loadedMagics.map { m -> m.id }} " +
-                        "shooter=${sw.loadedMagics.map { m -> m.id }} full=$full"
+                        "shooter=${sw.loadedMagics.map { m -> m.id }} mana=${w.status.mana} " +
+                        "resistance=${card.baseResistance + card.resistancePerCard}"
                 )
             },
             tick = { ctx, t ->
@@ -283,21 +296,29 @@ object CaptureScenes {
                 w.tick(h, ctx.level)
                 // ⚠️ 攻击者的法杖要按**两条路径**各推一次：
                 // `tick(caster)` 只跑被动（`Wand.tick` 在该分支里直接 return），
-                // 而冷却 `status.delay` 的递减只在 `tick(caster = null)` 的闲置分支里 ——
+                // 而冷却 `status.delay` / `status.recharge` 的递减只在 `tick(caster = null)` 的闲置分支里 ——
                 // 少推一次就只能开出第一发（实测后续全是 `[Delay 1/0]`）。
                 // 场景里的法杖没有实体物品、不会被 `WandManager` 收进表里，所以得自己推。
                 sw.tick(atk, ctx.level)
                 sw.tick(null, ctx.level)
-                val s = shield
-                if (firstDrop < 0 && s != null && s.durability < full) firstDrop = t
-                if (brokeAt < 0 && s != null && s.durability <= 0.0) brokeAt = t
-                val single = t == SHIELD_SHOT_A || t == SHIELD_SHOT_B || t == SHIELD_SHOT_C || t == SHIELD_SHOT_D
-                // 破盾之后就停火：否则残余火球会一直挂着自己的粒子，最后那条「粒子归零」断言就没法严卡
-                val rapidFire = brokeAt < 0 && t >= SHIELD_BREAK_START && t < SHIELD_BREAK_END && t % 2 == 0
-                if (single || rapidFire) sw.spell(atk)
-                // 连射段结束后把还在飞的火球收掉（与 setup 里清残留同一套做法）：
-                // 它们的粒子要跟着走完自己的销毁路径，这样收尾的「粒子归零」断言才是干净的
-                if (t == SHIELD_BREAK_END) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == SHIELD_SHOT_A || t == SHIELD_SHOT_B || t == SHIELD_SHOT_C || t == SHIELD_SHOT_D) {
+                    sw.spell(atk)
+                }
+                if (t == SHIELD_BLAST_OK || t == SHIELD_BLAST_FAIL) {
+                    if (t == SHIELD_BLAST_OK) manaBeforeBlast = w.status.mana
+                    blast(ctx, atk, sw)
+                }
+                // 激光回归（第 26 轮）：高速法术（5 格/tick、maxAge 1）在同一 tick 里就穿壳贴脸，
+                // 靠的是 `Hurt` 的命中兜底而不是扫场 —— 从壳外 3 格打进，保证它当 tick 真的贴到木桩
+                if (t == SHIELD_LASER_AT) {
+                    laser(ctx, atk, sw)
+                }
+                // 第二次大爆前：把法力压到不够（345 > 300），并收掉残余火球
+                // —— 后者的橙色拖尾会污染破口窗口的「暖色像素」判据
+                if (t == SHIELD_LOW_MANA_AT) {
+                    w.status.mana = SHIELD_LOW_MANA
+                    MagicManager.projectiles.forEach { it.alive = false }
+                }
             },
             finish = {
                 holder?.remove(Entity.RemovalReason.DISCARDED)
@@ -310,54 +331,138 @@ object CaptureScenes {
                     1 -> listOf(
                         Check(
                             name, t, "wand-loaded",
-                            w != null && w.loadedMagics.any { it is EnergyShield },
+                            w != null && s != null && w.loadedMagics.any { it is EnergyShield },
                             "loadedMagics=${w?.loadedMagics?.size}",
                         ),
                     )
                     SHIELD_IDLE_END - 1 -> listOf(
-                        Check(name, t, "shield-full", s != null && s.durability >= full, "durability=${s?.durability}"),
+                        Check(
+                            name, t, "idle-invisible",
+                            s != null && !s.breached && w != null && w.status.mana >= SHIELD_START_MANA - 1.0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}",
+                        ),
                     )
-                    SHIELD_SHOT_D + 20 -> listOf(
-                        // 四次点射后至少挨过一次：耐久掉过（回复 10/s 很快，所以断言「曾经掉过」而非「此刻低于满」）
-                        Check(name, t, "hits-absorbed", firstDrop > 0, "firstDrop=$firstDrop durability=${s?.durability}"),
+                    SHIELD_SHOT_D + 4 -> listOf(
+                        // 四次点射都落在抗性之外一点点：每次 10 MP（基础 5 + 超出 1 点 × 5）
+                        Check(
+                            name, t, "hits-blocked",
+                            s != null && !s.breached && w != null && w.status.mana <= SHIELD_START_MANA - 30.0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}",
+                        ),
+                    )
+                    SHIELD_BLAST_OK + 3 -> listOf(
+                        Check(
+                            name, t, "blast-absorbed",
+                            s != null && !s.breached && w != null && w.status.mana <= manaBeforeBlast - 300.0,
+                            "breached=${s?.breached} mana=${w?.status?.mana} before=$manaBeforeBlast",
+                        ),
+                    )
+                    SHIELD_BLAST_FAIL + 4 -> listOf(
+                        // 打穿的两个证据：破口生效 + 伤害数字出现（挡下时一个都不会有）
+                        Check(
+                            name, t, "breached-and-hit",
+                            s != null && s.breached && w != null &&
+                                w.status.mana >= SHIELD_LOW_MANA - 0.5 && damageNumbers(ctx, holder) > 0,
+                            "breached=${s?.breached} mana=${w?.status?.mana} 伤害数字=${damageNumbers(ctx, holder)}",
+                        ),
+                    )
+                    SHIELD_LASER_AT + 4 -> listOf(
+                        // 挡下即扣费：激光强度 0.5 ≤ 抗性 4 → 只付基础 5 MP（300 → 295）。
+                        // 这一条如果失败（mana 仍为 300），说明高速法术整个漏过了护盾。
+                        Check(
+                            name, t, "laser-blocked",
+                            w != null && w.status.mana <= SHIELD_LOW_MANA - 4.5,
+                            "mana=${w?.status?.mana}（挡下后应 ≈ ${SHIELD_LOW_MANA - 5}）",
+                        ),
                     )
                     SHIELD_SCENE_TICKS - 3 -> listOf(
-                        Check(name, t, "broke-then-recovered", brokeAt > 0 && s != null && s.durability > 0.0 && s.pauseTicks == 0,
-                            "brokeAt=$brokeAt durability=${s?.durability} pause=${s?.pauseTicks}"),
+                        Check(name, t, "breach-expired", s != null && !s.breached, "breached=${s?.breached}"),
                         pdParticleCheck(name, t, ctx),
-                    )
-                    else -> emptyList()
+                    )                    else -> emptyList()
                 }
             },
         )
     }
 
+    /**
+     * 摆一颗大爆并当帧引爆。
+     *
+     * `large_explosion` 是 immobile 投射物（`speed = 0` / `maxAge = 1`）：出生点就是爆点，
+     * 所以直接把它摆在壳外 3 格 —— 衰减后伤害 = 24 × (1 − 3/6) = 12，强度 = 12 × 半径 6 = 72。
+     * 抗性 4（1 张卡）时价钱 = 5 + (72 − 4) × 5 = 345 MP：第一次付得起、第二次（法力 300）付不起。
+     */
+    private fun blast(ctx: CaptureDriver.SceneCtx, caster: TestDummyEntity, wand: Wand) {
+        val floorY = ctx.floorBlockY(CX, CZ)
+        val projectile = MagicManager.create("large_explosion") as Projectile
+        projectile.caster = caster
+        projectile.wand = wand
+        projectile.position = Vector3f(CX + 3.5f, floorY + 2.0f, CZ + 0.5f)
+        projectile.velocity = Vector3f(0f, 0f, 0f)
+        projectile.spell()
+        MagicManager.add(projectile)
+    }
+
+    /** 场上的伤害数字实体数量：护盾挡下时一个都不会有，打穿时才出现（「真的打到了」的直接证据）。 */
+    private fun damageNumbers(ctx: CaptureDriver.SceneCtx, holder: TestDummyEntity?): Int {
+        val h = holder ?: return 0
+        return ctx.level.getEntitiesOfClass(DamageNumber::class.java, h.boundingBox.inflate(8.0)).size
+    }
+
+    /**
+     * 从壳外 3 格朝持有者打一发 `laser`（5 格/tick、`maxAge = 1`）。
+     *
+     * 这一发的意义是**回归「命中兜底」**：它在同一个 tick 里就穿壳贴到木桩身上
+     * （`Move` 子步进里 `status.pos = checkPos` 后立刻 `hitEntity`），而护盾的 tick 末尾扫场
+     * 在同一 tick 更晚才跑、那时它已经被 `maxAge` 收走 —— 只有 `Hurt` 里的
+     * `ShieldGuard.absorbProjectile` 拦得住。断言看的是「法力被扣了 5」（挡下即扣费）。
+     */
+    private fun laser(ctx: CaptureDriver.SceneCtx, caster: TestDummyEntity, wand: Wand) {
+        val floorY = ctx.floorBlockY(CX, CZ)
+        val from = Vector3f(CX + 3.0f, floorY + 2.0f, CZ + 0.5f)
+        val aim = Vector3f(CX + 0.5f, floorY + 2.0f, CZ + 0.5f)
+        val projectile = MagicManager.create("laser") as Projectile
+        projectile.caster = caster
+        projectile.wand = wand
+        projectile.position = from
+        projectile.velocity = aim.sub(from).normalize()
+        projectile.spell()
+        MagicManager.add(projectile)
+    }
+
     private const val DEATH_TICK = 70
 
-    /** 护盾被「拿在手上」的 tick 数，之后改走闲置分支触发消散。 */
-    private const val SHIELD_HOLD_TICKS = 100
-
-    /** 护盾球心相对持有者脚底的高度（`EnergyShield` 里是 `bbHeight * 0.55`）。 */
     /** 玩家眼睛相对脚底的高度：施法点与机位都按它算 */
     private const val EYE_HEIGHT = 1.62
 
     private const val SHIELD_CENTER_LIFT = 1.1
 
-    /** 护盾场景总长（tick）：静止 20 + 四次点射 40 + 连射破盾 + 破盾暂停 50 + 恢复闪一下 + 余量 */
+    /** 护盾场景总长（tick）：静止 20 + 四次点射 + 两次大爆（一次抵扣、一次打穿）+ 破口 60 + 余量 */
     private const val SHIELD_SCENE_TICKS = 196
 
     /** 静止段（不挨打）：屏幕上应当一个粒子都没有 */
     private const val SHIELD_IDLE_END = 20
 
-    /** 四次点射的 tick：每次在受击处亮起一块玻璃板 */
+    /** 四次点射的 tick：火球 `delay 4 / recharge 10` → 间隔取 12，保证每一发都真的能开出来 */
     private const val SHIELD_SHOT_A = 22
-    private const val SHIELD_SHOT_B = 30
-    private const val SHIELD_SHOT_C = 38
-    private const val SHIELD_SHOT_D = 46
+    private const val SHIELD_SHOT_B = 34
+    private const val SHIELD_SHOT_C = 46
+    private const val SHIELD_SHOT_D = 58
 
-    /** 连射段：每 2 tick 一发，直到耐久归零触发破盾 */
-    private const val SHIELD_BREAK_START = 62
-    private const val SHIELD_BREAK_END = 130
+    /** 第一次大爆：法力充足 → 抵扣成功（强度 72、抗性 4 → 345 MP） */
+    private const val SHIELD_BLAST_OK = 76
+
+    /** 把法力压到不够（345 > 300），并收掉残余火球，让破口窗口里只剩红色轮廓 */
+    private const val SHIELD_LOW_MANA_AT = 90
+
+    /** 第二次大爆：法力不够 → 打穿 + 破口 */
+    private const val SHIELD_BLAST_FAIL = 96
+
+    /** 激光回归（仍在破口期之后）：5 格/tick 的高速法术只能靠「命中兜底」拦下 */
+    private const val SHIELD_LASER_AT = 168
+
+    /** 测试台法力：满池起步；配合 `charge = 0`（关掉 1000/s 的回复）才能逼出「法力不足」 */
+    private const val SHIELD_START_MANA = 3000.0
+    private const val SHIELD_LOW_MANA = 300.0
 
     /** 绕球心的水平公转机位，看向球心。 */
     private fun orbit(

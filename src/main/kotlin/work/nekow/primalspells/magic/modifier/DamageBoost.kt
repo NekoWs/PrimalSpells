@@ -12,9 +12,10 @@ class DamageBoost: Modifier() {
         delay = 2
         effects += object: BaseEffect() {
             override fun onActive() {
-                projectile.status.damage += 2
+                // 定价见 docs/design/combat-pricing.md §2：与火球同价位的一档（+3 = 火球 5 → 8）
+                projectile.status.damage += 3
             }
         }
-        lore(Lore.DAMAGE, "+2")
+        lore(Lore.DAMAGE, "+3")
     }
 }

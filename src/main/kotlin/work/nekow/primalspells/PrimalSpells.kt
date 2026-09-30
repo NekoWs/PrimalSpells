@@ -19,7 +19,6 @@ import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.network.ClientPayloadSink
 import work.nekow.primalspells.network.ScreenShakePayload
 import work.nekow.primalspells.network.SelectSpellSlotPayload
-import work.nekow.primalspells.network.SyncShieldPayload
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.registry.ModDamageTypes
 import work.nekow.primalspells.registry.ModEntities
@@ -65,12 +64,6 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 SyncWandStatsPayload.STREAM_CODEC
             ) { payload, _ ->
                 ClientPayloadSink.wandStats?.invoke(payload)
-            }
-            registrar.playToClient(
-                SyncShieldPayload.ID,
-                SyncShieldPayload.STREAM_CODEC
-            ) { payload, _ ->
-                ClientPayloadSink.shield?.invoke(payload)
             }
             // 镜头冲击：特效重音那一拍的一条 8 字节包，逐帧偏移在客户端本地算
             registrar.playToClient(

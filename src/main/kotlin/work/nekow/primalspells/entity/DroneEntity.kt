@@ -124,16 +124,18 @@ class DroneEntity(
         if (attackCooldown > 0) return
         attackCooldown = 10
 
-        val fireball = MagicManager.create("fireball") as? Projectile ?: return
-        fireball.caster = this
-        fireball.wand = droneWand
+        // 无人机专用弱弹：**不经过牌堆/法力**，所以数值必须由这个法术自己承担
+        // （火球被抬到 5 伤害后，5 架无人机白拿会变成全场最强输出，见 DroneBolt 的 KDoc）
+        val bolt = MagicManager.create("drone_bolt") as? Projectile ?: return
+        bolt.caster = this
+        bolt.wand = droneWand
         val eye = eyePosition
-        fireball.position = Vector3f(eye.x.toFloat(), eye.y.toFloat(), eye.z.toFloat())
+        bolt.position = Vector3f(eye.x.toFloat(), eye.y.toFloat(), eye.z.toFloat())
         val center = target.position().add(0.0, target.bbHeight / 2.0, 0.0)
         val dir = center.subtract(eye).normalize()
-        fireball.velocity = Vector3f(dir.x.toFloat(), dir.y.toFloat(), dir.z.toFloat())
-        fireball.spell()
-        MagicManager.add(fireball)
+        bolt.velocity = Vector3f(dir.x.toFloat(), dir.y.toFloat(), dir.z.toFloat())
+        bolt.spell()
+        MagicManager.add(bolt)
     }
 
     override fun hurtServer(level: ServerLevel, source: DamageSource, amount: Float): Boolean {

@@ -10,10 +10,12 @@ class Fireball: Projectile() {
 
     init {
         mana = 3.0
-        delay = 1
-        recharge = 1
+        // 定价见 docs/design/combat-pricing.md §2：单体 10 DPS = 5 伤害 / 10 tick 间隔。
+        // 单发伤害与间隔必须一起改，只抬伤害会直接超模。
+        delay = 4
+        recharge = 10
         maxAge = 200
-        status.damage = 1.0
+        status.damage = 5.0
         hitRadius = 0.2
         effects += Trajectory(Color.ORANGE)
         effects += Hurt()

@@ -16,8 +16,14 @@ data class MagicStatus(
     var bounces: Int = 0,
     var hitTargets: Int = 0,
 
-    /** 爆炸中心最大伤害（距离衰减, 默认与 TNT 爆炸伤害相当） */
-    var explosionDamage: Double = 5.0,
+    /**
+     * 爆炸中心最大伤害（距离衰减, 与 TNT 爆炸伤害相当）。
+     *
+     * 这是**没显式定价的爆炸**的兜底值（`cluster_bomb` / `explosion_projectile` / `bounce_duplicate`
+     * 的碎片都吃它）—— 只有真正挂了 `Explosion` 效果的法术才用得上这个字段，
+     * 所以「护盾计强度」时必须先确认投射物带 `Explosion`，不能盲加（见 docs/design/combat-pricing.md §3）。
+     */
+    var explosionDamage: Double = 6.0,
 
     /** 爆炸半径（自定义爆炸结算用，不会破坏方块） */
     var explosionRadius: Float = 2.0f,

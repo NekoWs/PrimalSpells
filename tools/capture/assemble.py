@@ -61,15 +61,22 @@ SCENES = {
         "length": 130, "title": "重力场：球形范围 + 下坠粒子 + 落地波环", "decay": "instant",
     },
     "energy_shield": {
-        "length": 196, "title": "玻璃护盾：平时不可见 → 受击玻璃板 → 破盾一闪而碎 → 恢复闪一下",
-        # 「一闪而碎」设计上就是干脆的收场：不要求长尾渐变（像素判据看到的是 alpha 跨过亮度阈值的悬崖）
+        "length": 196, "title": "玻璃护盾：平时不可见 → 受击玻璃板 → 大爆抵扣 → 法力不足打穿 + 破口",
+        # 蓝色判据下的退场是**瞬灭**：这一场的蓝色峰值现在是「大爆」的原版烟（一次性粒子，寿命到就没了），
+        # 而玻璃板的 alpha 淡出在像素判据里表现为「跨过亮度阈值的悬崖」——两者都不是长尾渐变。
+        # 护盾**自己设计上的**淡出由粉色判据单独卡（见下面 `breach_fade`）。
         "decay": "instant",
         # 单块玻璃板只有整罩破盾的百分之几，阈值按峰值 5% 会把它判成「空」——这里单独调低到 2%
         "empty_ratio": 0.02,
         # 静止窗口：护盾平时必须**完全不可见**（这正是实机反馈「太挡视野」要解决的）
         "quiet": (2, 18),
-        # 受击窗口：应当出现多次「亮起 → 消失」（每次命中各出一片）
-        "hits": (28, 68), "min_peaks": 3,
+        # 受击窗口：应当出现多次「亮起 → 消失」（每次格挡各出一片）。
+        # 窗口从 40 起：攻击者在 5.5 格外，火球飞 11 tick 才到壳上（发射在 t=34/46/58）。
+        "hits": (40, 80), "min_peaks": 3,
+        # 破口窗口（第 26 轮）：碎裂之后那一圈**常驻**粉色轮廓（蓝判据抓不到，用粉色判据单独卡）
+        "breach": (105, 150), "min_breach_frames": 35,
+        # 破口到期必须是**淡出**：尾段还能看见几帧、然后在窗口末尾归零（实测 1261 → 571 → 0）
+        "breach_fade": (150, 162), "min_fade_frames": 3,
     },
 }
 
@@ -103,6 +110,23 @@ def blue_mask(path: Path) -> "np.ndarray":
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, b = a[..., 0], a[..., 2]
     return (b > BLUE_MIN) & ((b - r) > BLUE_RED_GAP)
+
+
+#: 「破口像素」判据（第 26 轮新增）：**偏粉的亮红**，用来把破口轮廓从场景里挑出来。
+#:
+#: 标定过程（别退回「红 > 蓝」那种粗判据）：摄影棚里的木桩与木构件是棕色 (135,109,68)、
+#: 火球拖尾是橙色 (219,122,21)，两者都满足「红 > 蓝」——用粗判据会把它们算成破口
+#: （实测末帧仍有 1 万「红」像素，而那时破口早没了）。破口颜色是 `Color.ofInt(255,118,118,150)`：
+#: **红远高于绿、且绿≈蓝**，两个条件一起用就能同时排掉木头与火焰。
+RED_MIN = 120
+RED_GREEN_GAP = 40
+GREEN_BLUE_MAX_DIFF = 25
+
+
+def red_mask(path: Path) -> "np.ndarray":
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (r > RED_MIN) & ((r - g) > RED_GREEN_GAP) & (np.abs(g - b) <= GREEN_BLUE_MAX_DIFF)
 
 
 def read_tsv(path: Path) -> list[list[str]]:
@@ -203,7 +227,9 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         return result
 
     cover = [int(blue_mask(f).sum()) for f in frames]
+    red_cover = [int(red_mask(f).sum()) for f in frames]
     result["cover"] = cover
+    result["red_cover"] = red_cover
     peak = max(cover)
     peak_idx = cover.index(peak)
     total_px = Image.open(frames[0]).size[0] * Image.open(frames[0]).size[1]
@@ -260,6 +286,28 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         need = spec.get("min_peaks", 2)
         result["asserts"].append(
             ("受击才亮起（多次亮点）", peaks >= need, f"受击窗口 {lo}-{hi} 帧检出 {peaks} 个亮点（要求 ≥{need}）"),
+        )
+    if "breach" in spec:
+        lo, hi = spec["breach"]
+        seg = red_cover[lo:hi]
+        red_peak = max(seg) if seg else 0
+        result["asserts"].append(
+            ("破口真的渲染", red_peak >= total_px * MIN_PEAK_RATIO,
+             f"破口窗口 {lo}-{hi} 暖色峰值 {red_peak} 像素"),
+        )
+        persist = sum(1 for v in seg if v >= red_peak * 0.4)
+        result["asserts"].append(
+            ("破口常驻显示", persist >= spec.get("min_breach_frames", 20),
+             f"持续 {persist}/{len(seg)} 帧 ≥40% 峰值"),
+        )
+    if "breach_fade" in spec:
+        lo, hi = spec["breach_fade"]
+        seg = red_cover[lo:hi]
+        visible = sum(1 for v in seg if v > 0)
+        result["asserts"].append(
+            ("破口是淡出而不是一帧消失",
+             visible >= spec.get("min_fade_frames", 3) and seg and seg[-1] == 0,
+             f"尾段 {lo}-{hi} 有 {visible} 帧仍可见、末帧 {seg[-1] if seg else '-'}"),
         )
 
     # 视频/动图/拼图

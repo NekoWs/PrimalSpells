@@ -16,10 +16,12 @@ class TriggerFireball: Projectile(), TriggerSpell {
 
     init {
         mana = 5.0
-        delay = 1
-        recharge = 1
+        // 定价见 docs/design/combat-pricing.md §2：自身 4 伤害 / 6 tick —— 比火球低一档，
+        // 因为荷载的牌会在 loadPayload 时把自己的 delay/recharge 累加到本弹上（Wand.kt）。
+        delay = 2
+        recharge = 6
         maxAge = 200
-        status.damage = 1.0
+        status.damage = 4.0
         hitRadius = 0.2
         effects += Trajectory(Color.ORANGE)
         effects += Hurt()

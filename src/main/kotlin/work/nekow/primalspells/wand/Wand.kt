@@ -208,6 +208,21 @@ class Wand(var id: String) {
     }
 
     /**
+     * 直接扣一笔法力，**不绑定具体 [Magic]**——供被动法术结算使用（目前只有能量护盾的格挡消耗）。
+     *
+     * 与 [consumeMana] 的区别：这里不写 `failedReason`（被动没有"这次施法失败"的语境，
+     * 而且 `failedReason` 每次施法开头都会被清空），返回值只表示「够不够扣」。
+     *
+     * @return true = 已扣除；false = 法力不足，**什么都没扣**
+     */
+    fun spendMana(amount: Double): Boolean {
+        if (amount <= 0.0) return true
+        if (status.mana < amount) return false
+        status.mana -= amount
+        return true
+    }
+
+    /**
      * 丢弃指定列表中的法术
      *
      * @param magics 法术列表

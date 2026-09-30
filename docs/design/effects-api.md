@@ -171,6 +171,42 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 ---
 
+### 0.4 外观能力（ParticleDrawing 1.0.13 起）与尺寸口径
+
+第 29 轮起程序化粒子终于能"指定外观"。参考实现：`magic/effect/lifecycle/ExplosionFx.kt`
+（爆炸「内爆 → 爆发」，对齐用户给的参考 `.refs/explosion-vfx/`）。**动特效前先读这一节。**
+
+**能力入口**
+
+| 想要 | 用法 |
+|---|---|
+| 柔边圆点 / 线段贴图 | `ParticleVisual().style(ParticleStyle.SOFT_DOT / LINE / SQUARE)`（内置 16×16，两端各自生成，不占带宽） |
+| 自定义贴图 | `ParticleManager.registerTexture(name, pngBytes)`（幂等；**同名第一次生效**，换图请换名字；未知名字回落纯白方块、不丢粒子） |
+| 逐粒子贴图 / 子矩形 UV | `Builder.texture(name)` / `.uv(u0,v0,u1,v1)`（或 `.visual(ParticleVisual().uv(...))`） |
+| 拉长的丝线 | `anisoWorld(长, 粗)`（**世界格数**）+ `alignTo(from, to)`（长轴对齐到线段）+ `billboard(false)` |
+| 一条折线一个调用 | `Draw.polyline(points, thickness, taper, texture, additive, glowing, colorFn, …)` —— **每段一颗粒子**，内部自动 `anisoWorld(段长, 粗)` + `alignTo`；`taper = true` 时自动用 `LINE` 贴图并两端收细 |
+| 发光溢出 | `additive(true)`（加色）+ `glowing(true)`（全亮不受光照） |
+| 分批出现 | `Builder.delay(ticks)`，或 `Draw.*` 的 `stagger` |
+| 换外观 | **没有更新通道** → `remove()` 后重新生成 |
+
+**尺寸口径（别再按 `scale` 当格数估）**
+
+- 渲染整宽 = 编辑器尺寸 × **0.2 格** × 贴图尺寸系数；内置贴图 16×16 → 系数 1 → **整宽 = scale × 0.2 格**。
+- `anisoWorld(w, h)` 收的是**世界格数**（渲染侧自己换算），**别再乘 0.2** ——
+  第 29 轮把标称尺寸喂进去过，黑核直接大了 5 倍。
+- 内置贴图**可见尺寸小于标称**（边缘柔化必然有半透明带）：`SOFT_DOT` 可见直径 ≈ **0.75 × 尺寸**、
+  `LINE` 可见粗 ≈ **0.7 × 尺寸**（两端各 ≈ 0.2 × 长度渐隐）。密铺间距按「≤ 0.3 × 可见直径」给就无方块感/空隙。
+  `ExplosionFx` 里的 `dotWorld()` / `lineWorld()` 就是这套反推。
+
+**两个必踩的坑（均已实测）**
+
+1. **内置贴图要在渲染线程就绪之后再确保**：`ParticleManager.registerBuiltinTextures()` 会碰 `RenderSystem`，
+   放在 `FMLClientSetupEvent` 里会抛 `Rendersystem called from wrong thread` 把客户端打崩；
+   `PrimalSpellsClient` 改在**首个客户端 tick**里做一次（布尔量保证只做一次）。
+   不做的话客户端解析不到 `particledrawing:builtin/*` → 回落纯白方块，表现就是"球壳全是硬边方块"。
+2. **外观没有更新通道**（这正是「零逐 tick 开销」的前提）：想换贴图/尺寸/朝向只能 `remove()` 后重新生成。
+   所以"边动边变"要用**组级一次性编排**（`scale` 连「到轴心的距离」一起缩 = 向心收拢 + 变短）或逐粒子 `move` / `delay`。
+
 ## 1. 目标
 
 让魔法模组在代码执行期间，用编辑器导出的粒子动画（`.pdrawc`）渲染法术特效，并让粒子投射物平滑跟随一个**不可预测轨迹**（追踪/索敌）的投射物。

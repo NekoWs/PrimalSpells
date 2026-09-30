@@ -8,7 +8,9 @@ import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.ModContainer
 import net.neoforged.fml.common.Mod
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
+import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.EntityRenderersEvent
+import work.nekow.particledrawing.api.ParticleManager
 import net.neoforged.neoforge.client.event.RegisterClientTooltipComponentFactoriesEvent
 import net.neoforged.neoforge.common.NeoForge
 import work.nekow.primalspells.PrimalSpells
@@ -38,6 +40,9 @@ import work.nekow.primalspells.registry.ModEntities
  */
 @Mod(value = PrimalSpells.MODID, dist = [Dist.CLIENT])
 class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
+    /** 内置形状贴图只在首个客户端 tick 里确保一次（见 init 里的说明） */
+    private var builtinsReady = false
+
     init {
         // 1. 网络包的客户端处理器
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
@@ -47,6 +52,19 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         //    只在「非生产环境 + 显式系统属性 primalspells.capture」下注册；
         //    生产包里 shouldInstall() 恒为 false，CaptureDriver 整个类不会被加载。
         if (CaptureDriver.shouldInstall()) CaptureDriver.install()
+
+        // 3a. ParticleDrawing 的内置形状贴图（SOFT_DOT / LINE）：客户端按需生成、幂等。
+        //     专用服务器上服务端贴图注册表里没有内置名，载荷带的就是**内联名字**，
+        //     所以客户端必须确保它们已经生成，否则会回落纯白方块。
+        //     ⚠️ 不能放在 `FMLClientSetupEvent`：那时渲染线程还没就绪，
+        //     `RenderSystem` 会抛「Rendersystem called from wrong thread」把客户端打崩（第 29 轮踩过）。
+        //     放到**首个客户端 tick**（渲染线程已就绪），一个布尔量保证只做一次。
+        NeoForge.EVENT_BUS.addListener<ClientTickEvent.Post> {
+            if (!builtinsReady) {
+                builtinsReady = true
+                ParticleManager.registerBuiltinTextures()
+            }
+        }
 
         // 3. 纯客户端事件与功能注册
         ScreenShakeClient.install()

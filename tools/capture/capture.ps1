@@ -25,7 +25,10 @@
 param(
     [string]$Scene = "all",
     [switch]$SkipBuild,
-    [switch]$NoVideo
+    [switch]$NoVideo,
+    # 客户端录制的最长等待秒数：超过就杀掉游戏进程并以失败退出。
+    # 为什么必须有：客户端一旦崩溃/卡死就不会自己退出，流水线会一直挂着（第 29 轮实测）。
+    [int]$TimeoutSec = 300
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,10 +50,24 @@ Remove-Item -Recurse -Force "build/capture/out" -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force "build/capture/out" | Out-Null
 
 # 3) 真客户端录制（驱动会在录完后自己退出）
-Write-Host "[capture] ./gradlew runCapture -Pcapture=$Scene ..."
-& .\gradlew.bat runCapture --console=plain "-Pcapture=$Scene" 2>&1 |
-    Tee-Object -FilePath "build/capture/gradle.log"
-if ($LASTEXITCODE -ne 0) { throw "[capture] runCapture 失败，见 build/capture/gradle.log" }
+#    ⚠️ 超时护栏：客户端崩溃/卡死时不会自己退出，必须由这里兜底杀掉（否则流水线会一直挂着）。
+Write-Host "[capture] ./gradlew runCapture -Pcapture=$Scene ...（超时 $TimeoutSec 秒）"
+$gradle = Start-Process -FilePath ".\gradlew.bat" `
+    -ArgumentList @("runCapture", "--console=plain", "-Pcapture=$Scene") `
+    -NoNewWindow -PassThru -RedirectStandardOutput "build/capture/gradle.log"
+if (-not $gradle.WaitForExit($TimeoutSec * 1000)) {
+    Write-Host "[capture] 超过 $TimeoutSec 秒仍未退出 → 杀掉游戏进程（看 run/capture/logs/latest.log 的异常）" -ForegroundColor Red
+    Get-CimInstance Win32_Process -Filter "Name like '%java%'" |
+        Where-Object { $_.CommandLine -match 'bootstraplauncher|devlaunch|net\.minecraft' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Stop-Process -Id $gradle.Id -Force -ErrorAction SilentlyContinue
+    if (Test-Path "run/capture/logs/latest.log") {
+        Select-String -Path "run/capture/logs/latest.log" -Pattern "Exception|Caused by" |
+            Select-Object -First 8 | ForEach-Object { Write-Host ("    " + $_.Line) }
+    }
+    exit 1
+}
+if ($gradle.ExitCode -ne 0) { throw "[capture] runCapture 失败，见 build/capture/gradle.log" }
 
 # 4) 客户端日志（装配脚本用它查异常/ERROR）
 $log = "run/capture/logs/latest.log"

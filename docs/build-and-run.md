@@ -224,6 +224,15 @@ python tools/capture/assemble.py          # 合成 + 判定
   于是它的「空场起飞 / 真的渲染 / 退场」都用暖色曲线判（其余场景仍用蓝）；
 - **暗核心判据**（亮度 `0.299r + 0.587g + 0.114b < 40`）：内爆的**黑色核心球**在中灰棚里是唯一的暗区。
 
+**跑流水线的两条硬规矩（第 29 轮补，都是为了不浪费时间）**
+
+1. **一律后台跑**：`capture.ps1` 会开真客户端，正常约 1~3 分钟，但**客户端崩溃时不会自己退出**
+   （第 29 轮实测：`FMLClientSetupEvent` 里碰 `RenderSystem` 抛 `Rendersystem called from wrong thread`，
+   游戏停在错误界面不动，前台调用把整轮对话挂死）。所以用后台任务跑，跑完再看结果。
+2. **脚本自带超时护栏**：`-TimeoutSec`（默认 300 秒）到点就杀掉 `bootstraplauncher|devlaunch|net.minecraft`
+   那个 java 进程、打印 `run/capture/logs/latest.log` 里的前 8 条异常并以失败退出。
+   想改等待上限就传 `-TimeoutSec 600`（大场景多的时候），**不要**去掉这个护栏。
+
 ⚠️ `implosion` 场景**故意用中灰摄影棚**（`buildStudio(..., color = LIGHT_GRAY)`）：
 黑球在原来的黑底棚里根本看不见，而中灰（`r≈g≈b`）既不参与蓝判据也不参与暖色判据。
 别退回「红 > 蓝」那种粗判据：木桩与木构件是棕色 (135,109,68)、火球拖尾是橙色 (219,122,21)，

@@ -65,8 +65,8 @@ SCENES = {
     "implosion": {
         "length": 78,
         "title": "内爆：黑色核心 + 蓄力线条 + 向心聚拢 → 爆发球放大到半径",
-        # 这一场的粒子是**暖色**（爆炸主题），蓝判据完全看不见 —— 标准判据改用它自己的暖色判据
-        "metric": "warm",
+        # 第 29 轮起爆炸改成**青白色能量**（对齐用户给的参考）→ 标准判据用蓝（青满足 b>80 且 b-r>12）
+        "metric": "blue",
         # 黑核心在中灰棚里是唯一的暗区（第 28 轮新增的暗判据）
         "dark_core": (22, 36), "min_dark_frames": 8,
         # 放弹（t=20）之前必须干净
@@ -333,13 +333,18 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     if "hits" in spec:
         lo, hi = spec["hits"]
         seg = cover[lo:hi]
+        # ⚠️ 基线取**窗口内**：场景后面可能有量级大得多的特效（第 29 轮起爆炸是青白色，
+        # 峰值 28 万像素），用全局空场阈值会把窗口里的玻璃板亮点（~1.4k 像素）全判成"不亮"。
+        local = max(seg) if seg else 0
+        floor = max(local * 0.25, 2.0)
         peaks = sum(
             1 for i in range(1, len(seg) - 1)
-            if seg[i] > empty * 1.5 and seg[i] >= seg[i - 1] and seg[i] > seg[i + 1]
+            if seg[i] > floor and seg[i] >= seg[i - 1] and seg[i] > seg[i + 1]
         )
         need = spec.get("min_peaks", 2)
         result["asserts"].append(
-            ("受击才亮起（多次亮点）", peaks >= need, f"受击窗口 {lo}-{hi} 帧检出 {peaks} 个亮点（要求 ≥{need}）"),
+            ("受击才亮起（多次亮点）", peaks >= need,
+             f"受击窗口 {lo}-{hi} 帧检出 {peaks} 个亮点（窗口内基线 {floor:.0f}，要求 ≥{need}）"),
         )
     if "breach" in spec:
         lo, hi = spec["breach"]

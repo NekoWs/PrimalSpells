@@ -778,6 +778,34 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 **P2 省事 3 项**（`Draw.*` 加 glowing/texture/aniso、polyline 图元、逐粒子生成延迟）。
 本轮**暂停这块的继续尝试**；形态与相位方案已定，能力到位即重做表现层（只是换实现，不改契约）。
 
+## 第 29 轮（2026-10-01，接入 ParticleDrawing 1.0.13；爆炸表现层按参考重写）
+
+| # | 事 | 结论 / 落点 |
+|---|---|---|
+| 29.1 | PD 侧把第 23/28 轮登记的**整组外观能力**做完了（1.0.13-ALPHA） | 需求档转「**0 未决**」；逐条对照「PD 给了什么 / 本侧改成什么」入 [附录 B](#1-0-13-alpha外观整组第-2328-轮登记--第-29-轮接线)；能力清单 + 尺寸口径 + 两个坑写进 [design/effects-api.md §0.4](../design/effects-api.md) |
+| 29.2 | 爆炸表现层重写（对齐用户给的参考：`.refs/explosion-vfx/`） | **蓄力**：一颗大柔边点当**实心黑核** + 三正交亮环 + **6 条螺旋丝**（`Draw.polyline`：每段一颗粒子、`taper` 两端收细、加色自发光）+ 10 根放射细刺 + 34 颗向心聚拢（逐粒子 `delay` 错开）；**爆发**：**半透球壳**（柔边点 + 低 alpha，`scale` 撑到爆炸半径）+ 亮边三环 + 9 条锯齿闪电丝 + 44 颗外飞 + 7 段壳裂弧 + 烟与贴地余晖。全程 **0 包/tick**（只在下发与爆发两拍各一次生成指令） |
+| 29.3 | 尺寸口径踩坑 | `anisoWorld` 收的是**世界格数**（不是标称尺寸 —— 踩过一次，黑核大了 5 倍）；`Draw.*` 的标量 `scale` 只在 visual **没有** aniso 时生效 → 尺寸统一放进 visual；可见尺寸 = SOFT_DOT **0.75 ×**、LINE **0.7 ×**（`dotWorld`/`lineWorld` 就是这套反推） |
+| 29.4 | **客户端崩溃**（用户实测：游戏报错且不退出） | `registerBuiltinTextures()` 会碰 `RenderSystem`，放在 `FMLClientSetupEvent` 里 → `Rendersystem called from wrong thread` 崩客户端；改到**首个客户端 tick**（布尔量保证只做一次）。不做的话客户端解析不到 `particledrawing:builtin/*` → 回落纯白方块（"球壳全是硬边方块") |
+| 29.5 | 流水线效率（用户要求：不要挂住） | `capture.ps1` 加 **`-TimeoutSec`（默认 300 秒）护栏**：到点杀掉 `bootstraplauncher\|devlaunch\|net.minecraft` 的 java 进程、打印 `run/capture/logs/latest.log` 前 8 条异常、以失败退出；`build-and-run.md` §9 写明「**一律后台跑 + 不要去掉护栏**」 |
+| 29.6 | 判据被新特效撑爆 | 护盾的「受击才亮起（多次亮点）」用**全局**空场阈值 → 爆炸峰值 28 万像素把基线抬高 10 倍，玻璃板亮点（~1.4k 像素）全被判成"不亮" → 改成**窗口内基线**（`local max × 0.25`） |
+| 29.7 | 烟活过了场景末尾 | `pd-particles-zero` 抓到剩 18 颗 → 烟改为组内 `delay + fadeIn + fadeOut(removeAfter = true)` |
+
+**验证**：4 场景 / **548 帧 / 丢帧 0 / 场景内断言 21 条全过 / 运行日志 0 异常**，构建 **0 warning**。
+
+- `implosion`：蓄力期 339 颗（黑核 + 丝线 + 聚拢）、**蓄力期间伤害数字 = 0**、爆发期 1535 颗、爆发后伤害数字 = 1、收干净；
+  像素：蓝判据峰值 **284944 像素（占画面 31%）**、暗核心 **19597 像素**（11/14 帧 ≥50%）。
+- `energy_shield`：8 条全过（`t=102` 抵扣 345 MP、`t=142` 打穿 + 伤害数字、`t=212` 激光兜底、`t=229` 零残留），
+  受击窗口检出 **6 个亮点** ✓ —— 青色爆炸没有把护盾的判据带偏。
+- 目视复核（`build/capture/out/implosion/contact.png` + `implosion.mp4`）：
+  黑核 + 连续青色丝线绕核收拢 → 塌成一点 → **能透视的半透明发光壳**撑到爆炸半径（带亮边）→ 收干净。
+
+**仍不满意 / 可调旋钮（下一轮想继续打磨就看这里）**：
+
+- 壳面仍能看出**点阵台阶**（想要更连续的膜：加密球壳点，或把 `SHELL_DOT_RATIO` 再调大 —— 代价是粒子数）；
+- **内部闪电丝被壳的亮度盖住**（想让它更明显：提高 `BOLT_COLOR` 强度/加粗，或把壳的 `SHELL_COLOR` alpha 再压低）；
+- 蓄力段的**亮环与尖刺在近处仍偏"块"**（都是柔边点，尺寸小的时候台阶明显）；
+- 参考里"壳裂成分段弧飞散"目前只是 7 段短弧，想要更戏剧化可以加长/加多。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：
@@ -797,6 +825,28 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 > | `spin` 与一次性 `rotate` 应可叠加（第 19 轮） | 多条 `rotate`/`spin` 的角度**累加**，后一条不再覆盖前一条的相位 | 「先自转一阵、再补一段一次性旋转、继续自转」可以直接写；本侧目前不需要补相位（不重建组） |
 > | `scale`/`pulse` 应连「粒子到轴心的距离」一起缩放（第 15 轮） | `ScaleBy`/`Pulse` 同时作用于**到轴心的距离**与视觉大小（KDoc：半径 3 的圆 `scale(3f)` 后半径就是 9） | 尚未使用（黑洞进场仍是逐粒子 `move`）；后续「整壳胀开/缩回」可一个调用写完 |
 > | `move()` 不应悄悄改 arm 基准轴心（第 15 轮） | `move`/`movePath` **不再改轴心**（轴心只由 `setPivot`/`followEntity` 决定），平移只作用于渲染位置 | 「铺完成员后第一条指令不能用 `move`」这条顺序硬约束解除
+
+### 1.0.13-ALPHA：外观整组（第 23/28 轮登记 → 第 29 轮接线）
+
+> 起因：用户给了参考效果（"这种效果才叫有冲击力"），素材与相位拆解在 `.refs/explosion-vfx/`。
+> 能力清单、尺寸口径与两个坑见 [design/effects-api.md](../design/effects-api.md) §0.4。
+
+| 需求（登记轮次） | 1.0.13 的落地 | 本侧改成什么 |
+|---|---|---|
+| 程序化粒子贴图写死 8×8 硬边白方块，无 texture/uv 入口（第 23 轮） | `ParticleStyle { SQUARE, SOFT_DOT, LINE }`（内置 16×16，两端各自生成、不占带宽）+ `ParticleManager.registerTexture(name, bytes)`（幂等；**同名第一次生效**；未知名字回落白方块、不丢粒子）+ `Builder.texture/uv` | 黑核、丝线、球壳全部改用内置贴图；尺寸按"**可见**尺寸"反推（`dotWorld`/`lineWorld`） |
+| 各向异性：一条线段贴图应能沿长度拉长（第 23 轮） | `ParticleVisual.anisoWorld(w, h)`（**世界格数**）+ `Builder.scale(w, h)` | 丝线不再"每 0.05 格一颗小方块"，改用 `Draw.polyline`：**每段一颗粒子**、内部自动 `anisoWorld(段长, 粗)` |
+| 固定朝向（丝线对齐线段）（第 28 轮） | `ParticleVisual.alignTo(from, to)` + `billboard(false)` + `spin(...)` | 同上（`polyline` 内部已用） |
+| 加色 / 发光（第 28 轮） | `Builder.additive/glowing`（动画侧 `FunctionObject(additive)` 早已在用） | 亮边、内部闪电丝、外飞粒子走加色 + 自发光；**球壳反过来走 alpha 半透**（加色叠几百颗会过曝成白球） |
+| 逐粒子生成延迟（第 28 轮 P2） | `Builder.delay(ticks)`（+ `Draw.*` 的 `stagger`） | 向心聚拢粒子按 `index % 4` 错开出现 |
+| （顺手）一条折线一个调用（第 28 轮 P2） | `Draw.polyline(points, thickness, taper, texture, additive, glowing, colorFn, stagger, group)` | 丝线 / 尖刺 / 内部闪电丝 / 壳裂弧段各一个调用 |
+
+**本侧踩到的两个坑（都记在 effects-api §0.4）**：
+① 内置贴图必须在**渲染线程就绪之后**才 `registerBuiltinTextures()` —— 放 `FMLClientSetupEvent` 会抛
+`Rendersystem called from wrong thread` 把客户端打崩，现改在**首个客户端 tick**里做一次；
+② `anisoWorld` 收的是**世界格数**，别再乘 0.2（踩过一次，黑核大了 5 倍）。
+
+**意义**：`ParticleStyle.kt` 从空文件变成有内容的枚举 —— 本模组"用密集小方块拼几何"的降级路线可以退役了
+（护盾的棱/面板将来也能换成一张柔边或线段贴图，粒子数可降一到两个数量级）。
 
 > 未决需求与登记模板见 [pd-api-requests.md](pd-api-requests.md)。下面这些都已闭环，留在这里是因为
 > 「当初为什么提、对方怎么修的」对后来人有价值。

@@ -318,12 +318,14 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   动画是**球体固定、逐块构建 / 逐块消散**：`updateShieldVisual` 每 tick 建 2 块（各自 `fadeIn(6)`），
   面板按中心高度**由低到高**排 → 像从脚下往上搭起来（约 16 tick）；消散反向逐块淡出、每 2 块错开 1 tick
   （约 1 秒的渐变）。稳态 `followEntity` 跟随 + `spin` 自转，**0 包/tick**。
-  ⚠️ **消散必须重建组**（第 17 轮）：`ParticleGroup` 的指令游标是**从建组时刻起累加的绝对时间**，
-  而客户端对「`startMs` 已过去」的指令是「下一帧立刻完成」—— 对建组 100 tick 后的旧组直接
-  `delay + fadeOut` 会**瞬间淡完**（且 `fadeOut(removeAfter)` 的销毁延时用的是同一个绝对游标、
-  却按相对 now 调度，两端口径不一致）。所以收起时把球壳**原地重建成一批新组**再下发
-  `delay(阶梯) + fadeOut(5, removeAfter = true)`：新组程序起点即 now，两侧同时正确、且自清理
-  （法术被取下/法杖被回收后动画照样放完）。已登记为 PD 需求，见 [issues/pd-api-requests.md](issues/pd-api-requests.md)。
+  ⚠️ **消散要自己算指令游标**（第 17 轮发现、第 19 轮定型）：`ParticleGroup` 的指令游标是
+  **从建组时刻起累加的绝对时间**，而客户端对「`startMs` 已过去」的指令是「下一帧立刻完成」——
+  对建组 100 tick 后的旧组直接 `delay + fadeOut` 会**瞬间淡完**。所以收起时把游标推到
+  `该组已运行时长 + 阶梯`（运行时长 = `gameTime − 建组时刻`，记在 `ShellPanel.bornAt` 上），
+  淡出时刻就对；`removeAfter` 反过来**不能用**（它拿同一个绝对游标按相对 now 排销毁，会把销毁推后一整段时长），
+  销毁交给 `util/Deferred` 在淡出之后执行 —— 所以法术被取下/法杖被回收后动画照样放完、也不留孤儿粒子。
+  ——**不重建组**是刻意的：第 17~18 轮曾用「原地重建」绕开，代价是组丢掉 `spin`（实机反馈「收起时不再旋转」），
+  且 PD 的 `spin` 与一次性 `rotate` 不叠加，补不回旧相位。PD 需求见 [issues/pd-api-requests.md](issues/pd-api-requests.md)。
   ⚠️ **调用顺序是硬要求**：**先** `createGroup(脚底)` + `followEntity(uuid, 身体中段)` 绑定轴心，**再**铺成员，
   且成员坐标相对**绑定后的轴心**（= 球心）—— 客户端按「成员 spawn 位置 − arm 时的组 `pivot` 字段」重算
   相对偏移（`issues/resolved.md` 第 13 轮）。⚠️ 另一条相关的 PD 坑：`move` 会改那个字段，
@@ -350,7 +352,12 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
      `a = 2d/(T(T+1))` 反推 —— 离散积分 `d(n) = a·n(n+1)/2` 下第 T tick 恰好抵达中心，寿命 = T 同刻过期。
      观感是「先悬一下、最后几 tick 猛地塌进去」（黑洞**退场**在用，第 18 轮把匀速直线收缩换成了它）；
      全程 **0 逐 tick 包**、本模组不留跨 tick 状态；
-  10. **落点重音（一次性粒子 + 镜头冲击）**：`spawnParticle(pos, color, scale, lifetime, velocity)`
+  10. **多拍连招**（第 19 轮）：黑洞退场「整壳塌缩 → 反弹小球 → 收成一点」三拍，
+     每拍都在 `Deferred` 里排下一拍（`Deferred.after(...)` 返回**可取消句柄**：
+     特效提前结束时撤销还没到点的重音，否则会出现「场没了、地面还在被压出环」）。
+     ⚠️ `Deferred.tick()` 必须**先摘出到期任务、再统一执行** —— 任务体会再排新任务，
+     边迭代边执行会抛 `ConcurrentModificationException` 打崩服务端（第 19 轮实测踩到）。
+  11. **落点重音（一次性粒子 + 镜头冲击）**：`spawnParticle(pos, color, scale, lifetime, velocity)`
      炸一圈 + `ScreenShake.shake(...)`（黑洞塌缩爆闪、重力场波环落地溅射、护盾展开冲击波/破盾炸裂）。
      这些时刻**晚于特效自己的生命周期**，所以由 `util/Deferred`（服务端延迟队列，`MagicManager` 每 tick 推）
      排到点触发；`Deferred` 是**我们自己的时序簿记**，不涉及任何粒子同步/求值（那仍然全归 PD）。

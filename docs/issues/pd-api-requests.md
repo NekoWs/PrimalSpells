@@ -118,9 +118,14 @@
   - (c) 提供显式的 `delayFromNow(ticks)` / `fadeOutFromNow(...)`，与现有 `delay` 并存。
 - 影响面：`magic/modifier/EnergyShield.kt`（消散波）。黑洞的进/退场不受影响（它用的是 `ParticleHandle`
   与一次性生成，不走组时间轴）。
-- 临时降级：消散时把球壳**原地重建成一批新组**再下发 `delay + fadeOut(removeAfter = true)`
-  —— 新组的程序起点就是 now，两个口径同时成立（代价：消散瞬间重铺一遍球壳，突发量与构建同量级）。
-  恢复条件 = (a)/(b)/(c) 任一落地后，可删掉重建、直接对旧组追加。
+- 临时降级（第 19 轮更新）：**自己把游标推到 now**（`delay(该组已运行时长 + 阶梯)`，运行时长由本模组按
+  `level.gameTime − 建组时刻` 记），客户端淡出时刻因此正确；`removeAfter` **不用**（它的销毁延时拿同一个绝对游标
+  却按相对 now 调度，会把销毁推后一整段已运行时长 → 留下看不见但活着的粒子），销毁改由本模组的
+  `util/Deferred` 在淡出结束后执行。
+  第 17~18 轮曾用「原地重建成一批新组」绕开，第 19 轮弃用：重建会让组丢掉 `spin`（实机反馈「收起时不再旋转」），
+  而在新组上补回旧相位补不出来 —— PD 的 `spin` 与一次性 `rotate` 是**各自按自己的基准写 `rel`、后者覆盖前者**，
+  不叠加（见 `ClientAnimationProgramManager.applySlot` → `rotateToSnapshot`）。
+  恢复条件 = (a)/(b)/(c) 任一落地后，可删掉「自己算游标 + 自己排销毁」这两步。
 
 ---
 

@@ -16,7 +16,8 @@ class LargeExplosion : Projectile() {
         maxAge = 1
         speed = 0f
         hitRadius = 0.0
-        effects += Explosion(onDeath = true, onHit = false)
+        // 蓄力 18 tick（0.9 s）：半径最大，蓄力也最长（明显的预兆 —— 够跑出去）
+        effects += Explosion(onDeath = true, onHit = false, chargeTicks = 18)
     }
 
     override fun onSpell() {

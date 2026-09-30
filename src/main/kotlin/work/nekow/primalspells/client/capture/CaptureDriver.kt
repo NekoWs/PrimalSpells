@@ -486,8 +486,17 @@ object CaptureDriver {
          *
          * 这是**为了看清特效**布置的取景环境，不是玩法场景；想录自然地形把这个调用删掉即可。
          */
-        fun buildStudio(cx: Int, cz: Int, floorY: Int, half: Int = 16, wallHeight: Int = 28) {
-            val state = Blocks.CONCRETE.pick(DyeColor.BLACK).defaultBlockState()
+        fun buildStudio(
+            cx: Int,
+            cz: Int,
+            floorY: Int,
+            half: Int = 16,
+            wallHeight: Int = 28,
+            color: DyeColor = DyeColor.BLACK,
+        ) {
+            // 默认黑底：让粒子（尤其细线）有对比度。**内爆场景改用中灰** —— 那一段的核心是黑色球体，
+            // 黑底里看不见（见 CaptureScenes.implosion）。
+            val state = Blocks.CONCRETE.pick(color).defaultBlockState()
             for (x in cx - half..cx + half) {
                 for (z in cz - half..cz + half) {
                     level.setBlock(BlockPos(x, floorY, z), state, BLOCK_FLAG)

@@ -62,8 +62,21 @@ SCENES = {
     "gravity_field": {
         "length": 130, "title": "重力场：球形范围 + 下坠粒子 + 落地波环", "decay": "instant",
     },
+    "implosion": {
+        "length": 78,
+        "title": "内爆：黑色核心 + 蓄力线条 + 向心聚拢 → 爆发球放大到半径",
+        # 这一场的粒子是**暖色**（爆炸主题），蓝判据完全看不见 —— 标准判据改用它自己的暖色判据
+        "metric": "warm",
+        # 黑核心在中灰棚里是唯一的暗区（第 28 轮新增的暗判据）
+        "dark_core": (22, 36), "min_dark_frames": 8,
+        # 放弹（t=20）之前必须干净
+        "quiet": (2, 16),
+        # 暖色判据下的退场是**阈值悬崖**（球体 alpha 淡出 6 tick，但像素判据只看到跨阈值那一帧）——
+        # 与玻璃面板同理；「收干净」由  +  负责
+        "decay": "instant",
+    },
     "energy_shield": {
-        "length": 196, "title": "玻璃护盾：平时不可见 → 受击玻璃板 → 大爆抵扣 → 法力不足打穿 + 破口",
+        "length": 232, "title": "玻璃护盾：平时不可见 → 受击玻璃板 → 大爆抵扣 → 法力不足打穿 + 破口",
         # 蓝色判据下**没有**可用的全局退场：这一场混了两套视觉系统 —— 受击玻璃板（一次性、alpha 淡出在
         # 像素判据里就是跨阈值的悬崖）与大爆的原版烟（随机粒子，峰值会与玻璃板逐次运行翻转）。
         # 护盾真正的收场是**粉色**破口轮廓，由下面的 `breach_fade` 单独卡；蓝色这边只保留
@@ -76,10 +89,11 @@ SCENES = {
         # 受击窗口：应当出现多次「亮起 → 消失」（每次格挡各出一片）。
         # 窗口从 40 起：攻击者在 5.5 格外，火球飞 11 tick 才到壳上（发射在 t=34/46/58）。
         "hits": (40, 80), "min_peaks": 3,
-        # 破口窗口（第 26 轮）：碎裂之后那一圈**常驻**粉色轮廓（蓝判据抓不到，用粉色判据单独卡）
-        "breach": (105, 150), "min_breach_frames": 35,
-        # 破口到期必须是**淡出**：尾段还能看见几帧、然后在窗口末尾归零（实测 1261 → 571 → 0）
-        "breach_fade": (150, 162), "min_fade_frames": 3,
+        # 破口窗口：第 28 轮起大爆要蓄力 18 tick 才结算（放弹 108 → 结算 126），窗口整体后移
+        "breach": (146, 192), "min_breach_frames": 35,
+        # 破口到期必须是**淡出**：尾段还能看见几帧、然后在窗口末尾归零
+        # 淡出：粉色判据看到的是阈值穿越（实测 2124 → 1025 → 0，两帧），设计要求是 6 tick 淡出
+        "breach_fade": (193, 208), "min_fade_frames": 2,
     },
 }
 
@@ -130,6 +144,29 @@ def red_mask(path: Path) -> "np.ndarray":
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     return (r > RED_MIN) & ((r - g) > RED_GREEN_GAP) & (np.abs(g - b) <= GREEN_BLUE_MAX_DIFF)
+
+
+#: 「暖色亮像素」判据（第 28 轮）：爆炸的内爆/爆发是暖色（橙红 / 亮黄），**蓝判据完全看不见**。
+#: 中灰摄影棚（r≈g≈b）与冷白玻璃都不满足，所以这条只挑爆炸自己的粒子。
+WARM_MIN = 150
+WARM_BLUE_GAP = 60
+
+
+def warm_mask(path: Path) -> "np.ndarray":
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    r, b = a[..., 0], a[..., 2]
+    return (r > WARM_MIN) & ((r - b) > WARM_BLUE_GAP)
+
+
+#: 「暗核心」判据（第 28 轮）：内爆的黑色核心球在中灰棚里是**唯一**的暗区。
+#: 亮度 = 0.299r + 0.587g + 0.114b：中灰混凝土 ≈ 150、木桩 ≈ 112、黑球 < 40。
+DARK_MAX_LUMA = 40
+
+
+def dark_mask(path: Path) -> "np.ndarray":
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    luma = 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
+    return luma < DARK_MAX_LUMA
 
 
 def read_tsv(path: Path) -> list[list[str]]:
@@ -229,10 +266,18 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         result["asserts"].append(("有帧产出", False, "frames/ 为空 —— 录制没跑起来或被删了"))
         return result
 
-    cover = [int(blue_mask(f).sum()) for f in frames]
+    blue_cover = [int(blue_mask(f).sum()) for f in frames]
     red_cover = [int(red_mask(f).sum()) for f in frames]
+    warm_cover = [int(warm_mask(f).sum()) for f in frames]
+    dark_cover = [int(dark_mask(f).sum()) for f in frames]
+    # 标准判据（空场起飞 / 真的渲染 / 退场 / 静止窗口）用哪一个像素判据：默认蓝（冷色粒子），
+    # 爆炸场景声明 `metric: warm`（暖色粒子）。粉色破口判据始终独立于它。
+    cover = warm_cover if spec.get("metric", "blue") == "warm" else blue_cover
     result["cover"] = cover
+    result["blue_cover"] = blue_cover
     result["red_cover"] = red_cover
+    result["warm_cover"] = warm_cover
+    result["dark_cover"] = dark_cover
     peak = max(cover)
     peak_idx = cover.index(peak)
     total_px = Image.open(frames[0]).size[0] * Image.open(frames[0]).size[1]
@@ -308,6 +353,16 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         result["asserts"].append(
             ("破口常驻显示", persist >= spec.get("min_breach_frames", 20),
              f"持续 {persist}/{len(seg)} 帧 ≥40% 峰值"),
+        )
+    if "dark_core" in spec:
+        lo, hi = spec["dark_core"]
+        seg = dark_cover[lo:hi]
+        peak = max(seg) if seg else 0
+        persist = sum(1 for v in seg if v >= peak * 0.5)
+        result["asserts"].append(
+            ("蓄力期有黑色核心",
+             peak >= total_px * MIN_PEAK_RATIO and persist >= spec.get("min_dark_frames", 5),
+             f"暗像素峰值 {peak}、{persist}/{len(seg)} 帧 ≥50% 峰值"),
         )
     if "breach_fade" in spec:
         lo, hi = spec["breach_fade"]

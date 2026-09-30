@@ -13,8 +13,10 @@
 
 ---
 
-**当前未决 2 条**（第 15 轮登记，见下节「未决需求」）：`ParticleGroup.scale`/`pulse` 只缩视觉尺寸、
-不缩「粒子到轴心的距离」（与它们的 KDoc 不符）；`ParticleGroup.move` 会改掉 arm 基准轴心（编排顺序陷阱）。
+**当前未决 3 条**：第 15 轮登记的两条 —— `ParticleGroup.scale`/`pulse` 只缩视觉尺寸、
+不缩「粒子到轴心的距离」（与它们的 KDoc 不符）；`ParticleGroup.move` 会改掉 arm 基准轴心（编排顺序陷阱）；
+外加第 17 轮登记的**「组指令缺少『从现在起』的时间锚点」**（建组很久之后再追加动画会瞬间完成，
+见下节最后一条）。
 
 另有两条已闭环：
 
@@ -89,6 +91,36 @@
   因此完全绕开了这条坑；但坑本身还在，`move` 的 KDoc 里也没有任何提示。
 - 临时降级：已按 (b) 的口径自行遵守 —— **铺完成员后第一条指令不使用 `move`**；
   恢复条件 = (a) 或 (b) 落地后可去掉这条顺序约束与注释。
+
+### [需求] 组指令需要一个「从现在起」的时间锚点（长寿组在运行期追加动画会瞬间完成）
+
+- 状态：未决（第 17 轮登记；本轮用「原地重建组」绕开，绕法有额外一次性成本）
+- 目标能力：**长寿组在运行期追加一段动画** —— 护盾球壳在建成约 100 tick 之后才「收起法杖」，
+  需要下发「逐块延迟 + 淡出」的消散波；任何「出现后等玩家操作再消失」的组级特效都会遇到同一件事。
+- 现有 API 为什么不够（**这不是签名问题，是时间轴语义问题，现场实测过**）：
+  - `ParticleGroup.delay(ticks)` 推进的是**从建组时刻起累加的绝对游标** `cursorMs`，
+    录进指令的 `AnimInstruction.startMs` 就是这个绝对时刻（建组时为 0）。
+  - 客户端 `ClientAnimationProgramManager.applySlot` 的第一句是 `if (now < start) return` ——
+    **`startMs` 落在过去的指令会在下一帧立刻生效**，`progress(now - start, duration)` 随即夹到 1。
+    于是「建组 100 tick 之后 `delay(1).fadeOut(5)`」＝ **当场淡完**：实测 104 帧还是完整球壳、
+    105 帧整壳消失（第 17 轮的实机录制帧序列，见 [resolved.md](resolved.md) 第 17 轮）。
+  - 同一个游标又被 `fadeOut(removeAfter = true)` 拿去排**相对 now** 的销毁任务
+    （`AnimationScheduler.schedule((cursorMs + duration * 50 + 250) / 50)`）—— 两端口径不一致：
+    为了让客户端时间正确而把游标推到 now，服务端的销毁就会被推后「已经运行过的时长」那么多 tick，
+    留下看不见但还活着的粒子；两者无法同时正确。
+- 复现步骤：`val g = manager.createGroup(pos)` + 铺成员 → 等 100 tick →
+  `g.delay(1).fadeOut(5, removeAfter = true)`。预期：1 tick 后开始、5 tick 淡出；
+  实际：下一帧即完全消失（粒子要到 `cursorMs+15` tick 之后才被销毁）。
+- 期望 API 形态（任一即可）：
+  - (a) **增量追加时把 `startMs` 视作「相对追加时刻」**：`flush()` 的 armed 分支给增量指令统一加
+    「追加时刻 − 程序起点」的偏移，`removeAfter` 的销毁延时同样以追加时刻为基准（最省事、使用方无感）；
+  - (b) 暴露 `ParticleGroup.elapsedMs()`（或 `timeCursor()`），让调用方自己把游标推到 now；
+  - (c) 提供显式的 `delayFromNow(ticks)` / `fadeOutFromNow(...)`，与现有 `delay` 并存。
+- 影响面：`magic/modifier/EnergyShield.kt`（消散波）。黑洞的进/退场不受影响（它用的是 `ParticleHandle`
+  与一次性生成，不走组时间轴）。
+- 临时降级：消散时把球壳**原地重建成一批新组**再下发 `delay + fadeOut(removeAfter = true)`
+  —— 新组的程序起点就是 now，两个口径同时成立（代价：消散瞬间重铺一遍球壳，突发量与构建同量级）。
+  恢复条件 = (a)/(b)/(c) 任一落地后，可删掉重建、直接对旧组追加。
 
 ---
 

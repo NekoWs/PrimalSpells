@@ -269,6 +269,44 @@
   「逐粒子 `move` 缓动」与「重新生成 + 向心初速」绕开；arm 基准那条则通过「面板不位移」绕开。
 - 构建：`./gradlew build --no-build-cache` **0 warning**（产物 `build/verify/build-round16.txt`）。
 
+## 第 17 轮（2026-09-30，实机录制流水线；顺带修掉护盾消散瞬间消失）
+
+起因：使用方无法操作电脑、只能对话和看文件，因此需要「进游戏截取真实表现」的能力 ——
+于是把「开客户端 → 进世界 → 摆位置施法 → 按 F2 截图」整条链自动化（新功能），
+并在第一次跑通后**当场抓到两个问题**（这就是这条流水线的价值）。
+
+### 17.1 实机录制流水线（新增）
+
+- `client/capture/CaptureDriver.kt`（开发期客户端驱动）+ `CaptureScenes.kt`（场景表）+
+  `tools/capture/capture.ps1`（一条命令）+ `tools/capture/assemble.py`（合成与判定）。
+- 全自动：固定种子的超平坦世界（不存在则现场建）→ 黑底摄影棚布景 → 冻结时间/天气/刷怪 →
+  相机轨迹（绕球心公转 / 第三人称转台）→ **真实施法路径**（`Wand.spell` / `wand.tick(caster, level)`）→
+  **每 tick 抓一帧**（20fps）→ 场景内断言 → 等帧落盘后 `mc.stop()` 自己退出。
+- 判定不看人眼：帧数/丢帧 + 场景内断言 + 「偏蓝亮像素」覆盖曲线（空场起飞 / 真的渲染 / 收干净 /
+  退场是渐变还是立即），有失败项就非零退出。
+- 与 `run/client` 完全隔离（工作目录 `run/capture`），生产包里驱动不激活
+  （`CaptureDriver.shouldInstall()` 要求非生产环境 + 系统属性）。
+
+### 17.2 录制发现的两个问题
+
+- **① 护盾消散是「瞬间消失」而不是渐变**（第 16 轮实现，实机还没被看到）：
+  帧曲线 104 帧仍是完整球壳、105 帧整壳没了。根因不在本模组的写法，而在 PD 的时间轴语义：
+  `ParticleGroup.delay` 推进的是**从建组时刻起累加的绝对游标**，而客户端对「`startMs` 已经过去」的指令
+  是「下一帧立刻完成」——建组 100 tick 后再 `delay + fadeOut` 等于当场淡完；
+  同一个游标又被 `fadeOut(removeAfter)` 拿去排**相对 now** 的销毁任务，两端口径不一致，
+  所以「把游标推到 now 让客户端正确」也不行（销毁会被推后整段已运行时长）。
+  已按政策登记为 PD 需求（见 [pd-api-requests.md](pd-api-requests.md)），本侧改成
+  **消散时原地重建成一批新组**再下发 `delay + fadeOut`（新组程序起点＝now，两个口径同时成立，自清理）。
+  修复后曲线：峰值 9715 → 109 帧 4441 → 120 帧 1113 → 130 帧 0，跨约 20 帧的逐块淡出。
+- **② 护盾粒子太密/太近看不出是球**（第 16 轮定稿前的旧机位）：第三人称默认相机距离 4 格、
+  而球壳直径 3.4 格 —— 录出来是「一屏蓝色方块」。录制场景因此改成**用测试木桩当持有者**
+  （`SceneCtx.spawnDummy`），摄像机退到 7 格外绕圈，整颗球壳才进得了画面。
+- 附：黑洞/重力场场景首次录制时上方露出一条亮蓝天空，抢走粒子对比度 → 摄影棚墙高 16 → **28**。
+
+- 落点：`client/capture/`（新）、`tools/capture/`（新）、`magic/modifier/EnergyShield.kt`、
+  `build.gradle`（`capture` 运行配置）、`client/PrimalSpellsClient.kt`（条件安装）
+- 验证：`pwsh tools/capture/capture.ps1`（三个场景 388 帧全 PASS）；构建 0 warning。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

@@ -14,7 +14,7 @@
 | [architecture.md](architecture.md) | 分层架构、法术对象模型、牌堆与施法流程、投射物生命周期、持久化、网络、客户端 | **第一次接触本项目**；要改核心机制、排查「为什么没生效」 |
 | [code-map.md](code-map.md) | 逐包逐文件的代码导航 + 「我要改 X → 去哪个文件」 | 知道要改什么、但不知道文件在哪 |
 | [spell-development.md](spell-development.md) | 新增投射物 / 修饰器 / 特效 / 物品 / 资源 / 语言键的完整步骤与注册点 | 要添加或修改法术内容 |
-| [build-and-run.md](build-and-run.md) | 版本矩阵、依赖、Gradle 命令、运行目录、CI、常见故障 | 要构建、运行、排障 |
+| [build-and-run.md](build-and-run.md) | 版本矩阵、依赖、Gradle 命令、运行目录、CI、常见故障、**实机录制（§9）** | 要构建、运行、排障；**要「看一眼实机效果」** |
 | [issues/README.md](issues/README.md) | **问题台账索引**：目录分工、严重度图例、维护规则 | 踩坑前先查；登记/关闭问题时对着规则来 |
 | ↳ [issues/open.md](issues/open.md) | **仍未解决**：待续开发的功能、性能与表现问题 | 修 bug 前先看有没有已知坑 |
 | ↳ [issues/verify.md](issues/verify.md) | **待实机验证清单**（编译过了但要进游戏确认手感） | 改完视觉/手感、或每次发版前 |
@@ -48,6 +48,7 @@ PrimalSpells/
 ├─ src/main/resources/                                  资源：assets（模型/贴图/语言/物品）、data（伤害类型）、META-INF
 ├─ src/generated/resources/                             数据生成输出（可选）
 ├─ docs/                                                本文档目录
+├─ tools/capture/                                       实机录制流水线（capture.ps1 + assemble.py，见 build-and-run.md §9）
 ├─ .github/workflows/build.yml                          CI：JDK 25 + ./gradlew build
 ├─ run/                                                 开发运行目录（不入库）：存档/日志/崩溃报告
 └─ build/                                               Gradle 产物与 NeoForm 缓存（不入库，体积大）

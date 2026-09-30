@@ -61,16 +61,18 @@ src/main/kotlin/work/nekow/primalspells/
 │  ├─ tooltip/                  ClientTooltipHandler, WandSpellTooltip/ClientWandSpellTooltip,
 │  │                           PouchTooltip/ClientPouchTooltip, SpellSlotTracker
 │  ├─ input/                    SpellSlotScrollHandler（滚轮选槽，法杖/小包共用）, ClientContainerDragHandler（Ctrl+左键拖拽交换）
-│  └─ render/                   DroneEntityModel/DroneEntityRenderer
+│  ├─ render/                   DroneEntityModel/DroneEntityRenderer
+│  └─ capture/                  **实机录制驱动**（CaptureDriver 状态机 + CaptureScenes 场景表）：只在开发环境激活，见 build-and-run.md §9
 ├─ util/                        无状态工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）、Polyhedra.kt（球面多面体几何：截角二十面体面板）、PdParticles.kt（PD 管理器兜底 + spawnParticle）
 └─ mixin/                       Java mixin；包名被 primalspells.mixins.json 引用，**不要改**
 ```
 
-另有两处非 Kotlin 位置：
+另有几处非 Kotlin 位置：
 
 ```
 src/main/java/work/nekow/primalspells/mixin/     Java mixin 源码
 src/main/resources/                              assets / data / META-INF（资源路径与包结构无关）
+tools/capture/                                   实机录制流水线（PowerShell + Python，不进 jar）：见 build-and-run.md §9
 ```
 
 ---
@@ -94,7 +96,7 @@ magic/projectile──→ magic/core, magic/effect, util/
 magic/modifier  ──→ magic/core, magic/effect
 ```
 
-`magic/core` 不得 import 具体投射物或修饰器；注册具体法术的地方只有 `MagicManager` 的 `init` 块（它位于 `core`，是唯一例外，见 [architecture.md](architecture.md#法术注册表)）。
+`magic/core` 不得 import 具体投射物或修饰器；注册具体法术的地方只有 `MagicManager` 的 `init` 块（它位于 `core`，是唯一例外，见 [architecture.md](architecture.md) §2.1 / §4）。
 
 ---
 

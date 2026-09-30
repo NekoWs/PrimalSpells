@@ -22,7 +22,7 @@
 2. **修好即搬家**：`open.md` 里的条目修好后，从 `open.md` **删掉**，把结论写进 `resolved.md` 的轮次表。
    台账里不留「已解决」条目（否则又会变回那个 500 行的文件）。
 3. **设计约定不写在这里**：「这个行为是刻意的、不是 bug」这类内容属于
-   [architecture.md §8](../architecture.md#8-关键不变量与陷阱)，不占问题台账。
+   [architecture.md §8](../architecture.md)，不占问题台账。
 4. **ParticleDrawing 的问题**：一律走 [pd-api-requests.md](pd-api-requests.md)，
    **不得在本模组自行另写一套实现**（政策全文见 [conventions.md §9](../conventions.md) 与
    [design/effects-api.md §0](../design/effects-api.md)）。

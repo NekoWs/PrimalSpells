@@ -314,9 +314,14 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   12 个五边形 + 20 个六边形共 32 块面板（几何由 `util/Polyhedra.kt` 生成，带 `require` 自检），
   **每块面板一个 `ParticleGroup`**，沿自身边界铺一圈粒子（每条棱 3 点 → 共 540 颗、永存）。
   动画是**球体固定、逐块构建 / 逐块消散**：`updateShieldVisual` 每 tick 建 2 块（各自 `fadeIn(6)`），
-  面板按中心高度**由低到高**排 → 像从脚下往上搭起来（约 16 tick）；消散反向逐块
-  `fadeOut(5, removeAfter = true)` 并用 `delay` 错开阶梯（PD 自己排销毁任务，所以法术被取下后动画照样放完）。
-  稳态 `followEntity` 跟随 + `spin` 自转，**0 包/tick**。
+  面板按中心高度**由低到高**排 → 像从脚下往上搭起来（约 16 tick）；消散反向逐块淡出、每 2 块错开 1 tick
+  （约 1 秒的渐变）。稳态 `followEntity` 跟随 + `spin` 自转，**0 包/tick**。
+  ⚠️ **消散必须重建组**（第 17 轮）：`ParticleGroup` 的指令游标是**从建组时刻起累加的绝对时间**，
+  而客户端对「`startMs` 已过去」的指令是「下一帧立刻完成」—— 对建组 100 tick 后的旧组直接
+  `delay + fadeOut` 会**瞬间淡完**（且 `fadeOut(removeAfter)` 的销毁延时用的是同一个绝对游标、
+  却按相对 now 调度，两端口径不一致）。所以收起时把球壳**原地重建成一批新组**再下发
+  `delay(阶梯) + fadeOut(5, removeAfter = true)`：新组程序起点即 now，两侧同时正确、且自清理
+  （法术被取下/法杖被回收后动画照样放完）。已登记为 PD 需求，见 [issues/pd-api-requests.md](issues/pd-api-requests.md)。
   ⚠️ **调用顺序是硬要求**：**先** `createGroup(脚底)` + `followEntity(uuid, 身体中段)` 绑定轴心，**再**铺成员，
   且成员坐标相对**绑定后的轴心**（= 球心）—— 客户端按「成员 spawn 位置 − arm 时的组 `pivot` 字段」重算
   相对偏移（`issues/resolved.md` 第 13 轮）。⚠️ 另一条相关的 PD 坑：`move` 会改那个字段，
@@ -338,7 +343,12 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   6. **逐粒子缓动移动**：`handle.move(target, ticks, easing)`——每颗粒子一条指令（一次性），
      缓动在**客户端逐帧求值**，位置总包数 = 粒子数 —— 黑洞**进场**的整壳「从球心长到球面」在用；
   7. **一次性向心爆发**：`spawnParticle(pos, color, scale, lifetime, velocity)`，不进任何集合
-     （自带寿命、不需回收）——黑洞退场塌缩粒子的写法（重新生成 + 向心初速）。
+     （自带寿命、不需回收）——黑洞退场塌缩粒子的写法（重新生成 + 向心初速）；
+  8. **「重建组」代替「给旧组追加动画」**（第 17 轮）：需要「运行期才决定何时开始」的组级动画时，
+     不要对旧组 `delay + fadeOut`（游标是绝对时间，晚追加＝瞬间完成），而是
+     **销毁旧组、在原地按同样的成员/轴心建新组**，再对新组下发 `delay + fadeOut` ——
+     新组程序起点就是 now，动画时序与销毁时刻都精确。代价：一次性重铺成员（与构建同量级）。
+     护盾的消散波在用；PD 需求落地后可删。
 - 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
   生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
 - 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）、`applyForceAll`（需要每颗各自的力时才有意义；

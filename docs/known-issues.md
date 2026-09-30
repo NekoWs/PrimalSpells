@@ -11,4 +11,4 @@
 | 要提给 ParticleDrawing 的 API 需求 | [issues/pd-api-requests.md](issues/pd-api-requests.md) |
 | 目录分工与维护规则（严重度图例、何时写哪个文件） | [issues/README.md](issues/README.md) |
 
-「这个行为是刻意的、不是 bug」这类**设计约定**不在问题台账里，见 [architecture.md 第 8 节](architecture.md#8-关键不变量与陷阱)。
+「这个行为是刻意的、不是 bug」这类**设计约定**不在问题台账里，见 [architecture.md 第 8 节](architecture.md)。

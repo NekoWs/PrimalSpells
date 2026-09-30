@@ -114,6 +114,17 @@
 | `util/Polyhedra.kt` | 球面多面体几何：**截角二十面体**（足球 = 12 五边形 + 20 六边形，60 顶点 / 90 棱）的面板中心与边界点，供护盾球壳取点（第 15 轮新增）。构造过程带 `require` 自检（棱数/面数/顶点度数不对直接抛错），数值离线自检见 [issues/resolved.md](issues/resolved.md) 第 15 轮 |
 | `util/PdParticles.kt` | PD 接线入口：`Wand.pdParticles(level)`（取/兜底创建粒子管理器）、`ParticleManager.spawnParticle(...)`（生成一颗粒子）、`PD_IMMORTAL`（永存寿命 `-1`） |
 
+### 实机录制 `client/capture/` + `tools/capture/`
+
+| 文件 | 职责 |
+|---|---|
+| `client/capture/CaptureDriver.kt` | 录制驱动：状态机（建世界 → 布景 → 机位 → 施法 → 每 tick 抓帧 → 断言 → 自动退出）；只在开发环境 + 系统属性下注册 |
+| `client/capture/CaptureScenes.kt` | 场景表（黑洞 / 重力场 / 能量盾）：相机轨迹、时长、施法动作、断言 |
+| `tools/capture/capture.ps1` | 一条命令：构建 → 录制 → 合成 → 判定 |
+| `tools/capture/assemble.py` | 帧 → mp4/gif/拼图/画廊 + 判定（帧数/丢帧/覆盖曲线/退场渐变）；失败非零退出 |
+
+用法与原理见 [build-and-run.md §9](build-and-run.md)。
+
 ### 客户端 `client/`
 
 | 文件 | 内容 |
@@ -198,6 +209,7 @@
 | 网络包 | `network/<Name>Payload.kt` | `PrimalSpells` 的 `RegisterPayloadHandlersEvent`；S→C 的处理写进 `ClientPayloadSink` |
 | 公共事件 | `event/` | `PrimalSpells.init` 的 `NeoForge.EVENT_BUS.register(...)` |
 | 客户端事件 / 渲染 / tooltip | `client/` 对应子包 | `PrimalSpellsClient`（或 `@EventBusSubscriber(CLIENT)`） |
+| 录一个特效的实机表现 | `client/capture/CaptureScenes.kt` 加场景 + `tools/capture/assemble.py` 的 `SCENES` 表加帧数/退场口径 | `pwsh tools/capture/capture.ps1` |
 | 语言键 | `resources/assets/primalspells/lang/{zh_cn,en_us}.json` | — |
 | 资源三件套 | `resources/assets/primalspells/{items,models/item,textures/item}/` | — |
 

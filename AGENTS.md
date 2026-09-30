@@ -11,6 +11,7 @@
 | 新增或修改法术内容（投射物、修饰器、特效、物品、贴图、语言键） | `docs/spell-development.md` |
 | 落笔写代码前（包结构、命名、注释、端分离） | `docs/conventions.md` |
 | 构建、运行、排障 | `docs/build-and-run.md` |
+| 要「看一眼实机效果」/ 改完特效要留证据 / 没人操作电脑 | `docs/build-and-run.md` 第 9 节（实机录制流水线） |
 | 改核心机制，或判断某设计是否有意为之 | `docs/architecture.md` 第 8 节「关键不变量与陷阱」+ `docs/issues/`（台账：未解决 / 待验证 / 已解决 / PD 需求） |
 | 做粒子特效、升级 `particledrawing` 前置 | `docs/design/effects-api.md` |
 

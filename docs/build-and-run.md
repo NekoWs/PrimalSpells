@@ -63,11 +63,14 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 ./gradlew gameTestServer     # 跑 GameTest 后退出
 ./gradlew runData            # 数据生成（clientData 配置，输出到 src/generated/resources/）
 ./gradlew --offline build     # 依赖已缓存时可离线构建（首次不可用）
+./gradlew runCapture          # 实机录制：真客户端自动跑场景并抓帧（见 §9）
+python tools/capture/assemble.py   # 把帧合成 mp4/gif/拼图并判定
 ```
 
 `build.gradle` 中自定义的运行配置（`runs { … }`）：
 
 - `client`：窗口 1708×960，随机用户名 `Player####`（便于多开调试）。
+- `capture`：**实机录制**（`runType 'client'`，工作目录 `run/capture`，1280×720，场景由 `-Pcapture=` 选，见 §9）。
 - `server`：`--nogui`。
 - 三者都设置了 `neoforge.enabledGameTestNamespaces = primalspells`。
 - 工作目录：`run/<配置名>`（`client` → `run/client`）。
@@ -122,4 +125,83 @@ Kotlin 编译器手工编译「目标文件 + 一个同语义的最小替身」�
 
 1. 改代码 → `./gradlew compileKotlin`（快速反馈）。
 2. 功能可用性 → `./gradlew runClient`，进开发世界实测；崩溃看 `run/client/crash-reports/`，告警看 `run/client/logs/latest.log`。
+   （**没人操作电脑时**用 §9 的 `pwsh tools/capture/capture.ps1` —— 它会把实机画面录成视频给你看。）
 3. 交付前 → `./gradlew build`，并确认资源三件套（items/models/textures/lang）齐全（对照表见 [spell-development.md](spell-development.md)）。
+
+---
+
+## 9. 实机录制：一条命令看到「游戏里实际长什么样」
+
+第 7 节的离线自检只能验数值/几何；「粒子在屏幕上长什么样、动画有没有按设计跑」必须进游戏看。
+这一节把「开客户端 → 进世界 → 摆位置施法 → 按 F2 截图」整条链自动化：**真客户端 + 集成服务端跑真实施法路径**
+（`Wand.spell` / `Wand.tick`），逐 tick 抓一帧，合成视频并给出 PASS/FAIL 判定。
+
+```powershell
+pwsh tools/capture/capture.ps1                      # 三个场景全录（约 1 分钟）
+pwsh tools/capture/capture.ps1 -Scene black_hole    # 只录一个（逗号分隔可多个）
+pwsh tools/capture/capture.ps1 -SkipBuild           # 跳过前置的 gradlew build
+pwsh tools/capture/capture.ps1 -NoVideo             # 只判定 + 拼图，不调 ffmpeg
+
+# 等价的手工两步：
+./gradlew runCapture -Pcapture=all        # 录制（驱动录完自己退出）
+python tools/capture/assemble.py          # 合成 + 判定
+```
+
+产物都在 `build/capture/out/`（`build/` 不入库）：
+
+| 路径 | 内容 |
+|---|---|
+| `index.html` | **画廊**：三个场景并排（视频 + 动图 + 拼图 + 判定）—— 只想「看一眼」就看这个 |
+| `report.txt` | 判定结果（PASS/FAIL + 每个失败项） |
+| `<scene>/<scene>.mp4` | H.264 / 20fps / 1280×720 |
+| `<scene>/<scene>.gif` | 640 宽动图（贴到聊天里直接能动） |
+| `<scene>/contact.png` | 12 帧拼图（一眼看完整条时间线） |
+| `<scene>/frames/*.png` | 逐 tick 原始帧 + `frames.tsv`（帧号 ↔ tick ↔ gameTime） |
+
+### 9.1 驱动做了什么（`client/capture/CaptureDriver.kt`）
+
+| 阶段 | 行为 |
+|---|---|
+| 启动 | 关失焦暂停、隐藏 HUD、静音、关垂直同步、粒子设 ALL、渲染距离 8 |
+| 建世界 | 存档不存在就现场建**固定种子的超平坦世界**（`WorldOpenFlows.createFreshLevel`），存档存在则直接打开 |
+| 布景 | `/gamerule advance_time false` 等命令冻结时间/天气/刷怪，玩家进旁观（护盾场景用创造） |
+| 机位 | 每个场景一条**相机轨迹**（绕球心公转 / 第三人称转台），由服务端权威地每 tick 传送玩家 |
+| 施法 | 走真实路径：造 `Wand` → `wand.spell(player)`；被动（护盾）走 `wand.tick(caster, level)` |
+| 抓帧 | 客户端 tick 时记「本 tick 还没抓」，渲染线程在**本 tick 的第一帧**抓一次 → 恰好 20fps、每 tick 一帧 |
+| 断言 | 场景内检查（施法成功 / 清理干净 / 被动装载）写进 `meta.tsv`，由装配脚本收口 |
+| 收尾 | 等尾部帧落盘 → `mc.stop()` 自己退出（无人值守） |
+
+抓帧口径值得强调：**渲染帧率远高于 20Hz**，逐帧全录只会得到大量重复帧；
+「每 tick 一帧」既与游戏的实际动画步进一致，又让 100 多帧的体积可控。
+
+### 9.2 场景与判定口径
+
+| 场景 | 帧数 | 看什么 |
+|---|---|---|
+| `black_hole` | 108 | 整壳从中心长出（14t）→ 稳态 → t=70 触发正常死亡 → 向心塌缩（14t） |
+| `gravity_field` | 130 | 球形范围 + 下坠粒子 + 每 22t 一层落地波环 + 地面井环 |
+| `energy_shield` | 150 | 固定球体逐块搭起（16t）→ t=100「放下法杖」→ 逐块淡出消散 |
+
+`assemble.py` 的判定（**非零退出 = 有失败项**，可直接当 CI 门）：
+
+1. **帧数** = 场景声明长度，且驱动侧 `framesDropped == 0`；
+2. **场景内断言**全部通过（施法/清理/被动装载）；
+3. **空场起飞**：开头 2 帧几乎没有任何特效像素；
+4. **真的渲染了**：峰值特效像素超过阈值（证明粒子确实上了屏幕，而不是只有服务端状态对）；
+5. **收干净了**：最后 3 帧几乎没有任何特效像素；
+6. **退场是渐变的**（设计上有退场动画的效果：黑洞/护盾）或**立即且干净**（设计上没有的：重力场）。
+
+特效像素的判据是「偏蓝的亮像素」——黑底摄影棚里只有粒子满足（木桩、地面、天空都不满足），
+所以这条曲线同时充当「特效出现了/消失了/逐渐消失了」的证据。
+
+### 9.3 注意事项
+
+- 驱动只在**开发环境 + 系统属性**下注册（`CaptureDriver.shouldInstall()`）；
+  生产 jar 里 `CaptureDriver` 整个类不会被加载，也不注册任何监听器。
+- 每次跑都会删掉 `run/capture` 并从固定种子重建世界 —— **不碰 `run/client` 的存档与配置**。
+- 画面里的**黑底「摄影棚」**（地面与四壁换成黑色混凝土）是为了让细线粒子有对比度，属于**取景环境**，
+  不是玩法场景。想录自然地形：删掉 `CaptureScenes` 里的 `ctx.buildStudio(...)` 调用即可。
+- 加场景 = 两处一起改：`client/capture/CaptureScenes.kt` 的 `all()` 与 `tools/capture/assemble.py` 的 `SCENES` 表
+  （帧数/退场口径要对齐，否则判定会拦下来）。
+- 依赖：`ffmpeg`（PATH 里）+ `python`（`numpy` / `pillow`）；缺 ffmpeg 时 `-NoVideo` 仍能做判定与拼图。
+- 录制是**真机渲染**（AMD RX 7800 XT / 1280×720），窗口会真的弹出来；跑的时候别去动键盘鼠标。

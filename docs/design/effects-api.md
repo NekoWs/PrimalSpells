@@ -70,6 +70,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 锚在一个实体身上（形状刚性） | 整组用 `ParticleGroup.followEntity(uuid, offset, local)`；零散粒子用 `handle.attachTo(Entity/uuid/entityId, 偏移)`（1.0.9 起身份统一） | **0** | `EnergyShield` 球壳已改用**组**（要自转）；`attachTo` 当前无使用者 |
 | **逐粒子缓动移动**（一次性指令） | `handle.move(target, ticks, easing)`：每颗粒子一条指令，缓动在**客户端逐帧求值**；带宽 = 粒子数（一次性），不是每 tick | 一次性 | `BlackHole` **进场**（整壳 144 颗从球心长到球面）；⚠️ 服务端会**立即**把权威位置设为目标（`takeOverPosition`），所以只适合「位置无人读取」的纯视觉粒子 |
 | **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起，1.0.10 补批量设速/施力）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity(All)`/`applyForce(All)`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll`/`setVelocityAll` 为 1 包/tick） | **已在用**：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）。见 [../issues/resolved.md](../issues/resolved.md) 第 10/12 轮 |
+| **运行期才决定何时开始的组级动画**（长寿组） | ⚠️ **不能**对旧组 `delay + fadeOut`：组指令游标是「从建组时刻起累加的绝对时间」，客户端对 `startMs` 已过去的指令是**下一帧立即完成**（建组 100 tick 后追加＝瞬间淡完）；`fadeOut(removeAfter)` 的销毁延时又用同一游标按**相对 now** 调度，两端口径不一致。可行写法：**销毁旧组 → 在原地按同样成员/轴心建新组 → 对新组 `delay + fadeOut`**（新组程序起点＝now） | 一次性重铺成员 | `EnergyShield` 的消散波（第 17 轮）。已登记 PD 需求 |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
 六条硬要点：

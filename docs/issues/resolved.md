@@ -738,6 +738,37 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
   （烟是随机粒子），全局退场判定因此不稳定 → 给 spec 增加 `decay: none` 显式出口
   （声明"本场退场由专属判据负责"，并校验该判据存在），护盾的收场改由粉色 `breach_fade` 卡住。
 
+## 第 28 轮（2026-09-30，时间值改用秒并重排曲线；修 HUD 冷却条；爆炸改成「内爆 → 爆发」）
+
+| # | 问题 | 结论 | 落点 |
+|---|---|---|---|
+| 28.1 | 两个时间值用**毫秒**、且整体太长（施放延迟 0.70→0.15 s、充能时间 2.10→0.60 s） | 单位统一改成**秒**（`Wand.TICKS_PER_SECOND = 20`，NBT 两级迁移 `delay_ms` → `delay_sec`），并按用户口径重排：**施放延迟 0.50 → 0.30 s**、**充能时间 1.00 → 0.50 s**（都随等级递减）。Alt 面板 / 语言键 / 指令回报全部跟着走 | `Wand`、`WandTier`、`WandStats`、`SyncWandStatsPayload`、`ClientTooltipHandler`、`WandCommand`、lang |
+| 28.2 | HUD 的冷却条在**充能时间比施放延迟长**时仍显示施放延迟条 | 修前是 `if (showDelay) … else if (showRecharge)` —— delay 一活跃，更长的充能就永远看不见。改成按**剩余比例**选真正卡住施法的那条（`max(current/last)`；充能胜出时用充能色） | `client/hud/WandHudRenderer.kt` |
+| 28.3 | 爆炸用原版爆炸粒子（`EXPLOSION`/`EXPLOSION_EMITTER`），没有冲击力 | 改成**内爆 → 爆发**两拍：① 黑色核心球罩住**爆炸半径的 1/3**（180 颗 / scale 0.40）+ **8 条径向蓄力线条**（两侧尖中间略粗，`EASE_IN` 边向内平移边缩短）+ 32 颗向心聚拢粒子；② 爆发：球体从 0.35R **放大到 R**（`ParticleGroup.scale`，1.0.12 起连「到轴心的距离」一起缩放）+ 26 颗向外飞散粒子。**原版爆炸粒子全部删除** | `magic/effect/lifecycle/ExplosionFx.kt`（新）、`Explosion.kt` |
+| 28.4 | 蓄力意味着伤害被推迟（可躲） | 用户口径：小爆 **0.4 s**（8 tick）、大爆 **0.9 s**（18 tick），且**全部爆炸**都加蓄力（含火球命中 / 集束弹 / 弹跳爆炸）。结算用 `Deferred.after` 排到蓄力结束 —— **伤害时机与视觉一致** | `Explosion.startCharge`、`SmallExplosion` / `LargeExplosion` 的 `chargeTicks` |
+| 28.5 | 录制流水线看不见暖色爆炸、也判不了黑球 | `assemble.py` 新增**暖色判据**（`r > 150` 且 `r − b > 60`）、**暗核心判据**（亮度 < 40）与 per-scene 的 `metric` 选择；新增 `implosion` 场景，并给它**中灰摄影棚**（黑球在黑底棚里根本看不见） | `tools/capture/assemble.py`、`CaptureScenes.implosion`、`CaptureDriver.buildStudio(color = …)` |
+| 28.6 | 护盾场景因蓄力推迟而整体失准 | 大爆的断言窗口后移：`SHIELD_BLAST_SETTLE = 26`。⚠️ 26 而不是 18+3：实测结算比「放弹 + 18」还要晚约 4 tick（投射物入库 → 下一 tick 才 `die()` → `Deferred` 的 +1），**诊断日志**（`DIAG`）量出来的；场景 196 → 232 tick | `CaptureScenes.energyShield`、`assemble.py` 的破口窗口 |
+
+**本轮我自己踩的两个坑（都已修，留档）**：
+
+1. **内爆场景第一版把「被打的木桩」当成了施法者** → `applyDamageAndKnockback` 会排除 `source` 实体，
+   于是爆炸永远打不到它。是场景里那条 `burst-damage-landed` 断言（爆发后必须出现伤害数字）抓出来的，
+   改成 `ctx.player` 当施法者后转绿。
+2. **`assemble.py` 的 `dark_core` 断言多套了一层括号** → 报告生成时 `ValueError: not enough values to unpack`，
+   表现为「场景全绿但判定脚本崩了」（`capture.ps1` 退出码 1）。已修。
+
+**验证（实机录制 + 像素判定）**：
+
+- **4 个场景 / 548 帧 / 丢帧 0 / 场景内断言 21 条全过 / 运行日志 0 异常**，构建 **0 warning**。
+- `implosion`（新场景，中灰棚）5 条断言：蓄力期 PD 粒子 **300**（核心 180 + 线条 88 + 聚拢 32）、
+  **蓄力期间伤害数字 = 0**（伤害确实被推迟）、爆发期 **506** 颗、**爆发后伤害数字 = 1**、收干净 `remaining=0`；
+  像素：**暗核心峰值 2073 像素**（11/14 帧 ≥50% 峰值）、暖色峰值 **32714 像素** @帧 48。
+- `energy_shield`（重排后）8 条：`t=102 blast-absorbed mana=2615.5`（抵扣 345 MP）、
+  `t=142 breached-and-hit breached=true mana=300 伤害数字=1`、`t=212 laser-blocked mana=295`、
+  `t=229 breach-expired` + `pd-particles-zero`。
+- 目视复核（`build/capture/out/implosion/contact.png`）：静止 → **黑球 + 径向线条**（线条向内收）→
+  收成一点 → **一整个撑到爆炸半径的亮球 + 外飞粒子** → 收干净，与用户描述的顺序一致。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

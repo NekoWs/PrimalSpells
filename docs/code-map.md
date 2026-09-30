@@ -15,7 +15,7 @@
 | 改法杖等级数值（法力/充能速度/施放延迟/充能时间/槽位/施放数权重） | `wand/WandTier.kt`（**等级表 = 唯一事实源**） | [design/wand-tiers.md](design/wand-tiers.md)（口径）、`wand/Wand.kt`（消耗与冷却） |
 | 改投射物飞行 / 碰撞 | `magic/effect/geometry/Move.kt` | `magic/projectile/Projectile.kt`（`hitBlock`/`hitEntity`） |
 | 改命中伤害 | `magic/effect/lifecycle/Hurt.kt` | `magic/core/MagicStatus.kt`（`damage`） |
-| 改爆炸表现 / 范围 | `magic/effect/lifecycle/Explosion.kt` | `magic/core/MagicStatus.kt`（`explosion*`） |
+| 改爆炸表现 / 范围 / 蓄力时长 | `magic/effect/lifecycle/ExplosionFx.kt`（内爆 → 爆发）、`Explosion.kt`（蓄力与结算时机）、各法术的 `chargeTicks` | `magic/core/MagicStatus.kt`（`explosion*`）、[design/combat-pricing.md](design/combat-pricing.md) §4 |
 | 改区域场（黑洞 / 重力场） | `magic/effect/lifecycle/AreaFieldEffect.kt`（**首 tick 固定维度** + 半径/迟缓/拉拽/投射物施力钩子） | `BlackHole.kt` / `GravityField.kt`（参数与 PD 粒子）、`util/PdParticles.kt`（粒子管理器与生成入口） |
 | 改投射物外观（粒子） | `magic/effect/visual/ProjectileBody.kt`（本体）、`Trajectory.kt`（拖尾） | `util/PdParticles.kt`（管理器 + `spawnParticle`）、`lib/particledrawing`（`ParticleBatch`/`ParticleHandle` 在这里） |
 | 改「效果谁先跑」 | `magic/core/EffectPhase.kt`（阶段表） | `magic/core/Magic.kt`（排序执行） |
@@ -73,8 +73,8 @@
 | `projectile/DroneSwarm.kt` | `drone_swarm`（召唤 5 架无人机后立即死亡） |
 | `projectile/Laser.kt` | `laser`（高速短命，delay/recharge 为负） |
 | `projectile/TeleportProjectile.kt` | `teleport`（命中/消亡时传送施法者） |
-| `projectile/immobile/SmallExplosion.kt` | `small_explosion`（死亡时半径 3 / 伤害 4） |
-| `projectile/immobile/LargeExplosion.kt` | `large_explosion`（半径 6 / 伤害 8） |
+| `projectile/immobile/SmallExplosion.kt` | `small_explosion`（死亡时半径 3 / 中心伤害 12 / 蓄力 8 tick） |
+| `projectile/immobile/LargeExplosion.kt` | `large_explosion`（半径 6 / 中心伤害 24 / 蓄力 18 tick） |
 | `projectile/immobile/GravityFieldProjectile.kt` | `gravity_field`（静止光环，200 tick） |
 | `projectile/immobile/BlackHoleProjectile.kt` | `black_hole`（静止引力场） |
 | `modifier/`（26 个，逐个见 §3） | 修饰器实现 |

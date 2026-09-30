@@ -39,7 +39,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  └─ effect/                   特效（挂在投射物上的可组合行为）
 │     ├─ BaseEffect.kt          特效基类：六钩子 + phase + 同类叠加辅助（stackScale/isStackPrimary）
 │     ├─ geometry/              空间与运动：Position, Velocity, Move, Bounce, Tracking, ConstantAcceleration
-│     ├─ lifecycle/             时机与结算：Trigger, DelayedTrigger, Hurt, Explosion, AreaFieldEffect, BlackHole, GravityField
+│     ├─ lifecycle/             时机与结算：Trigger, DelayedTrigger, Hurt, Explosion（+ ExplosionFx 表现层）, AreaFieldEffect, BlackHole, GravityField
 │     └─ visual/                粒子表现：ProjectileBody（本体）, Trajectory（拖尾）
 ├─ wand/                        法杖运行时状态
 │  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（小数 tick + 余数累加）、NBT 序列化（槽位保序）

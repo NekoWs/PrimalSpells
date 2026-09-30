@@ -660,6 +660,41 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 - 落点：`event/ShieldDummyCommand.kt`（新）、`entity/TestDummyEntity.kt`、`PrimalSpells.kt`
 - 验证：端到端探针（见上）；构建 0 warning。
 
+## 第 26 轮（2026-09-30，护盾大改：耐久 → 强度/抗性 + 法力；攻击法术按 DPS 重新定价；持续攻击靶子）
+
+**用户口径**（三轮问答定稿，全文见 [design/combat-pricing.md](../design/combat-pricing.md)）：
+移除「耐久 / 破盾」，只要装卡护盾就是展开的；受击按「强度 vs 抗性」结算法力 ——
+强度 ≤ 抗性只付基础消耗，超出部分每点加价，**法力不够就是挡不住**（受击一圈碎裂 + 3 秒定向破口 + 粉色轮廓）。
+
+| # | 问题 | 结论 | 落点 |
+|---|---|---|---|
+| 26.1 | 攻击法术没有定价：火球 1 点伤害 × 20 发/秒 = **20 DPS**（比铁剑的 9.6 还高），单发却毫无手感 | 按**整体 DPS 对齐原版武器**（单体弹/瞬时命中 10 DPS、AoE 单体 8）重排：火球 1→5（delay 4/recharge 10）、触发火球 1→4（2/6）、小爆中心 4→12（12/30）、大爆中心 8→24（24/60）、爆炸兜底 5→6、伤害强化 +2→+3；穿刺不再削伤害（改 delay 4/recharge 8，200 法力留待等级表）；`laser` 保持 0.5 与负 delay —— 它的 DPS 只能靠**伤害**收敛（20 发/秒） | `magic/projectile/{Fireball,TriggerFireball}.kt`、`magic/projectile/immobile/{Small,Large}Explosion.kt`、`magic/core/MagicStatus.kt`、`magic/modifier/{DamageBoost,Piercing}.kt` |
+| 26.2 | 无人机白拿火球数值：`DroneEntity` 直接造投射物（不走牌堆/法力），火球涨到 5 之后 5 架无人机 = 25 伤害/秒，会变成全场最强单体输出 | 新增无人机专用弱弹 `drone_bolt`（伤害 2、冷绿贴图），无人机改发它 | `magic/projectile/DroneBolt.kt`（新）、`entity/DroneEntity.kt`、`magic/core/MagicManager.kt`、`items/models/textures` + 语言键 |
+| 26.3 | 护盾的耐久模型整体删除 | `EnergyShield` 只剩「方向索引 + 玻璃表现」：抗性 = 基础 2 + 每卡 2；基础弹开 5 MP + 超出每点 5 MP（固定值，等法杖分等级再重调）；MP 从护盾所在法杖的 `status.mana` 扣（新增 `Wand.spendMana`，不走 `consumeMana`）；挡不住 → 受击面板 + `Polyhedra.adjacency` 给出的相邻一圈（约 6–7 片）碎裂 + 60 tick 破口 + 粉色常驻轮廓 | `magic/modifier/EnergyShield.kt`、`util/Polyhedra.kt`（新增 `adjacency`）、`wand/Wand.kt` |
+| 26.4 | 爆炸怎么算 | 中心在**壳内侧** → 护盾不触发（壳挡不住已经发生在自己内部的事）；在外侧 → 强度 = **衰减后伤害 × 半径**，抵扣成功**只替持有者吃**（伤害与击退一起免），世界其他部分照常 | `magic/core/ShieldGuard.kt`（新）、`magic/effect/lifecycle/Explosion.kt` |
+| 26.5 | 穿透 | **完全无视护盾**：不结算、不出玻璃、不出破口（两个判定入口都会先跳过 `maxHitTargets < 0`） | `EnergyShield.tryBlock` |
+| 26.6 | **高速法术整发漏过护盾**（既有缺陷）：`laser` 单 tick 位移 5 格、`maxAge = 1`，它的「移动 + 命中结算 + 到寿死亡」全在 `MagicManager.tick`（`ServerTickEvent.Pre`）里做完，而被动扫场在同一 tick 更晚的实体 tick 才跑 —— 扫场再准也看不到它 | 判定改成「扫掠线段穿壳 + 起点在壳外」，并且**两个入口同一套规则**：① tick 末尾扫场（常规弹速）；② **命中兜底**（`Hurt` 在造成伤害前问一次 `ShieldGuard.absorbProjectile`）。`Move` 子步进是「`status.pos = checkPos` 之后才 `hitEntity`」，所以兜底拿到的 `pos - velocity` 仍是本 tick 的位移线段，判据成立 | `EnergyShield`（`tryBlock`/`absorbProjectile`）、`ShieldGuard.absorbProjectile`、`Hurt.kt` |
+| 26.7 | 「在护盾里」施法也会弹出一块玻璃 | 判据改为「**从外侧**穿过壳面」：起点在壳内不算穿越 → 不挡、不出玻璃（用户口径「施法过近本来就挡不住」） | 同上 |
+| 26.8 | 用户要「一个持续攻击我的靶子」看第一视角 | `/primalspells shielddummy attack [法术] [间隔]`：靶子每 N tick 朝 32 格内最近的玩家打一发（直接构造投射物、不占牌堆不耗法力 —— 与 `DroneEntity` 同一条路），索敌**不排除**创造/旁观玩家 | `event/ShieldDummyCommand.kt`、`entity/TestDummyEntity.kt` |
+| 26.9 | 耐久没了以后，HUD / 网络 / 存档上的护盾耦合 | 删除 `SyncShieldPayload`、`ShieldHudRenderer`、`ClientPayloadSink.shield`、`Lore` 的 4 个键与对应语言键、护盾的运行期状态持久化；`magicStates` 机制保留但**当前无使用者**（与 `onPassiveIdle`/`onUnloaded` 一起登记在 [open.md](open.md) §2） | `network/`、`client/hud/`、`client/PrimalSpellsClient.kt`、`PrimalSpells.kt`、`util/Lore.kt`、lang |
+| 26.10 | 顺带修掉的文档缺陷 | PD 版本号在 6 篇文档里漂移（写 1.0.11，而 `gradle.properties` 与 `lib/` 已是 1.0.12），`build-and-run.md` 内部还自相矛盾 | `docs/{architecture,build-and-run,conventions,README,design/effects-api}.md` |
+
+**验证（实机录制 + 像素判定）**：
+
+- **场景内断言 16/16**（`black_hole` 4、`gravity_field` 4、`energy_shield` **8**），三场景 **434 帧 / 丢帧 0**；运行日志 0 异常。
+- `energy_shield` 的 8 条（`build/capture/capture.log`）：
+  `t=19 idle-invisible mana=3000` → `t=62 hits-blocked mana=2970`（四次点射各扣 10 = 基础 5 + 超出 1 点 × 5）→
+  `t=79 blast-absorbed mana=2615.5`（大爆强度 72、抗性 4 → **345 MP**）→
+  `t=100 breached-and-hit breached=true mana=300 伤害数字=1`（法力不足 → 挡不住、不扣钱、伤害真的落到身上）→
+  `t=172 laser-blocked mana=295.0`（**26.6 的命中兜底**：单 tick 穿壳贴脸的高速法术被拦下）→
+  `t=193 breach-expired` + `pd-particles-zero remaining=0`。
+- **像素判定 32 条全过**，其中第 26 轮新增的粉色破口判据：破口峰值 **1776 像素**、**42/45 帧**常驻、
+  到期是**淡出**（尾段 7 帧仍可见、末帧归零）。
+- **目视复核**（`build/capture/out/energy_shield/contact.png` 与 `frames/00142.png`）：
+  静止窗口**全黑**（平时不可见 ✓）、受击那一侧亮一块白玻璃、大爆是一团白色烟、
+  打穿后**一圈粉色点阵多边形轮廓**挂在受击方向（读得懂「这里能打」✓）、末帧干净。
+- 构建 **0 warning**。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

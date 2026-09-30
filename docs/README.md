@@ -71,7 +71,7 @@ PrimalSpells/
 | **牌堆 / 抽牌** | 施法时按 `cast` 预算从 `drawPile` 抽牌进 `hand`，结算后进 `discardPile`；抽牌堆空时回洗并附加 `recharge` | `wand/Wand.kt` |
 | **TriggerSpell** | 触发法术：会额外抽牌组成 `payload`，命中时触发 payload 内法术 | `magic/core/TriggerSpell.kt` |
 | **wandId / pouchId** | 物品数据组件里的唯一标识（UUID 字符串），用于把物品栈关联到服务端的 `Wand` 实例或小包内容 | `item/component/WandID.kt` |
-| **HUD** | 法杖数值条与能量护盾数值条 | `client/hud/` |
+| **HUD** | 法杖数值条（法力/冷却） | `client/hud/` |
 
 ## 5. 推荐的阅读 / 改动路径
 

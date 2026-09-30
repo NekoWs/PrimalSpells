@@ -29,7 +29,8 @@
 | 改小包容量 / 内容 | `item/SpellPouchItem.kt`（`SLOT_COUNT` + 组件读写） | `client/tooltip/PouchTooltip.kt` |
 | 改小包/法杖的键鼠操作 | `item/SpellPouchItem.kt` / `item/WandItem.kt`（`overrideOtherStackedOnMe`） | `client/input/SpellSlotScrollHandler.kt` |
 | 改滚轮选槽（法杖/小包） | `client/input/SpellSlotScrollHandler.kt` | `network/SelectSpellSlotPayload.kt`、`registry/ModItems.kt`（选中槽组件） |
-| 改 HUD（法力/冷却/护盾条） | `client/hud/WandHudRenderer.kt`、`ShieldHudRenderer.kt` | `network/SyncWandStatsPayload.kt`、`SyncShieldPayload.kt` |
+| 改 HUD（法力/冷却条） | `client/hud/WandHudRenderer.kt` | `network/SyncWandStatsPayload.kt` |
+| 改伤害 / 施法间隔 / 护盾强度与抗性 | [design/combat-pricing.md](design/combat-pricing.md)（口径表） | 各法术 `init` 里的 `status.damage`/`delay`/`recharge`、`EnergyShield` 的字段 |
 | 改 tooltip 文案/布局 | `client/tooltip/ClientTooltipHandler.kt`、`WandSpellTooltip.kt`、`PouchTooltip.kt` | `util/Lore.kt`（词条类型） |
 | 改 Ctrl+左键拖拽交换 | `client/input/ClientContainerDragHandler.kt` | `mixin/AbstractContainerScreenInvokerMixin.java` |
 | 改法术 id ↔ 物品映射 | `registry/ModItems.kt`（`MAGICS`/`spellItem`/`spellIdOf`） | — |
@@ -66,6 +67,7 @@
 | `core/TriggerSpell.kt` | 触发法术接口（`triggerCast` + `payload`） |
 | `projectile/Projectile.kt` | 投射物基类：装配 4 个内建效果、命中/弹跳分派、`maxAge`/`maxHitTargets` 等字段 |
 | `projectile/Fireball.kt` | `fireball`（基础火球：Trajectory + Hurt） |
+| `projectile/DroneBolt.kt` | `drone_bolt`（无人机专用弱弹：伤害 2，不占牌堆、不耗法力） |
 | `projectile/TriggerFireball.kt` | `trigger_fireball`（+ `Trigger`） |
 | `projectile/DelayedCastProjectile.kt` | `delayed_cast`（静止，死亡时沿施法方向释放 payload） |
 | `projectile/DroneSwarm.kt` | `drone_swarm`（召唤 5 架无人机后立即死亡） |
@@ -104,7 +106,6 @@
 | 文件 | 内容 |
 |---|---|
 | `network/SyncWandStatsPayload.kt` | S→C：法杖数值（HUD / tooltip） |
-| `network/SyncShieldPayload.kt` | S→C：护盾状态（HUD） |
 | `network/SelectSpellSlotPayload.kt` | C→S：选中的法术槽位（法杖/小包共用，含 `send()`） |
 | `network/ClientPayloadSink.kt` | 公共侧→客户端的可空回调；由 `PrimalSpellsClient` 安装，保证公共入口不引用客户端类 |
 | `event/WandEventHandler.kt` | 公共侧：右键拦截（不与方块/实体交互但可施法）、登录补发同步、登出清理施法记录 |
@@ -132,7 +133,6 @@
 | `PrimalSpellsClient.kt` | 客户端 `@Mod(dist=CLIENT)`：安装 `ClientPayloadSink`、注册 tooltip 工厂/渲染器/输入、镜头冲击、登出清理缓存 |
 | `ScreenShakeClient.kt` | 镜头冲击（屏幕震动 + FOV 抽动）的客户端求值；受原版「受伤视角晃动」强度控制 |
 | `hud/WandHudRenderer.kt` | 准星下法力/延迟/充能条（`@EventBusSubscriber(CLIENT)`，含 `clear()`） |
-| `hud/ShieldHudRenderer.kt` | 屏幕顶端护盾条（`@EventBusSubscriber(CLIENT)`，含 `clear()`） |
 | `tooltip/ClientTooltipHandler.kt` | 组装 tooltip：法杖槽位网格/Alt 属性、小包网格、选中槽法术词条 |
 | `tooltip/WandSpellTooltip.kt` | 法杖 9 列槽位 tooltip 组件（+`ClientWandSpellTooltip`，选中槽高亮） |
 | `tooltip/PouchTooltip.kt` | 小包 8 列槽位 tooltip 组件（+`ClientPouchTooltip`，选中槽高亮） |
@@ -159,6 +159,7 @@
 | id | 类 | 类型 | 文件 |
 |---|---|---|---|
 | `fireball` | `Fireball` | 投射物 | `magic/projectile/Fireball.kt` |
+| `drone_bolt` | `DroneBolt` | 投射物 | `magic/projectile/DroneBolt.kt` |
 | `trigger_fireball` | `TriggerFireball` | 投射物（触发） | `magic/projectile/TriggerFireball.kt` |
 | `delayed_cast` | `DelayedCastProjectile` | 投射物（触发） | `magic/projectile/DelayedCastProjectile.kt` |
 | `drone_swarm` | `DroneSwarm` | 投射物 | `magic/projectile/DroneSwarm.kt` |
@@ -193,7 +194,7 @@
 | `sphere_orbit` | `SphereOrbit` | 修饰器（`OVERRIDE` 定位） | `magic/modifier/SphereOrbit.kt` |
 | `teleport` | `TeleportProjectile` | 投射物 | `magic/projectile/TeleportProjectile.kt` |
 | `quantum_entanglement` | `QuantumEntanglement` | 修饰器（生成子弹） | `magic/modifier/QuantumEntanglement.kt` |
-| `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`；功能可用，数值/手感待调，见 [issues/open.md](issues/open.md) 1.1；球壳为五/六边形面板 + 展开/收起，第 15 轮） | `magic/modifier/EnergyShield.kt`、`util/Polyhedra.kt` |
+| `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`）：常驻展开、平时不可见；格挡按「强度 vs 抗性」扣法力，挡不住就出**定向破口**（第 26 轮重做，口径见 [design/combat-pricing.md](design/combat-pricing.md) §3–§4） | `magic/modifier/EnergyShield.kt`、`util/Polyhedra.kt`、`magic/core/ShieldGuard.kt` |
 
 **非法术物品**（`registry/ModItems.kt` 直接注册）：`wand`、`spell_pouch`、`test_dummy`。
 
@@ -213,8 +214,8 @@
 | 客户端事件 / 渲染 / tooltip | `client/` 对应子包 | `PrimalSpellsClient`（或 `@EventBusSubscriber(CLIENT)`） |
 | 想要个「会挨打的盾」在游戏里自己看 | 游戏内跑 `/primalspells shielddummy [卡片数]`（清理用 `… shielddummy clear`），然后用手上的法术打它 |
 | 录一个特效的实机表现 | `client/capture/CaptureScenes.kt` 加场景 + `tools/capture/assemble.py` 的 `SCENES` 表加帧数/退场口径 | `pwsh tools/capture/capture.ps1` |
-| 改护盾自转轴/角速度 | `EnergyShield` 的 `SHELL_SPIN_AXIS` / `SHELL_SPIN_RADIANS_PER_TICK`。⚠️ 面板是**分批**建的：每块必须用 `rotate(轴, 晚生时长 × 角速度, 0)` 补到同一相位，否则整球错位（`resolved.md` 第 22 轮） |
-| 调护盾玻璃板的样子/时长 | `EnergyShield` 的常量段：`GLASS_EDGE_SCALE`/`GLASS_EDGE_COLOR`（冷白亮边）、`GLASS_FILL_SCALE`/`GLASS_FILL_COLOR`（≈18% 冷白填充）、`HIT_*`（受击停留与淡出）、`BREAK_*`（破盾飘散）、`RECOVERY_*`（恢复一闪）；面板密度由 `SHELL_POINTS_PER_EDGE`（6，点距 = 棱长 1.166 ÷ 点数）决定，粒子实际尺寸 ≈ `scale × 0.213` 格 |
+| 改护盾的判定半径 / 破口大小与时长 | `EnergyShield` 的 `SHELL_RADIUS`（**表现面 = 判定面 = 「壳内侧」界线**）与字段 `breachTicks`；破口范围由 `Polyhedra.adjacency` 给出的「一块 + 相邻一圈」决定（护盾第 23 轮起不再自转，第 22 轮那套补相位写法已删除） |
+| 调护盾玻璃板的样子/时长 | `EnergyShield` 的常量段：`GLASS_EDGE_SCALE`/`GLASS_EDGE_COLOR`（冷白亮边）、`GLASS_FILL_SCALE`/`GLASS_FILL_COLOR`（≈18% 冷白填充）、`HIT_*`（格挡玻璃）、`SHATTER_*`（打穿碎裂）、`BREACH_OUTLINE_*`（破口粉色轮廓）；面板密度由 `SHELL_POINTS_PER_EDGE`（6，点距 = 棱长 1.166 ÷ 点数）决定，粒子实际尺寸 ≈ `scale × 0.213` 格 |
 | 给某个特效加「重音」（震屏 / 爆闪 / 落地溅射） | 特效里调 `util/ScreenShake.shake(...)` + 一次性 `spawnParticle(...)`；**晚于特效死亡**的重音用 `util/Deferred.after(level, ticks) { ... }` | 参数抄 `BlackHole`/`GravityField`/`EnergyShield` 的常量段 |
 | 语言键 | `resources/assets/primalspells/lang/{zh_cn,en_us}.json` | — |
 | 资源三件套 | `resources/assets/primalspells/{items,models/item,textures/item}/` | — |

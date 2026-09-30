@@ -26,11 +26,12 @@ src/main/kotlin/work/nekow/primalspells/
 │  │  ├─ EffectPhase.kt         效果执行阶段（SETUP/MODIFIER/MOTION/OVERRIDE/VISUAL）
 │  │  ├─ MagicStatus.kt         投射物运行时状态（pos/velocity/damage/age/bounces/爆炸参数）
 │  │  ├─ MagicManager.kt        法术 id 注册表、投射物列表、每 tick 驱动、创建法术实例
+│  │  ├─ ShieldGuard.kt         「命中/爆炸 → 护盾」接入缝：通用效果只问这一句，不认识具体法术
 │  │  ├─ Modifier.kt            修饰器基类（effects() 克隆注入）
 │  │  └─ TriggerSpell.kt        触发法术接口（payload 组装）
 │  ├─ projectile/               投射物（非 MC Entity 的服务端对象）
 │  │  ├─ Projectile.kt          投射物基类：装配 Position/Velocity/Move/ProjectileBody，命中分派
-│  │  ├─ Fireball.kt TriggerFireball.kt Laser.kt TeleportProjectile.kt
+│  │  ├─ Fireball.kt DroneBolt.kt TriggerFireball.kt Laser.kt TeleportProjectile.kt
 │  │  ├─ DelayedCastProjectile.kt DroneSwarm.kt
 │  │  └─ immobile/              静止/定点类投射物
 │  │     ├─ SmallExplosion.kt LargeExplosion.kt GravityFieldProjectile.kt BlackHoleProjectile.kt
@@ -51,13 +52,13 @@ src/main/kotlin/work/nekow/primalspells/
 │  └─ component/ WandID.kt      数据组件值类型（wand_id 与 pouch_id 共用）
 ├─ entity/                      自定义实体与 AI 目标：Drone(+3 Goal)/TestDummy/DamageNumber
 ├─ network/                     payload 定义与客户端分发点
-│  ├─ SyncWandStatsPayload.kt / SyncShieldPayload.kt      S→C
+│  ├─ SyncWandStatsPayload.kt / ScreenShakePayload.kt    S→C
 │  ├─ SelectSpellSlotPayload.kt                           C→S（法杖/小包共用的选槽同步）
 │  └─ ClientPayloadSink.kt                               公共侧→客户端的可空回调（专用服务器安全）
 ├─ event/                       公共侧事件处理器：WandEventHandler（右键屏蔽、登录同步、登出清理）、ShieldDummyCommand（测试指令 `/primalspells shielddummy`，见 build-and-run.md §9）
 ├─ client/                      仅在客户端加载（Dist.CLIENT）的代码
 │  ├─ PrimalSpellsClient.kt     客户端入口：安装 ClientPayloadSink、注册渲染器/tooltip/输入、登出清缓存
-│  ├─ hud/                      WandHudRenderer, ShieldHudRenderer
+│  ├─ hud/                      WandHudRenderer
 │  ├─ tooltip/                  ClientTooltipHandler, WandSpellTooltip/ClientWandSpellTooltip,
 │  │                           PouchTooltip/ClientPouchTooltip, SpellSlotTracker
 │  ├─ input/                    SpellSlotScrollHandler（滚轮选槽，法杖/小包共用）, ClientContainerDragHandler（Ctrl+左键拖拽交换）
@@ -188,7 +189,7 @@ magic/modifier  ──→ magic/core, magic/effect
 | `item/SpellPouchMenu.kt`, `item/SpellPouchInventory.kt` | `item/menu/` | 与物品强耦合的容器实现 |
 | `utils/` | `util/` | 单数命名 |
 | `client/entity/`（Model/Renderer/RenderState） | `client/render/` | 与 `entity/` 区分：这是表现层 |
-| `client/WandHudRenderer.kt`, `ShieldHudRenderer.kt` | `client/hud/` | HUD |
+| `client/WandHudRenderer.kt` | `client/hud/` | HUD |
 | `client/ClientTooltipHandler.kt`, `WandSpellTooltip.kt`, `PouchTooltip.kt`, `WandTooltipTracker.kt` | `client/tooltip/` | tooltip |
 | `client/SpellPouchScreen.kt` | `client/screen/` | 屏幕 |
 | `client/ClientContainerDragHandler.kt` | `client/input/` | 输入交互 |

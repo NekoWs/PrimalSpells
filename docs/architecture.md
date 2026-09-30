@@ -9,11 +9,11 @@
 
 ```
                      ┌──────────────────────────── 客户端（client/）────────────────────────────┐
-                     │ HUD（法杖数值条 / 护盾条）  tooltip（法术词条、槽位预览）                   │
+                     │ HUD（法杖数值条）             tooltip（法术词条、槽位预览）                   │
                      │ 输入（滚轮选槽、Ctrl+左键拖拽交换）与 tooltip/HUD 表现                  │
                      │ 实体渲染（Cube/Sphere/Drone 的 Model+Renderer）                            │
                      └───────────────▲──────────────────────────────┬───────────────────────────┘
-                          S→C payload（数值/护盾）          C→S payload（选槽/编辑）
+                          S→C payload（法杖数值/镜头）    C→S payload（选槽/编辑）
                      ┌───────────────┴──────────────────────────────▼───────────────────────────┐
                      │ network/  payload 定义与编解码                                            │
 ┌────────────────────┴──────────────────────────────────────────────────────────────────────────┐
@@ -52,12 +52,12 @@
 - `die()`：按注入顺序触发 `onDie()`，再调 `onDie()`；
 - `onInventoryTick()`：仅当 `needInventory = true` 且法杖在主手/副手时，由 `Wand.tick(caster)` 每 tick 驱动（被动法术的持有期入口）。
 - `onPassiveIdle()`：法杖**这一 tick 没有被任何实体驱动**时，由 `Wand.tick(level = …)` 的闲置分支逐 tick 驱动一次
-  —— 用于「放下后延迟清理 / 播淡出动画」这类收尾（`EnergyShield` 用它做球壳的 4 tick 延迟销毁）。
+  —— 用于「放下后延迟清理 / 播淡出动画」这类收尾（**当前没有使用者**：第 26 轮护盾重做后不再有常驻球壳；钩子保留给将来需要「放下后收尾」的法术）。
   判断依据是 `lastPassiveTick` 落后当前 `gameTime` 超过 1 tick（闲置分支跑在 `ServerTickEvent.Pre`，早于实体 tick）。
 - `onUnloaded()`：法术**被从法杖上取下**（或槽位被替换）时调用一次 —— 由 `Wand.load()` 对「本次重建后不再装载」的实例触发，
   也由 `Wand.unload()`（法杖内存实例被回收）触发。用于清理「只该在装载期间存在」的东西：
   取下之后该实例**不再有任何 tick**（`onInventoryTick`/`onPassiveIdle` 都不会再跑），
-  不在这里清理就会把永存粒子组之类的资源永远留在世界里（`EnergyShield` 的球壳就是例子）。
+  不在这里清理就会把永存粒子组之类的资源永远留在世界里（**当前没有使用者**：护盾第 23 轮起改用「每次现铺、淡出后由 PD 自行销毁」的玻璃面板组）。
 - `clone()`：**从注册表新建一枚「本次施法实例」**，不是字段拷贝——修饰器会把效果注入实例自身的 `effects`，复用实例会让效果累积；`id` 未注册时直接抛 `IllegalStateException`（而不是 `!!` 的 NPE）。
 
 ### 2.2 `Projectile`（`magic/projectile/Projectile.kt`）
@@ -226,7 +226,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 - **牌堆也入库**：`draw_pile`/`hand`/`discard_pile`（法术 id 序列）随存档保存并在读档后覆盖还原。
   这是「内存实例可被回收 + 懒加载」的前提 —— 不存就会出现「放下法杖再捡起 = 重新洗牌」。
 - **法术运行期状态**：`magic_states`（法术 id → NBT），由 `saveTag` 逐个问 `loadedMagics` 要（`Magic.saveRuntimeState`），
-  读档时经 `Magic.loadRuntimeState` 回灌。当前用户是 `EnergyShield`（当前耐久 + 破盾暂停），因此重登/重启/被回收后再懒加载都不再回满。
+  读档时经 `Magic.loadRuntimeState` 回灌。**当前没有使用者**（第 26 轮护盾改成「强度 vs 抗性 + 法力」后不再有需要跨存档的进度）；机制保留给将来「有进度的法术」。
   注意键是**法术 id**：同一 id 的重复卡共享一份状态。
 - **持有者记录与回收**（`WandManager`）：`markHeld(wandId, 实体 UUID, gameTime)` 是唯一写入口，
   由 `WandItem.inventoryTick`（任何实体的背包/装备槽 tick）与 `Wand.spell`（任何实体主动施法，覆盖生物施法）调用；
@@ -241,12 +241,11 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 | payload | 方向 | 关键字段 | 处理 |
 |---|---|---|---|
 | `SyncWandStatsPayload` | S→C | wandId、当前/上限法力、当前/上次 delay、recharge、cast、charge | 经 `ClientPayloadSink.wandStats` → `client/hud/WandHudRenderer.putStats` |
-| `SyncShieldPayload` | S→C | wandId、durability、maxDurability、pauseTicks、breakPauseTicks | 经 `ClientPayloadSink.shield` → `client/hud/ShieldHudRenderer.putShield` |
 | `ScreenShakePayload` | S→C | amplitude(0..1)、ticks | 经 `ClientPayloadSink.screenShake` → `client/ScreenShakeClient`：**只发重音那一拍**（8 字节），逐帧偏移/衰减在客户端本地算（见 §9 第 9 条） |
 | `SelectSpellSlotPayload` | C→S | targetId、slot、pouch | 遍历背包：`pouch=false` 按 `wand_id` 匹配并写 `WAND_SELECTED_SLOT`；`pouch=true` 按 `pouch_id` 匹配并写 `POUCH_SELECTED_SLOT` |
 
 **公共侧不引用客户端类**：S→C 包的处理器在公共入口注册，但真正的客户端逻辑通过 `network/ClientPayloadSink`
-（三个可空回调）转发，由 `client/PrimalSpellsClient` 在初始化时安装实现；专用服务器上它们保持 `null`。
+（两个可空回调）转发，由 `client/PrimalSpellsClient` 在初始化时安装实现；专用服务器上它们保持 `null`。
 
 **编杖/编包不走自定义包**：一律走原版「物品对上物品」交互（`WandItem`/`SpellPouchItem.overrideOtherStackedOnMe`），
 只有滚轮选槽需要显式同步选中槽（物品组件只有服务端权威）。
@@ -255,7 +254,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 | 子包 | 内容 | 触发方式 |
 |---|---|---|
-| `client/hud/` | `WandHudRenderer`（法力/冷却条）、`ShieldHudRenderer`（护盾条） | 消费 S→C payload，缓存按 `wandId`，登出清空 |
+| `client/hud/` | `WandHudRenderer`（法力/冷却条） | 消费 S→C payload，缓存按 `wandId`，登出清空 |
 | `client/tooltip/` | `ClientTooltipHandler`（组装词条）、`WandSpellTooltip`/`PouchTooltip`（自定义 tooltip 组件，都高亮选中槽）、`SpellSlotTracker`（法杖与小包共用的「预览槽位」缓存） | `RenderTooltipEvent.GatherComponents` + 组件工厂 |
 | `client/input/` | `SpellSlotScrollHandler`（滚轮选槽：法杖与小包共用，发 `SelectSpellSlotPayload`）、`ClientContainerDragHandler`（Ctrl+左键拖拽交换，复用原版 `slotClicked(PICKUP)` 协议） | `ScreenEvent`，注册在 `PrimalSpellsClient` |
 | `client/render/` | `DroneEntityModel`/`DroneEntityRenderer`（立方体/球体调试实体已随死代码清理删除） | `EntityRenderersEvent` |
@@ -284,7 +283,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 7. **命中回调每个 tick 都会触发**（投射物停在实体体内时）：穿刺玩法依赖这一点，`Move` 刻意不去重。
 8. **触发法术 payload 是一次性的**：释放即清空，穿刺多次命中不会重复释放。
 9. **公共侧不引用客户端类**：S→C 包一律经 `network/ClientPayloadSink` 转发（见 §6）。
-10. **粒子表现有两条路**：法术粒子走 `particledrawing`（`wand.status.particleManager`，服务端权威 + 客户端插值）——投射物本体/拖尾/黑洞与重力场的球壳与运动粒子/护盾球壳都在这一路（集合簿记用 PD 的 `ParticleBatch`，见 §9）；纯装饰性的一次性撒点走原版 `ServerLevel.sendParticles`（爆炸、无人机、传送、护盾弹开命中）。
+10. **粒子表现有两条路**：法术粒子走 `particledrawing`（`wand.status.particleManager`，服务端权威 + 客户端插值）——投射物本体/拖尾/黑洞与重力场的球壳与运动粒子/护盾玻璃面板都在这一路（集合簿记用 PD 的 `ParticleBatch`，见 §9）；纯装饰性的一次性撒点走原版 `ServerLevel.sendParticles`（爆炸、无人机、传送、护盾弹开命中）。
 11. **区域场每 tick 结算、离开即解除**：`AreaFieldEffect` 每 tick 刷新迟缓并施加拉拽，实体离开范围（或效果结束）时**立刻**撤销迟缓，不留尾巴。
 12. **区域场的维度在首 tick 捕获**（`AreaFieldEffect.fieldLevel`）：不能每 tick 读 `caster.level()` —— 施法者跨维度后那是**新**维度，而场的坐标还在旧维度，会导致迟缓/投射物施力/粒子一起静默失效。
 
@@ -308,37 +307,35 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 ## 9. 与 ParticleDrawing 的接口现状
 
 - 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.12-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
-- 集合类粒子（球壳、被吸入粒子、下落粒子、护盾球壳）**成员簿记统一交给 PD 的 `ParticleBatch`**：
+- 集合类粒子（黑洞球壳、被吸入粒子、下落粒子）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
   [issues/resolved.md](issues/resolved.md) 第 10 轮与 [design/effects-api.md](design/effects-api.md) §0.3。
-- **护盾球壳**（`EnergyShield`）现状（第 16 轮）：球壳是**截角二十面体**（足球）——
-  12 个五边形 + 20 个六边形共 32 块面板（几何由 `util/Polyhedra.kt` 生成，带 `require` 自检），
-  **每块面板一个 `ParticleGroup`**，沿自身边界铺一圈粒子（每条棱 3 点 → 共 540 颗、永存）。
-  动画是**球体固定、逐块构建 / 逐块消散**：`updateShieldVisual` 每 tick 建 2 块（各自 `fadeIn(6)`），
-  面板按中心高度**由低到高**排 → 像从脚下往上搭起来（约 16 tick）；消散反向逐块
-  `delay(阶梯) + fadeOut(5, removeAfter = true)`（约 1 秒的渐变，PD 自己排销毁 → 法术被取下/法杖被回收后动画照样放完）。
-  稳态 `followEntity` 跟随 + `spin` 自转，**0 包/tick**。
+- **护盾玻璃**（`EnergyShield`）现状（第 26 轮；几何仍是第 16 轮那套）：面板拓扑是**截角二十面体**（足球）——
+  12 个五边形 + 20 个六边形共 32 块（几何由 `util/Polyhedra.kt` 生成，带 `require` 自检），
+  **每块面板一个 `ParticleGroup`**，沿自身边界铺一圈粒子（每条棱 6 点）。
   ⚠️ **密度按「粒子实际尺寸」反推**（第 20 轮实测的换算，第 21 轮定的取向）：PD 的
   `quadSize = scale × 0.1 × texScale`，实测 `texScale ≈ 2.1` → **实际格数 ≈ scale × 0.213**，不是 `scale` 本身。
   棱长 1.166 格（半径 1.7）÷ 每条棱的点数 = 点距。
   **取向：点距明显大于粒径，保留「粒子感」，靠点阵读出五/六边形** ——
-  现在 **6 点/棱（点距 0.194 格）+ `SHELL_SCALE = 0.25`（实际 ≈0.053 格）= 1080 颗**。
+  现在 **6 点/棱（点距 0.194 格）+ 亮边 `scale = 0.26`（实际 ≈0.055 格）**。
   第 20 轮曾把点距做到 ≈ 粒径（14 点/棱 + scale 0.40 = 2520 颗）去追求**连续实线**：
   球外看是干净的线框，但**球内第一人称**最近处一颗方块占 80+ 像素，糊成粗带、多边形也看不清
   （实机反馈「不完美的形状很丑」）。结论：**不要再往连续实线调**（要成倍粒子，且近看必然糊）。
-  第 23 轮按实机反馈（太挡视野 / 一直转会晕 3D）**重做成「受击处展开的玻璃护盾」**：
-  **平时完全不可见**，只在三个瞬间现形 —— ① 格挡生效时在**受击方向最近的那一块面板**处亮一块玻璃板
-  （亮边 + ≈15% 填充，约 0.35 秒淡出，每次命中各出一片）；② 破盾时整罩**一闪而碎**（面板沿法线向外飘散）；
-  ③ 恢复时全身轮廓**极淡一闪**。做法上 `shieldPanels` 从「球壳成员表」变成**方向索引**
-  （`maxByOrNull { it.center.dot(受击方向) }`），每个时机用 `spawnGlassPanel` 现铺一个**新建的组**
-  （先 `followEntity` 再铺成员，`delay + fadeOut(removeAfter = true)` → PD 自己销毁，不依赖本实例继续 tick）。
-  **自转、逐块构建波、消散波、以及第 22 轮那套「分批建组补相位」全部删除** —— 整壳只在破盾/恢复两个瞬间
-  整体出现，天然同相位。玻璃的「磨砂」观感是**临时降级**：程序化粒子的贴图写死为纯白方块，
+  第 23 轮按实机反馈（太挡视野 / 一直转会晕 3D）**重做成「受击处展开的玻璃护盾」**，第 26 轮沿用这套表现：
+  **平时完全不可见**，只在两个时机现形 —— ① **格挡成功**：受击方向最近的那一块面板亮起一块玻璃板
+  （亮边 + ≈18% 填充，约 0.35 秒淡出，每次格挡各出一片）；② **打穿（法力不足）**：受击那一块 + **相邻一圈**碎裂
+  （向外飘散 + 淡出），随后是**持续整段破口期的粉色轮廓**（`Color.ofInt(255,118,118,150)`，提示攻击者「这里能打」）。
+  做法上 `shieldPanels` 是**方向索引**（`maxByOrNull { it.center.dot(受击方向) }`），
+  `panelNeighbours`（`Polyhedra.adjacency`：共享一条棱 = 相邻）给出破口那一圈；
+  每个时机用 `spawnGlassPanels` 现铺**新建的组**（先 `followEntity` 再铺成员，
+  `delay + fadeOut(removeAfter = true)` → PD 自己销毁，不依赖本实例继续 tick）。
+  **自转、逐块构建波、消散波、整罩「一闪而碎 / 恢复一闪」、以及第 22 轮那套「分批建组补相位」全部删除** ——
+  护盾不再有常驻外观，也就没有相位问题。玻璃的「磨砂」观感是**临时降级**：程序化粒子的贴图写死为纯白方块，
   真玻璃要等 PD 开放贴图/UV（需求已登记，见 [issues/pd-api-requests.md](issues/pd-api-requests.md)）。
 - 已接线（七种用法，均对应 PD 的低带宽写法）：
   1. **组级编排**：`Draw.<形状>(...)` 铺形状 + `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` /
-     `.fadeIn/.fadeOut` / `.move`——护盾的 32 块面板组、黑洞球壳、重力场的波环与井环；
+     `.fadeIn/.fadeOut` / `.move`——护盾的玻璃面板组（每次格挡/碎裂现铺一组）、黑洞球壳、重力场的波环与井环；
      跟随/旋转/淡入淡出/平移都由客户端每 tick 本地求值，**0 包/tick**；
   2. **锚定**：`ParticleHandle.attachTo(实体, 世界空间偏移)`——需要「一堆各自独立的粒子钉在实体上」时用
      （当前没有使用者；护盾已改用第 1 条）；
@@ -367,22 +364,19 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
      ⚠️ `Deferred.tick()` 必须**先摘出到期任务、再统一执行** —— 任务体会再排新任务，
      边迭代边执行会抛 `ConcurrentModificationException` 打崩服务端（第 19 轮实测踩到）。
   12. **落点重音（一次性粒子 + 镜头冲击）**：`spawnParticle(pos, color, scale, lifetime, velocity)`
-     炸一圈 + `ScreenShake.shake(...)`（黑洞塌缩爆闪、重力场波环落地溅射、护盾展开冲击波/破盾炸裂）。
+     炸一圈 + `ScreenShake.shake(...)`（黑洞塌缩爆闪、重力场波环落地溅射）。
      这些时刻**晚于特效自己的生命周期**，所以由 `util/Deferred`（服务端延迟队列，`MagicManager` 每 tick 推）
      排到点触发；`Deferred` 是**我们自己的时序簿记**，不涉及任何粒子同步/求值（那仍然全归 PD）。
   8. **「重建组」代替「给旧组追加动画」**（第 17 轮）：需要「运行期才决定何时开始」的组级动画时，
      不要对旧组 `delay + fadeOut`（游标是绝对时间，晚追加＝瞬间完成），而是
      **销毁旧组、在原地按同样的成员/轴心建新组**，再对新组下发 `delay + fadeOut` ——
      新组程序起点就是 now，动画时序与销毁时刻都精确。代价：一次性重铺成员（与构建同量级）。
-     护盾的消散波在用；PD 需求落地后可删。
+     （当前无使用者：第 17 轮为护盾消散波引入，第 23 轮重做后随常驻球壳一起删除。）
 - 管理器获取：统一走 `wand.pdParticles(level)`（缺失/跨维度时现场建立），未来生物施法者也有粒子表现；
   生成一颗粒子的写法统一走 `ParticleManager.spawnParticle(...)`（`util/PdParticles.kt`，不含簿记）。
 - 未使用：`attachToLocal`（需要「贴在身前/身侧」的粒子时可用）、`applyForceAll`（需要每颗各自的力时才有意义；
   恒定的力已用逐粒子 `applyForce` 接入重力场）、`ParticleGroup.pulse`/`recolor`/`movePath`/`expression`、
   `ParticleGroup.destroyAfter`（收起动画用 `fadeOut(removeAfter = true)` 即可）。
-  ⚠️ `ParticleGroup.scale`/`pulse` 目前**只缩粒子的视觉尺寸，不缩粒子到轴心的距离**（与它们的 KDoc 不符），
-  所以「整壳胀大/塌缩」这条最直觉的写法不可用，已登记需求；现在的径向动画用**逐粒子缓动**
-  （黑洞进场）与**重新生成 + 向心初速**（黑洞退场）表达。
 - 未接线：`.pdrawc` 动画特效（锚点/播放时钟/资源注册表那一整套）。设计方案与落地阶段见 [design/effects-api.md](design/effects-api.md)；
   1.0.8-ALPHA 新增的 `EffectCallbacks` / `EffectVarStore` 正是为此准备；1.0.9-ALPHA 另提供 `ParticleBatch`（程序化粒子集）与统一的实体锚点身份；
   1.0.11-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。

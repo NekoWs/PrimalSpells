@@ -15,6 +15,7 @@ import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.projectile.TeleportProjectile
 import work.nekow.primalspells.magic.modifier.*
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.util.Deferred
 
 object MagicManager {
     val registry = mutableMapOf<String, () -> Magic>()
@@ -47,6 +48,8 @@ object MagicManager {
         }
         projectiles.addAll(pendingAdd)
         pendingAdd.clear()
+        // 延迟重音（塌缩爆闪、波环落地溅射…）也在这里推进：它们必须在效果死掉之后仍然到点触发
+        Deferred.tick()
     }
 
     init {
@@ -96,5 +99,6 @@ object MagicManager {
     @SubscribeEvent
     fun onServerStopping(event: ServerStoppingEvent) {
         projectiles.clear()
+        Deferred.clear()
     }
 }

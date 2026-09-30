@@ -43,6 +43,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         // 1. 网络包的客户端处理器
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
         ClientPayloadSink.shield = { ShieldHudRenderer.putShield(it) }
+        ClientPayloadSink.screenShake = { ScreenShakeClient.onShake(it) }
 
         // 2. 实机录制驱动（开发期自动化测试的「眼睛」）：
         //    只在「非生产环境 + 显式系统属性 primalspells.capture」下注册；
@@ -50,6 +51,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         if (CaptureDriver.shouldInstall()) CaptureDriver.install()
 
         // 3. 纯客户端事件与功能注册
+        ScreenShakeClient.install()
         NeoForge.EVENT_BUS.register(ClientTooltipHandler)
         NeoForge.EVENT_BUS.register(ClientContainerDragHandler)
         NeoForge.EVENT_BUS.register(SpellSlotScrollHandler)

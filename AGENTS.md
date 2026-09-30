@@ -14,6 +14,7 @@
 | 要「看一眼实机效果」/ 改完特效要留证据 / 没人操作电脑 | `docs/build-and-run.md` 第 9 节（实机录制流水线） |
 | 改核心机制，或判断某设计是否有意为之 | `docs/architecture.md` 第 8 节「关键不变量与陷阱」+ `docs/issues/`（台账：未解决 / 待验证 / 已解决 / PD 需求） |
 | 做粒子特效、升级 `particledrawing` 前置 | `docs/design/effects-api.md` |
+| 改伤害 / 施法间隔 / 护盾强度与抗性（战斗数值） | `docs/design/combat-pricing.md` |
 
 ## 硬性要求
 

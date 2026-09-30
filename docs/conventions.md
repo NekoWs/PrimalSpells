@@ -210,7 +210,7 @@ magic/modifier  ──→ magic/core, magic/effect
 ## 9. 外部依赖政策：ParticleDrawing（硬性）
 
 `particledrawing` 是本模组的**必需前置**（`neoforge.mods.toml`：`required` + `AFTER`），
-仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.11-ALPHA`）。
+仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.12-ALPHA`）。
 它是粒子能力的**唯一实现方**，PrimalSpells 只负责接线。
 
 **红线：遇到它的 API 缺陷 / 签名不符 / 能力缺失时，不得在本模组自行编写另一套实现。**
@@ -230,7 +230,7 @@ magic/modifier  ──→ magic/core, magic/effect
   `ParticleSwarm` 就是反例：自写的句柄/寿命簿记接连引出四个 bug）。
 - 升级依赖的固定流程（都用 `gradle.properties` 做单一数据源，不再手改 `mods.toml`）：
   新 jar 放 `lib/` → 改 `particledrawing_version`（jar 文件名版本段）与 `particledrawing_version_range`
-  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.11-ALPHA,)`，写 `[1.0.10,)` 不匹配 `1.0.11-ALPHA`）→
+  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.12-ALPHA,)`，写 `[1.0.12,)` 不匹配 `1.0.12-ALPHA`）→
   `./gradlew build --no-build-cache`；
   **构建失败就回到上面两条（停下 + 提需求），不要就地绕开**。
 

@@ -13,10 +13,10 @@
 
 ---
 
-**当前未决 3 条**：第 15 轮登记的两条 —— `ParticleGroup.scale`/`pulse` 只缩视觉尺寸、
+**当前未决 4 条**：第 15 轮登记的两条 —— `ParticleGroup.scale`/`pulse` 只缩视觉尺寸、
 不缩「粒子到轴心的距离」（与它们的 KDoc 不符）；`ParticleGroup.move` 会改掉 arm 基准轴心（编排顺序陷阱）；
-外加第 17 轮登记的**「组指令缺少『从现在起』的时间锚点」**（建组很久之后再追加动画会瞬间完成，
-见下节最后一条）。
+外加第 17 轮登记的**「组指令缺少『从现在起』的时间锚点」**（建组很久之后再追加动画会瞬间完成）与
+第 19 轮登记的**「`spin` 与一次性 `rotate` 应该叠加，而不是互相覆盖」**（见下节最后两条）。
 
 另有两条已闭环：
 
@@ -126,6 +126,29 @@
   而在新组上补回旧相位补不出来 —— PD 的 `spin` 与一次性 `rotate` 是**各自按自己的基准写 `rel`、后者覆盖前者**，
   不叠加（见 `ClientAnimationProgramManager.applySlot` → `rotateToSnapshot`）。
   恢复条件 = (a)/(b)/(c) 任一落地后，可删掉「自己算游标 + 自己排销毁」这两步。
+
+### [需求] `ParticleGroup` 的 `spin`（持续）与 `rotate`（一次性）应可叠加
+
+- 状态：未决（第 19 轮登记；本侧已改用「不重建组、保住原有自转」绕开）
+- 目标能力：**在一个已经转了一阵子的组上「接着转下去」**。触发场景：护盾球壳消散时想把旧组的淡出
+  挪到新建的组上（因为 PD 缺「从现在起」的游标，见上一条），需要让新组**从旧组当前的角度**继续自转，
+  而不是跳回 0（跳回去会看到球壳「啪」地整颗转一下）。
+- 现有 API 为什么不够：`ClientAnimationProgramManager.applySlot` 里 `Spin` 与 `RotateOnce` 都调用
+  `rotateToSnapshot(p, slot, axis, angle)`，而它是 **`st.rel = base.rotateAround(axis, angle)`** ——
+  `base` 是**该指令槽自己**的 `snapRel` 快照。两条旋转指令各自从自己的快照整体重写 `rel`，
+  **后应用的覆盖先应用的**，两者不相加。于是「`rotate(补相位, 0t)` + `spin(同轴同速)`」里
+  `spin` 会把自己的角度（程序刚开始 ≈ 0）写回去，补的相位白补；反过来顺序则干脆不转。
+- 复现：对同一个组先 `spin(axis, r)`（跑 100 tick），再 `rotate(axis, 100*r, 0)` + 再 `spin(axis, r)`：
+  期望「从当前角度继续以 r 转」；实际角度由最后应用的那条决定（≈ 0 或不转）。
+- 期望 API 形态（任一即可）：
+  - (a) `rotateToSnapshot` 改为**在当前 `rel` 上叠加**（`st.rel = st.rel.rotateAround(axis, delta)`，
+    并把 `RotateOnce` 的缓动按每帧增量下发）——最符合直觉，但会改变现有语义，需在 KDoc 里写明；
+  - (b) 另给 `spinFrom(axis, radiansPerTick, initialRadians)`，一次性指定起始相位 + 角速度；
+  - (c) 至少暴露「当前已累计的旋转角」（配合上一条的 `elapsedMs()`），让使用方自己烘进成员坐标。
+- 影响面：`magic/modifier/EnergyShield.kt`（消散时想保留自转相位；当前改为**不重建组**，
+  于是不需要补相位，但这也意味着上一条需求的绕法被迫更绕）。
+- 临时降级：**不重建组** —— 直接对旧组追加淡出（自转天然延续），销毁交给本模组的 `util/Deferred`。
+  恢复条件 = 本需求 (a)/(b)/(c) 之一 + 上一条游标需求落地后，可回到「重建组」的写法（若那时还有必要）。
 
 ---
 

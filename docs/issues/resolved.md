@@ -769,6 +769,14 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 - 目视复核（`build/capture/out/implosion/contact.png`）：静止 → **黑球 + 径向线条**（线条向内收）→
   收成一点 → **一整个撑到爆炸半径的亮球 + 外飞粒子** → 收干净，与用户描述的顺序一致。
 
+**⚠️ 表现质感的阻塞（本轮实机反馈「太丑、没有冲击力」）**：用户给了参考效果 —— **柔边发光丝线 + 半透球壳 + 黑核带亮边**。
+当前 PD 的程序化粒子只能画**硬边白方块**（贴图写死 8×8 纯白，无 texture/uv/aniso/朝向入口），
+堆密度只会更糊。按政策**不自行另写替代实现**：已把达成整个特效所需的整组能力按优先级登记到
+[pd-api-requests.md](pd-api-requests.md) —— **P0 硬阻塞 5 项**（贴图注册 / 逐粒子贴图+子矩形 UV / 各向异性尺寸 /
+朝向+自转 / 载荷扩字段）、**P1 质感 3 项**（`ParticleStyle.SOFT_DOT` + `LINE`、`Builder.additive`、可选 bloom）、
+**P2 省事 3 项**（`Draw.*` 加 glowing/texture/aniso、polyline 图元、逐粒子生成延迟）。
+本轮**暂停这块的继续尝试**；形态与相位方案已定，能力到位即重做表现层（只是换实现，不改契约）。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

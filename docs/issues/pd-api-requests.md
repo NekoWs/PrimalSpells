@@ -13,47 +13,78 @@
 
 ---
 
-**当前未决 1 条**（第 23 轮登记）：程序化粒子也应能指定贴图 / UV（见下）。
+**当前未决：1 组**（第 23 轮首次登记贴图/UV，第 28 轮合并为「达成整个特效所需的整组能力」）。
 
 四个历史需求（第 15/17/19 轮登记）已由 **ParticleDrawing 1.0.12-ALPHA** 全部实现，
 逐条对照与「本侧因此简化了什么」见 [resolved.md](resolved.md) 附录 B「ParticleDrawing 已闭环条目」。
 
 ---
 
-### [需求] 程序化粒子也应能指定贴图 / UV（现在是**写死的 8×8 白方块**）
+### [需求组] 程序化粒子需要「贴图 / UV / 各向异性 / 朝向 / 加色」整组能力
 
-- 状态：未决（第 23 轮登记；本侧已用「密集小方块拼几何」降级，玻璃质感因此只能做到"磨砂"，做不到"真玻璃"）
-- 目标能力：
-  1. **柔边/半透明贴图**：护盾「半透明玻璃」的受击面板、能量球壳、薄雾类效果 —— 硬边方块的堆叠在近距离会糊成一块（实机反馈过「不完美的形状很丑」）；
-  2. **线段贴图 + 各向异性**：一条棱用**一张沿线段拉长的贴图、一颗粒子**就能画完。现在画一条连续的棱要沿棱每 0.05 格放一颗、一条棱 20+ 颗、整颗球壳上千颗，近距离仍是一串方块（第 20 轮实测：`scale 0.40` 的方块在球内最近处占 80+ 像素）；
-  3. **子矩形 UV**：一张图集里放多种形状（点/线/月牙/六边形），按粒子选 UV。
-- 现有 API 为什么不够（均为源码核对，不是猜）：
-  - **贴图写死**：`core/client/TextureCache.defaultWhite()` 造的是 **8×8 全不透明纯白**，且它是程序化粒子的唯一贴图（KDoc 明说「无贴图粒子的默认全白纹理」）；
-  - **API 无入口**：`ParticleHandle.Builder` 只暴露 `position/color/scale/lifetime/group/offsetFromPivot/glowing/lightLevel/spawn`，**没有 texture / uv / style**；`api/ParticleStyle.kt` 目前是**空文件**；
-  - **载荷无槽位**：`core/network/ParticleSpawnPayload` 的字段只有 `particleId/xyz/rgba/scale/lifetime/groupId/glowing/lightLevel` —— 服务端就算想指定贴图，**也没有地方传**（批量子类载荷同理）；
-  - **能力其实已经有了，只是没接过来**：`.pdrawc` 那条路一直支持自定义贴图与 UV ——
-    `Animation.Builder.texture(name, bytes)`、`groupUV(name, UvData)`、`ParticleBuilder.uv(UvData)`、
-    `FunctionBuilder.uv(...)`，底层走 `TextureCache.load(name, pngBytes)`（运行时注册 `DynamicTexture`，名字映射到 `particledrawing:custom/<md5>`）。
-    也就是说「解码 + 注册 + UV 归一化」这套机制是现成的，缺的只是**程序化粒子的入口与载荷字段**。
-  - 复现：`manager.create().position(p).color(c).scale(0.25f).spawn()` → 屏幕上是一个**硬边白方块**；
-    想画「一条线」只能靠密集排列（见上面的数量级），且没有柔边可用。
-- 期望 API 形态（(a)+(b) 为主，(c) 顺手做也好）：
-  - **(a) 注册入口**：`ParticleManager.registerTexture(name: String, pngBytes: ByteArray)`（内部走现成的 `TextureCache.load`），
-    或复用一个全局 `ParticleTextures.register(...)`；返回可复用的句柄/名字。未知名字必须**回落 `default_white` 而不是丢粒子**。
-  - **(b) 逐粒子指定**：`ParticleHandle.Builder.texture(name)` + 可选 `.uv(u0, v0, u1, v1)`（子矩形）
-    + `.anisotropic(width, height)`（或 `scale(x, y)`）—— 后者让「一张线段贴图沿棱拉长」成立。
-  - **(c) 内置基础形状**（对第三方最省事）：`ParticleStyle.SOFT_DOT`（柔边圆点）/ `SQUARE`（现状）/ `LINE`（沿指定方向拉长），
-    配 `Builder.style(ParticleStyle)`；其中**柔边圆点**是能量护盾 / 玻璃 / 薄雾这类效果最缺的那一个。
-  - **载荷**：`ParticleSpawnPayload`（及批量子类载荷）增加贴图标识与可选 UV/各向异性字段；
-    若组程序的成员也要带贴图，按「生成时定死、后续更新不变」的约定最省带宽（否则每次全量重发都要带）。
-  - 线程与生命周期：注册沿用现有 `TextureCache`（客户端 `TextureManager`，主线程）；服务端只持有名字/字节。
-    「贴图在生成时确定、之后不可变」这个约定我们能接受，不接受也不会阻塞 —— 只要入口存在即可。
-- 影响面：`magic/modifier/EnergyShield.kt`（受击玻璃面板）、`magic/effect/lifecycle/*`（凡是「用粒子拼线」的地方）、
-  `util/PdParticles.kt`（封装入口会加 texture/style 参数）。
-- 临时降级：**继续用密集小方块拼几何**（现状）：玻璃面板 = 半透明方点铺满 + 亮边，
-  能做到「磨砂玻璃」，做不到「清透玻璃」；棱仍是点阵而非实线。
-  恢复条件 = (a)+(b) 或 (c) 任一落地后，本侧把「铺满面板」换成**一张柔边贴图**、把「沿棱排点」换成**沿棱拉长的线段贴图**
-  （粒子数可降一到两个数量级）。
+- **状态**：未决（第 23 轮登记贴图/UV；第 28 轮按"达成整个特效"合并成一组，补上优先级与源码依据）
+- **场景**：爆炸的**「内爆 → 爆发」**表现 —— 黑色核心球 + **发光螺旋丝线**向心收拢 → 塌成亮点 →
+  **半透球壳**撑到爆炸半径 + 内部锯齿闪电丝 + 壳裂成分段弧飞散。
+  目标观感的关键是**柔边 + 发光的长丝线**；用现在的硬边白方块点阵堆，只会得到"马赛克"，堆得越多越糊
+  （第 28 轮实机反馈：「太丑」「没有冲击力」）。
+
+**为什么现有 API 不够（逐条源码依据，`lib/particledrawing-1.0.12-ALPHA-sources.jar`）**
+
+| 想要的效果 | 现状 | 源码位置 |
+|---|---|---|
+| 柔边圆点（黑核 / 能量球 / 薄雾） | 程序化粒子的贴图写死为 **8×8 纯白硬边方块** | `core/client/TextureCache.defaultWhite()`（`NativeImage(8,8)` 全不透明）；`core/client/BridgeParticle.resolveTexture()` 对没有 uv 的粒子直接回落它 |
+| 逐粒子贴图 / 子矩形 UV | `ParticleHandle.Builder` 只有 `position/color/scale/lifetime/group/glowing/lightLevel/offsetFromPivot/spawn` —— **没有 texture / uv**；`api/ParticleStyle.kt` 是**空文件** | `api/ParticleHandle.kt`（Builder 私有字段与方法清单） |
+| 载荷没有槽位可传 | `ParticleSpawnPayload` 字段只有 `particleId/xyz/rgba/scale/lifetime/groupId/glowing/lightLevel` | `core/network/ParticleSpawnPayload.kt:24-33` |
+| 一条丝 = 一张沿线段拉长的贴图 | **渲染层其实已经支持**：双轴尺寸 `scaleW/scaleH`、非广告牌朝向 + 自转都对 `.pdrawc` 开放；缺的只是程序化入口与载荷 | `BridgeParticle`：`scaleW/scaleH = scaleArray[0/1] × EDITOR_TO_MC_SCALE × texScale`（:177-179）、`syncOrientation(billboard, spin, spinLocal)`（:57）、`orientationQuaternion()`；同层的动画模型 `AnimParticle(..., uv, billboard, spinLocal)`（`core/network/ParticleAnimationCodec.kt:188`）早就在用这些字段 |
+| 发光溢出（加色辉光） | 只有 `glowing`（全亮不受光照）与 `lightLevel`；**加色语义在动画那条路已有**（`FunctionObject(..., additive)`），程序化入口没有 | `api/Animation.kt:247`（`glowing`）、`core/network/ParticleAnimationCodec.kt:277`（`additive`） |
+| 图元直接产出发光丝线 | `Draw.*` 内部 `spawnInto` 只设 `position/color/scale/lifetime/group/offsetFromPivot` —— **连 `glowing` 都没设** | `api/Draw.kt:338-346` |
+
+**期望 API 形态**（按对本次效果的必要性排序）
+
+**P0 —— 硬阻塞（不做就出不来参考质感）**
+
+1. **贴图注册入口**
+   `ParticleManager.registerTexture(name: String, pngBytes: ByteArray): Boolean`
+   （内部走现成的 `TextureCache.load(name, pngBytes)`，幂等；**未知名字必须回落 `default_white` 而不是丢粒子**）
+2. **逐粒子贴图 + 子矩形 UV**
+   `ParticleHandle.Builder.texture(name: String)` + `.uv(u0: Float, v0: Float, u1: Float, v1: Float)`
+   （或直接 `.uv(uv: UvData)`，复用动画那套结构）
+3. **逐粒子各向异性尺寸**
+   `ParticleHandle.Builder.scale(w: Float, h: Float)` → 接到 `BridgeParticle.scaleW/scaleH`
+   （现在的 `scale(Float)` 是各向同性；一条沿线段拉长的贴图必须能单独控制长/短轴）
+4. **逐粒子朝向**
+   `ParticleHandle.Builder.billboard(enabled: Boolean)` + `.spin(radians: Double, spinLocal: Boolean = true)`
+   → 接到 `syncOrientation(...)`。**这是"丝线沿线段方向对齐"的必要条件**（否则线段贴图永远面向相机，方向不可控）
+5. **载荷扩字段**（唯一涉及协议改动的一项）
+   `ParticleSpawnPayload`（若批量/更新类载荷也要带，同样扩）增加
+   `textureName: String?`、`uv: UvData?`、`scaleW/scaleH: Float`、`billboard: Boolean`、`spin: Double`、`spinLocal: Boolean`。
+   **约定：生成时定死、后续不变** → 不增加任何逐 tick 包（现有 `ParticleUpdatePayload` 等更新类载荷可以不动）。
+
+**P1 —— 质感的一半在这里，工作量很小，建议与 P0 同批**
+
+6. **内置基础形状**：把 `api/ParticleStyle.kt`（现在空文件）填成
+   `enum class ParticleStyle { SQUARE, SOFT_DOT, LINE }`，并加 `Builder.style(style)` + `ParticleManager.registerBuiltinTextures(…)`。
+   `SOFT_DOT` = 柔边圆点（黑核"实心球"、能量球壳"膜感"、薄雾最缺的就是它）；
+   `LINE` = 沿指定方向拉长、两端渐隐的线段贴图（配合 3、4 用）
+7. **加色混合开关**：`Builder.additive(enabled: Boolean)`。参考图「光溢出来」的那层效果靠它；
+   PD 自己持有渲染类型（`core/client/BatchedQuadParticleGroup.kt:22` 注册 `PARTICLE_DRAWING_BATCHED`），
+   加一趟 additive pass 即可，不必让使用方碰渲染层
+8. （可选）**emissive 泛光/bloom 后处理**：能让能量类特效再上一个台阶；不做也能靠 6+7 到八成
+
+**P2 —— 省事，不急**
+
+9. `Draw.*` 图元接受 `glowing / texture / aniso / taper` 参数（现在连 `glowing` 都没有，见上表最后一行）
+10. 一个 **polyline / beam 图元**：`Draw.polyline(points: List<Vec3>, thickness: Float, taper: Boolean, texture: String?, additive: Boolean)`
+    —— 闪电丝/能量弧一条调用画完（我现在得为每条丝手写 40+ 颗粒子）
+11. **逐粒子生成延迟**（动画路径有 `st`）：让我用一条指令铺出「分批出现」的收拢粒子
+
+- **影响面**：`magic/effect/lifecycle/ExplosionFx.kt`（本次全部表现）、`util/PdParticles.kt`（封装入口要加 `texture/style/scale2/spin` 参数）、
+  `magic/modifier/EnergyShield.kt`（受击玻璃面板同样受益：一条棱一张贴图，粒子数可降一到两个数量级）
+- **临时降级**：**本次爆炸视觉暂停在这一步**（不再往程序化粒子上堆密度 —— 堆到参考的连续度需要每颗爆炸上千颗粒子，
+  近距离仍是硬方块、且只会更糊）。已交付的**形态**保留：黑核 + 蓄力线条 + 向心聚拢 → 球壳放大到爆炸半径 + 外飞粒子、
+  伤害推迟到蓄力结束（见 [resolved.md](resolved.md) 第 28 轮）。
+- **恢复条件**：P0 任一项落地即可开始逐项改善（贴图/UV 先解锁柔边，各向异性+朝向解锁丝线，加色解锁辉光）；
+  **P0 全落地 = 能完整做出参考那套**。几何与相位方案已定，届时只需重写表现层。
 
 ---
 
@@ -66,7 +97,7 @@
 | `lib/` 下的版本与 `particledrawing_version` 必须一致 | `lib/` 只留 `1.0.12-ALPHA` | 若手工塞入别的版本，容易对照错 API | 对照 API 一律以 `lib/particledrawing-1.0.12-ALPHA-sources.jar` 为准 |
 | 位置指令会清掉速度与力 | `ServerParticleEngine.takeOverPosition`：`move`/`track`/`trackAll` 一律 `velocity=0`、`accel=0` | 「位置驱动」与「速度/力驱动」不能混用在同一颗粒子上 | 同一粒子只选一种驱动方式；见 [design/effects-api.md §0.3](../design/effects-api.md) |
 | 运动指令一律解除实体锚点 | 位置（`move`/`track`）、速度（`setVelocity`/`setVelocityAll`）、力（`applyForce`/`applyForceAll`）都接管位置 | 先 `attachTo` 再给速度/力＝锚点被解掉，粒子不再跟随实体 | 1.0.11-ALPHA 起口径统一（此前 `setVelocity` 漏了解除，位置每 tick 仍被锚点覆盖） |
-| **程序化粒子固定使用纯白方块贴图** | `TextureCache.defaultWhite()` = 8×8 全白；`ParticleHandle.Builder` 与 `ParticleSpawnPayload` 都没有贴图/UV 字段（贴图只对 `.pdrawc` 开放） | 「细线」「柔边」「玻璃质感」都只能用密集硬方块逼近，近距离必然发糊（第 20 轮实测） | 第 23 轮已登记为 API 需求（见上）；在它落地前，护盾球壳与玻璃面板都用**点阵/磨砂**路线（点距 0.194 格 vs 粒径 0.053 格） |
+| **程序化粒子固定使用纯白方块贴图** | `TextureCache.defaultWhite()` = 8×8 全白；`ParticleHandle.Builder` 与 `ParticleSpawnPayload` 都没有贴图/UV 字段（贴图只对 `.pdrawc` 开放） | 「细线」「柔边」「玻璃质感」都只能用密集硬方块逼近，近距离必然发糊（第 20 轮实测） | 已并成上文的 **P0 整组需求**；落地前，护盾球壳/玻璃面板用点阵、爆炸用少量方块（不再堆密度） |
 | **粒子「实际尺寸」不是 `scale` 本身** | `BridgeParticle`：`quadSize = scale × 0.1 × texScale`；实机/录制实测 `texScale ≈ 2.1` → **实际格数 ≈ scale × 0.213** | 按「scale = 格数」估密度会严重偏小：护盾球壳 3 点/棱 + scale 0.3 画出来是一串**断点**（实机反馈「有两条线条」就是它） | 密度按「点距 ≈ 实际尺寸」反推：点距 0.083 格 → `scale 0.40`；见 `EnergyShield` 的 `SHELL_POINTS_PER_EDGE`/`SHELL_SCALE` |
 
 ---

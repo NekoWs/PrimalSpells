@@ -57,9 +57,10 @@ import kotlin.math.min
  * - **构建**：`updateShieldVisual` 每 tick 建 [BUILD_PANELS_PER_TICK] 块面板（各自的组 + 一圈粒子 +
  *   `fadeIn([BUILD_FADE_TICKS])`）；[shieldPanels] 已按**面板中心高度由低到高**排序，于是整颗球像被
  *   **从脚下往上搭起来**，共约 16 tick；
- * - **消散**：反向（最后搭起来的最先拆）逐块 `fadeOut([FOLD_FADE_TICKS], removeAfter = true)`，
- *   每块之间用 `delay` 错开一个阶梯；PD 自己排销毁任务，所以**即使本实例此后不再被 tick
- *   （法术被取下 / 法杖被回收）动画照样放完**，也不留孤儿粒子；
+ * - **消散**：反向（最后搭起来的最先拆）把球壳**原地重建成一组新组**，每块各带
+ *   `delay(阶梯) + fadeOut([FOLD_FADE_TICKS], removeAfter = true)`；
+ *   新组的程序起点就是「现在」，所以阶梯与销毁时刻都精确（细节与 PD 侧的坑见 [foldShieldVisual]），
+ *   且**即使本实例此后不再被 tick（法术被取下 / 法杖被回收）动画照样放完**，不留孤儿粒子；
  * - **不再使用 `move`**：面板不位移，也就不碰 PD 的「第一条指令不能是 `move`」那条坑
  *   （`move` 会改组的轴心字段，而客户端 arm 时拿它反算相对偏移，见 `docs/issues/pd-api-requests.md`）。
  *
@@ -100,7 +101,12 @@ class EnergyShield : Modifier() {
      * 「跟随 + 自转 + 展开/收起」，这些在组里都由**客户端本地求值**（每 tick 零网络包），
      * 服务端只在建立与录制新指令时下发。
      */
-    private val shell = ArrayList<ParticleGroup>()
+    private val shell = ArrayList<ShellPanel>()
+
+    /**
+     * 球壳的一块面板：粒子组 + 它的几何（几何要留到消散时用，见 [foldShieldVisual]）。
+     */
+    private class ShellPanel(val group: ParticleGroup, val panel: Polyhedra.Panel)
 
     /** 已经建到第几块面板（0 = 还没开始）：构建被摊到多 tick 上，见 [buildShieldPanels]。 */
     private var buildCursor = 0
@@ -338,7 +344,7 @@ class EnergyShield : Modifier() {
             // 第一条指令必须是「不挪轴心」的：fadeIn 只做透明度编排，arm 时轴心仍是球心
             group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
             group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
-            shell += group
+            shell += ShellPanel(group, shieldPanels[index])
         }
         buildCursor = end
     }
@@ -354,9 +360,48 @@ class EnergyShield : Modifier() {
      */
     private fun foldShieldVisual() {
         if (shell.isEmpty()) return
-        for ((order, group) in shell.reversed().withIndex()) {
-            group.delay((order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS)
-            group.fadeOut(FOLD_FADE_TICKS, removeAfter = true)
+        val level = shellLevel
+        val holderUuid = shellHolder
+        val holder = level?.let { holderUuid?.let(it::getEntity) }
+        // 拿不到「当初那块地方」时只能硬销毁（例如持有者已下线）：宁可瞬间消失，也不留孤儿粒子
+        if (level == null || holderUuid == null || holder == null) {
+            for (p in shell) p.group.remove()
+            shell.clear()
+            buildCursor = 0
+            shellLevel = null
+            shellHolder = null
+            idleTicks = 0
+            return
+        }
+
+        // ⚠️ 为什么是「原地重建」而不是直接给旧组 `delay + fadeOut`：
+        // 组的指令时间游标（cursorMs）是**从建组时刻起累加的绝对时间**，
+        // 而 `fadeOut` 的 `removeAfter` 又用这个绝对游标去排**相对 now** 的销毁任务（PD 侧两端口径不一致）。
+        // 于是「建组很久之后再追加淡出」这件事：客户端把它当作早已过去的时刻 → 瞬间淡完；
+        // 若把游标推到 now 让客户端正确，服务端销毁又会被推后整段已运行时长（留下看不见的粒子）。
+        // 见 `docs/issues/pd-api-requests.md`。这里的绕法是用**刚建的新组**下发淡出：
+        // 新组的程序起点就是 now，`delay` 与 `fadeOut(removeAfter)` 两个口径同时成立。
+        // 代价是消散时一次性重铺一遍球壳（与构建时同量级的一次性突发），换来精确的逐块淡出 + 自清理。
+        val manager = wand.pdParticles(level)
+        val bodyOffset = shellCenterOffset(holder)
+        val feet = holder.position()
+        val center = feet.add(0.0, bodyOffset, 0.0)
+        for ((order, entry) in shell.reversed().withIndex()) {
+            entry.group.remove()
+            val fading = manager.createGroup(feet)
+            fading.followEntity(holderUuid, Vec3(0.0, bodyOffset, 0.0))
+            for (offset in entry.panel.ring) {
+                manager.create()
+                    .position(center.add(offset))
+                    .color(SHELL_COLOR)
+                    .scale(SHELL_SCALE)
+                    .lifetime(PD_IMMORTAL)
+                    .group(fading.id)
+                    .offsetFromPivot(offset)
+                    .spawn()
+            }
+            fading.delay((order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS)
+            fading.fadeOut(FOLD_FADE_TICKS, removeAfter = true)
         }
         shell.clear()
         buildCursor = 0
@@ -391,7 +436,7 @@ class EnergyShield : Modifier() {
 
     /** 立即销毁整个球壳（不播动画）：跨维度/换实体/重建时用 —— 旧面板挂在旧实体上，动画没有意义。 */
     private fun clearShieldVisual() {
-        for (group in shell) group.remove()
+        for (p in shell) p.group.remove()
         shell.clear()
         buildCursor = 0
         shellLevel = null

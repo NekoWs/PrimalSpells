@@ -129,7 +129,8 @@
 
 | 文件 | 内容 |
 |---|---|
-| `PrimalSpellsClient.kt` | 客户端 `@Mod(dist=CLIENT)`：安装 `ClientPayloadSink`、注册 tooltip 工厂/渲染器/输入、登出清理缓存 |
+| `PrimalSpellsClient.kt` | 客户端 `@Mod(dist=CLIENT)`：安装 `ClientPayloadSink`、注册 tooltip 工厂/渲染器/输入、镜头冲击、登出清理缓存 |
+| `ScreenShakeClient.kt` | 镜头冲击（屏幕震动 + FOV 抽动）的客户端求值；受原版「受伤视角晃动」强度控制 |
 | `hud/WandHudRenderer.kt` | 准星下法力/延迟/充能条（`@EventBusSubscriber(CLIENT)`，含 `clear()`） |
 | `hud/ShieldHudRenderer.kt` | 屏幕顶端护盾条（`@EventBusSubscriber(CLIENT)`，含 `clear()`） |
 | `tooltip/ClientTooltipHandler.kt` | 组装 tooltip：法杖槽位网格/Alt 属性、小包网格、选中槽法术词条 |
@@ -210,6 +211,7 @@
 | 公共事件 | `event/` | `PrimalSpells.init` 的 `NeoForge.EVENT_BUS.register(...)` |
 | 客户端事件 / 渲染 / tooltip | `client/` 对应子包 | `PrimalSpellsClient`（或 `@EventBusSubscriber(CLIENT)`） |
 | 录一个特效的实机表现 | `client/capture/CaptureScenes.kt` 加场景 + `tools/capture/assemble.py` 的 `SCENES` 表加帧数/退场口径 | `pwsh tools/capture/capture.ps1` |
+| 给某个特效加「重音」（震屏 / 爆闪 / 落地溅射） | 特效里调 `util/ScreenShake.shake(...)` + 一次性 `spawnParticle(...)`；**晚于特效死亡**的重音用 `util/Deferred.after(level, ticks) { ... }` | 参数抄 `BlackHole`/`GravityField`/`EnergyShield` 的常量段 |
 | 语言键 | `resources/assets/primalspells/lang/{zh_cn,en_us}.json` | — |
 | 资源三件套 | `resources/assets/primalspells/{items,models/item,textures/item}/` | — |
 

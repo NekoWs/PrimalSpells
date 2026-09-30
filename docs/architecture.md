@@ -242,10 +242,11 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 |---|---|---|---|
 | `SyncWandStatsPayload` | S→C | wandId、当前/上限法力、当前/上次 delay、recharge、cast、charge | 经 `ClientPayloadSink.wandStats` → `client/hud/WandHudRenderer.putStats` |
 | `SyncShieldPayload` | S→C | wandId、durability、maxDurability、pauseTicks、breakPauseTicks | 经 `ClientPayloadSink.shield` → `client/hud/ShieldHudRenderer.putShield` |
+| `ScreenShakePayload` | S→C | amplitude(0..1)、ticks | 经 `ClientPayloadSink.screenShake` → `client/ScreenShakeClient`：**只发重音那一拍**（8 字节），逐帧偏移/衰减在客户端本地算（见 §9 第 9 条） |
 | `SelectSpellSlotPayload` | C→S | targetId、slot、pouch | 遍历背包：`pouch=false` 按 `wand_id` 匹配并写 `WAND_SELECTED_SLOT`；`pouch=true` 按 `pouch_id` 匹配并写 `POUCH_SELECTED_SLOT` |
 
 **公共侧不引用客户端类**：S→C 包的处理器在公共入口注册，但真正的客户端逻辑通过 `network/ClientPayloadSink`
-（两个可空回调）转发，由 `client/PrimalSpellsClient` 在初始化时安装实现；专用服务器上它们保持 `null`。
+（三个可空回调）转发，由 `client/PrimalSpellsClient` 在初始化时安装实现；专用服务器上它们保持 `null`。
 
 **编杖/编包不走自定义包**：一律走原版「物品对上物品」交互（`WandItem`/`SpellPouchItem.overrideOtherStackedOnMe`），
 只有滚轮选槽需要显式同步选中槽（物品组件只有服务端权威）。
@@ -258,6 +259,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 | `client/tooltip/` | `ClientTooltipHandler`（组装词条）、`WandSpellTooltip`/`PouchTooltip`（自定义 tooltip 组件，都高亮选中槽）、`SpellSlotTracker`（法杖与小包共用的「预览槽位」缓存） | `RenderTooltipEvent.GatherComponents` + 组件工厂 |
 | `client/input/` | `SpellSlotScrollHandler`（滚轮选槽：法杖与小包共用，发 `SelectSpellSlotPayload`）、`ClientContainerDragHandler`（Ctrl+左键拖拽交换，复用原版 `slotClicked(PICKUP)` 协议） | `ScreenEvent`，注册在 `PrimalSpellsClient` |
 | `client/render/` | `DroneEntityModel`/`DroneEntityRenderer`（立方体/球体调试实体已随死代码清理删除） | `EntityRenderersEvent` |
+| `client/ScreenShakeClient.kt` | 镜头冲击求值：`ViewportEvent.ComputeCameraAngles`（偏航/俯仰/翻滚）+ `ComputeFov`（冲击瞬间视野张开）；相位按 tick 推进、渲染帧用 partialTick 插值（帧率无关）；整体乘原版 `options.damageTiltStrength`（设 0 = 玩家关掉，不再打扰） | 消费 `ScreenShakePayload`，注册在 `PrimalSpellsClient` |
 | `client/PrimalSpellsClient.kt` | 客户端入口（`@Mod(dist = CLIENT)`）：安装 `ClientPayloadSink`、集中注册以上全部、登出清理缓存 | — |
 
 划分原则：**公共侧不 import 客户端类**；纯客户端事件不挂在 `PrimalSpells`（公共入口）上。
@@ -344,6 +346,14 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
      缓动在**客户端逐帧求值**，位置总包数 = 粒子数 —— 黑洞**进场**的整壳「从球心长到球面」在用；
   7. **一次性向心爆发**：`spawnParticle(pos, color, scale, lifetime, velocity)`，不进任何集合
      （自带寿命、不需回收）——黑洞退场塌缩粒子的写法（重新生成 + 向心初速）；
+  9. **一次性向心加速（悬停 → 砸进中心）**：生成时一次 `applyForce(向心加速度, -1)`，加速度按
+     `a = 2d/(T(T+1))` 反推 —— 离散积分 `d(n) = a·n(n+1)/2` 下第 T tick 恰好抵达中心，寿命 = T 同刻过期。
+     观感是「先悬一下、最后几 tick 猛地塌进去」（黑洞**退场**在用，第 18 轮把匀速直线收缩换成了它）；
+     全程 **0 逐 tick 包**、本模组不留跨 tick 状态；
+  10. **落点重音（一次性粒子 + 镜头冲击）**：`spawnParticle(pos, color, scale, lifetime, velocity)`
+     炸一圈 + `ScreenShake.shake(...)`（黑洞塌缩爆闪、重力场波环落地溅射、护盾展开冲击波/破盾炸裂）。
+     这些时刻**晚于特效自己的生命周期**，所以由 `util/Deferred`（服务端延迟队列，`MagicManager` 每 tick 推）
+     排到点触发；`Deferred` 是**我们自己的时序簿记**，不涉及任何粒子同步/求值（那仍然全归 PD）。
   8. **「重建组」代替「给旧组追加动画」**（第 17 轮）：需要「运行期才决定何时开始」的组级动画时，
      不要对旧组 `delay + fadeOut`（游标是绝对时间，晚追加＝瞬间完成），而是
      **销毁旧组、在原地按同样的成员/轴心建新组**，再对新组下发 `delay + fadeOut` ——

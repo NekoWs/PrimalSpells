@@ -62,8 +62,9 @@ src/main/kotlin/work/nekow/primalspells/
 │  │                           PouchTooltip/ClientPouchTooltip, SpellSlotTracker
 │  ├─ input/                    SpellSlotScrollHandler（滚轮选槽，法杖/小包共用）, ClientContainerDragHandler（Ctrl+左键拖拽交换）
 │  ├─ render/                   DroneEntityModel/DroneEntityRenderer
-│  └─ capture/                  **实机录制驱动**（CaptureDriver 状态机 + CaptureScenes 场景表）：只在开发环境激活，见 build-and-run.md §9
-├─ util/                        无状态工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）、Polyhedra.kt（球面多面体几何：截角二十面体面板）、PdParticles.kt（PD 管理器兜底 + spawnParticle）
+│  ├─ capture/                  **实机录制驱动**（CaptureDriver 状态机 + CaptureScenes 场景表）：只在开发环境激活，见 build-and-run.md §9
+│  └─ ScreenShakeClient.kt        镜头冲击（屏幕震动 / FOV 抽动）的客户端求值：消费 `ScreenShakePayload`，受原版「受伤视角晃动」强度控制
+├─ util/                        工具：HitResult.kt、Lore.kt、ParticleShapes.kt（球体粒子采样）、Polyhedra.kt（球面多面体几何：截角二十面体面板）、PdParticles.kt（PD 管理器兜底 + spawnParticle）、ScreenShake.kt（镜头冲击的服务端入口）、Deferred.kt（服务端延迟一次性动作队列，由 MagicManager 每 tick 推）
 └─ mixin/                       Java mixin；包名被 primalspells.mixins.json 引用，**不要改**
 ```
 

@@ -151,6 +151,13 @@ pwsh tools/capture/capture.ps1 -NoVideo             # 只判定 + 拼图，不�
 python tools/capture/assemble.py          # 合成 + 判定
 ```
 
+**录制不会打扰你**：客户端窗口默认被隐藏（`CaptureDriver.hideWindow` 走 `GLFW.glfwHideWindow` 并关掉
+`FOCUS_ON_SHOW`），并且每 tick 兜底释放鼠标抓取 —— 不会弹窗、抢焦点、锁鼠标。
+隐藏只影响「窗口是否呈现」，渲染与帧缓冲照旧（截图读的是 `gameRenderer.mainRenderTarget()`）；
+判定里的「特效确实渲染」这条断言就是它的兜底验证。
+想看着录制跑（调机位/调场景时有用）：`pwsh tools/capture/capture.ps1` 之外加 `-PcaptureShowWindow=true`
+（即 `./gradlew runCapture -PcaptureShowWindow=true`）。
+
 产物都在 `build/capture/out/`（`build/` 不入库）：
 
 | 路径 | 内容 |

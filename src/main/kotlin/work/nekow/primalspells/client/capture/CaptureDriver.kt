@@ -22,6 +22,7 @@ import net.neoforged.fml.loading.FMLEnvironment
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderFrameEvent
 import net.neoforged.neoforge.common.NeoForge
+import org.lwjgl.glfw.GLFW
 import org.slf4j.LoggerFactory
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.MagicManager
@@ -66,6 +67,11 @@ object CaptureDriver {
 
     /** 输出根目录（PNG 帧、meta、日志都写这里）。 */
     const val PROP_OUT = "primalspells.capture.out"
+
+    /**
+     * `true` = 录制时**保留客户端窗口可见**（调机位/调场景时用；默认隐藏，见 [hideWindow]）。
+     */
+    const val PROP_SHOW_WINDOW = "primalspells.capture.showWindow"
 
     /** 录制世界 id（`run/capture/saves/<本值>`）；`tools/capture/capture.ps1` 每次跑前会删掉它。 */
     const val LEVEL_ID = "primalspells-capture"
@@ -146,6 +152,8 @@ object CaptureDriver {
 
     private fun onClientTick() {
         val mc = Minecraft.getInstance()
+        // 兜底：录制期间不需要鼠标，抓住就放掉（正常情况下窗口已被隐藏，根本抓不到）
+        runCatching { if (mc.mouseHandler.isMouseGrabbed) mc.mouseHandler.releaseMouse() }
         totalTicks++
         if (abortRequested) {
             log("no scene to record —— 退出")
@@ -192,8 +200,33 @@ object CaptureDriver {
         stepScene(mc, current)
     }
 
+    /**
+     * **不让录制窗口抢使用方的鼠标**（无人值守录制的底线，实机反馈过这个问题）。
+     *
+     * 1. `GLFW.glfwHideWindow` 把窗口直接隐藏，并关掉 `FOCUS_ON_SHOW` —— 窗口不出现、拿不到焦点；
+     * 2. 每 tick 兜底 `MouseHandler.releaseMouse()`（见 [onClientTick]）—— 万一窗口还是被显示出来，
+     *    鼠标也不会被锁进游戏里。
+     *
+     * 隐藏只影响「窗口是否呈现」：渲染循环与帧缓冲照旧，而 [Screenshot.takeScreenshot] 读的是
+     * `gameRenderer.mainRenderTarget()`，与窗口是否可见无关（每次录制都会用「特效确实渲染」这条断言兜底验证）。
+     * 想看着录制跑（调机位/调场景时有用）：`-PcaptureShowWindow=true`。
+     */
+    private fun hideWindow(mc: Minecraft) {
+        if (System.getProperty(PROP_SHOW_WINDOW).toBoolean()) {
+            log("showWindow=true：保留客户端窗口（调试模式）")
+            return
+        }
+        runCatching {
+            val handle = mc.window.handle()
+            GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_FOCUS_ON_SHOW, GLFW.GLFW_FALSE)
+            GLFW.glfwHideWindow(handle)
+            log("client window hidden (不抢焦点/鼠标；-PcaptureShowWindow=true 可保留窗口)")
+        }.onFailure { log("hideWindow failed: ${it.message}") }
+    }
+
     /** 一次性画面配置：把我们不想要的一切关掉，让输出里只剩特效本身。 */
     private fun configureClient(mc: Minecraft) {
+        hideWindow(mc)
         mc.options.pauseOnLostFocus = false
         mc.options.bobView().set(false)
         mc.options.fovEffectScale().set(0.0)

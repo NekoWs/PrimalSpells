@@ -468,6 +468,40 @@ PD 1.0.12-ALPHA 把第 15/17/19 轮提的四条**全部实现**（见附录 B）
   `client/capture/CaptureDriver.kt`、`tools/capture/assemble.py`、`gradle.properties`（PD 版本由使用方提交）
 - 验证：三场景 388 帧、12 条断言全过；构建 0 warning；护盾在 2.6× 放大下逐帧目视确认为连续线框。
 
+## 第 21 轮（2026-09-30，护盾回到「粒子感」点阵；录制不再抢鼠标）
+
+### 21.1 护盾：连续实线这条路走不通，改回点阵（实机选的）
+
+第 20 轮把棱做成**连续实线**（14 点/棱 + `SHELL_SCALE` 0.40 = 2520 颗）—— 球外看是干净的线框，
+但实机**球内第一人称**反馈「不完美的形状很丑」：最近处一颗方块占 **80+ 像素**，整条棱糊成一条粗带、
+五/六边形的轮廓反而看不出来。
+
+- **离线渲染台定位**：把 `Polyhedra` 的边界点 dump 成 TSV（`build/verify/geom/Dump2.kt`），
+  再用 Python 按**真实透视**（眼睛在球心上方 0.63 格 = 第一人称实际机位）把粒子画成实心方块，
+  一次对比 4 组密度/尺寸 —— 不用反复开游戏，几十秒就能看遍所有候选。
+  （这套「dump 几何 + Python 复现视角」的方法本身值得留着，见 `docs/build-and-run.md` 第 7 节。）
+- **结论（实机拍板）**：**保留粒子感**，点距明显大于粒径 ——
+  **6 点/棱（点距 0.194 格）+ `SHELL_SCALE` 0.25（实际 ≈0.053 格）= 1080 颗**，
+  粒子颗颗分明、轮廓清晰。`docs/issues/resolved.md` 里同时记下反方向的经验：
+  **不要再往连续实线调**（要成倍粒子，且球内近看必然糊）。
+- 顺带确认的换算（第 20 轮实测、这轮继续用）：`实际格数 ≈ scale × 0.213`（`quadSize = scale × 0.1 × texScale`，
+  `texScale ≈ 2.1`）。
+- 粒子量 2520 → **1080**（-57%），构建突发随之减半。
+
+### 21.2 录制流水线：不再抢使用方的鼠标/焦点
+
+实机反馈「截图程序会抢我的鼠标」。原因是录制跑的是**真客户端窗口**，会弹出来抢焦点并抓鼠标。
+
+- 修法：`CaptureDriver.hideWindow` 在配置阶段直接 `GLFW.glfwHideWindow` + 关掉 `GLFW_FOCUS_ON_SHOW`，
+  窗口根本不出现；另外**每 tick 兜底** `MouseHandler.releaseMouse()`（万一某版本又把窗口显示出来，
+  鼠标也不会被锁进游戏）。想要窗口可见（调机位/调场景）用 `-PcaptureShowWindow=true`。
+- **风险与验证**：隐藏窗口只影响「是否呈现」，渲染与帧缓冲照旧（截图读 `gameRenderer.mainRenderTarget()`）。
+  实测跑完整流水线：三场景 388 帧、12 条断言全过，峰值像素 3003 / 2335 / 12684 ——
+  帧内容与可见窗口时一致（判定里的「特效确实渲染」就是这条的兜底验证）。
+
+- 落点：`magic/modifier/EnergyShield.kt`、`client/capture/CaptureDriver.kt`、`build.gradle`
+- 验证：`pwsh tools/capture/capture.ps1`（隐藏窗口下三场景全 PASS）；构建 0 warning。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

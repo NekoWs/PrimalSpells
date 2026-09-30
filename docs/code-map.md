@@ -211,7 +211,7 @@
 | 公共事件 | `event/` | `PrimalSpells.init` 的 `NeoForge.EVENT_BUS.register(...)` |
 | 客户端事件 / 渲染 / tooltip | `client/` 对应子包 | `PrimalSpellsClient`（或 `@EventBusSubscriber(CLIENT)`） |
 | 录一个特效的实机表现 | `client/capture/CaptureScenes.kt` 加场景 + `tools/capture/assemble.py` 的 `SCENES` 表加帧数/退场口径 | `pwsh tools/capture/capture.ps1` |
-| 调护盾球壳的粗细/密度 | `EnergyShield` 的 `SHELL_POINTS_PER_EDGE`（14）与 `SHELL_SCALE`（0.40）：**点距（棱长 1.166 ÷ 点数）要 ≈ 粒子实际尺寸**，而实际尺寸 ≈ `SHELL_SCALE × 0.213` 格 |
+| 调护盾球壳的疏密/点大小 | `EnergyShield` 的 `SHELL_POINTS_PER_EDGE`（6，点距 = 棱长 1.166 ÷ 点数）与 `SHELL_SCALE`（0.25，粒子实际尺寸 ≈ `scale × 0.213` 格）。现在点距是粒径的 3.7 倍 —— 这是刻意的「粒子感」，不是没连上 |
 | 给某个特效加「重音」（震屏 / 爆闪 / 落地溅射） | 特效里调 `util/ScreenShake.shake(...)` + 一次性 `spawnParticle(...)`；**晚于特效死亡**的重音用 `util/Deferred.after(level, ticks) { ... }` | 参数抄 `BlackHole`/`GravityField`/`EnergyShield` 的常量段 |
 | 语言键 | `resources/assets/primalspells/lang/{zh_cn,en_us}.json` | — |
 | 资源三件套 | `resources/assets/primalspells/{items,models/item,textures/item}/` | — |

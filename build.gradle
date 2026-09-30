@@ -94,6 +94,9 @@ runs {
         systemProperty 'primalspells.capture', (project.findProperty('capture') ?: 'all').toString()
         systemProperty 'primalspells.capture.out',
                 project.layout.projectDirectory.dir('build/capture/out').asFile.absolutePath
+        // 默认隐藏客户端窗口（不抢焦点/鼠标）；调机位时用 -PcaptureShowWindow=true 保留窗口
+        systemProperty 'primalspells.capture.showWindow',
+                (project.findProperty('captureShowWindow') ?: 'false').toString()
         // 1280×720：够看清棱/点，单帧 PNG 又小到能一次录几百帧
         arguments '--width', '1280', '--height', '720'
         arguments '--username', 'Capturer'

@@ -32,6 +32,7 @@
 | `lib/` 下的版本与 `particledrawing_version` 必须一致 | `lib/` 只留 `1.0.12-ALPHA` | 若手工塞入别的版本，容易对照错 API | 对照 API 一律以 `lib/particledrawing-1.0.12-ALPHA-sources.jar` 为准 |
 | 位置指令会清掉速度与力 | `ServerParticleEngine.takeOverPosition`：`move`/`track`/`trackAll` 一律 `velocity=0`、`accel=0` | 「位置驱动」与「速度/力驱动」不能混用在同一颗粒子上 | 同一粒子只选一种驱动方式；见 [design/effects-api.md §0.3](../design/effects-api.md) |
 | 运动指令一律解除实体锚点 | 位置（`move`/`track`）、速度（`setVelocity`/`setVelocityAll`）、力（`applyForce`/`applyForceAll`）都接管位置 | 先 `attachTo` 再给速度/力＝锚点被解掉，粒子不再跟随实体 | 1.0.11-ALPHA 起口径统一（此前 `setVelocity` 漏了解除，位置每 tick 仍被锚点覆盖） |
+| **程序化粒子固定使用纯白方块贴图** | `TextureCache.DEFAULT_WHITE`：`ParticleHandle.Builder` 没有贴图/样式入口（只有 `.pdrawc` 动画的 `Animation.Builder.texture` 能指定） | 于是「细线」只能靠「密集小方块」拼；方块在近距离必然发糊（第 20 轮） | 反过来用它：护盾球壳就是**点阵**风格（点距 0.194 格 vs 粒径 0.053 格），保留粒子感。**不是缺陷**，是风格选择；真需要柔边圆点/线段再提需求 |
 | **粒子「实际尺寸」不是 `scale` 本身** | `BridgeParticle`：`quadSize = scale × 0.1 × texScale`；实机/录制实测 `texScale ≈ 2.1` → **实际格数 ≈ scale × 0.213** | 按「scale = 格数」估密度会严重偏小：护盾球壳 3 点/棱 + scale 0.3 画出来是一串**断点**（实机反馈「有两条线条」就是它） | 密度按「点距 ≈ 实际尺寸」反推：点距 0.083 格 → `scale 0.40`；见 `EnergyShield` 的 `SHELL_POINTS_PER_EDGE`/`SHELL_SCALE` |
 
 ---

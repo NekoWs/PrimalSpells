@@ -204,22 +204,24 @@ override fun onTick() {
   别再自己存句柄表或寿命表（原 `ParticleSwarm` 已在第 10 轮删除，见 [issues/resolved.md](issues/resolved.md) 第 10 轮）；
 - **生成**一颗粒子统一用 `ParticleManager.spawnParticle(pos, color, scale, lifetime, velocity?)`；
 - **管理器**统一用 `wand.pdParticles(level)` 获取（缺失/跨维度时兜底创建，未来的生物施法者也有粒子）；
-- **编排动画（进入 / 退出 / 展开 / 收起）** → `ParticleGroup`：`fadeIn`/`fadeOut(removeAfter = true)` 做进出场、
-  `move`/`rotate`/`spin` 做位移与旋转，都在**客户端本地求值（0 包/tick）**。三条约束：
-  ① **退场动画要把时间线对齐到「现在」**：指令时间是「相对程序起点」的毫秒数，所以先 `delay(已存在 tick)`
-  再录 `fadeOut`（`BlackHole`/`EnergyShield` 都在用）；
+- **编排动画（淡入淡出 / 自转 / 位移）** → `ParticleGroup`：`fadeIn`/`fadeOut(removeAfter = true)`、
+  `rotate`/`spin`/`move`，都在**客户端本地求值（0 包/tick）**。三条约束：
+  ① **要错开时间的"阶梯"只能用 `fadeOut` + `delay`，不能用 `fadeIn`**：`fadeOut` 在指令生效前默认「还没开始淡出」
+     （不影响 alpha），而 `fadeIn` 默认值相反（1）——用它做阶梯会先闪一下（`EnergyShield` 的逐块消散在用）；
   ② **铺完成员后，第一条录进去的指令不能是 `move`** —— `move` 会改组的 `pivot` 字段，而客户端 arm 时
-  用它反算每颗粒子的相对偏移，先 move 会让整体偏移错一个位移（详见 `EnergyShield.updateShieldVisual`）；
-  ③ 「整壳从中心胀开 / 缩回中心」这类**径向**动画当前**不能用 `scale`**（PD 只缩视觉尺寸、不缩到轴心的距离，
-  见 [issues/pd-api-requests.md](issues/pd-api-requests.md)）：要么**每块面板各自成组**用 `move`
-  （`EnergyShield` 的 32 个面板组），要么撒一圈**带向心初速的一次性粒子**（`BlackHole` 的进/退场）；
+     用它反算每颗粒子的相对偏移，先 move 会让整体偏移错一个位移（见 [issues/pd-api-requests.md](issues/pd-api-requests.md)）；
+  ③ 「整壳从中心胀开 / 缩回中心」这类**径向**动画当前**不能用 `scale`**（PD 只缩视觉尺寸、不缩到轴心的距离，同上），
+     两条已验证的替代写法：**逐粒子缓动** `handle.move(target, ticks, easing)`（黑洞**进场**：整壳从球心长到球面；
+     注意服务端会立即把权威位置设成目标，只适合位置无人读取的纯视觉粒子）、
+     **同位置重新生成 + 向心初速 + 寿命兜底**（黑洞**退场**：永存粒子没有改寿命的入口，不重生成就会飞过中心留在世界里）；
 - 采样/几何工具：`util/ParticleShapes.kt`（`fibonacciSphere` 均匀球壳取点、随机单位方向/球内取点、随机切向）、
   `util/Polyhedra.kt`（截角二十面体 = 五/六边形球体的面板与边界点，护盾在用）；
-- 参考实现：`BlackHole.kt`（组球壳 `fadeIn`+`spin`；进/退场各一批向心粒子；被吸入粒子切向初速 + 每 tick
-  `setVelocityAll` 批量设速 + 抵达中心 `removeIf`）、
+- 参考实现：`BlackHole.kt`（球壳 `ParticleBatch` + 逐粒子缓动进场 + 退场整壳塌缩；被吸入粒子切向初速 +
+  每 tick `setVelocityAll` 批量设速 + 抵达中心 `removeIf`）、
   `GravityField.kt`（范围球壳 `ensureSize`；下坠粒子**一次施力**；波环 `move`+`EASE_IN` 加速下压；
   地面井环 `Draw.circle` + `spin`；回收只读 PD 权威位置）、
-  `EnergyShield.kt`（32 个面板组：`followEntity` 跟随 + `spin` 自转 + `move` 展开/收起 + `fadeIn/fadeOut`）。
+  `EnergyShield.kt`（32 个面板组：`followEntity` 跟随 + `spin` 自转 + **分 tick 逐块构建** +
+  反向逐块 `fadeOut` 消散 —— 球体位置固定不动）。
 - ⚠️ 两条铁律：**不要自己写粒子系统**；**不要按列表索引给粒子配对偏移**（有粒子被拒/重建就会错位）——
   PD 缺能力时停下并提需求（[conventions.md](conventions.md) §9）。
 

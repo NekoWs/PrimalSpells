@@ -45,7 +45,8 @@ import kotlin.math.sqrt
  * 现在首 tick 用一次向下探测求出**场底平面** [floorY]（探测不到实地就退化为球体最底端），
  * 粒子与波环都落到这个平面为止 —— 看得见的「砸在地上」。
  *
- * 成员簿记交给 PD 的 [ParticleBatch]（球壳 `ensureSize` 补齐、下坠粒子 `removeIf` 按位置回收）；
+ * 球壳用 `ParticleGroup`（铺一次 + 自转，0 包/tick），下坠粒子的成员簿记交给 PD 的 [ParticleBatch]
+ * （增量登记、`removeIf` 按位置回收）；
  * 位置积分/同步/渲染由 ParticleDrawing 负责（见 `docs/conventions.md` §9 与 `docs/design/effects-api.md` §0）。
  */
 class GravityField : AreaFieldEffect(
@@ -53,8 +54,13 @@ class GravityField : AreaFieldEffect(
     slownessAmplifier = 3,
     pullPerTick = 0.0,
 ) {
-    /** 范围球壳（永存粒子）：首 tick 铺满，之后只在 PD 侧有损耗时补齐。 */
-    private var shell: ParticleBatch? = null
+    /**
+     * 范围球壳（永存粒子的 `ParticleGroup`）：首 tick 铺一次 + 缓慢自转，之后不再有逐 tick 开销。
+     *
+     * 第 15 轮用 `ParticleBatch.ensureSize` 每 tick 补齐；第 16 轮换成组，为的是让**球形范围**更显眼
+     * （缓慢自转 + 稳定的 120 个粒子）。代价与黑洞球壳一样：成员固定，不再补量。
+     */
+    private var shell: ParticleGroup? = null
 
     /** 下坠粒子（初速 0 + 恒定向下加速度，按位置条件回收）。 */
     private var falling: ParticleBatch? = null
@@ -74,19 +80,16 @@ class GravityField : AreaFieldEffect(
     /** 正在下坠的重力波环（自带淡出与销毁，这里只留引用，好在场地提前结束时一并收掉）。 */
     private val rings = ArrayList<ParticleGroup>()
 
-    /** 球壳偏移（相对中心，半径 [EFFECT_RADIUS]）：Fibonacci 球结果确定，算一次即可。 */
-    private val shellOffsets: List<Vec3> by lazy {
-        ParticleShapes.fibonacciSphere(SHELL_PARTICLES).map { it.scale(EFFECT_RADIUS) }
-    }
-
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = manager.level.random
         val floor = floorY ?: detectFloor(manager.level, center).also { floorY = it }
 
-        val shellBatch = shell ?: ParticleBatch(manager).also { shell = it }
-        // 均匀球壳（Fibonacci 球）：点到点间距近似相等，才像「范围标识」
-        shellBatch.ensureSize(SHELL_PARTICLES) { index ->
-            manager.spawnParticle(center.add(shellOffsets[index]), SHELL_COLOR, SHELL_SCALE)
+        // 均匀球壳（Fibonacci 球）：点到点间距近似相等，才像「范围标识」；缓慢自转让它「活着」
+        if (shell == null) {
+            val group = manager.createGroup(center)
+            Draw.sphere(manager, center, EFFECT_RADIUS, SHELL_PARTICLES, ColorSource.of(SHELL_COLOR), SHELL_SCALE, group = group)
+            group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+            shell = group
         }
 
         // 地面井环：铺一次，之后由 PD 在客户端本地自转（0 包/tick）
@@ -125,7 +128,8 @@ class GravityField : AreaFieldEffect(
     }
 
     override fun clearVisuals(manager: ParticleManager, center: Vec3) {
-        shell?.clear()
+        shell?.remove()
+        shell = null
         falling?.clear()
         // 井环与还在下坠的波环都是粒子组：直接销毁（场地结束不需要退场动画，粒子随组一起消失）
         wellRing?.remove()
@@ -202,12 +206,17 @@ class GravityField : AreaFieldEffect(
 
         // ---- 范围球壳（只做「作用范围」标识，压暗以免抢下坠粒子的视觉） ----
 
-        /** 范围球壳粒子数（永存） */
-        const val SHELL_PARTICLES = 96
+        /** 范围球壳粒子数（永存）：要让人一眼看出「球形范围」，密度不能再压 */
+        const val SHELL_PARTICLES = 120
 
-        const val SHELL_SCALE = 0.4f
+        const val SHELL_SCALE = 0.45f
 
-        val SHELL_COLOR: Color = Color.ofInt(150, 175, 205, 70)
+        /** 球壳颜色：半透明淡蓝灰（第 16 轮把 alpha 从 70 提回 120 —— 之前太淡，范围看不出来） */
+        val SHELL_COLOR: Color = Color.ofInt(150, 178, 208, 120)
+
+        /** 球壳自转轴与角速度：绕竖直轴慢转（约 10 秒一圈），客户端本地求值 → 0 包/tick */
+        val SHELL_SPIN_AXIS: Vec3 = Vec3(0.0, 1.0, 0.0)
+        const val SHELL_SPIN_RADIANS_PER_TICK = 0.0105
 
         // ---- 下坠粒子：初速 0 + 恒定向下加速度（「重力」的核心特征） ----
 
@@ -234,9 +243,9 @@ class GravityField : AreaFieldEffect(
         /** 每隔多少 tick 压下一层重力波 */
         const val RING_INTERVAL_TICKS = 22
 
-        /** 每层环的粒子数与尺寸 */
-        const val RING_PARTICLES = 44
-        const val RING_SCALE = 0.45f
+        /** 每层环的粒子数与尺寸（第 16 轮调稀：波环是「下压感」的补充，不该抢球壳的戏） */
+        const val RING_PARTICLES = 36
+        const val RING_SCALE = 0.4f
 
         /** 环的起始高度（球心上方，半径的倍数）：0.62 → 该高度截面半径约 0.78×半径 */
         const val RING_START_HEIGHT_SCALE = 0.62
@@ -249,14 +258,14 @@ class GravityField : AreaFieldEffect(
 
         /** 环的颜色（偏亮的天蓝白：与淡灰下坠粒子区分开，才看得出是「一层」在压下来） */
         val RING_COLOR: ColorSource = ColorSource { t -> RING_TINT.lerp(RING_TINT_BRIGHT, t.toFloat()) }
-        val RING_TINT: Color = Color.ofInt(150, 190, 235, 150)
-        val RING_TINT_BRIGHT: Color = Color.ofInt(205, 230, 255, 190)
+        val RING_TINT: Color = Color.ofInt(150, 190, 235, 105)
+        val RING_TINT_BRIGHT: Color = Color.ofInt(205, 230, 255, 145)
 
         // ---- 地面井环 ----
 
-        /** 井环粒子数与尺寸 */
-        const val WELL_RING_PARTICLES = 56
-        const val WELL_RING_SCALE = 0.5f
+        /** 井环粒子数与尺寸（同样压暗：它是地面标记，不是主体） */
+        const val WELL_RING_PARTICLES = 44
+        const val WELL_RING_SCALE = 0.45f
 
         /** 井环抬高一点，免得和地面方块重叠闪烁 */
         const val WELL_RING_LIFT = 0.12
@@ -268,8 +277,8 @@ class GravityField : AreaFieldEffect(
         const val WELL_RING_SPIN_RADIANS_PER_TICK = 0.0105
 
         val WELL_RING_COLOR: ColorSource = ColorSource { t -> WELL_RING_TINT.lerp(WELL_RING_TINT_BRIGHT, t.toFloat()) }
-        val WELL_RING_TINT: Color = Color.ofInt(120, 160, 210, 130)
-        val WELL_RING_TINT_BRIGHT: Color = Color.ofInt(180, 215, 250, 175)
+        val WELL_RING_TINT: Color = Color.ofInt(120, 160, 210, 95)
+        val WELL_RING_TINT_BRIGHT: Color = Color.ofInt(180, 215, 250, 130)
 
         /** 施加给投射物的向下加速度（每 tick，与 `ConstantAcceleration` 默认值一致） */
         const val GRAVITY_PER_TICK = 0.03f

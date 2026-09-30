@@ -65,9 +65,10 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
 | 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleBatch.trackAll(positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）。本模组没有「自己算位置」的批量使用者了 |
 | **每 tick 变化的每粒子速度**（受力随位置变化） | **`ParticleBatch.setVelocityAll(velocities)`**（1.0.10 起）：速度每 tick 重算、一包下发，**位置积分归 PD**（`pos += vel`） | **1 包/tick**（与粒子数无关） | `BlackHole` 被吸入粒子（`v ← v·阻尼 + 向心加速度`） |
-| **组级编排：跟随 + 旋转/淡入淡出/平移** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeIn` / `.fadeOut(ticks, removeAfter)` / `.move(delta, ticks, easing)`；都在**客户端本地求值**。⚠️ **顺序即语义**：轴的绑定（`setPivot`/`followEntity`）对**其后**的旋转/缩放生效，成员必须相对**绑定后的轴心**铺开（`followEntity(offset)` 会同步改组的 `pivot` 字段，客户端按「spawn 位置 − 该字段」算相对偏移）；⚠️ **`move` 也会改那个字段**，而 arm 用的正是那一刻的值 → 铺完成员后的第一条指令不要用 `move`；⚠️ `scale`/`pulse` 只缩视觉尺寸、**不缩到轴心的距离** | **0 包/tick** | `EnergyShield`（第 15 轮起：**每块五/六边形面板一个组**，`move` 展开/收起、`fadeIn/fadeOut` 进出场、`spin` 自转）、`BlackHole` 球壳（fadeIn/fadeOut/spin）、`GravityField` 波环与井环 |
-| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | `GravityField` 下坠粒子（第 15 轮：`spawnParticle(..., acceleration = Vec3(0,-0.01,0))` → 一次施力、两端逐 tick 积分，**0 逐 tick 包**）；黑洞的力随距离变化，仍用 `setVelocityAll` |
+| **组级编排：跟随 + 旋转/淡入淡出/平移** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeIn` / `.fadeOut(ticks, removeAfter)` / `.move(delta, ticks, easing)`；都在**客户端本地求值**。⚠️ **顺序即语义**：轴的绑定（`setPivot`/`followEntity`）对**其后**的旋转/缩放生效，成员必须相对**绑定后的轴心**铺开（`followEntity(offset)` 会同步改组的 `pivot` 字段，客户端按「spawn 位置 − 该字段」算相对偏移）；⚠️ **`move` 也会改那个字段**，而 arm 用的正是那一刻的值 → 铺完成员后的第一条指令不要用 `move`；⚠️ `scale`/`pulse` 只缩视觉尺寸、**不缩到轴心的距离** | **0 包/tick** | `EnergyShield`（第 16 轮：**每块五/六边形面板一个组**，固定球体 + 逐块 `fadeIn`/`fadeOut` + `spin`）、`BlackHole` 退场后的 `ParticleBatch`、`GravityField` 球壳（`Draw.sphere` + `spin`）与波环/井环 |
+| 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | `GravityField` 下坠粒子（第 15 轮起：`spawnParticle(..., acceleration = Vec3(0,-0.01,0))` → 一次施力、两端逐 tick 积分，**0 逐 tick 包**）；黑洞的力随距离变化，仍用 `setVelocityAll` |
 | 锚在一个实体身上（形状刚性） | 整组用 `ParticleGroup.followEntity(uuid, offset, local)`；零散粒子用 `handle.attachTo(Entity/uuid/entityId, 偏移)`（1.0.9 起身份统一） | **0** | `EnergyShield` 球壳已改用**组**（要自转）；`attachTo` 当前无使用者 |
+| **逐粒子缓动移动**（一次性指令） | `handle.move(target, ticks, easing)`：每颗粒子一条指令，缓动在**客户端逐帧求值**；带宽 = 粒子数（一次性），不是每 tick | 一次性 | `BlackHole` **进场**（整壳 144 颗从球心长到球面）；⚠️ 服务端会**立即**把权威位置设为目标（`takeOverPosition`），所以只适合「位置无人读取」的纯视觉粒子 |
 | **程序化粒子集**（成员逐 tick 增删、每粒子独立受力、按位置/速度回收） | **`ParticleBatch(manager)`**（1.0.9 起，1.0.10 补批量设速/施力）：`add`/`addAll`/`remove`/`track`/`trackAll`/`trackEach`/`setVelocity(All)`/`applyForce(All)`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`；位置与速度一律读 PD 权威值，过期成员自动出列 | 取决于内部批量调用（`trackAll`/`setVelocityAll` 为 1 包/tick） | **已在用**：`BlackHole`（球壳 + 被吸入粒子）、`GravityField`（球壳 + 下落粒子）。见 [../issues/resolved.md](../issues/resolved.md) 第 10/12 轮 |
 | 编辑器导出的 `.pdrawc` 动画 | `Effects.play(...)` + `Anchor`（`Fixed`/`Entity`/`Movable`） | — | **尚未接线** |
 
@@ -141,6 +142,11 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 >   （各列表与 `handles()` 顺序一一对应，一包覆盖全组，逐玩家按可见性裁剪；`ParticleManager` 同名的 id 列表版本），
 >   以及修正「`setVelocity`/`applyForce` 未解除实体锚点」（现在与 `move`/`track` 一致：运动指令接管位置）。
 >   **第 12 轮已接入**：黑洞改用 `setVelocityAll`（速度每 tick 重算、位置积分交回 PD，删掉了自持的「粒子 id → 速度」表）。
+> - **2026-09-30（第 16 轮，按实机反馈重改）**：黑洞进/退场改成**整壳径向运动**（进场用逐粒子缓动
+>   `ParticleHandle.move`、退场用「同位置重新生成 + 向心初速 + 寿命兜底」），结构退回 `ParticleBatch`（去掉组的 `spin`）；
+>   重力场球壳提亮/加密（alpha 70 → 120、96 → 120 颗）并换 `ParticleGroup` 加慢速自转，波环/井环压暗；
+>   护盾从「面板飞进飞出」改成**固定球体逐块构建/消散**（每 tick 建 2 块、反向逐块 `fadeOut`），
+>   粒子密度 2 → 3 点/棱（360 → 540 颗）。见 [../issues/resolved.md](../issues/resolved.md) 第 16 轮。
 > - **2026-09-30（第 15 轮）**：黑洞球壳改用 `ParticleGroup`（144 粒、`fadeIn`+`spin`）并在进/退场各撒一批
 >   「向心收拢」的一次性粒子；重力场下坠改用**恒定力**（一次施力、越落越快）并补了加速下压的波环与地面井环；
 >   护盾球壳改成 `util/Polyhedra.kt` 的**截角二十面体**（12 五边形 + 20 六边形 = **32 个面板组**，`move` 展开/收起）。

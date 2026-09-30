@@ -31,10 +31,10 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟢 | 黑洞粒子带宽：范围球壳 **144** 个（`ParticleGroup`：`fadeIn` + `spin`）+ 被吸入粒子（每 tick 3 颗；本模组重算速度 + **一次 `setVelocityAll`**，位置由 PD 积分） | `magic/effect/lifecycle/BlackHole.kt` | 球壳 **0 包/tick**；被吸入粒子 **1 包/tick（与粒子数无关）**，峰值约 **100**；进/退场各一批一次性向心粒子（生成时一次初速，自带寿命，**0 包/tick**、无需簿记） |
-| 🟢 | 重力场粒子带宽：范围球壳 96 个（`ensureSize`）+ 下坠粒子（生成时一次**施力** `applyForce(a, -1)`）+ 波环/井环（`ParticleGroup`） | `magic/effect/lifecycle/GravityField.kt` | 下坠粒子 **0 包/tick**（恒定力由两端逐 tick 积分）；波环每 22 tick 建一个组（一次性，自带淡出与销毁）；回收只读 PD 权威位置（读不产包）。要更密改 `FALLING_PER_TICK`，要更砸改 `FALL_ACCELERATION` |
-| 🟡 | `EnergyShield` 球壳带宽（第 15 轮）：**32 个面板组**（12 五边形 + 20 六边形；每条棱 2 点 → 360 颗**永存**粒子、半径 1.7）+ 跟随 + 自转 + 展开/收起 | `magic/modifier/EnergyShield.kt` | 稳态 **0 包/tick**（跟随/自转/淡入淡出/平移都在客户端本地求值）；**代价在建立时刻**：32 份程序包 + 360 个生成包（一次性，可按 `SHELL_POINTS_PER_EDGE` 减半），收起为 32 份追加包。转速/轴/展开时长是常数，调它不花带宽 |
-| 🟡 | `EnergyShield` 收起动画是「发射后不管」：`fadeOut(removeAfter = true)` 由 PD 调度销毁 | `magic/modifier/EnergyShield.kt` | 收起途中重新握杖会出现**一瞬间两层球壳**（新壳展开 + 旧壳淡出，约 0.6 秒）。要严格无缝就得等动画结束再重建（为一段过渡多存一份状态，暂不做） |
+| 🟢 | 黑洞粒子带宽（第 16 轮）：球壳 **144** 颗（`ParticleBatch`，成员固定）+ 被吸入粒子（每 tick 3 颗，本模组重算速度 + 一次 `setVelocityAll`） | `magic/effect/lifecycle/BlackHole.kt` | 稳态 **0 包/tick**；进场 1 包/粒子、退场 2 包/粒子（各一次性：逐粒子缓动 `move` / 重新生成 + 向心初速），被吸入粒子 1 包/tick、峰值约 100 |
+| 🟢 | 重力场粒子带宽（第 16 轮）：范围球壳 **120** 颗（`ParticleGroup`：`Draw.sphere` + 慢速自转，**0 包/tick**）+ 下坠粒子（生成时一次施力）+ 波环/井环（组，一次性） | `magic/effect/lifecycle/GravityField.kt` | 下坠粒子 **0 包/tick**（恒定力由两端逐 tick 积分）；波环每 22 tick 建一个组；回收只读 PD 权威位置。球壳 alpha/数量就是「看得出球形范围」的旋钮 |
+| 🟡 | `EnergyShield` 球壳带宽（第 16 轮）：**32 个面板组**（12 五边形 + 20 六边形；每条棱 **3** 点 → **540** 颗永存粒子、半径 1.7）+ 跟随 + 自转 + 逐块淡入淡出 | `magic/modifier/EnergyShield.kt` | 稳态 **0 包/tick**；建立被摊到 **16 tick**（每 tick 2 块面板 ≈ 34 颗）所以没有瞬时突发；消散 32 份追加包。粒子密度旋钮 `SHELL_POINTS_PER_EDGE` |
+| 🟡 | `EnergyShield` 消散动画是「发射后不管」：`fadeOut(removeAfter = true)` 由 PD 调度销毁 | `magic/modifier/EnergyShield.kt` | 拆到一半又握起法杖时，未拆完的面板会被立即清掉、从头重新搭（`clearShieldVisual` + `buildCursor` 归零）；要严格平滑就得等动画结束，暂不做 |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 已加两道剪枝：场上无投射物直接返回；先按「到玩家中心的距离球」粗筛（半径 = 护盾半径 + 玩家包围盒最远角 1.0 + 该投射物碰撞半径，保证不漏判）。法术数量再上量级时可考虑空间分桶/网格 |
 

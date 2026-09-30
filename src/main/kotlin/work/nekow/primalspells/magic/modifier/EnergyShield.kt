@@ -46,32 +46,26 @@ import kotlin.math.min
  * 护盾都不会回满（没读到耐久时按**当前容量**补满，见 [durabilityLoaded]）。
  * 数值与手感本身仍是待调项（`docs/issues/open.md` 1.1 —— 含 [regenPerSecond] 是否随卡数放大）。
  *
- * ## 视觉：五/六边形拼成的球壳 + 展开 / 收起动画（第 15 轮重做）
+ * ## 视觉：五/六边形球体 + **逐块构建 / 逐块消散**（第 16 轮按实机反馈重做）
  *
- * 球壳不再是「均匀撒点的球」，而是**截角二十面体**（足球：12 个五边形 + 20 个六边形，共 60 个顶点、90 条棱，
- * 几何见 [Polyhedra]）：每个面板一块 [ParticleGroup]，沿自己的边界铺一圈粒子。
- * 用**一组面板各自成组**换来的能力是「一块一块地动」——组级编排只能整组平移/旋转/淡入淡出，
- * 单组做不出「各面板从球心飞向自己的位置」：
+ * 球壳是**截角二十面体**（足球：12 个五边形 + 20 个六边形，共 60 个顶点、90 条棱，几何见 [Polyhedra]），
+ * **每块面板一个 [ParticleGroup]**，沿自己的边界铺一圈粒子（每条棱 [SHELL_POINTS_PER_EDGE] 个点）。
  *
- * - **展开**：每块面板先瞬时折叠到球心（`move(-面板中心偏移, 0)`），再 `move(面板中心偏移, [UNFOLD_TICKS])`
- *   用 [EasingType.EASE_OUT] 飞回球面，同时整组 `fadeIn` —— 观感是「能量从身体里炸开、凝成球壳」；
- * - **稳态**：`spin` 持续自转（客户端本地求值，**0 包/tick**）；
- * - **收起**：`move(-面板中心偏移, [FOLD_TICKS], EASE_IN)` 向心收拢 + `fadeOut(removeAfter = true)`
- *   —— 面板缩回身体、边缩边淡出，PD 在动画结束后自行销毁整组，本模组不必再回来清理。
+ * 第 15 轮的展开/收起是「每块面板从球心飞出去 / 缩回球心」，实机反馈是**不好看**（整颗球在位移）。
+ * 第 16 轮改成**球体位置固定、一块一块地出现与消失**：
  *
- * ⚠️ **录制顺序（展开）**：两条 `move` 必须录在 `fadeIn` **之后**。`move` 会**同步挪动组的轴心字段**，
- * 而客户端在 arm（收到「全量程序」）那一刻用**当时的轴心**反算每颗粒子的相对偏移 —— 先录 `move`
- * 会让整壳半径翻倍（详见 [updateShieldVisual] 内注释，该易踩点已登记到 `docs/issues/pd-api-requests.md`）。
+ * - **构建**：`updateShieldVisual` 每 tick 建 [BUILD_PANELS_PER_TICK] 块面板（各自的组 + 一圈粒子 +
+ *   `fadeIn([BUILD_FADE_TICKS])`）；[shieldPanels] 已按**面板中心高度由低到高**排序，于是整颗球像被
+ *   **从脚下往上搭起来**，共约 16 tick；
+ * - **消散**：反向（最后搭起来的最先拆）逐块 `fadeOut([FOLD_FADE_TICKS], removeAfter = true)`，
+ *   每块之间用 `delay` 错开一个阶梯；PD 自己排销毁任务，所以**即使本实例此后不再被 tick
+ *   （法术被取下 / 法杖被回收）动画照样放完**，也不留孤儿粒子；
+ * - **不再使用 `move`**：面板不位移，也就不碰 PD 的「第一条指令不能是 `move`」那条坑
+ *   （`move` 会改组的轴心字段，而客户端 arm 时拿它反算相对偏移，见 `docs/issues/pd-api-requests.md`）。
  *
- * ⚠️ **退场动画的时间线要对齐到「现在」**：组的指令时间轴是**相对程序起点**的毫秒数，
- * 而收起发生在球壳建立很久之后，所以必须先 `delay(已过去 tick)` 再录指令（见 [foldShieldVisual]）。
- *
- * ⚠️ **不做径向缩放的替代实现**：`ParticleGroup.scale` 的 KDoc 承诺「粒子到轴心的距离与视觉大小同乘」，
- * 但 PD 实现只缩放视觉尺寸（位置 = 轴心 + 位移 + 相对偏移），所以「整壳胀大/缩小」这条最直觉的写法
- * 当前**不可用**；已登记 API 需求（`docs/issues/pd-api-requests.md`），本模组改用「面板平移」表达展开/收起。
- *
- * 代价：32 个组意味着建立时要发 32 份程序包 + 每个面板一圈粒子的生成包（一次性的，见 `open.md` §2），
- * 稳态仍是 **0 包/tick**；组数是常数，调粒子密度只改 [SHELL_POINTS_PER_EDGE]。
+ * 代价：32 个组意味着建立时要发 32 份程序包 + 每块面板一圈粒子的生成包；构建被摊到 16 tick 上
+ * （每 tick 约 2 块面板），所以瞬时突发比第 15 轮小得多。稳态仍是 **0 包/tick**
+ * （跟随 / 自转 / 淡入淡出都在客户端本地求值）。
  *
  * 不弹开持有者自己施放的法术（投射物出生点在施法者面前，会被瞬间弹回）。
  */
@@ -108,18 +102,15 @@ class EnergyShield : Modifier() {
      */
     private val shell = ArrayList<ParticleGroup>()
 
-    /** 与 [shell] 一一对应的「面板中心偏移」（收起动画要按同样的方向把面板收回球心）。 */
-    private val shellRadials = ArrayList<Vec3>()
-
-    /** 球壳建立时的服务端 gameTime：收起动画要把指令时间线对齐到「现在」，见 [foldShieldVisual]。 */
-    private var shellStartTick = 0L
+    /** 已经建到第几块面板（0 = 还没开始）：构建被摊到多 tick 上，见 [buildShieldPanels]。 */
+    private var buildCursor = 0
 
     /**
-     * 球壳面板几何（截角二十面体：12 五边形 + 20 六边形，坐标**相对球心**，见 [Polyhedra]）。
-     * 结果确定，算一次缓存；[shell] 按同样的顺序建立（面板中心偏移另存于 [shellRadials]）。
+     * 球壳面板几何（截角二十面体：12 五边形 + 20 六边形，坐标**相对球心**，见 [Polyhedra]），
+     * **按面板中心高度从低到高排序** —— 这个顺序就是构建波（由下往上搭）与消散波（由上往下拆）的顺序。
      */
     private val shieldPanels: List<Polyhedra.Panel> by lazy {
-        Polyhedra.truncatedIcosahedron(SHELL_RADIUS, SHELL_POINTS_PER_EDGE)
+        Polyhedra.truncatedIcosahedron(SHELL_RADIUS, SHELL_POINTS_PER_EDGE).sortedBy { it.center.y }
     }
 
     /** [shell] 建立时所在的维度：跨维度后旧粒子组留在旧维度，需要重建（见 [updateShieldVisual]）。 */
@@ -297,40 +288,44 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * 护盾视觉（ParticleDrawing）：以持有者为**轴心**的五/六边形球壳 —— 跟随 + 自转 + 展开，
-     * 前两者**零逐 tick 包**，展开只在建立时录一次指令。
+     * 护盾视觉（ParticleDrawing）：以持有者为**轴心**的五/六边形球壳，**分多 tick 逐块构建**。
      *
-     * 实现要点：
-     * - **一个面板一个组**（[Polyhedra] 给出的 32 块：12 五边形 + 20 六边形）。组级编排只能整组动，
-     *   所以「各面板从球心飞向自己的位置」必须靠**每块面板各自的组**才能表达；
-     * - **先绑轴心、再铺成员**（PD 的轴心是**程序级状态**，调用顺序即语义）：
-     *   `createGroup(脚底)` → `followEntity(实体, 身体中段偏移)`（此后组的 pivot 字段 = 球心）
-     *   → 再按「球心 + 面板边界点」铺成员，`offsetFromPivot` 用**相对球心**的偏移。
-     *   顺序反了（或 [shellCenterOffset] 那段偏移被算两次/漏掉）都会让 arm 之后的相对偏移差一个身体中段，
-     *   实机表现是「出现时位置正确、arm 之后整壳掉到脚下」（第 13 轮踩过，见 `resolved.md`）；
-     * - **展开 = 两次 `move`**：先 `move(-面板中心偏移, 0)` 瞬时把面板折到球心，再
-     *   `move(+面板中心偏移, [UNFOLD_TICKS], EASE_OUT)` 飞回位；⚠️ 两条 `move` 必须录在 `fadeIn`
-     *   **之后**（`fadeIn` 那条指令完成 arm），原因见方法内注释；
-     * - **自转**用 `spin`（客户端本地累加角度）。它写的是粒子的**相对偏移**，而展开写的是**组位移**，
-     *   两者互不覆盖 —— 这是能同时使用的原因（旋转类指令之间会互相覆盖，别在同一组上叠加两次旋转）；
-     * - 跨维度 / 换实体（重生）时**立即**销毁旧球壳再重建：旧面板组在旧维度/旧实体上，动画没有意义；
-     * - 破盾 / 放下法杖 / 法术被取下走 [foldShieldVisual]（收起动画）。
+     * 每 tick 调 [buildShieldPanels] 建一小批面板，直到 32 块建满（之后这个函数就是空转）。
+     * 跨维度 / 换实体（重生）时**立即**销毁旧球壳再从头构建：旧面板组挂在旧实体上，淡出没有意义。
      */
     private fun updateShieldVisual(level: ServerLevel, holder: Entity) {
-        // 已建立且维度/实体都没变：跟随与自转都在客户端本地推进，这里不需要再做任何事
-        if (shell.isNotEmpty() && shellLevel === level && shellHolder == holder.uuid) return
-        clearShieldVisual() // 跨维度 / 换实体：先销毁旧的，避免球壳留在旧维度或挂在已消失的实体上
+        if (shellLevel === level && shellHolder == holder.uuid) {
+            buildShieldPanels(level, holder) // 还在构建中：继续搭下一批（已建满则直接返回）
+            return
+        }
+        clearShieldVisual()
+        shellLevel = level
+        shellHolder = holder.uuid
+        buildCursor = 0
+        buildShieldPanels(level, holder)
+    }
 
+    /**
+     * 建下一批面板（[BUILD_PANELS_PER_TICK] 块）：每块一个组 —— 先绑轴心、再铺成员，最后录
+     * `fadeIn` + `spin` 两条指令（两条都不挪组的轴心字段，满足 PD 的 arm 基准约束，见类注释）。
+     *
+     * 成员坐标 = 「绑定后的轴心（= 球心）+ 面板边界偏移」，`offsetFromPivot` 用**相对球心**的偏移：
+     * 客户端 arm 时按「成员 spawn 位置 − 当时的组 `pivot` 字段」重算相对偏移，而 `followEntity(offset)`
+     * 会顺手改那个字段 —— 所以**先 `followEntity` 再铺成员**是硬要求（第 13 轮踩过，见 `resolved.md`）。
+     * 面板位置固定不动（不做位移动画），所以不会再碰到 `move` 相关的坑。
+     */
+    private fun buildShieldPanels(level: ServerLevel, holder: Entity) {
+        if (buildCursor >= shieldPanels.size) return
         val manager = wand.pdParticles(level)
         val bodyOffset = shellCenterOffset(holder)
         val feet = holder.position()
         val center = feet.add(0.0, bodyOffset, 0.0)
+        val end = min(shieldPanels.size, buildCursor + BUILD_PANELS_PER_TICK)
 
-        for (panel in shieldPanels) {
+        for (index in buildCursor until end) {
             val group = manager.createGroup(feet)
             group.followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
-            for (offset in panel.ring) {
-                // 成员必须相对**绑定后的轴心**铺开（= 球心），见上面的顺序说明
+            for (offset in shieldPanels[index].ring) {
                 manager.create()
                     .position(center.add(offset))
                     .color(SHELL_COLOR)
@@ -340,63 +335,41 @@ class EnergyShield : Modifier() {
                     .offsetFromPivot(offset)
                     .spawn()
             }
-            val radial = panel.center // 面板中心相对球心的偏移（长度 = SHELL_RADIUS）
-            // ⚠️⚠️ 录制顺序是硬要求：`move` 会**同步挪动组的轴心字段** `pivot`，而客户端在 arm
-            //   （收到「全量程序」那一刻）用的正是**当时的轴心字段**去反算每颗粒子的相对偏移
-            //   （`rel = spawn 位置 − 轴心字段`）。所以第一条录进去的指令必须**不挪轴心**：
-            //   本组第一条是 fadeIn（轴心仍是球心）→ arm 时下发正确轴心 → rel = 面板边界偏移；
-            //   两次 move 在其后录，只作为「追加剧组指令」下发，不再影响已算好的相对偏移。
-            //   若把 move 放到最前面（最自然的「先铺形状再动」写法），arm 基准会少掉一个面板中心偏移，
-            //   实机表现是整壳半径翻倍、展开从错误的位置开始。这条已登记为 PD 侧易踩点（pd-api-requests.md）。
-            group.fadeIn(UNFOLD_TICKS, EasingType.EASE_OUT) // 1) 先录淡入：同时完成 arm（此时轴心 = 球心）
-            group.move(radial.scale(-1.0), 0) // 2) 瞬时折到球心：展开动画的起点
-            group.move(radial, UNFOLD_TICKS, EasingType.EASE_OUT) // 3) 展开：飞回球面
+            // 第一条指令必须是「不挪轴心」的：fadeIn 只做透明度编排，arm 时轴心仍是球心
+            group.fadeIn(BUILD_FADE_TICKS, EasingType.EASE_OUT)
             group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
             shell += group
-            shellRadials += radial
         }
-        shellStartTick = level.gameTime
-        shellLevel = level
-        shellHolder = holder.uuid
+        buildCursor = end
     }
 
     /**
-     * 收起动画：每块面板向心收拢 + 淡出，动画结束后由 PD 自行销毁整组（`fadeOut(removeAfter = true)`
-     * 内部会排一个延迟销毁任务），所以这里把引用丢掉即可 —— **本模组不需要再回来清理**。
+     * 消散动画：**反向**（最后搭起来的最先拆）逐块 `fadeOut`，每块之间用 `delay` 错开一个阶梯。
      *
-     * ⚠️ `delay([shellAgeTicks])` 不能省：组的时间线是「相对程序起点」的毫秒数，
-     * 球壳可能已经存在几分钟；不推游标就会被客户端当成「这条指令早就该执行完」，动画瞬间跳到终点（等于没动画）。
+     * `fadeOut(removeAfter = true)` 会在淡出结束后由 PD 排任务销毁整组，所以这里把引用丢掉即可 ——
+     * **即使本实例之后不再被 tick（法术被取下 / 法杖被回收）动画也能放完**，且不留孤儿粒子。
      *
-     * 面板组是「发射后不管」的：收起途中重新握杖会铺出**新**球壳，旧球壳在这 [FOLD_TICKS] tick 内
-     * 自行淡出，中间会有一瞬间两层同框（可接受；要严格无缝就得等动画结束再重建，不值得为此加状态）。
+     * ⚠️ 用 `delay` 做阶梯在这里是安全的：`fadeOut` 在指令生效前默认「还没开始淡出」（因子 0，不影响 alpha），
+     * 所以后面的面板在被轮到之前保持完全可见；而 `fadeIn` 的默认值相反（1），用它做阶梯会「先闪一下」。
      */
     private fun foldShieldVisual() {
         if (shell.isEmpty()) return
-        val age = shellAgeTicks()
-        for ((index, group) in shell.withIndex()) {
-            val radial = shellRadials[index]
-            group.delay(age)
-            group.move(radial.scale(-1.0), FOLD_TICKS, EasingType.EASE_IN)
-            group.fadeOut(FOLD_TICKS, removeAfter = true)
+        for ((order, group) in shell.reversed().withIndex()) {
+            group.delay((order / FOLD_PANELS_PER_STEP) * FOLD_STAGGER_TICKS)
+            group.fadeOut(FOLD_FADE_TICKS, removeAfter = true)
         }
         shell.clear()
-        shellRadials.clear()
+        buildCursor = 0
         shellLevel = null
         shellHolder = null
         idleTicks = 0
     }
 
-    /** 球壳已存在多少 tick（收起动画的时间线游标要对齐到「现在」）。 */
-    private fun shellAgeTicks(): Int {
-        val level = shellLevel ?: return 0
-        return (level.gameTime - shellStartTick).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
-    }
-
     /**
      * 被动「未被持有」时的每 tick 回调（由 `Wand.tick` 的闲置分支驱动）。
      *
-     * 放下法杖后**保留 [SHELL_LINGER_TICKS] tick** 再**收起**球壳 —— 这段窗口是给「刚放下又马上拿起来」
-     * 留的缓冲（重新握杖时 [onInventoryTick] 会把倒计时归零，球壳根本不会被收）。
+     * 放下法杖后**保留 [SHELL_LINGER_TICKS] tick** 再开始消散球壳 —— 这段窗口是给「刚放下又马上拿起来」
+     * 留的缓冲（重新握杖时 [onInventoryTick] 会把倒计时归零，还没拆完的面板会连同构建进度一起重建）。
      */
     override fun onPassiveIdle() {
         if (shell.isEmpty()) return
@@ -405,22 +378,22 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * 从法杖上取下（或槽位被替换）时调用：**立刻收起球壳**。
+     * 从法杖上取下（或槽位被替换）时调用：**立刻开始消散球壳**。
      *
      * 必须做：取下之后本实例不再出现在 `Wand.loadedMagics` 里，[onInventoryTick] 与 [onPassiveIdle]
-     * **都不会再被调用** —— 而球壳是 `lifetime = -1` 的永存粒子组，不在这里处理就会一直留在世界里。
-     * 收起动画不依赖本实例继续 tick（销毁由 PD 的调度器负责），所以取下后动画照样能放完。
-     * 若取下的只是「多张护盾卡」中的一张，接任的主卡会在下一 tick 铺出自己的球壳。
+     * **都不会再被调用** —— 而面板是 `lifetime = -1` 的永存粒子组，不在这里处理就会一直留在世界里。
+     * 消散动画不依赖本实例继续 tick（销毁由 PD 的调度器负责），所以取下后动画照样能放完。
+     * 若取下的只是「多张护盾卡」中的一张，接任的主卡会重新构建自己的球壳。
      */
     override fun onUnloaded() {
         foldShieldVisual()
     }
 
-    /** 立即销毁整个球壳（不播动画）：跨维度/换实体/重建时用 —— 旧面板在旧维度上，动画没有意义。 */
+    /** 立即销毁整个球壳（不播动画）：跨维度/换实体/重建时用 —— 旧面板挂在旧实体上，动画没有意义。 */
     private fun clearShieldVisual() {
         for (group in shell) group.remove()
         shell.clear()
-        shellRadials.clear()
+        buildCursor = 0
         shellLevel = null
         shellHolder = null
         idleTicks = 0
@@ -461,19 +434,31 @@ class EnergyShield : Modifier() {
 
         /**
          * 每条棱上放几个点（含起点，见 [Polyhedra.truncatedIcosahedron]）：
-         * 1 = 只放顶点（球壳是「点阵」，最省）；2 = 顶点 + 中点（边长 0.69 格被切成两段，看起来接近实线）。
-         * ⚠️ 32 块面板 × 每块 5~6 条棱 × 本值 = 建立时的粒子数（当前 2 → 360 个），调大它就成比例变多。
+         * 棱长 0.686 格 ÷ 本值 = 点间距，点间距要 ≲ [SHELL_SCALE] 才连得成实线。
+         * 3 → 点距 0.229、共 540 颗（第 16 轮从 2 提到 3：太稀时看不出五/六边形）；4 → 点距 0.171、720 颗。
          */
-        private const val SHELL_POINTS_PER_EDGE = 2
+        private const val SHELL_POINTS_PER_EDGE = 3
 
-        /** 单颗粒子尺寸（球壳边长约 0.69 格，这个尺寸下相邻点刚好相接） */
-        private const val SHELL_SCALE = 0.4f
+        /**
+         * 单颗粒子尺寸：点距 0.229 时，**0.3 左右刚好连成一条细线**（离线投影对比过：
+         * 0.4 → 棱变成粗管、0.25 → 略稀但最清晰、0.3 → 兼顾实线与细度）。
+         */
+        private const val SHELL_SCALE = 0.3f
 
-        /** 展开时长（tick）：面板从球心飞到球面 + 整壳淡入 */
-        private const val UNFOLD_TICKS = 14
+        /** 每 tick 构建几块面板：32 ÷ 本值 = 构建波的总时长（2 → 16 tick ≈ 0.8 秒） */
+        private const val BUILD_PANELS_PER_TICK = 2
 
-        /** 收起时长（tick）：面板缩回球心 + 淡出（PD 在同一时刻销毁整组） */
-        private const val FOLD_TICKS = 12
+        /** 单块面板的淡入时长（tick）：与构建波叠加，最后一块在 16+6 tick 后完全出现 */
+        private const val BUILD_FADE_TICKS = 6
+
+        /** 消散时每几块面板共用同一个起始时刻：32 ÷ 本值 × [FOLD_STAGGER_TICKS] ≈ 消散波总时长 */
+        private const val FOLD_PANELS_PER_STEP = 2
+
+        /** 消散波相邻两级的间隔（tick） */
+        private const val FOLD_STAGGER_TICKS = 1
+
+        /** 单块面板的淡出时长（tick）：PD 在淡出结束后销毁该组 */
+        private const val FOLD_FADE_TICKS = 5
 
         /**
          * 自转轴：略微倾斜（不是纯 Y 轴）。
@@ -493,7 +478,7 @@ class EnergyShield : Modifier() {
 
         /**
          * 放下法杖后球壳保留的 tick 数（= [onPassiveIdle] 的倒计时阈值）：
-         * 先等这么久（防止「放下又立刻拿起」闪一下），再播 [FOLD_TICKS] 的收起动画。
+         * 先等这么久（防止「放下又立刻拿起」闪一下），再开始消散动画。
          */
         private const val SHELL_LINGER_TICKS = 4
 

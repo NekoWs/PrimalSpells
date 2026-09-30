@@ -51,8 +51,10 @@
     `radialScale(ratio, durationTicks, easing)`（只缩到轴心的距离）与现有 `scale`（只缩尺寸）；
     或 `scale(ratio, ticks, easing, radial: Boolean = true)`。
   服务端/客户端：组指令本就是「两端同规则、客户端本地求值」，无新增同步需求；线程与生命周期同现有组指令。
-- 影响面：`magic/modifier/EnergyShield.kt`（展开/收起改用「32 个面板组各自 `move`」表达）、
-  `magic/effect/lifecycle/BlackHole.kt`（进/退场改用「一批带向心初速的一次性粒子」表达）。
+- 影响面：`magic/modifier/EnergyShield.kt`、`magic/effect/lifecycle/BlackHole.kt`。
+  ⚠️ **第 16 轮起本侧不再被它阻塞**：护盾改成「固定球体 + 逐块淡入淡出」（不需要径向缩放），
+  黑洞的径向进/退场改用「逐粒子缓动 `ParticleHandle.move`」与「同位置重新生成 + 向心初速」。
+  该需求仍然成立（一个 `scale` 就能替掉这两套写法），只是不再挡路。
 - 临时降级：**无**（该能力暂不可用）。径向动画已用**不依赖该 API** 的两种写法保住观感：
   逐面板 `move`（护盾）与向心初速粒子（黑洞）；恢复条件 = (a) 或 (b) 任一落地后，
   可删掉一部分面板组、把展开/收起压回单组。
@@ -82,7 +84,9 @@
   - (b) 或提供显式 `arm()`（把当前成员清单与轴心先发出去），并在 `move`/`movePath` 的 KDoc 里写明
     「会改 arm 基准，请在铺完成员后立即 `arm()`」；`Draw.*` 也可以顺手在返回前 `arm()`。
   服务端/客户端：纯服务端下发语义调整，客户端 `arm()` 无需改动；线程与生命周期同现有组指令。
-- 影响面：`magic/modifier/EnergyShield.kt`（当前把 `fadeIn` 排在两条 `move` 之前，并写了醒目注释）。
+- 影响面：`magic/modifier/EnergyShield.kt`（第 15 轮把 `fadeIn` 排在两条 `move` 之前规避）。
+  ⚠️ **第 16 轮起本侧不再被它阻塞**：护盾面板**不做任何位移动画**（球体固定、逐块淡入淡出），
+  因此完全绕开了这条坑；但坑本身还在，`move` 的 KDoc 里也没有任何提示。
 - 临时降级：已按 (b) 的口径自行遵守 —— **铺完成员后第一条指令不使用 `move`**；
   恢复条件 = (a) 或 (b) 落地后可去掉这条顺序约束与注释。
 

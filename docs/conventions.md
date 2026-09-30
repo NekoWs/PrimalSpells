@@ -54,7 +54,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  ├─ SyncWandStatsPayload.kt / SyncShieldPayload.kt      S→C
 │  ├─ SelectSpellSlotPayload.kt                           C→S（法杖/小包共用的选槽同步）
 │  └─ ClientPayloadSink.kt                               公共侧→客户端的可空回调（专用服务器安全）
-├─ event/                       公共侧事件处理器：WandEventHandler（右键屏蔽、登录同步、登出清理）
+├─ event/                       公共侧事件处理器：WandEventHandler（右键屏蔽、登录同步、登出清理）、ShieldDummyCommand（测试指令 `/primalspells shielddummy`，见 build-and-run.md §9）
 ├─ client/                      仅在客户端加载（Dist.CLIENT）的代码
 │  ├─ PrimalSpellsClient.kt     客户端入口：安装 ClientPayloadSink、注册渲染器/tooltip/输入、登出清缓存
 │  ├─ hud/                      WandHudRenderer, ShieldHudRenderer

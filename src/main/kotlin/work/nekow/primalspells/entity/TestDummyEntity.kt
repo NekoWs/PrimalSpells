@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.phys.Vec3
+import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.registry.ModItems
 
 /**
@@ -35,6 +36,23 @@ class TestDummyEntity(
         // 头顶跳出本次伤害量数字
         spawnDamageNumber(level, position().add(0.0, bbHeight + 0.35, 0.0), amount.toDouble())
         return true
+    }
+
+    /**
+     * 驱动**主手上那根法杖**的被动（每 tick 一次，仅服务端）。
+     *
+     * 为什么需要：法术的被动（护盾的弹开结算、玻璃表现、法力回复…）都由 `Wand.tick(caster)` 驱动，
+     * 而那个入口本来是给「玩家手里拿着法杖」用的 —— 木桩没有物品栏 tick，塞了法杖也不会自己转。
+     * 这里补上这一下，于是 `/primalspells shielddummy` 造出来的靶子能自己维持护盾，
+     * 而且法杖是**真实物品**（存在主手、随存档持久化），重载世界后照样有效。
+     */
+    override fun tick() {
+        super.tick()
+        val level = level()
+        if (level !is ServerLevel) return
+        val stack = getItemInHand(InteractionHand.MAIN_HAND)
+        if (stack.item !is WandItem) return
+        WandItem.getWand(stack)?.tick(this, level)
     }
 
     /** 木桩不接受任何治疗效果 */

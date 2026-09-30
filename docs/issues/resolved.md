@@ -629,6 +629,37 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 实测（重录后）：静止窗口仍是 **0 像素**（平时完全不可见不变）、受击单片玻璃 ≈ **1100~1300 像素**、
 破盾峰值 ≈ **31k 像素**；三场景 434 帧、13 条断言全过，构建 0 warning。
 
+## 第 25 轮（2026-09-30，加测试指令 `/primalspells shielddummy`）
+
+使用方要能在游戏里自己看护盾效果，但当时没有方便的手段造一个「会挨打的盾」：`TestDummyItem` 放出来的木桩是空手的，
+法杖得手工塞，而且**塞了也不会被动驱动**（护盾的结算与玻璃表现全在 `Wand.tick(caster)` 那一条被动路径上）。
+
+### 25.1 做了什么
+
+- 新增 `event/ShieldDummyCommand.kt`：`/primalspells shielddummy [cards]` 在**视线方向 3 格**（按地面高度图落到地面）
+  生成一个 `TestDummyEntity`，往它主手塞一根装了 `cards` 张护盾卡的法杖；`clear` 按实体上的标记清理。
+- `TestDummyEntity.tick()` 新增：**服务端每 tick 驱动主手上那根法杖的被动**（`WandItem.getWand(stack)?.tick(this, level)`）。
+  这样靶子能自己维持护盾，而且法杖是**真实物品**（存在主手、随存档持久化），重载世界后依然有效 ——
+  比在指令里维护一张「内存里的靶子表」干净得多。
+
+### 25.2 踩到的两个 API 坑（都是实测撞出来的）
+
+1. **26.2 的权限 API 变了**：`CommandSourceStack` 不再有 `hasPermission(int)`，改用
+   `Commands.hasPermission(PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER))`
+   （与 `/gamemode`、`/summon` 同级）。
+2. **法杖必须走 `WandManager` 拿正牌实例**：`WandItem.getWand(stack)` 是**按 `wand_id` 去 `WandManager` 里查**的，
+   自己 `Wand("...")` 造一个再把 id 写进组件，查回来会是另一个空实例 —— 实测表现为「靶子生成了、手上法杖却没有任何法术」
+   （`shields=0`）。正确写法是 `WandManager.createWand(stack)` → `WandManager[id]` → 往这个实例里加法术 → `load()`。
+
+### 25.3 验证方式
+
+用录制客户端跑了一遍端到端：在护盾场景的 prepare 里临时执行 `ctx.command("primalspells shielddummy 2")`，
+再在 t=19 断言「存在带标记的靶子、其主手法杖的 `loadedMagics` 里有 **2** 张护盾卡、且耐久 > 0」——
+实测 `dummy=true shields=2 durability=[200.0, 200.0]`（200 = 100 × 2 卡 ✓）。验完即撤掉临时探针。
+
+- 落点：`event/ShieldDummyCommand.kt`（新）、`entity/TestDummyEntity.kt`、`PrimalSpells.kt`
+- 验证：端到端探针（见上）；构建 0 warning。
+
 ## 附录 A：历史崩溃记录（已有防护，保留备查）
 
 - `run/client/crash-reports/crash-2026-08-10_06.39.49-server.txt`：

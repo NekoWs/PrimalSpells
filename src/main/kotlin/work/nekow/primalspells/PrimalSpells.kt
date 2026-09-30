@@ -11,6 +11,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.slf4j.Logger
 import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.TestDummyEntity
+import work.nekow.primalspells.event.ShieldDummyCommand
 import work.nekow.primalspells.event.WandEventHandler
 import work.nekow.primalspells.item.SpellPouchItem
 import work.nekow.primalspells.item.WandItem
@@ -39,6 +40,8 @@ import work.nekow.primalspells.wand.WandManager
 class PrimalSpells(bus: IEventBus, container: ModContainer) {
     init {
         NeoForge.EVENT_BUS.register(WandEventHandler)
+        // 测试指令：/primalspells shielddummy [cards|clear]（详见类注释）
+        NeoForge.EVENT_BUS.register(ShieldDummyCommand)
         NeoForge.EVENT_BUS.register(MagicManager)
         NeoForge.EVENT_BUS.register(WandManager)
         ModItems.COMPONENTS.register(bus)

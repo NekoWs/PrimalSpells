@@ -151,6 +151,10 @@ pwsh tools/capture/capture.ps1 -NoVideo             # 只判定 + 拼图，不�
 python tools/capture/assemble.py          # 合成 + 判定
 ```
 
+**只想手工看效果？** 游戏里跑 `/primalspells shielddummy [卡片数]` 会在视线方向 3 格放一个**持盾靶子**
+（法杖 + N 张护盾卡，靶子自己驱动被动），拿手上的法术打它就能现场看护盾的受击玻璃 / 破盾 / 恢复；
+清理用 `/primalspells shielddummy clear`。实现见 `event/ShieldDummyCommand.kt` 与 `TestDummyEntity.tick`。
+
 **录制不会打扰你**：客户端窗口默认被隐藏（`CaptureDriver.hideWindow` 走 `GLFW.glfwHideWindow` 并关掉
 `FOCUS_ON_SHOW`），并且每 tick 兜底释放鼠标抓取 —— 不会弹窗、抢焦点、锁鼠标。
 隐藏只影响「窗口是否呈现」，渲染与帧缓冲照旧（截图读的是 `gameRenderer.mainRenderTarget()`）；

@@ -209,7 +209,9 @@
 | 法术 | `magic/core/MagicManager.kt` 的 `init { register { X() } }` | 同时自动获得同名物品（`ModItems` 的 `init` 遍历注册表） |
 | 网络包 | `network/<Name>Payload.kt` | `PrimalSpells` 的 `RegisterPayloadHandlersEvent`；S→C 的处理写进 `ClientPayloadSink` |
 | 公共事件 | `event/` | `PrimalSpells.init` 的 `NeoForge.EVENT_BUS.register(...)` |
+| 测试指令（造持盾靶子等） | `event/ShieldDummyCommand.kt` | `RegisterCommandsEvent`；靶子由 `TestDummyEntity.tick` 驱动它主手上的法杖 |
 | 客户端事件 / 渲染 / tooltip | `client/` 对应子包 | `PrimalSpellsClient`（或 `@EventBusSubscriber(CLIENT)`） |
+| 想要个「会挨打的盾」在游戏里自己看 | 游戏内跑 `/primalspells shielddummy [卡片数]`（清理用 `… shielddummy clear`），然后用手上的法术打它 |
 | 录一个特效的实机表现 | `client/capture/CaptureScenes.kt` 加场景 + `tools/capture/assemble.py` 的 `SCENES` 表加帧数/退场口径 | `pwsh tools/capture/capture.ps1` |
 | 改护盾自转轴/角速度 | `EnergyShield` 的 `SHELL_SPIN_AXIS` / `SHELL_SPIN_RADIANS_PER_TICK`。⚠️ 面板是**分批**建的：每块必须用 `rotate(轴, 晚生时长 × 角速度, 0)` 补到同一相位，否则整球错位（`resolved.md` 第 22 轮） |
 | 调护盾玻璃板的样子/时长 | `EnergyShield` 的常量段：`GLASS_EDGE_SCALE`/`GLASS_EDGE_COLOR`（冷白亮边）、`GLASS_FILL_SCALE`/`GLASS_FILL_COLOR`（≈18% 冷白填充）、`HIT_*`（受击停留与淡出）、`BREAK_*`（破盾飘散）、`RECOVERY_*`（恢复一闪）；面板密度由 `SHELL_POINTS_PER_EDGE`（6，点距 = 棱长 1.166 ÷ 点数）决定，粒子实际尺寸 ≈ `scale × 0.213` 格 |

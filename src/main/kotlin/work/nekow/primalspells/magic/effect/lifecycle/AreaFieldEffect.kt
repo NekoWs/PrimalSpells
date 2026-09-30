@@ -50,6 +50,14 @@ abstract class AreaFieldEffect(
      */
     private var fieldLevel: ServerLevel? = null
 
+    /**
+     * 本效果使用的 PD 粒子管理器：与 [fieldLevel] 一起在**首 tick 捕获**。
+     *
+     * 为什么要缓存：效果的**退场动画**（[clearVisuals]）在 `onDie` 里触发，此时可能已经拿不到
+     * 合适的 `caster.level()`（施法者跨维度/卸载）；粒子必须交给「当初铺它们的那套管理器」所在维度去清。
+     */
+    private var fieldManager: ParticleManager? = null
+
     // ---------- 子类扩展点 ----------
 
     /** 每 tick 生成本 tick 的视觉粒子（用 PD API；默认无）。 */
@@ -58,8 +66,13 @@ abstract class AreaFieldEffect(
     /** 每 tick 更新已有视觉粒子（施加力 / 清理过期；默认无）。 */
     protected open fun updateVisuals(manager: ParticleManager, center: Vec3) { }
 
-    /** 效果结束：销毁本效果生成的全部 PD 粒子（默认无）。 */
-    protected open fun clearVisuals() { }
+    /**
+     * 效果结束：处理（销毁 / 播放退场动画）本效果生成的全部 PD 粒子（默认无）。
+     *
+     * @param manager 当初铺粒子的管理器（= 效果所在维度的管理器）
+     * @param center  区域中心（= `status.pos`）
+     */
+    protected open fun clearVisuals(manager: ParticleManager, center: Vec3) { }
 
     /**
      * 对半径内的**魔法投射物**每 tick 施加一次力（默认无）。
@@ -77,6 +90,7 @@ abstract class AreaFieldEffect(
 
         // 视觉：PD 粒子（管理器缺失时现场建立，保证非玩家施法者也有粒子表现）
         val manager = wand.pdParticles(level)
+        fieldManager = manager
         spawnVisuals(manager, center)
         updateVisuals(manager, center)
 
@@ -140,7 +154,10 @@ abstract class AreaFieldEffect(
     override fun onDie() {
         for (entity in affected) removeOurSlowness(entity)
         affected.clear()
-        clearVisuals()
+        // 退场动画/清理交给「当初铺粒子的那套管理器」；一次都没铺过（首 tick 就没跑起来）则无需处理
+        fieldManager?.let { manager ->
+            clearVisuals(manager, Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()))
+        }
     }
 
     /** 仅当生物当前的迟缓等级与本效果一致时才移除，避免误清其它来源（药水等）的迟缓。 */

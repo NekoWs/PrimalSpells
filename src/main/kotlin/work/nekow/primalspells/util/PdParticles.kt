@@ -32,6 +32,9 @@ fun Wand.pdParticles(level: ServerLevel): ParticleManager {
  * @param lifetimeTicks 寿命（tick）；[PD_IMMORTAL] = 永存
  * @param velocity      初速度（blocks/tick）。非 null 时多下发一次速度包（只在生成时一次，
  *                      之后位置由 PD 逐 tick 积分）—— 这条路径**零逐 tick 包**
+ * @param acceleration  恒定加速度（blocks/tick²）。非 null 时多下发一次施力包；之后**两端逐 tick
+ *                      自行积分**（速度累加、位置跟上），同样**零逐 tick 包** ——
+ *                      「一直受同一个力」的粒子（重力场的下坠）用这个，别自己每 tick 重算速度
  * @return 句柄；被维度粒子上限拒绝时为 `null`（调用方按「下一 tick 再补」处理，不要空转）
  */
 fun ParticleManager.spawnParticle(
@@ -40,8 +43,14 @@ fun ParticleManager.spawnParticle(
     scale: Float,
     lifetimeTicks: Int = PD_IMMORTAL,
     velocity: Vec3? = null,
+    acceleration: Vec3? = null,
 ): ParticleHandle? {
     val handle = create().position(pos).color(color).scale(scale).lifetime(lifetimeTicks).spawn() ?: return null
     if (velocity != null) handle.setVelocity(velocity)
+    // 力与速度**叠加**（PD 明确语义：施力不覆盖已有速度），所以「初速 + 恒定加速度」可以同时给
+    if (acceleration != null) handle.applyForce(acceleration, FORCE_FOREVER)
     return handle
 }
+
+/** 施加无限持续的力（PD `applyForce` 的 `ticks` 约定：负数 = 无限，直到被下一次指令覆盖）。 */
+private const val FORCE_FOREVER = -1

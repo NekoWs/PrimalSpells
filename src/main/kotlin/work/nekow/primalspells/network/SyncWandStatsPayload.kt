@@ -7,13 +7,18 @@ import net.minecraft.resources.Identifier
 import work.nekow.primalspells.PrimalSpells
 
 /**
- * 服务端 → 客户端：法杖展示数值（HUD 与 tooltip 用）。
+ * 服务端 → 客户端：法杖展示数值（Alt 面板与 HUD 用）。
  *
- * 只同步**展示需要**的标量；槽位内容由物品组件（`WAND_SPELLS`）同步，
- * 所以这里不再冗余携带 `size`（物品 LORE 里已经写了）。
+ * 两组数值要分清（**别混成一个**）：
+ * - **配置值**（`wandDelayMs` / `wandRechargeMs` / `cast` / `size` / `charge` / `maxMana`）：
+ *   这根杖**是什么数值**，Alt 面板显示的就是它们（第 27 轮补上，之前面板只能显示下面的实时冷却）；
+ * - **实时值**（`currentMana` / `currentDelay` / `currentRecharge` / `lastDelay` / `lastRecharge`）：
+ *   当前剩多少冷却，HUD 的进度条用它们。
  *
- * ⚠️ 冷却值是**小数 tick**（第 26 轮双延迟改成毫秒后，计数器变 Double）：
- * 卡牌贡献整数、法杖自己的延迟折成小数，负余数用于「毫秒级平均节奏」（见 `Wand.spell`）。
+ * 名词沿用 `Wand` 与既有语言键：`delay` = **施放延迟**、`recharge` = **充能时间**、
+ * `charge` = **充能速度**、`cast` = **施放数**。
+ *
+ * ⚠️ 冷却值是**小数 tick**（毫秒折过来 + 负余数用于平均节奏，见 `Wand.spell`）。
  */
 data class SyncWandStatsPayload(
     val wandId: String,
@@ -25,6 +30,9 @@ data class SyncWandStatsPayload(
     val lastDelay: Double,
     val lastRecharge: Double,
     val charge: Double,
+    val wandDelayMs: Double,
+    val wandRechargeMs: Double,
+    val size: Int,
 ) : CustomPacketPayload {
 
     companion object {
@@ -42,7 +50,10 @@ data class SyncWandStatsPayload(
                     buf.readVarInt(),
                     buf.readDouble(),
                     buf.readDouble(),
-                    buf.readDouble()
+                    buf.readDouble(),
+                    buf.readDouble(),
+                    buf.readDouble(),
+                    buf.readVarInt()
                 )
                 override fun encode(buf: RegistryFriendlyByteBuf, p: SyncWandStatsPayload) {
                     buf.writeUtf(p.wandId)
@@ -54,6 +65,9 @@ data class SyncWandStatsPayload(
                     buf.writeDouble(p.lastDelay)
                     buf.writeDouble(p.lastRecharge)
                     buf.writeDouble(p.charge)
+                    buf.writeDouble(p.wandDelayMs)
+                    buf.writeDouble(p.wandRechargeMs)
+                    buf.writeVarInt(p.size)
                 }
             }
     }

@@ -43,7 +43,7 @@ src/main/kotlin/work/nekow/primalspells/
 │     └─ visual/                粒子表现：ProjectileBody（本体）, Trajectory（拖尾）
 ├─ wand/                        法杖运行时状态
 │  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（小数 tick + 余数累加）、NBT 序列化（槽位保序）
-│  ├─ WandTier.kt               法杖等级表（六级 + 调试杖）+ 蓄能型变体 + 创建时掷点，见 design/wand-tiers.md
+│  ├─ WandTier.kt               法杖等级表（六级 + 调试杖：法力/充能速度/施放延迟/充能时间/槽位/施放数）+ 蓄能型变体 + 创建时掷点，见 design/wand-tiers.md
 │  ├─ WandManager.kt            法杖实例表（wandId → Wand）、每 tick 维护、世界存档读写
 │  └─ WandSavedData.kt          SavedData：法杖 NBT 的持久化容器
 ├─ item/                        物品（编辑交互一律走原版「物品对上物品」，没有容器菜单）

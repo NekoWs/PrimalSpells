@@ -1,18 +1,14 @@
 package work.nekow.primalspells.wand
 
-import net.minecraft.core.component.DataComponents
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.network.chat.Component
 import net.minecraft.util.RandomSource
 import net.minecraft.world.item.ItemStack
-import net.minecraft.world.item.component.ItemLore
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStartedEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.item.component.WandID
-import work.nekow.primalspells.util.Lore
 import java.util.*
 
 /**
@@ -264,34 +260,13 @@ object WandManager {
             } else {
                 WandVariant.NORMAL
             }
-            val stats = WandStats.roll(tier, variant, random)
-            wand.applyStats(stats)
-            writeStatsLore(stack, stats)
+            // 数值只留在法杖实例里（随 NBT 存档）。展示走**既有的 Alt 面板**：
+            // 服务端把数值经 `SyncWandStatsPayload` 同步给客户端，`ClientTooltipHandler` 读缓存渲染
+            // —— 不要往物品 LORE 里再写一份（那是重复的第二套展示，第 27 轮踩过）。
+            wand.applyStats(WandStats.roll(tier, variant, random))
         }
         wands[wandId] = wand
         return wandId
-    }
-
-    /**
-     * 把**这一根杖掷出的数值**写进物品 LORE（法力上限/回蓝/双延迟/槽位/抽牌）。
-     *
-     * 为什么要写在物品上：数值里有**掷点**（抽牌数），不能只靠等级名表达；
-     * 而物品栏/tooltip 是最直接的展示位。实时值（当前法力/冷却）仍由 HUD 走
-     * `SyncWandStatsPayload` 显示，两者不冲突。
-     */
-    private fun writeStatsLore(stack: ItemStack, stats: WandStats) {
-        stack.set(
-            DataComponents.LORE,
-            ItemLore(
-                listOf(
-                    Component.translatable("wand.primalspells.stat.mana", Lore.formatDouble(stats.maxMana)),
-                    Component.translatable("wand.primalspells.stat.regen", Lore.formatDouble(stats.manaPerSecond)),
-                    Component.translatable("wand.primalspells.stat.delay", Lore.formatDouble(stats.delayMs)),
-                    Component.translatable("wand.primalspells.stat.size", stats.size.toString()),
-                    Component.translatable("wand.primalspells.stat.cast", stats.cast.toString()),
-                )
-            )
-        )
     }
 
     fun remove(key: WandID) = wands.remove(key)

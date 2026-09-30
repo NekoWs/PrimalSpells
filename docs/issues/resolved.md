@@ -695,21 +695,33 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
   打穿后**一圈粉色点阵多边形轮廓**挂在受击方向（读得懂「这里能打」✓）、末帧干净。
 - 构建 **0 warning**。
 
-## 第 27 轮（2026-09-30，法杖等级：六级曲线 + 蓄能型变体 + 毫秒双延迟）
+## 第 27 轮（2026-09-30，法杖等级：六级曲线 + 蓄能型变体 + 毫秒级施放延迟/充能时间）
 
-**起因是用户对上一轮基准的纠正**：`Wand.kt` 里写死的 3000 法力 / 1000 每秒回蓝 / 0 双延迟是
+**起因是用户对上一轮基准的纠正**：`Wand.kt` 里写死的 3000 法力 / 1000 每秒充能 / 0/0 两个时间值是
 **创造模式专用**的调试杖，正常中后期杖是 300 / 100 / ~5 tick 量级、初期是 100 / <80 / ≥10 tick。
 第 26 轮拿调试杖当基准定 DPS 与护盾消耗，结论虽然成立（伤害值与池子无关），但"法力是否够用"这一层是失真的。
 
 | # | 问题 | 结论 | 落点 |
 |---|---|---|---|
-| 27.1 | 法杖没有等级概念，数值写死在 `Wand.kt` | 新增 [design/wand-tiers.md](../design/wand-tiers.md) 作为**法杖数值的唯一事实源**：六级曲线（T1 80/30/700ms/6 槽 → T5 300/100/240ms/14 → T6 450/140/150ms/16，调试杖 3000/1000/0/18 留在曲线外）+ **蓄能型变体**（蓝 ×3、回蓝 ÷3、延迟 ×1.5） | `wand/WandTier.kt`（新：等级表 + `WandStats.roll`）、`wand/Wand.kt`（`applyStats`） |
-| 27.2 | **`wand.delay` 根本没接进冷却**（只出现在一句诊断字符串里）——"等级表里的延迟"如果不管它，就只是展示数字 | 语义定为：`delayMs` = **最小施法间隔**（与卡牌累加值取大）、`rechargeMs` = **重装代价**（抽牌堆空时加一次，保持原语义） | `Wand.spell()` / `Wand.reloadIfNeeded()` |
+| 27.1 | 法杖没有等级概念，数值写死在 `Wand.kt` | 新增 [design/wand-tiers.md](../design/wand-tiers.md) 作为**法杖数值的唯一事实源**：六级曲线（T1 80/30/施放延迟 700ms/充能时间 2100ms/6 槽 → T5 300/100/240/900ms/14 → T6 450/140/150/600ms/16，调试杖 3000/1000/0/0/18 留在曲线外）+ **蓄能型变体**（蓝 ×3、充能 ÷3、两个时间值 ×1.5） | `wand/WandTier.kt`（新：等级表 + `WandStats.roll`）、`wand/Wand.kt`（`applyStats`） |
+| 27.2 | **`wand.delay` 根本没接进冷却**（只出现在一句诊断字符串里）——"等级表里的延迟"如果不管它，就只是展示数字 | 语义定为：`delayMs` = **施放延迟**（每发之间的最小间隔，与卡牌累加值取大）、`rechargeMs` = **充能时间**（抽牌堆抽空后的重装时间，保持原语义） | `Wand.spell()` / `Wand.reloadIfNeeded()` |
 | 27.3 | "单次间隔被 50 ms 卡住，数值很难受" + 用户追问 "OnceUse/Holding 包能不能做到真毫秒" | **真毫秒做不到**：包被处理时仍落在同一个游戏 tick 内（世界没推进、两发同 tick 的弹完全重合），而客户端驱动的施法包必须由服务端限速、上限还是每 tick 一次。**长期平均可以做到毫秒**：冷却计数器改小数 tick 并**保留 ≤0 的零头**（`status.delay = max(卡牌累加, delayTicks) + 余数`） | `Wand.Status.delay`/`recharge` → `Double`、`Wand.spell()`、`Wand.MS_PER_TICK`、`SyncWandStatsPayload`（Int → Double）、`WandHudRenderer` |
-| 27.4 | 抽牌数怎么分等级 | 用户口径：**带权重随机** —— `≤T3` 出 1~3（60/25/15），`>T3` 出 1~6（40/20/15/10/8/7），**1 的权重最高**（抽牌 > 1 会让某些法术链难以回绕，所以它是"抽到的惊喜"）。掷点在**创建时**一次，随 NBT 存档 | `WandTier.rollCast` / `WandStats.roll` |
+| 27.4 | 施放数怎么分等级 | 用户口径：**带权重随机** —— `≤T3` 出 1~3（60/25/15），`>T3` 出 1~6（40/20/15/10/8/7），**1 的权重最高**（施放数 > 1 会让某些法术链难以回绕，所以它是"抽到的惊喜"）。掷点在**创建时**一次，随 NBT 存档 | `WandTier.rollCast` / `WandStats.roll` |
 | 27.5 | 等级在物品层怎么体现 | 用户选择**六个独立物品**（各自贴图/名字）+ 蓄能型用组件（`wand_charged`）与自定义名（"大师杖·蓄能"）；数值不在物品上，物品只决定"是哪一级" | `registry/ModItems.kt`、`assets/.../{items,models/item,textures/item}/wand_t*.json|png`、语言键 |
 | 27.6 | 怎么拿到各级法杖 | 本轮只做"拿得到"：创造模式物品栏（六级 × 2 变体 + 调试杖）+ `/primalspells wand <t1..t6\|debug> [charged]`（会把掷出的数值回报出来）。**自然生成（战利品掉落）按用户口径放到下一轮** | `event/WandCommand.kt`（新）、`ModItems.wandStack` |
-| 27.7 | 掷出的数值玩家看不到（尤其抽牌数是随机的） | 创建法杖时把**这一根**的数值写进物品 LORE（法力上限/回蓝/双延迟/槽位/抽牌，用可翻译组件）；实时值仍由 HUD 走 `SyncWandStatsPayload` | `WandManager.createWand` + `writeStatsLore` |
+| 27.7 | 掷出的数值玩家看不到（尤其施放数是随机的） | ~~创建法杖时写进物品 LORE~~ —— **这一条是错的，见 27.8①**：既有 Alt 面板就是展示位，不该另写一份。最终只补了面板缺的**配置值**（施放延迟/充能时间/槽位） | `client/tooltip/ClientTooltipHandler.kt`、`SyncWandStatsPayload` |
+
+| 27.8 | **用户实机反馈（三条，全是我的问题）**：① 我在**已有的「按住 Alt 看信息」**之上又塞了一套物品 LORE；② 新到手的杖按住 Alt 是空的、**得先施放一次**才有；③ 我自造了"双延迟"这个说法，而 `Wand` 与既有语言键里明明是**施放延迟**与**充能时间**两个概念 | 三条都按"改回既有实现、不自造第二套"处理：<br>① **删掉 `writeStatsLore` 与 5 个 `wand.primalspells.stat.*` 语言键** —— 展示只有一条路径：既有 Alt 面板（`ClientTooltipHandler` + `tooltip.primalspells.*`）；<br>② 根因是 `WandItem.inventoryTick` 只同步 `lastCastWand`（最近施法过的那根）→ 新杖在客户端**没有缓存**。改成：**正在施法的那根每 tick 同步，背包里其它杖按 20 tick 节流同步**（`lastStatSync`，登出清理）；<br>③ 名词全部改回 `Wand`/语言键的口径（施放延迟/充能时间/充能速度/施放数），并且等级表**拆成两个独立的值**——充能时间 ≈ 施放延迟 × 3（低等级杖槽位少、抽空频繁 + 重装慢 = "打几发就得喘一口"）；<br>④ 顺带修掉面板的显示内容：它原本显示**实时剩余冷却**（计数器改小数 tick 后会打出 `3.7999999`），现在显示**配置值（毫秒）**并新增"槽位"一行 | `wand/WandManager.kt`（删 LORE）、`item/WandItem.kt`（`syncStatsIfNeeded` + 新字段）、`network/SyncWandStatsPayload.kt`（+`wandDelayMs`/`wandRechargeMs`/`size`）、`client/tooltip/ClientTooltipHandler.kt`、`wand/WandTier.kt`（两个时间值）、lang（删 5 键、改 `delay`/`recharge` 格式、加 `size`） |
+
+**27.8 的实机验证**（临时探针，写在护盾场景里；验完已 revert）：
+
+- 给玩家一根**从没施法过**的 T5 法杖（放在**背包第 30 格**，不是快捷栏）→ 等 28 tick →
+  读客户端缓存：`probe-alt-has-stats-without-cast ok=true cached=true delayMs=240.0 rechargeMs=900.0 size=14 maxMana=300.0 cast=1`
+  —— 修复前这里是 `cached=false`（Alt 面板空白）。
+  ⚠️ 探针第一版把杖放进了快捷栏，结果**第一人称把手里的杖渲染了出来**，污染了「平时完全不可见」的像素判据
+  （首帧多出 145 个偏蓝像素）—— 这是探针自身的副作用，不是产品缺陷，改成背包格后整场 `capture exit=0`。
+- `probe-tier-two-times ok=true T1=700/2100 T2=580/1800 T3=460/1500 T4=340/1200 T5=240/900 T6=150/600`
+  —— 六级两个时间值各不相同且充能时间更长。
 
 **验证（实机探针 + 全量录制）**：
 

@@ -23,7 +23,7 @@
 | [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
 | [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
 | [design/combat-pricing.md](design/combat-pricing.md) | **战斗数值口径**：攻击法术的伤害/施法间隔（对齐原版 DPS）、护盾的强度与抗性 | 改伤害、`delay`/`recharge`、护盾数值之前 |
-| [design/wand-tiers.md](design/wand-tiers.md) | **法杖数值口径**：六级等级曲线（法力/回蓝/双延迟/槽位/抽牌）、蓄能型变体、毫秒与余数累加 | 改法杖数值、加掉落/合成、调施法节奏之前 |
+| [design/wand-tiers.md](design/wand-tiers.md) | **法杖数值口径**：六级等级曲线（法力/充能速度/施放延迟/充能时间/槽位/施放数）、蓄能型变体、毫秒与余数累加、Alt 面板的展示路径 | 改法杖数值、加掉落/合成、调施法节奏之前 |
 
 ## 2. 技术栈与关键事实
 

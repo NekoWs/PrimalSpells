@@ -41,8 +41,8 @@
   "item.primalspells.quantum_entanglement": "Quantum Entanglement",
   "item.primalspells.energy_shield": "Energy Shield",
   "tooltip.primalspells.mana": "Mana: %s / %s",
-  "tooltip.primalspells.delay": "Cast Delay: %s ",
-  "tooltip.primalspells.recharge": "Recharge Time: %s ",
+  "tooltip.primalspells.delay": "Cast Delay: %s ms",
+  "tooltip.primalspells.recharge": "Recharge Time: %s ms",
   "tooltip.primalspells.cast": "Casts: %s",
   "tooltip.primalspells.charge": "Recharge Speed: %s/s",
   "tooltip.primalspells.hold_alt": "Hold [Alt] to view wand stats",
@@ -105,9 +105,5 @@
   "item.primalspells.wand_t5": "Master Wand",
   "item.primalspells.wand_t6": "Archmage Wand",
   "wand.primalspells.variant.charged": "Charged %s",
-  "wand.primalspells.stat.mana": "Max Mana: %s",
-  "wand.primalspells.stat.regen": "Mana Regen: %s/s",
-  "wand.primalspells.stat.delay": "Delay / Recharge: %s ms",
-  "wand.primalspells.stat.size": "Slots: %s",
-  "wand.primalspells.stat.cast": "Draw: %s"
+  "tooltip.primalspells.size": "Slots: %s"
 }

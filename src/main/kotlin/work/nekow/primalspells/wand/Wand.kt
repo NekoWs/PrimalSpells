@@ -26,16 +26,16 @@ class Wand(var id: String) {
     /** 法力上限 */
     var mana: Double = 3000.0
 
-    /** 施法后的**最小间隔**（毫秒）：与卡牌自己累加的 delay 取大值，见 [spell] */
+    /** **施放延迟**（毫秒）：每发之间的最小间隔，与卡牌自己累加的 delay 取大值，见 [spell] */
     var delayMs: Double = 0.0
 
-    /** 抽牌堆抽空时的**重装代价**（毫秒），见 [reloadIfNeeded] */
+    /** **充能时间**（毫秒）：抽牌堆抽空之后的重装时间，见 [reloadIfNeeded] */
     var rechargeMs: Double = 0.0
 
-    /** 每秒回蓝 */
+    /** 每秒充能（回蓝） */
     var charge: Double = 1000.0
 
-    /** 每回抽几张牌（创建时按等级权重掷出，1 的权重最高） */
+    /** 每回施放几个法术（创建时按等级权重掷出，1 的权重最高） */
     var cast = 1
 
     /** 法术槽位数 */
@@ -81,10 +81,10 @@ class Wand(var id: String) {
     )
     var status: Status = Status()
 
-    /** 本杖的**最小施法间隔**（tick，含小数）：[delayMs] ÷ 50 */
+    /** 本杖的**施放延迟**（tick，含小数）：[delayMs] ÷ 50 */
     fun delayTicks(): Double = delayMs / MS_PER_TICK
 
-    /** 本杖的**重装代价**（tick，含小数）：[rechargeMs] ÷ 50 */
+    /** 本杖的**充能时间**（tick，含小数）：[rechargeMs] ÷ 50 */
     fun rechargeTicks(): Double = rechargeMs / MS_PER_TICK
 
     /**

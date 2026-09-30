@@ -33,17 +33,30 @@ class WandItem(properties: Properties) : Item(properties) {
          */
         private val lastCastWand: MutableMap<UUID, WandID> = hashMapOf()
 
+        /**
+         * 「玩家 UUID → (法杖 id → 上次同步数值的 gameTime)」：给背包里**非施法中**的法杖做同步节流。
+         *
+         * 为什么需要：`inventoryTick` 每 tick 都会对背包里每个法杖跑一次，而这些杖的数值
+         * （法力/冷却）也在变 —— 全量每 tick 同步会造成无谓的包量，不同步又会让 Alt 面板显示旧值。
+         * 折中是**每 [STAT_SYNC_INTERVAL] tick 一次**（正在施法的那根仍然每 tick 同步）。
+         */
+        private val lastStatSync: MutableMap<UUID, MutableMap<String, Long>> = hashMapOf()
+
+        /** 非施法中法杖的同步间隔（tick）。 */
+        private const val STAT_SYNC_INTERVAL = 20L
+
         fun getWand(stack: ItemStack): Wand? {
             val id = stack.get(ModItems.WAND_ID) ?: return null
             return WandManager[id, null]
         }
 
         /**
-         * 清掉某个玩家的施法记录（玩家登出时由 `WandEventHandler` 调用）。
-         * 这张表只是「最近一次施法用的法杖」，不清理会随玩家数量只增不减。
+         * 清掉某个玩家的施法记录与同步节流表（玩家登出时由 `WandEventHandler` 调用）。
+         * 这两张表只按玩家累积，不清理会随玩家数量只增不减。
          */
         fun forgetCastState(playerId: UUID) {
             lastCastWand.remove(playerId)
+            lastStatSync.remove(playerId)
         }
 
         /**
@@ -81,8 +94,32 @@ class WandItem(properties: Properties) : Item(properties) {
                 wand.cast,
                 wand.status.lastDelay,
                 wand.status.lastRecharge,
-                wand.charge
+                wand.charge,
+                wand.delayMs,
+                wand.rechargeMs,
+                wand.size
             ))
+        }
+
+        /**
+         * 需要时把法杖数值同步给客户端（Alt 面板与 HUD 的数据来源）。
+         *
+         * 两种时机：
+         * 1. **正在施法的那根**（`lastCastWand`）：每 tick 同步，HUD 的法力/冷却进度条要实时；
+         * 2. **背包里的其它杖**：按 [STAT_SYNC_INTERVAL] 节流同步 —— 这样**刚拿到手、还没施法过**的杖
+         *    也立刻有数值可看。
+         *
+         * ⚠️ 第 27 轮的实测反馈就是第 2 条缺失：当时只同步"最近施法过的那根"，
+         * 新到手的杖在客户端根本没有缓存，**按住 Alt 是空的，得先放一发才有信息**。
+         */
+        private fun syncStatsIfNeeded(stack: ItemStack, player: ServerPlayer, gameTime: Long) {
+            val wandId = stack.get(ModItems.WAND_ID)?.wandId ?: return
+            val casting = lastCastWand[player.uuid]?.wandId == wandId
+            val bucket = lastStatSync.getOrPut(player.uuid) { hashMapOf() }
+            val synced = bucket[wandId]
+            if (!casting && synced != null && gameTime - synced < STAT_SYNC_INTERVAL) return
+            syncStats(stack, player)
+            bucket[wandId] = gameTime
         }
     }
 
@@ -98,10 +135,7 @@ class WandItem(properties: Properties) : Item(properties) {
             getWand(stack)?.tick(owner)
         }
         if (owner is ServerPlayer) {
-            val wandId = stack.get(ModItems.WAND_ID)
-            if (wandId == lastCastWand[owner.uuid]) {
-                syncStats(stack, owner)
-            }
+            syncStatsIfNeeded(stack, owner, level.gameTime)
         }
     }
 

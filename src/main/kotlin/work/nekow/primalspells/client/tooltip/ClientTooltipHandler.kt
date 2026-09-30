@@ -52,6 +52,13 @@ object ClientTooltipHandler {
         addSelectedSpellLines(event, spells, wandId, pouch = false)
     }
 
+    /**
+     * Alt 面板的属性行。
+     *
+     * **施放延迟 / 充能时间显示的是这根杖的配置值（毫秒）**，不是当前剩余冷却 ——
+     * 剩余冷却由 HUD 的进度条表达；面板要回答的是"这根杖多快"，第 27 轮之前这里显示的是实时计数器
+     * （一旦计数器改成小数 tick，还会打出 `3.7999999` 这种数）。
+     */
     private fun addStatLines(event: RenderTooltipEvent.GatherComponents, wandId: String) {
         val s = WandHudRenderer.getStats(wandId) ?: return
         event.tooltipElements.add(Either.left(
@@ -60,11 +67,11 @@ object ClientTooltipHandler {
         ))
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.delay",
-                s.currentDelay).withStyle(ChatFormatting.GOLD)
+                ms(s.wandDelayMs)).withStyle(ChatFormatting.GOLD)
         ))
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.recharge",
-                s.currentRecharge).withStyle(ChatFormatting.DARK_BLUE)
+                ms(s.wandRechargeMs)).withStyle(ChatFormatting.DARK_BLUE)
         ))
         event.tooltipElements.add(Either.left(
             Component.translatable("tooltip.primalspells.cast", s.cast).withStyle(ChatFormatting.WHITE)
@@ -73,7 +80,14 @@ object ClientTooltipHandler {
             Component.translatable("tooltip.primalspells.charge",
                 "%.1f".format(s.charge)).withStyle(ChatFormatting.BLUE)
         ))
+        event.tooltipElements.add(Either.left(
+            Component.translatable("tooltip.primalspells.size", s.size).withStyle(ChatFormatting.GRAY)
+        ))
     }
+
+    /** 毫秒显示：整数值不带小数点（`240` 而不是 `240.0`）。 */
+    private fun ms(value: Double): String =
+        if (value % 1.0 == 0.0) "%.0f".format(value) else "%.1f".format(value)
 
     private fun addSpellLore(event: RenderTooltipEvent.GatherComponents) {
         val id = ModItems.spellIdOf(event.itemStack.item) ?: return

@@ -15,7 +15,7 @@
 | 改核心机制，或判断某设计是否有意为之 | `docs/architecture.md` 第 8 节「关键不变量与陷阱」+ `docs/issues/`（台账：未解决 / 待验证 / 已解决 / PD 需求） |
 | 做粒子特效、升级 `particledrawing` 前置 | `docs/design/effects-api.md` |
 | 改伤害 / 施法间隔 / 护盾强度与抗性（战斗数值） | `docs/design/combat-pricing.md` |
-| 改法杖数值（法力/回蓝/双延迟/槽位/抽牌）、做法杖掉落 | `docs/design/wand-tiers.md` |
+| 改法杖数值（法力/充能速度/施放延迟/充能时间/槽位/施放数）、做法杖掉落 | `docs/design/wand-tiers.md` |
 
 ## 硬性要求
 

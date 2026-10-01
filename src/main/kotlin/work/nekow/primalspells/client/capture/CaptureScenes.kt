@@ -248,6 +248,8 @@ object CaptureScenes {
         // 与服务器 tick 有 ±10 tick 的漂移，直接"在事件当 tick 断言"会抢跑（第 41 轮踩过）。
         var volleyBreached = false
         var volleyPanels = 0
+        var burstBreached = false
+        var burstPanels = 0
         Scene(
             name = name,
             title = "玻璃护盾：平时不可见 → 受击玻璃板 → 超预算挡不住 + 破口 → 爆炸把波及到的片全打碎",
@@ -330,6 +332,15 @@ object CaptureScenes {
                 // 法力全程充足，所以破口只能来自预算。
                 if (t in SHIELD_BURST_AT until SHIELD_BURST_AT + SHIELD_BURST_SHOTS) {
                     sw.spell(atk)
+                }
+                // 连射的破口在**第 2 发**就发生（火球强度 5、预算 6 ⇒ 5 + 5 > 6），
+                // 而破口只持续 20 tick —— 断言又跑在客户端计数器上（与服务器差 ±10 tick），
+                // 所以这里在服务端 tick 上把状态记下来，断言稍后再读（第 41 轮踩过的坑）。
+                if (t == SHIELD_BURST_AT + SHIELD_HIT_SETTLE - 1) {
+                    val shieldCard = shield
+                    burstBreached = shieldCard != null && shieldCard.breached
+                    burstPanels = shieldCard?.breachPanelCount ?: 0
+                    ctx.log("burst @$t: breached=$burstBreached panels=$burstPanels")
                 }
                 // 激光回归（第 26 轮）：高速法术（5 格/tick、maxAge 1）在同一 tick 里就穿壳贴脸，
                 // 只有 `Hurt` 的命中兜底拦得到它 —— 这一发法力不够（4 < 基础 5）⇒ 应当**打穿**，
@@ -433,12 +444,14 @@ object CaptureScenes {
                     )
                     SHIELD_BURST_AT + SHIELD_HIT_SETTLE + 16 -> listOf(
                         // 第 39/42 轮的核心断言：**连射**把 20 tick 窗口堆爆 ⇒ 挡不住。
-                        // 关键在 mana：它还几乎是满的（只花掉十几发的钱）⇒ 破口**不是**"没蓝"造成的
+                        // 关键在 mana：它还几乎是满的（只花了 2 发的钱）⇒ 破口**不是**"没蓝"造成的。
+                        // 破口状态读的是 `t=145` 在服务端记下的值（避开客户端计数漂移）。
                         Check(
                             name, t, "budget-breach",
-                            s != null && s.breached && w != null &&
-                                w.status.mana >= SHIELD_START_MANA - 140.0 && damageNumbers(ctx, holder) > 0,
-                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 140}）" +
+                            burstBreached && w != null &&
+                                w.status.mana >= SHIELD_START_MANA - 30.0 && damageNumbers(ctx, holder) > 0,
+                            "t=145 记录：breached=$burstBreached 面板数=$burstPanels" +
+                                " mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 30}）" +
                                 " 伤害数字=${damageNumbers(ctx, holder)}",
                         ),
                     )
@@ -768,8 +781,8 @@ object CaptureScenes {
     /**
      * 连射段（第 42 轮口径）：每 tick 一发，共 [SHIELD_BURST_SHOTS] 发。
      *
-     * 火球强度现在只有 0.5（伤害 0.5、间隔为基准的 0.05 秒）⇒ 第 13 发累计 6.5 > 预算 6 ⇒ 破口。
-     * 这一条同时是"手感"的证据：**射速确实是每 tick 一发**（20 发/秒），挡不住的只是"堆太多"。
+     * 火球单发强度 5（Noita 式：法术给伤害、法杖给节奏）⇒ **第 2 发就 5 + 5 > 预算 6 ⇒ 破口**；
+     * 连射只是把"持续输出压破护盾"这件事演出来（第 2 发之后每一发都从破口里穿过去）。
      */
     private const val SHIELD_BURST_AT = 130
     private const val SHIELD_BURST_SHOTS = 16

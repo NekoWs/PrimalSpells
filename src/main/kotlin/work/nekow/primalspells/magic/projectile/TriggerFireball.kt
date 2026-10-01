@@ -21,7 +21,7 @@ class TriggerFireball: Projectile(), TriggerSpell {
         delay = 0
         recharge = 0
         maxAge = 200
-        status.damage = 0.5
+        status.damage = 4.0
         hitRadius = 0.2
         effects += Trajectory(Color.ORANGE)
         effects += Hurt()

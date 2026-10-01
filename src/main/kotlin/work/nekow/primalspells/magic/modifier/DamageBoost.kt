@@ -13,7 +13,7 @@ class DamageBoost: Modifier() {
         effects += object: BaseEffect() {
             override fun onActive() {
                 // 定价见 docs/design/combat-pricing.md §2：与火球同价位的一档（+3 = 火球 5 → 8）
-                projectile.status.damage += 0.3
+                projectile.status.damage += 3
             }
         }
         lore(Lore.DAMAGE, "+3")

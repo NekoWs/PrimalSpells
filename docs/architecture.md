@@ -333,8 +333,13 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   （`Color.ofInt(255,118,118,150)`，提示攻击者「这里能打」）。
   做法上 `shieldPanels` 是**方向索引**（`maxByOrNull { it.center.dot(受击方向) }`），
   `panelNeighbours`（`Polyhedra.adjacency`：共享一条棱 = 相邻）给出破口那一圈；
-  每个时机用 `spawnGlassPanels` 现铺**新建的组**（第 36 轮起**不** `followEntity`：碎片盖章在原地，
-  判定仍跟着玩家），`delay + fadeOut(removeAfter = true)` → PD 自己销毁，不依赖本实例继续 tick）。
+  每个时机用 `spawnGlassPanels` 现铺**新建的组**（白色玻璃/碎片**不** `followEntity`：盖章在原地，
+  判定仍跟着玩家；**粉色破口轮廓 `followEntity` 跟随持有者** —— 第 40 轮口径，破口方向是相对玩家算的，
+  轮廓留在原地就会与真正的破口错位），`delay + fadeOut(removeAfter = true)` → PD 自己销毁。
+  **破口时长按"超出抗性多少"给**（第 40 轮）：`20 tick + 超出每点 6 tick`，封顶 60 tick。
+  **原版投射物**（箭矢/三叉戟/火球/雪球/药水…）走**同一套**判定与结算，挡下即按壳面法线**反弹**
+  并把归属改成持有者；除每 tick 扫场外还有 `ProjectileImpactEvent` 命中兜底
+  （见 [design/combat-pricing.md](design/combat-pricing.md) §4.97/§4.98）。
   格挡结算自第 39 轮起是「**先查 1 秒窗口预算、再查法力**」（抗性既是单发阈值、也是每秒可承担的强度）——
   见 [design/combat-pricing.md](design/combat-pricing.md) §3/§4.95。
   **自转、逐块构建波、消散波、整罩「一闪而碎 / 恢复一闪」、以及第 22 轮那套「分批建组补相位」全部删除** ——

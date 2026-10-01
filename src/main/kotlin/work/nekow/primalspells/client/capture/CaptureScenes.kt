@@ -502,8 +502,8 @@ object CaptureScenes {
                     IMPLOSION_CAST + 6 -> listOf(
                         Check(
                             name, t, "charge-particles",
-                            particles in 120..420,
-                            "蓄力期 PD 粒子 = $particles（核心 180 + 线条 88 + 聚拢 32 ≈ 300）",
+                            particles in 200..1200,
+                            "蓄力期 PD 粒子 = $particles（黑核 130 + 亮边 168 + 三波丝线 216 + 向心 48 ≈ 560）",
                         ),
                         Check(
                             name, t, "charge-no-damage-yet",

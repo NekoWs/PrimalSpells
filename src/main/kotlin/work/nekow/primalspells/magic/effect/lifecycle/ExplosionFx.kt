@@ -19,43 +19,40 @@ import kotlin.math.sin
 /**
  * 爆炸的**表现层**：内爆蓄力（[implode]）→ 爆发（[burst]）。
  *
- * 观感目标是用户给的参考（`.refs/explosion-vfx/`：8 帧 + 逐帧说明）：
- * **黑色实心球核（带亮边）+ 青色发光丝线向心收拢 → 塌成亮点 → 巨大半透明球壳撑到爆炸半径
- * （内部锯齿闪电丝）→ 壳裂成分段弧飞散 → 烟与余晖**。
+ * ## 口径（用户第 30 轮定的，比参考图优先）
  *
- * ## 尺寸口径（ParticleDrawing 1.0.13 起，别再按 scale 当格数估）
+ * > 「整体的贴图感太重，特别是蓄力阶段。蓄力的线条和粒子：是每个有自己的动画出现 → 逐渐往中间汇聚，
+ * > 而不是简单的整体缩小一些而已。不是完美复刻我给的参考，而是用 **MC 本身的粒子感**还原一个符合 MC 风格的版本。」
  *
- * - 渲染整宽 = 编辑器尺寸 × **0.2 格** × 贴图尺寸系数；内置贴图（[ParticleStyle]）边长 16 → 系数 1
- *   → **整宽 = scale × 0.2 格**。
- * - 内置贴图**可见尺寸小于标称**（边缘柔化必然有半透明带）：[ParticleStyle.SOFT_DOT] 可见直径
- *   ≈ **0.75 × 尺寸**、[ParticleStyle.LINE] 可见粗 ≈ **0.7 × 尺寸**（两端各 ≈ 0.2 × 长度渐隐）。
- *   本文件所有尺寸都过 [dotSize] / [lineSize] 反推，密铺间距按「≤ 0.3 × 可见直径」给。
- * - **外观没有更新通道**（零逐 tick 开销的前提）：形变一律用**组级一次性编排**
- *   （`scale` / `fadeIn` / `fadeOut` / `delay` / `move`）或逐粒子 `move` / `delay`；要换外观就 `remove()` 后重生成。
+ * 落实成三条硬约束：
  *
- * **0 包/tick**：只在「蓄力开始」与「爆发」两拍各下发一次生成指令，之后全在客户端求值。
+ * 1. **不做"整体缩小"**：蓄力**分波出现** —— 每波丝线有自己的组、自己的延迟与淡入（`stagger` 让丝线**逐段扫出**），
+ *    向心粒子**各自带速度**飞向中心；没有任何"整组 scale 一缩了事"。
+ * 2. **粒子的世界尺寸是绝对档位，不随爆炸半径膨胀**（MC 粒子的观感前提）：
+ *    [shellDot]/[coreDot]/[sparkDot] 只做很小的半径相关夹取，绝大多数情况是固定的 0.1~0.4 格 —— 小而多，而不是大而少。
+ * 3. **不用大柔边块、不用半透明大膜**：球壳是**一大片小颗粒**铺出来的；亮边是细环；丝线是细线（可见粗 ≈ 0.06 格）。
+ *
+ * 尺寸换算（PD 1.0.13 口径）见 [dotWorld]/[lineWorld]：`anisoWorld` 收**世界格数**；
+ * 内置贴图**可见尺寸小于标称**（SOFT_DOT ≈ 0.75×、LINE ≈ 0.7×）。
+ *
+ * **0 包/tick**：只在下发与爆发两拍各下发一次生成指令，其余（延迟/速度/缓动/淡出/销毁）全在客户端本地求值。
  */
 object ExplosionFx {
 
-    // ---------------------------------------------------------------- 尺寸换算（见类 KDoc）
+    // ---------------------------------------------------------------- 尺寸换算
 
     /** SOFT_DOT 可见直径 ≈ 0.75 × 标称尺寸 */
     private const val SOFT_DOT_VISIBLE = 0.75
     /** LINE 可见粗 ≈ 0.7 × 标称尺寸 */
     private const val LINE_VISIBLE = 0.7
 
-    /**
-     * 让柔边点的**可见直径**为 [blocks] 格所需的 `anisoWorld` 值。
-     *
-     * ⚠️ `anisoWorld` 收的是**世界格数**（`worldUnits = true`，渲染侧会自己换算成编辑器尺寸），
-     * 所以这里只除可见比例、**不再乘 0.2**（第 29 轮把它当标称尺寸用过一次，黑核大了 5 倍）。
-     */
+    /** 让柔边点的**可见直径**为 [blocks] 格所需的 `anisoWorld` 值。 */
     private fun dotWorld(blocks: Double): Double = blocks / SOFT_DOT_VISIBLE
 
-    /** 让线段的**可见粗**为 [blocks] 格所需的 `anisoWorld` 值（同理：只除可见比例）。 */
+    /** 让线段的**可见粗**为 [blocks] 格所需的 `anisoWorld` 值。 */
     private fun lineWorld(blocks: Double): Double = blocks / LINE_VISIBLE
 
-    /** 柔边点外观（可见直径 [blocks] 格）；[glow] 打开时叠加自发光 + 加色。 */
+    /** 柔边点外观（可见直径 [blocks] 格，世界单位）。 */
     private fun dotVisual(blocks: Double, glow: Boolean = true): ParticleVisual {
         val size = dotWorld(blocks).toFloat()
         return ParticleVisual().style(ParticleStyle.SOFT_DOT)
@@ -64,98 +61,100 @@ object ExplosionFx {
             .additive(glow)
     }
 
+    // ---------------------------------------------------------------- 绝对尺寸档位（不随半径膨胀）
+
+    /** 火花（向心粒子 / 外飞粒子）：MC 粒子的量级 */
+    private const val SPARK_DOT = 0.13
+    /** 蓄力丝线的可见粗：细线，不是带子 */
+    private const val FILAMENT_WIDTH = 0.14
+    /** 内部闪电丝的可见粗 */
+    private const val BOLT_WIDTH = 0.05
+    /** 壳裂弧段的可见粗 */
+    private const val CRACK_WIDTH = 0.045
+    /** 黑核表面点的可见直径 */
+    private const val CORE_DOT = 0.30
+    /** 黑核亮边的可见直径 */
+    private const val RIM_DOT = 0.12
+
+    /** 球壳点的可见直径：随半径**轻微**变化（大爆稍微大一点），上限 0.42 —— 保证"多而小" */
+    private fun shellDot(radius: Float): Double = (radius * 0.055).coerceIn(0.14, 0.42)
+
     // ---------------------------------------------------------------- 蓄力：黑核
 
     /** 核心球半径 = 爆炸半径 × 1/3（用户口径） */
     private const val CORE_RATIO = 1f / 3f
-    /** 核亮边的点数/圈（三个正交平面各一圈 → 任意角度看都是"球核的边"） */
-    private const val CORE_RING_COUNT = 72
-    /** 核亮边的可见粗细（相对核心半径） */
-    private const val CORE_RING_WIDTH_RATIO = 0.05
-    /** 核心内爆收缩比：蓄力结束时缩到 45% */
-    private const val CORE_SHRINK = 0.45f
-    private val CORE_COLOR = Color.ofInt(4, 6, 12, 255)
-    private val RIM_COLOR = Color.ofInt(175, 242, 255, 255)
+    /** 核表面点数（用密集小点铺球面 → 暗球，而不是一颗大方块） */
+    private const val CORE_POINTS = 130
+    /** 核亮边：三正交平面各一圈小点 */
+    private const val CORE_RING_COUNT = 56
+    private val CORE_COLOR = Color.ofInt(6, 8, 16, 255)
+    private val RIM_COLOR = Color.ofInt(180, 244, 255, 255)
 
-    // ---------------------------------------------------------------- 蓄力：丝线
+    // ---------------------------------------------------------------- 蓄力：丝线（分波）
 
-    private const val FILAMENT_COUNT = 6
-    /** 每条丝线的折线点数（**每段一颗粒子**，故 14 → 14 颗/条） */
-    private const val FILAMENT_SEGMENTS = 18
-    /** 丝线起点半径（相对爆炸半径）与终点（相对核心半径） */
-    private const val FILAMENT_START_RATIO = 0.95f
-    private const val FILAMENT_END_RATIO = 1.25f
+    /** 分几波收拢（每波一组，各自的延迟/淡入/半径/相位） */
+    private const val WAVE_COUNT = 3
+    /** 每波的丝线根数 */
+    private const val FILAMENT_PER_WAVE = 8
+    /** 每条丝线的折线点数（**每段一颗粒子**） */
+    private const val FILAMENT_SEGMENTS = 12
+    /** 每波起点半径（相对爆炸半径）：外层 → 内层 */
+    private val WAVE_START = doubleArrayOf(0.95, 0.66, 0.42)
+    /** 相邻两波之间隔多少 tick 出现（"每个有自己的动画出现"的节拍） */
+    private const val WAVE_GAP = 4
+    /** 每波淡入/淡出时长 */
+    private const val WAVE_FADE_IN = 2
+    private const val WAVE_FADE_OUT = 3
     /** 丝线绕核的螺旋圈数 */
-    private const val FILAMENT_TWIST = 0.55
-    private const val FILAMENT_SPIRAL_RADIUS = 0.35
-    /** 丝线**可见**粗细（相对爆炸半径）：中间最粗、两端渐隐（`taper = true`） */
-    private const val FILAMENT_WIDTH_RATIO = 0.018
-    /** 蓄力结束时丝线组收缩到的比例（`scale` 连"到轴心的距离"一起缩 → 向心收拢 + 变短） */
-    private const val FILAMENT_CONTRACT = 0.30f
-    /** 放射状细刺（参考第 1 帧里那些又细又直的亮刺） */
-    private const val SPIKE_COUNT = 10
-    private val FILAMENT_INNER = Color.ofInt(228, 252, 255, 255)
-    private val FILAMENT_OUTER = Color.ofInt(85, 195, 255, 255)
+    private const val FILAMENT_TWIST = 0.5
+    private const val FILAMENT_SPIRAL = 0.33
+    /** 每波相位偏移（避免三波叠成同一张图） */
+    private const val WAVE_PHASE = 0.7
+    private val FILAMENT_INNER = Color.ofInt(232, 252, 255, 255)
+    private val FILAMENT_OUTER = Color.ofInt(96, 200, 255, 255)
 
-    // ---------------------------------------------------------------- 蓄力：向心聚拢
+    // ---------------------------------------------------------------- 蓄力：向心粒子
 
-    private const val CONVERGE_COUNT = 34
-    private const val CONVERGE_DOT_RATIO = 0.05
-    private val CONVERGE_COLOR = Color.ofInt(155, 228, 255, 255)
+    private const val CONVERGE_COUNT = 48
+    private const val CONVERGE_DELAY_STEPS = 7
+    /** 向心速度系数：让粒子大致在蓄力结束时抵达核心（各自速度，不是组位移） */
+    private const val CONVERGE_SPEED = 1.05
+    private val CONVERGE_COLOR = Color.ofInt(160, 230, 255, 255)
 
-    // ---------------------------------------------------------------- 爆发：球壳
+    // ---------------------------------------------------------------- 爆发
 
-    /** 球壳起始半径（相对爆炸半径），随后 `scale` 撑到 1.0 */
-    private const val SHELL_START_RATIO = 0.32f
-    /** 球壳柔边点**可见直径**（相对爆炸半径） */
-    private const val SHELL_DOT_RATIO = 0.26
+    /** 壳起始半径（相对爆炸半径），随后 `scale` 撑到 1.0 */
+    private const val SHELL_START_RATIO = 0.28f
+    /** 壳的密铺间距（相对**可见直径**）：≤0.3 无空隙；这里略松，靠"多而小"读成粒子云 */
+    private const val SHELL_SPACING = 0.42
+    private const val SHELL_MAX_POINTS = 780
+    private const val SHELL_GROW_TICKS = 8
+    private const val SHELL_HOLD_TICKS = 3
+    private const val SHELL_FADE_TICKS = 8
+    private val SHELL_COLOR = Color.ofInt(74, 112, 142, 255)
+    private val SHELL_RIM_COLOR = Color.ofInt(180, 235, 255, 255)
 
-    /** 膜上的点比亮边点略小（膜要透、边要亮） */
-    private const val FILM_DOT_SHRINK = 0.85
-    /** 球壳密铺间距上限（相对可见直径）：≤ 0.3 无空隙 */
-    private const val SHELL_SPACING_RATIO = 0.30
-    private const val SHELL_MAX_POINTS = 900
-    private const val SHELL_GROW_TICKS = 7
-    private const val SHELL_HOLD_TICKS = 4
-    private const val SHELL_FADE_TICKS = 9
-    /**
-     * 球壳颜色：**低 alpha 的半透膜**（不加色）。
-     *
-     * 参考里的壳是能看见后面世界的"膜"；加色混合叠几百颗只会累加成一颗过曝白球（第 29 轮实测），
-     * 所以壳走普通 alpha 混合，亮边（[SHELL_RIM_COLOR]）与内部闪电丝才用加色。
-     */
-    private val SHELL_COLOR = Color.ofInt(205, 236, 255, 58)
-    private val SHELL_RIM_COLOR = Color.ofInt(165, 232, 255, 255)
+    /** 起爆闪光：几颗短命的大亮点（MC 的 FLASH 观感） */
+    private const val FLASH_COUNT = 4
+    private const val FLASH_LIFETIME = 4
+    private val FLASH_COLOR = Color.ofInt(245, 253, 255, 255)
 
-    // ---------------------------------------------------------------- 爆发：内部闪电丝
+    private const val BOLT_COUNT = 10
+    private const val BOLT_SEGMENTS = 10
+    private val BOLT_COLOR = Color.ofInt(225, 250, 255, 255)
 
-    private const val BOLT_COUNT = 9
-    private const val BOLT_SEGMENTS = 11
-    private const val BOLT_WIDTH_RATIO = 0.022
-    private val BOLT_COLOR = Color.ofInt(215, 250, 255, 255)
+    private const val OUT_COUNT = 64
+    private const val OUT_LIFETIME = 14
+    private const val OUT_SPEED = 0.55
+    private val OUT_COLOR = Color.ofInt(205, 240, 255, 255)
 
-    // ---------------------------------------------------------------- 爆发：外飞 / 壳裂 / 余韵
+    private const val CRACK_COUNT = 6
+    private const val CRACK_SEGMENTS = 6
 
-    private const val OUT_COUNT = 44
-    private const val OUT_DOT_RATIO = 0.055
-    private const val OUT_LIFETIME = 16
-    private const val OUT_SPEED = 0.62
-    private val OUT_COLOR = Color.ofInt(200, 242, 255, 255)
-
-    private const val CRACK_COUNT = 7
-    private const val CRACK_SEGMENTS = 7
-    private const val CRACK_WIDTH_RATIO = 0.015
-
-    private const val SMOKE_COUNT = 18
+    private const val SMOKE_COUNT = 22
     private const val SMOKE_IN_TICKS = 3
-    private const val SMOKE_FADE_TICKS = 10
-    private const val SMOKE_DOT_RATIO = 0.42
-    private val SMOKE_COLOR = Color.ofInt(118, 124, 130, 255)
-
-    /** 各段共用的淡入时长 */
-    private const val FADE_IN_TICKS = 2
-    /** 塌缩时长：核心与丝线在爆发前的最后几 tick 收掉 */
-    private const val COLLAPSE_TICKS = 3
+    private const val SMOKE_FADE_TICKS = 8
+    private val SMOKE_COLOR = Color.ofInt(130, 136, 142, 255)
 
     /**
      * 由半径反推蓄力时长（tick）：`半径 × 3`，夹在 4~20 tick。
@@ -170,117 +169,90 @@ object ExplosionFx {
     // =====================================================================================
 
     /**
-     * 蓄力表现。所有粒子的销毁都在**客户端本地**排好（`delay` + `fadeOut(removeAfter = true)`），
-     * 蓄力结束那一刻自行收干净，服务端不需要再发任何指令。
+     * 蓄力表现：黑核常驻 → 三波丝线**依次出现**并向心收拢 → 各自带速度的向心粒子。
+     *
+     * 所有销毁都在客户端本地排好（`delay` + `fadeOut(removeAfter = true)`），服务端不再发任何指令。
      */
     fun implode(manager: ParticleManager, center: Vec3, radius: Float, chargeTicks: Int) {
         if (radius <= 0f || chargeTicks <= 0) return
         val coreRadius = radius * CORE_RATIO
-        val collapse = COLLAPSE_TICKS.coerceAtMost(chargeTicks)
-        implodeCore(manager, center, coreRadius, chargeTicks, collapse)
-        implodeFilaments(manager, center, coreRadius, radius, chargeTicks, collapse)
+        implodeCore(manager, center, coreRadius, chargeTicks)
+        implodeWaves(manager, center, coreRadius, radius, chargeTicks)
         implodeConverge(manager, center, coreRadius, radius, chargeTicks)
     }
 
-    /**
-     * **黑色实心球核 + 亮边**。
-     *
-     * 核用**一颗大柔边点**：柔边圆点本身就是圆的，而球从任意角度看都是圆 ——
-     * 一颗「可见直径 = 核心直径」的 SOFT_DOT 就是"实心黑球"，比铺几百颗小点既准又省。
-     * 亮边用三个正交平面各一圈柔边点（从任何角度看都贴着球核外沿）。
-     */
-    private fun implodeCore(
-        manager: ParticleManager,
-        center: Vec3,
-        coreRadius: Float,
-        chargeTicks: Int,
-        collapse: Int,
-    ) {
+    /** **黑核**：密集小点铺出的暗球 + 三正交圈的小亮点亮边。 */
+    private fun implodeCore(manager: ParticleManager, center: Vec3, coreRadius: Float, chargeTicks: Int) {
         val group = manager.createGroup(center)
-        manager.create()
-            .position(center)
-            .color(CORE_COLOR)
-            .visual(dotVisual(coreRadius * 2.0, glow = false))
-            .lifetime(-1)
-            .group(group.id)
-            .spawn()
-
-        val rimVisual = dotVisual(coreRadius * CORE_RING_WIDTH_RATIO)
+        Draw.sphere(
+            manager, center, coreRadius.toDouble(), CORE_POINTS,
+            ColorSource.of(CORE_COLOR), 1f, 0, group, dotVisual(CORE_DOT, glow = false),
+        )
+        val rim = dotVisual(RIM_DOT)
         for (axis in listOf(Draw.Axis.XZ, Draw.Axis.XY, Draw.Axis.YZ)) {
             Draw.circle(
                 manager, center, coreRadius.toDouble(), CORE_RING_COUNT, axis,
-                ColorSource.of(RIM_COLOR), 1f, 0, group, rimVisual,
+                ColorSource.of(RIM_COLOR), 1f, 0, group, rim,
             )
         }
-
-        group.fadeIn(FADE_IN_TICKS)
-        // 内爆：越收越小（`scale` 连粒子尺寸一起缩）
-        group.scale(CORE_SHRINK, chargeTicks, EasingType.EASE_IN)
-        group.delay((chargeTicks - collapse).coerceAtLeast(0))
-        group.fadeOut(collapse, removeAfter = true, easing = EasingType.EASE_IN)
+        group.fadeIn(2)
+        group.delay((chargeTicks - 4).coerceAtLeast(0))
+        group.fadeOut(4, removeAfter = true, easing = EasingType.EASE_IN)
     }
 
     /**
-     * **发光丝线 + 放射细刺**。
-     *
-     * `Draw.polyline` 每条丝线的每一段只放**一颗**粒子：长度方向由 `anisoWorld(段长, 粗)` 拉长、
-     * 朝向由 `alignTo` 对齐到该段，`taper = true` 让两端收细（"两侧尖中间略粗"）并自动用 `LINE` 贴图。
-     * 于是一条丝就是**一条连续的发光丝**，不再是一排小方块。
+     * **三波丝线**：每波一个组、各自的延迟与淡入淡出，起点半径逐波收里 ——
+     * 于是观感是「一批丝线扫出来 → 收拢 → 下一批更靠里地扫出来」，而不是整张图一起缩小。
      */
-    private fun implodeFilaments(
+    private fun implodeWaves(
         manager: ParticleManager,
         center: Vec3,
         coreRadius: Float,
         radius: Float,
         chargeTicks: Int,
-        collapse: Int,
     ) {
-        val group = manager.createGroup(center)
-        val nominalWidth = lineWorld(radius * FILAMENT_WIDTH_RATIO).toFloat()
-        // 沿丝线的渐变：外端青 → 内端近白
+        val nominalWidth = lineWorld(FILAMENT_WIDTH).toFloat()
         val gradient = ColorSource { t -> FILAMENT_OUTER.lerp(FILAMENT_INNER, t.toFloat()) }
+        val dirs = ParticleShapes.fibonacciSphere(FILAMENT_PER_WAVE)
 
-        ParticleShapes.fibonacciSphere(FILAMENT_COUNT).forEachIndexed { index, dir ->
-            val axis = normalize(dir)
-            val lateral = tangentOf(axis)
-            val normal = axis.cross(lateral)
-            val points = ArrayList<Vec3>(FILAMENT_SEGMENTS)
-            for (i in 0 until FILAMENT_SEGMENTS) {
-                val t = i.toDouble() / (FILAMENT_SEGMENTS - 1).toDouble()
-                val r = lerp(radius * FILAMENT_START_RATIO, coreRadius * FILAMENT_END_RATIO, t)
-                val spin = 2.0 * PI * FILAMENT_TWIST * t * if (index % 2 == 0) 1.0 else -1.0
-                points += center.add(axis.scale(r))
-                    .add(lateral.scale(cos(spin) * r * FILAMENT_SPIRAL_RADIUS))
-                    .add(normal.scale(sin(spin) * r * FILAMENT_SPIRAL_RADIUS))
+        for (wave in 0 until WAVE_COUNT) {
+            val group = manager.createGroup(center)
+            val startRatio = WAVE_START[wave]
+            val endRatio = if (wave == WAVE_COUNT - 1) 1.2 else WAVE_START.getOrElse(wave + 1) { 0.4 } * CORE_RATIO / CORE_RATIO * 0.85
+            for (index in 0 until FILAMENT_PER_WAVE) {
+                val axis = normalize(dirs[index])
+                val lateral = tangentOf(axis)
+                val normal = axis.cross(lateral)
+                val points = ArrayList<Vec3>(FILAMENT_SEGMENTS)
+                for (i in 0 until FILAMENT_SEGMENTS) {
+                    val t = i.toDouble() / (FILAMENT_SEGMENTS - 1).toDouble()
+                    val r = lerp(radius * startRatio, coreRadius * endRatio, t)
+                    val spin = 2.0 * PI * FILAMENT_TWIST * t * if ((index + wave) % 2 == 0) 1.0 else -1.0 +
+                        wave * WAVE_PHASE
+                    points += center.add(axis.scale(r))
+                        .add(lateral.scale(cos(spin) * r * FILAMENT_SPIRAL))
+                        .add(normal.scale(sin(spin) * r * FILAMENT_SPIRAL))
+                }
+                // stagger = 1：丝线**逐段扫出**（这就是"每个有自己的动画出现"）
+                Draw.polyline(manager, points, nominalWidth, true, null, true, true, gradient, 1, group)
             }
-            Draw.polyline(manager, points, nominalWidth, true, null, true, true, gradient, 0, group)
+            val appearAt = wave * WAVE_GAP
+            group.delay(appearAt)
+            group.fadeIn(WAVE_FADE_IN)
+            // 每波撑到自己那段窗口的末尾就收掉 → 观感是"一层层收进去"，最后一波撑到蓄力结束
+            val holdUntil = if (wave < WAVE_COUNT - 1) {
+                (chargeTicks - WAVE_GAP * (WAVE_COUNT - 1 - wave)) - WAVE_FADE_OUT
+            } else {
+                chargeTicks - 2
+            }
+            group.delay((holdUntil - appearAt - WAVE_FADE_IN).coerceAtLeast(0))
+            group.fadeOut(WAVE_FADE_OUT, removeAfter = true, easing = EasingType.EASE_IN)
         }
-
-        // 放射细刺
-        val spikeDirs = ParticleShapes.fibonacciSphere(SPIKE_COUNT * 2)
-        for (i in 0 until SPIKE_COUNT) {
-            val dir = normalize(spikeDirs[i * 2])
-            Draw.polyline(
-                manager,
-                listOf(
-                    center.add(dir.scale(coreRadius * 1.15)),
-                    center.add(dir.scale(radius * 0.78)),
-                ),
-                nominalWidth * 0.55f, true, null, true, true,
-                ColorSource.of(FILAMENT_INNER), 0, group,
-            )
-        }
-
-        group.fadeIn(FADE_IN_TICKS)
-        // 向心收拢 + 变短：组级 `scale` 同时缩"到轴心的距离"与粒子尺寸
-        group.scale(FILAMENT_CONTRACT, chargeTicks, EasingType.EASE_IN)
-        group.delay((chargeTicks - collapse).coerceAtLeast(0))
-        group.fadeOut(collapse, removeAfter = true, easing = EasingType.EASE_IN)
     }
 
     /**
-     * **向心聚拢的粒子**：从壳外各方向朝核心收进去；逐粒子 `delay` 错开出现（一波接一波），
-     * `EASE_IN` 让它们越靠近核心越快。
+     * **向心粒子**：每一颗**自己带速度**飞向中心（`setVelocity`，两端逐 tick 自行积分），
+     * 出现时刻按 `delay` 错开 —— "每个有自己的动画出现 + 逐渐汇聚"。
      */
     private fun implodeConverge(
         manager: ParticleManager,
@@ -289,23 +261,22 @@ object ExplosionFx {
         radius: Float,
         chargeTicks: Int,
     ) {
-        val visual = dotVisual(radius * CONVERGE_DOT_RATIO)
+        val visual = dotVisual(SPARK_DOT)
         ParticleShapes.fibonacciSphere(CONVERGE_COUNT).forEachIndexed { index, dir ->
             val radial = normalize(dir)
-            val startRadius = radius * (0.65 + 0.35 * ((index * 5 % CONVERGE_COUNT) / CONVERGE_COUNT.toDouble()))
-            val delay = index % 4
-            val handle = manager.create()
-                .position(center.add(radial.scale(startRadius)))
+            val startRadius = radius * (0.55 + 0.45 * ((index * 7 % CONVERGE_COUNT) / CONVERGE_COUNT.toDouble()))
+            val p = center.add(radial.scale(startRadius))
+            val delay = index % CONVERGE_DELAY_STEPS
+            val flyTicks = (chargeTicks - delay).coerceAtLeast(1)
+            val speed = (startRadius - coreRadius * 1.05) / flyTicks * CONVERGE_SPEED
+            manager.create()
+                .position(p)
                 .color(CONVERGE_COLOR)
                 .visual(visual.copy())
-                .lifetime(chargeTicks)
+                .lifetime(flyTicks + 2)
                 .delay(delay)
-                .spawn() ?: return@forEachIndexed
-            handle.move(
-                center.add(radial.scale(coreRadius * 1.05)),
-                chargeTicks - delay,
-                EasingType.EASE_IN,
-            )
+                .spawn()
+                ?.setVelocity(radial.scale(-speed))
         }
     }
 
@@ -313,12 +284,10 @@ object ExplosionFx {
     // 爆发
     // =====================================================================================
 
-    /**
-     * 爆发表现：**球壳从 ~0.3R 撑到爆炸半径**（组级 `scale` 一个调用写完），
-     * 内部走锯齿闪电丝，壳淡出时裂成弧段飞散，最后留一点烟与余晖。
-     */
+    /** 爆发：闪光 → 小颗粒球壳撑到爆炸半径 → 内部闪电丝 / 外飞 / 壳裂 / 烟与余晖。 */
     fun burst(manager: ParticleManager, center: Vec3, radius: Float) {
         if (radius <= 0f) return
+        burstFlash(manager, center, radius)
         burstShell(manager, center, radius)
         burstBolts(manager, center, radius)
         burstOutward(manager, center, radius)
@@ -326,47 +295,55 @@ object ExplosionFx {
         burstAfterglow(manager, center, radius)
     }
 
-    /** 球壳（含壳边亮环）：加色柔边点铺面 → "半透膜 + 亮边"。 */
-    private fun burstShell(manager: ParticleManager, center: Vec3, radius: Float) {
-        val shellStart = radius * SHELL_START_RATIO
-        val dot: Float = (radius * SHELL_DOT_RATIO).toFloat()
-        val points = shellPointCount(shellStart, dot)
+    /** 起爆闪光：几颗短命亮点（MC 的 FLASH 观感），峰值只维持 4 tick。 */
+    private fun burstFlash(manager: ParticleManager, center: Vec3, radius: Float) {
+        val size = dotWorld((radius * 0.30).coerceIn(0.5, 1.6))
+        val visual = ParticleVisual().style(ParticleStyle.SOFT_DOT)
+            .anisoWorld(size.toFloat(), size.toFloat()).glowing(true).additive(true)
+        ParticleShapes.fibonacciSphere(FLASH_COUNT + 2).take(FLASH_COUNT).forEachIndexed { index, dir ->
+            manager.create()
+                .position(center.add(normalize(dir).scale(radius * 0.08 * index)))
+                .color(FLASH_COLOR)
+                .visual(visual.copy())
+                .lifetime(FLASH_LIFETIME)
+                .spawn()
+        }
+    }
 
+    /** **球壳**：一大片小颗粒铺满球面，组级 `scale` 撑到爆炸半径（"多而小"才是 MC 的粒子云）。 */
+    private fun burstShell(manager: ParticleManager, center: Vec3, radius: Float) {
+        val dot = shellDot(radius)
+        val shellStart = radius * SHELL_START_RATIO
+        val points = shellPointCount(shellStart, dot)
         val shell = manager.createGroup(center)
-        val film = ParticleVisual().style(ParticleStyle.SOFT_DOT).anisoWorld(
-            dotWorld(dot.toDouble() * FILM_DOT_SHRINK).toFloat(),
-            dotWorld(dot.toDouble() * FILM_DOT_SHRINK).toFloat(),
-        )
         Draw.sphere(
             manager, center, shellStart.toDouble(), points,
-            ColorSource.of(SHELL_COLOR), 1f, 0, shell, film,
+            ColorSource.of(SHELL_COLOR), 1f, 0, shell, dotVisual(dot),
         )
-        // 亮边：三正交圈，加色 + 自发光（壳上唯一"发光"的部分）
-        val rimVisual = dotVisual(dot * 0.85)
+        val rimVisual = dotVisual((dot * 1.6).coerceAtMost(0.6))
         for (axis in listOf(Draw.Axis.XZ, Draw.Axis.XY, Draw.Axis.YZ)) {
             Draw.circle(
-                manager, center, shellStart.toDouble(), (points / 3).coerceIn(40, 220), axis,
+                manager, center, shellStart.toDouble(), (points / 4).coerceIn(30, 180), axis,
                 ColorSource.of(SHELL_RIM_COLOR), 1f, 0, shell, rimVisual,
             )
         }
-
         shell.fadeIn(1)
         shell.scale(1f / SHELL_START_RATIO, SHELL_GROW_TICKS, EasingType.EASE_OUT)
         shell.delay(SHELL_GROW_TICKS + SHELL_HOLD_TICKS)
         shell.fadeOut(SHELL_FADE_TICKS, removeAfter = true, easing = EasingType.EASE_OUT)
     }
 
-    /** 球壳点数：按「间距 ≤ 0.3 × 可见直径」在球面上铺满，并夹上限。 */
-    private fun shellPointCount(shellRadius: Float, dot: Float): Int {
-        val spacing = max(dot * SHELL_SPACING_RATIO, 1.0e-3)
+    /** 球壳点数：按「间距 ≈ 0.42 × 可见直径」铺满球面并夹上限。 */
+    private fun shellPointCount(shellRadius: Float, dot: Double): Int {
+        val spacing = max(dot * SHELL_SPACING, 1.0e-3)
         val area = 4.0 * PI * shellRadius * shellRadius
-        return (area / (spacing * spacing)).roundToInt().coerceIn(60, SHELL_MAX_POINTS)
+        return (area / (spacing * spacing)).roundToInt().coerceIn(80, SHELL_MAX_POINTS)
     }
 
-    /** 内部闪电丝：从中心向外走的锯齿折线（参考第 5、6 帧里的分叉亮丝）。 */
+    /** 内部闪电丝：从中心向外的锯齿细线。 */
     private fun burstBolts(manager: ParticleManager, center: Vec3, radius: Float) {
         val group = manager.createGroup(center)
-        val nominalWidth = lineWorld(radius * BOLT_WIDTH_RATIO).toFloat()
+        val nominalWidth = lineWorld(BOLT_WIDTH).toFloat()
         ParticleShapes.fibonacciSphere(BOLT_COUNT).forEachIndexed { index, dir ->
             val axis = normalize(dir)
             val lateral = tangentOf(axis)
@@ -385,13 +362,13 @@ object ExplosionFx {
         group.fadeOut(SHELL_GROW_TICKS + SHELL_HOLD_TICKS, removeAfter = true, easing = EasingType.EASE_OUT)
     }
 
-    /** 向外飞散的粒子：一次性初速，之后由 PD 两端自行积分（零逐 tick 包）。 */
+    /** 向外飞散的小颗粒：一次性初速，之后两端自行积分。 */
     private fun burstOutward(manager: ParticleManager, center: Vec3, radius: Float) {
-        val visual = dotVisual(radius * OUT_DOT_RATIO)
+        val visual = dotVisual(SPARK_DOT)
         ParticleShapes.fibonacciSphere(OUT_COUNT).forEach { dir ->
             val outward = normalize(dir)
             manager.create()
-                .position(center.add(outward.scale(radius * 0.22)))
+                .position(center.add(outward.scale(radius * 0.20)))
                 .color(OUT_COLOR)
                 .visual(visual.copy())
                 .lifetime(OUT_LIFETIME)
@@ -400,13 +377,10 @@ object ExplosionFx {
         }
     }
 
-    /**
-     * **壳裂**：球壳淡出的同时，几条**沿球面的弧段**向外漂散（参考第 7 帧）。
-     * 弧段同样用折线画（每段一颗粒子），`delay` 到壳撑满之后才出现。
-     */
+    /** **壳裂**：几条沿球面的细弧向外漂散（每段一颗粒子的折线）。 */
     private fun burstCracks(manager: ParticleManager, center: Vec3, radius: Float) {
         val group = manager.createGroup(center)
-        val nominalWidth = lineWorld(radius * CRACK_WIDTH_RATIO).toFloat()
+        val nominalWidth = lineWorld(CRACK_WIDTH).toFloat()
         ParticleShapes.fibonacciSphere(CRACK_COUNT).forEachIndexed { index, dir ->
             val axis = normalize(dir)
             val lateral = tangentOf(axis)
@@ -427,27 +401,22 @@ object ExplosionFx {
         }
         group.delay(SHELL_GROW_TICKS + 2)
         group.fadeIn(2)
-        group.move(Vec3(0.0, radius * 0.06, 0.0), SHELL_FADE_TICKS + 4, EasingType.EASE_OUT)
-        group.fadeOut(SHELL_FADE_TICKS + 4, removeAfter = true, easing = EasingType.EASE_OUT)
+        group.move(Vec3(0.0, radius * 0.06, 0.0), SHELL_FADE_TICKS, EasingType.EASE_OUT)
+        group.fadeOut(SHELL_FADE_TICKS, removeAfter = true, easing = EasingType.EASE_OUT)
     }
 
-    /**
-     * 余韵：少量柔边"烟"缓慢上浮（参考第 8 帧）+ 贴地余晖。
-     *
-     * 烟也放进**组**里统一收场（`delay` → `fadeIn` → `fadeOut(removeAfter = true)`）：
-     * 一开始只按粒子寿命自然到期，结果它活过了录制场景末尾（`pd-particles-zero` 抓到剩 18 颗）。
-     */
+    /** 余韵：少量柔边"烟"上浮 + 贴地一圈小点。 */
     private fun burstAfterglow(manager: ParticleManager, center: Vec3, radius: Float) {
         val smoke = manager.createGroup(center)
         val smokeLife = SHELL_GROW_TICKS + SMOKE_IN_TICKS + SMOKE_FADE_TICKS + 2
+        val smokeDot = (radius * 0.09).coerceIn(0.25, 0.7)
         ParticleShapes.fibonacciSphere(SMOKE_COUNT).forEachIndexed { index, dir ->
             val radial = normalize(dir)
-            val shrink = 0.8 + 0.4 * (index % 3)
             val p = center.add(radial.scale(radius * (0.15 + 0.25 * (index % 5) / 5.0)))
             val handle = manager.create()
                 .position(p)
                 .color(SMOKE_COLOR)
-                .visual(dotVisual(radius * SMOKE_DOT_RATIO * shrink, glow = false))
+                .visual(dotVisual(smokeDot * (0.8 + 0.4 * (index % 3)), glow = false))
                 .lifetime(smokeLife)
                 .delay(SHELL_GROW_TICKS)
                 .group(smoke.id)
@@ -460,8 +429,8 @@ object ExplosionFx {
 
         val ground = manager.createGroup(center)
         Draw.circle(
-            manager, center, radius * 0.55, 64, Draw.Axis.XZ,
-            ColorSource.of(SHELL_COLOR), 1f, 0, ground, dotVisual(radius * 0.22),
+            manager, center, radius * 0.55, 56, Draw.Axis.XZ,
+            ColorSource.of(SHELL_COLOR), 1f, 0, ground, dotVisual(SPARK_DOT * 1.6),
         )
         ground.fadeIn(2)
         ground.fadeOut(SHELL_GROW_TICKS + SHELL_HOLD_TICKS + SHELL_FADE_TICKS, removeAfter = true)

@@ -201,7 +201,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
   `LINE` 可见粗 ≈ **0.7 × 尺寸**（两端各 ≈ 0.2 × 长度渐隐）。密铺间距按「≤ 0.3 × 可见直径」给就无方块感/空隙。
   `ExplosionFx` 里的 `dotWorld()` / `lineWorld()` 就是这套反推。
 
-**两个必踩的坑（均已实测）**
+**三个必踩的坑（均已实测）**
 
 1. **内置贴图要在渲染线程就绪之后再确保**：`ParticleManager.registerBuiltinTextures()` 会碰 `RenderSystem`，
    放在 `FMLClientSetupEvent` 里会抛 `Rendersystem called from wrong thread` 把客户端打崩；
@@ -209,6 +209,13 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
    不做的话客户端解析不到 `particledrawing:builtin/*` → 回落纯白方块，表现就是"球壳全是硬边方块"。
 2. **外观没有更新通道**（这正是「零逐 tick 开销」的前提）：想换贴图/尺寸/朝向只能 `remove()` 后重新生成。
    所以"边动边变"要用**组级一次性编排**（`scale` 连「到轴心的距离」一起缩 = 向心收拢 + 变短）或逐粒子 `move` / `delay`。
+3. **`followEntity(uuid, offset)` 的 `offset` 不改变渲染位置**（第 40 轮踩）：它不是"设成 实体+偏移"，
+   而是 `pivot = offset + pivot`（把 offset **累加**到当时的组轴心上）；客户端 arm 时算
+   `rel = 成员 spawn 位置 − pivot`、逐帧渲染 `实体位置 + offset + rel` —— offset 减一次加一次，**净效果为零**。
+   想要"跟随 + 抬高到球心"必须**把轴心取在实体脚底**（`createGroup(holder.position())` + 成员铺在球心处），
+   这样 `rel` 里自然带上"脚底 → 球心"的抬升；传 offset 只会让 `rel` 少掉同样的量（表现为整组下沉/偏移）。
+   推论：**跟随时渲染位置 = 实体位置 + (成员 spawn 位置 − createGroup 时的轴心)**，与 `offsetFromPivot`
+   无关（客户端 arm 只读 spawn 位置），所以"跟不跟、抬多高"全由这两个量决定。
 
 ## 1. 目标
 

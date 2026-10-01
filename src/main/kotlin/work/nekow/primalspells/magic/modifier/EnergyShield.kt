@@ -803,14 +803,20 @@ class EnergyShield : Modifier() {
     ) {
         val manager = wand.pdParticles(level)
         val center = shellCenter(holder)
-        val lift = Vec3(0.0, shellCenterOffset(holder), 0.0)
-        // ⚠️ 顺序：**先建组（含 followEntity）再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
-        // 反算相对偏移（第 13 轮踩过：`followEntity` 会顺手改那个 pivot 字段）。
-        // 成员用**相对球心**的偏移（`offsetFromPivot`），而 followEntity 的偏移量正好是"脚底 → 球心"，
-        // 两者同源 ⇒ 形状刚性、跟着人走时不会错位。
+        // ⚠️⚠️ PD 的 `ParticleGroup.followEntity(uuid, offset)` 不是"设成实体 + 偏移"，而是
+        // **把 offset 加到当时的 pivot 上**（`pivot = offset + pivot`）。而客户端 arm 时算的是
+        // `rel = 成员 spawn 位置 − pivot`（`ClientAnimationProgramManager.arm`），逐帧渲染成
+        // `实体位置 + pivotEntityOffset + rel` —— offset 在 rel 里被减掉、又在渲染时加回来，
+        // **净效果是零**。所以"跟随 + 抬到球心"只能靠 **pivot 取脚底**来实现：
+        // `rel = (脚底 + 抬升 + 面板偏移) − 脚底 = 抬升 + 面板偏移` ⇒ 渲染位置正好是「球心 + 面板偏移」。
+        //
+        // 第 40 轮的初版正是在这里错的：pivot 用了球心、offset 传了抬升 ⇒ rel 少了抬升，
+        // 跟着人走的红色破口轮廓整片**下沉约 1.1 格**（实机截图一眼可见）。
+        // 顺序也仍是硬约束：**先建组（含 followEntity）再铺成员**（第 13 轮踩过）。
+        val pivot = if (follow) holder.position() else center
         for ((drift, batch) in panelIndices.mapNotNull { shieldPanels.getOrNull(it) }.groupBy(driftOf)) {
-            val group = manager.createGroup(center)
-            if (follow) group.followEntity(holder.uuid, lift)
+            val group = manager.createGroup(pivot)
+            if (follow) group.followEntity(holder.uuid)
             for (panel in batch) {
                 for (offset in panel.ring) {
                     manager.create()

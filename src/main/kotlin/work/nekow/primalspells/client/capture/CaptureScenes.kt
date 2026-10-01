@@ -320,6 +320,27 @@ object CaptureScenes {
                     w.status.mana = SHIELD_LOW_MANA
                     MagicManager.projectiles.forEach { it.alive = false }
                 }
+                // ---- 静态锚定验证（第 33 轮）：把**持有者挪走**，看护盾跟不跟 ----
+                if (t == SHIELD_MOVE_AT) {
+                    // 先补满法力：这一段的目的是测"锚定"，不能因为没蓝而挡不住（345 > 295）
+                    w.status.mana = SHIELD_ANCHOR_MANA
+                    val pos = h.position()
+                    h.setPos(pos.x + SHIELD_MOVE_DISTANCE, pos.y, pos.z)
+                    h.setOldPosAndRot()
+                    ctx.log("holder moved +$SHIELD_MOVE_DISTANCE → ${h.position()}（护盾应当留在原地）")
+                }
+                if (t == SHIELD_INSIDE_BLAST_AT) {
+                    // **决定性一发**：打在**旧壳心**（锚点）上 —— 壳锚在原地时它在壳**内**，
+                    // 按设计"壳内侧的爆炸护盾不触发"→ 法力不变、木桩掉血；
+                    // 若护盾跟着人走，壳已在新位置，这发在壳外 → 会被抵扣（法力掉）→ 两者可判
+                    manaBeforeBlast = w.status.mana
+                    blast(ctx, atk, sw, offsetX = 0.5f)
+                }
+                if (t == SHIELD_ANCHOR_BLAST_AT) {
+                    // 旧位置外侧：壳还在原地 → 仍在壳外 → 应当被挡下（顺带证明护盾仍在工作）
+                    manaBeforeBlast = w.status.mana
+                    blast(ctx, atk, sw)
+                }
             },
             finish = {
                 holder?.remove(Entity.RemovalReason.DISCARDED)
@@ -376,6 +397,29 @@ object CaptureScenes {
                             "mana=${w?.status?.mana}（挡下后应 ≈ ${SHIELD_LOW_MANA - 5}）",
                         ),
                     )
+                    SHIELD_INSIDE_BLAST_AT + SHIELD_ANCHOR_SETTLE -> listOf(
+                        // **决定性断言**：木桩已走到 3 格外，而这一发打在**旧壳心**上。
+                        // 壳锚在原地 → 它在壳**内** → 按设计护盾不触发：法力**不变**、木桩掉血。
+                        // 若护盾跟着人走了，壳在新位置，这发在壳外 → 会被抵扣（法力掉 345）→ 判据翻面。
+                        Check(
+                            name, t, "anchor-stays-put",
+                            w != null && w.status.mana >= manaBeforeBlast - 1.0 &&
+                                damageNumbers(ctx, holder) > 0,
+                            "旧壳心大爆：mana=${w?.status?.mana}（应 ≈ $manaBeforeBlast 不变）、" +
+                                "伤害数字=${damageNumbers(ctx, holder)}（应 > 0）",
+                        ),
+                    )
+                    SHIELD_ANCHOR_BLAST_AT + SHIELD_ANCHOR_SETTLE -> listOf(
+                        // 旧位置外侧那一发：壳还在原地 → 仍在壳外 → 被挡下（护盾照常工作）
+                        Check(
+                            name, t, "anchor-still-blocks",
+                            s != null && !s.breached && w != null &&
+                                w.status.mana <= manaBeforeBlast - 300.0,
+                            // 不再断言"伤害数字 = 0"：上一条（壳内那发）的伤害数字还活着，
+                            // 这里只判"被抵扣"这个信号
+                            "旧位置外侧大爆：mana=${w?.status?.mana}（应比  少一大截 = 被抵扣）",
+                        ),
+                    )
                     SHIELD_SCENE_TICKS - 3 -> listOf(
                         Check(name, t, "breach-expired", s != null && !s.breached, "breached=${s?.breached}"),
                         pdParticleCheck(name, t, ctx),
@@ -393,12 +437,17 @@ object CaptureScenes {
      * 所以直接把它摆在壳外 3 格 —— 衰减后伤害 = 24 × (1 − 3/6) = 12，强度 = 12 × 半径 6 = 72。
      * 抗性 4（1 张卡）时价钱 = 5 + (72 − 4) × 5 = 345 MP：第一次付得起、第二次（法力 300）付不起。
      */
-    private fun blast(ctx: CaptureDriver.SceneCtx, caster: TestDummyEntity, wand: Wand) {
+    private fun blast(
+        ctx: CaptureDriver.SceneCtx,
+        caster: TestDummyEntity,
+        wand: Wand,
+        offsetX: Float = 3.5f,
+    ) {
         val floorY = ctx.floorBlockY(CX, CZ)
         val projectile = MagicManager.create("large_explosion") as Projectile
         projectile.caster = caster
         projectile.wand = wand
-        projectile.position = Vector3f(CX + 3.5f, floorY + 2.0f, CZ + 0.5f)
+        projectile.position = Vector3f(CX + offsetX, floorY + 2.0f, CZ + 0.5f)
         projectile.velocity = Vector3f(0f, 0f, 0f)
         projectile.spell()
         MagicManager.add(projectile)
@@ -530,7 +579,23 @@ object CaptureScenes {
     private const val EXPLOSION_RADIUS = 6.0f
 
     /** 护盾场景总长（tick）：静止 20 + 四次点射 + 两次大爆（各含 18 tick 蓄力）+ 破口 60 + 激光 + 余量 */
-    private const val SHIELD_SCENE_TICKS = 232
+    private const val SHIELD_SCENE_TICKS = 300
+
+    /** 锚定验证段开始前把护盾补满（大爆要在壳外被抵扣，需要 ≥345 MP） */
+    private const val SHIELD_ANCHOR_MANA = 3000.0
+
+    /** 静态锚定验证：把持有者往 +X 挪这么远，再看护盾跟不跟（第 33 轮） */
+    private const val SHIELD_MOVE_DISTANCE = 3.0f
+    private const val SHIELD_MOVE_AT = 218
+
+    /** 旧位置（锚点）外侧那一发：应当仍被抵扣 */
+    private const val SHIELD_INSIDE_BLAST_AT = 226
+
+    /** 新位置（木桩身边）外侧那一发：应当没人挡 */
+    private const val SHIELD_ANCHOR_BLAST_AT = 244
+
+    /** 大爆放弹到结算的间隔（触发即爆，留几 tick 余量） */
+    private const val SHIELD_ANCHOR_SETTLE = 6
 
     /** 大爆从放弹到**结算**的间隔：蓄力 18 tick + 3 tick 余量（伤害在蓄力结束时才落，见 `Explosion`） */
     private const val SHIELD_BLAST_SETTLE = 26

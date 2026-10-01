@@ -11,6 +11,7 @@ enum class Lore(val key: String) {
     MAX_AGE("lore.primalspells.max_age"),
     RESISTANCE("lore.primalspells.resistance"),
     RESISTANCE_PER_CARD("lore.primalspells.resistance_per_card"),
+    RESISTANCE_BUDGET("lore.primalspells.resistance_budget"),
     BOUNCE_COST("lore.primalspells.bounce_cost"),
     EXTRA_COST("lore.primalspells.extra_cost"),
     BREACH("lore.primalspells.breach");

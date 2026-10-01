@@ -29,11 +29,18 @@ import kotlin.math.sqrt
  *
  * - 只要法杖上装着护盾卡，护盾就是**展开的**：没有耐久、没有破盾冻结、没有回复，
  *   因此也**没有持续状态**（HUD 条已随之删除）。
- * - 每次「格挡真的发生」按强度结算：
- *   `R = 基础抗性 + 每张卡抗性`；`强度 ≤ R` 只付「基础反弹 MP」，
- *   `强度 > R` 付 `基础反弹 + (强度 - R) × 每点额外`。
- * - **法力不够 = 挡不住**：这一发照常命中持有者，并在受击方向「一块 + 相邻一圈」上出**碎裂**，
- *   该区域 [breachTicks] 内不挡任何东西（**定向破口**），破口期间那一圈常驻显示淡红色轮廓。
+ * - 每次「格挡真的发生」按强度结算，**两道关**（第 39 轮起）：
+ *   1. **窗口预算**：`R = 基础抗性 + 每张卡抗性`，**最近 1 秒（[BUDGET_WINDOW_TICKS] tick）内
+ *      已经承担的强度 + 本次 > R × [RESISTANCE_BUDGET_RATIO]** 就直接挡不住
+ *      —— 用户口径「护盾防的是 DPS 而不是单次伤害，抗性改为在一段时间内可以承担的强度大小」；
+ *   2. **法力**：预算内才轮到 `强度 ≤ R` 只付「基础反弹 MP」、`强度 > R` 付
+ *      `基础反弹 + (强度 - R) × 每点额外`（超出部分封顶 2 × R，第 35 轮）。
+ * - **挡不住 = 破口**（预算爆掉或法力不够）：这一发照常命中持有者，破口区在 [breachTicks] 内
+ *   不挡任何东西，并常驻显示淡红色轮廓。破口区**就是碎裂的那一片**：
+ *   投射物是「受击面板 + 相邻一圈」（**定向破口**），爆炸则是**所有被波及到的面板**（见下）。
+ * - **爆炸按影响范围选片**（第 39 轮）：面心到爆心 ≤ 爆炸半径的面板**全部**入选 ——
+ *   半径 6 的核弹摆在壳外 3 格时 32 片全被波及（于是整罩碎裂）；抵扣成功时这些片**全亮一下玻璃**，
+ *   挡不住时它们**全碎**（朝爆点的片白热、背对爆点的片暗一档）。
  * - **只有「从外侧穿过壳面」才算格挡**：判据是这一 tick 的位移线段与**球壳**求交、且起点在壳外。
  *   因此在壳内生成的法术（贴脸施法、壳内释放的荷载）**不会被误判成挡下**，
  *   单 tick 位移再大（`laser` 是 5 格）也不会漏过——两条都是既有缺陷，第 26 轮一并修掉。
@@ -46,11 +53,17 @@ import kotlin.math.sqrt
  * ## 视觉（延续第 23 轮「受击处展开玻璃」，第 26 轮换掉整罩两段演出）
  *
  * - **格挡成功**：受击方向那一块面板展开一块**白玻璃**（亮边 + 极淡填充，约 0.35 秒淡出）；
- * - **打穿**：那一块 + 相邻一圈**碎裂**（向外飘散 + 淡出），随后是持续整个破口期的**淡红轮廓**；
+ * - **打穿**：破口区那一片**碎裂**（向外飘散 + 淡出），随后是持续整个破口期的**淡红轮廓**；
  * - 旧的「整罩一闪而碎」「护盾恢复闪一下」两段演出随耐久模型一起删除。
  *
- * 所有玻璃都挂在持有者身上（`followEntity`，随人移动），淡出结束由 PD 自行销毁
+ * 玻璃**画在生成处就不再动**（第 36 轮口径：判定跟人、碎片盖章），淡出结束由 PD 自行销毁
  * （`fadeOut(removeAfter = true)`），所以本实例此后不再被 tick（法杖被收起/回收）也不留孤儿粒子。
+ *
+ * ## PD 分组（第 39 轮，open.md §1.9.2）
+ *
+ * PD 的组是 arm / 演出的单位：一块面板一个组 = 一次爆炸打 32 条 `armed` 日志。所以 [spawnGlassPanels]
+ * **按飘散位移分组** —— 位移相同的面板共用一个组（格挡玻璃、破口轮廓、爆炸碎裂都只占 1 个组），
+ * 只有「投射物打穿、每片沿自己法线向外」那种一片一方向，才不得不一片一组。
  */
 class EnergyShield : Modifier() {
     override val id = "energy_shield"
@@ -105,6 +118,62 @@ class EnergyShield : Modifier() {
      */
     val breached: Boolean get() = breachPanels.isNotEmpty()
 
+    // ---------------------------------------------------------------- DPS 预算（第 39 轮）
+
+    /** 滚动记录里的一项：某个 gameTime 承担掉的强度。 */
+    private class UsedStrength(val gameTime: Long, val strength: Double)
+
+    /**
+     * 最近 [BUDGET_WINDOW_TICKS] tick 内**已经承担**的强度（只在内存：1 秒的瞬时状态，不进存档）。
+     *
+     * 只由**主卡**记账（只有主卡结算格挡），所以「多张卡」的影响全部走 [resistance]，不在这里。
+     */
+    private val recentStrength = ArrayDeque<UsedStrength>()
+
+    /**
+     * 本杖**一个窗口内能承担的强度总量** = `抗性 × [RESISTANCE_BUDGET_RATIO]`。
+     *
+     * 这是「抗性」的第二个身份：既是**单发阈值**（超出它才加价，见 [bounceCost]），
+     * 也是**窗口预算**（超出它直接挡不住）。为什么取 2 倍见 [RESISTANCE_BUDGET_RATIO]。
+     *
+     * 公开只读：录制流水线靠它断言「预算而非法力」那一段（同 [breached]）。
+     */
+    fun strengthBudget(): Double = resistance() * RESISTANCE_BUDGET_RATIO
+
+    /** 窗口内已承担的强度总量（顺带把到期项丢掉，所以这个表不会只增不减）。 */
+    private fun usedStrength(gameTime: Long): Double {
+        val cutoff = gameTime - BUDGET_WINDOW_TICKS
+        while (recentStrength.isNotEmpty() && recentStrength.first().gameTime <= cutoff) {
+            recentStrength.removeFirst()
+        }
+        var sum = 0.0
+        for (used in recentStrength) sum += used.strength
+        return sum
+    }
+
+    /**
+     * 一次格挡的**资金结算**：先查窗口预算、再查法力 —— 两个入口（投射物 / 爆炸）共用。
+     *
+     * 顺序与副作用都是刻意的（第 39 轮用户口径「护盾防的是 DPS 而不是单次伤害」）：
+     * 1. `已承担 + 本次 > 预算` → 挡不住，**并把窗口记账清零**（这一发连法力都不花）；
+     * 2. 预算内再看法力：付不起 [bounceCost] 同样挡不住（既有口径：法力不够 = 挡不住）；
+     * 3. 都过了才记账 + 扣法力。
+     *
+     * 破口期间不需要在这里排除：破口一开就 [breachTicks]（60 tick = 3 秒），
+     * 那段时间整个格挡判定根本走不到这里。
+     *
+     * @return true = 这一发挡得住（已记账、已扣法力）
+     */
+    private fun payForBlock(gameTime: Long, strength: Double): Boolean {
+        if (usedStrength(gameTime) + strength > strengthBudget()) {
+            recentStrength.clear()
+            return false
+        }
+        if (!wand.spendMana(bounceCost(strength))) return false
+        recentStrength.addLast(UsedStrength(gameTime, strength))
+        return true
+    }
+
     /**
      * 面板几何（截角二十面体：12 五边形 + 20 六边形，坐标**相对球心**、长度 = [SHELL_RADIUS]）。
      *
@@ -156,8 +225,8 @@ class EnergyShield : Modifier() {
     /**
      * 每 tick 维护护盾：只做主卡的格挡结算（见 [primaryShield]）。
      *
-     * 判定顺序刻意是「先算强度与价钱、再看付不付得起」——付不起不是"少扣一点"，
-     * 而是这一发**整个挡不住**（用户口径：MP 不足则无法抵挡这次攻击）。
+     * 判定顺序刻意是「先算强度、再看预算与法力」（[payForBlock]）——预算爆掉或付不起都不是"少扣一点"，
+     * 而是这一发**整个挡不住**（用户口径：MP 不足则无法抵挡；第 39 轮起再加一条"窗口内承担不下"）。
      */
     override fun onInventoryTick() {
         if (primaryShield() !== this) return
@@ -237,9 +306,9 @@ class EnergyShield : Modifier() {
         if (panelIndex in breachPanels) return false           // 破口方向：直接放行（连 MP 都不花）
 
         val strength = strengthOf(p)
-        if (!wand.spendMana(bounceCost(strength))) {
-            // 挡不住：投射物照常飞（一行都不改），护盾这边付出破口
-            openBreach(level, holder, panelIndex)
+        if (!payForBlock(level.gameTime, strength)) {
+            // 挡不住（窗口预算爆掉 / 法力不够）：投射物照常飞（一行都不改），护盾这边付出破口
+            openBreach(level, holder, breachArea(panelIndex))
             return false
         }
 
@@ -250,7 +319,7 @@ class EnergyShield : Modifier() {
         spawnGlassPanels(
             level, holder, listOf(panelIndex),
             edgeColor = GLASS_EDGE_COLOR, edgeScale = GLASS_EDGE_SCALE,
-            withFill = true, holdTicks = HIT_HOLD_TICKS, fadeTicks = HIT_FADE_TICKS, drift = 0.0,
+            withFill = true, holdTicks = HIT_HOLD_TICKS, fadeTicks = HIT_FADE_TICKS,
         )
         return true
     }
@@ -277,21 +346,25 @@ class EnergyShield : Modifier() {
         if (center.distanceTo(shellCenter) < SHELL_RADIUS) return false
 
         expireBreach(level.gameTime)
-        val panelIndex = nearestPanelIndex(center.subtract(shellCenter)) ?: return false
-        if (panelIndex in breachPanels) return false
+        // 这件事发生在**这把法杖**上：粒子管理器与抗性都取它的
+        // （爆炸路径不保证 `this.wand` 已被 tick 写过）
+        this.wand = wand
+        val toBlast = center.subtract(shellCenter)
+        val axisPanel = nearestPanelIndex(toBlast) ?: return false
+        if (axisPanel in breachPanels) return false    // 破口方向：直接放行（连 MP 都不花）
 
         // 强度 = 衰减后伤害 × 半径（见 design/combat-pricing.md §3）
         val strength = falloffDamage * radius
-        if (!wand.spendMana(bounceCost(strength))) {
-            openBreach(level, holder, panelIndex)
+        val panels = blastPanels(toBlast, radius)
+        if (!payForBlock(level.gameTime, strength)) {
+            openBlastBreach(level, holder, panels, toBlast)
             return false
         }
-        // 这件事发生在**这把法杖**上：粒子管理器取它的（爆炸路径不保证 `this.wand` 已被 tick 写过）
-        this.wand = wand
+        // 挡下了：波及到的片**全部出玻璃**（这就是「护盾遇到爆炸」看得见的那一下）
         spawnGlassPanels(
-            level, holder, listOf(panelIndex),
+            level, holder, panels.all,
             edgeColor = GLASS_EDGE_COLOR, edgeScale = GLASS_EDGE_SCALE,
-            withFill = true, holdTicks = HIT_HOLD_TICKS, fadeTicks = HIT_FADE_TICKS, drift = 0.0,
+            withFill = true, holdTicks = HIT_HOLD_TICKS, fadeTicks = HIT_FADE_TICKS,
         )
         return true
     }
@@ -388,6 +461,66 @@ class EnergyShield : Modifier() {
         return if (best >= 0) best else null
     }
 
+    /**
+     * 投射物打穿的破口区：**受击面板 + 相邻一圈**（共享一条棱 = 相邻，见 [panelNeighbours]）。
+     *
+     * 破口区既是玩法（这段时间不格挡），也是表现（碎裂 + 淡红轮廓的那一片）。
+     */
+    private fun breachArea(panelIndex: Int): List<Int> =
+        listOf(panelIndex) + panelNeighbours.getOrElse(panelIndex) { emptySet() }
+
+    /**
+     * 一次爆炸**波及到**的面板（第 39 轮用户口径：「能够被爆炸波及的片全部显示」）。
+     *
+     * 判据就是字面：**面板中心（球面上的点）到爆心的距离 ≤ 爆炸半径**。
+     * 所以爆炸越大、点亮的片越多 —— 半径 6 的核弹摆在壳外 3 格时，最远的背面片也只有 5.2 格，
+     * 于是 **32 片全被波及**（整罩碎裂）；反过来小半径的爆炸只会点亮朝着它的那几片。
+     *
+     * ⚠️ 这里算的是**相对球心**的向量：`panel.center` 与 `toBlast` 都以球心为原点，直接相减即可。
+     *
+     * @param toBlast 爆心相对球心的向量（调用方已保证它在壳外）
+     */
+    private fun blastPanels(toBlast: Vec3, radius: Float): BlastPanels {
+        val facing = ArrayList<Int>()
+        val back = ArrayList<Int>()
+        val unit = if (toBlast.lengthSqr() > 1e-9) toBlast.normalize() else Vec3(0.0, 1.0, 0.0)
+        for ((index, panel) in shieldPanels.withIndex()) {
+            if (panel.center.distanceTo(toBlast) > radius) continue
+            // 朝爆点（法线与「球心 → 爆心」同侧）= 正面被吹到；背对的那几片同一发波及、暗一档显示
+            if (panel.center.dot(unit) > 0.0) facing += index else back += index
+        }
+        // 一片都没够着（半径比"爆心到最近那片"还小）：退回离爆点最近的一块，保证总有东西可看
+        if (facing.isEmpty() && back.isEmpty()) {
+            nearestPanelIndex(toBlast)?.let { facing += it }
+        }
+        return BlastPanels(facing, back)
+    }
+
+    /** 一次爆炸波及到的面板，按「朝着爆点」与「背对爆点」分成两批（表现上后者暗一档）。 */
+    private class BlastPanels(val facing: List<Int>, val back: List<Int>) {
+        /** 全部被波及的面板：破口区（玩法）用的就是它 */
+        val all: List<Int> get() = facing + back
+    }
+
+    /**
+     * 爆炸碎裂的飘散方向：**整批沿爆点方向被吹开**。
+     *
+     * 返回的是**同一个 [Vec3] 实例** —— 同一个方向的面板会合并成一个 PD 组（见 [spawnGlassPanels]），
+     * 所以一次整罩碎裂只占 1 个组、1 条 arm 日志，而不是 32 条。
+     */
+    private fun blastDrift(toBlast: Vec3): (Polyhedra.Panel) -> Vec3? {
+        val blow = if (toBlast.lengthSqr() > 1e-9) toBlast.normalize().scale(SHATTER_DRIFT) else null
+        return { blow }
+    }
+
+    /**
+     * 投射物打穿的飘散方向：**每块面板沿自己的法线向外**（像被顶出去的一层壳）。
+     *
+     * 方向各不相同 ⇒ 每块面板各占一个组（≤7 块，见 [spawnGlassPanels] 的分组说明）。
+     */
+    private val panelNormalDrift: (Polyhedra.Panel) -> Vec3? =
+        { it.center.normalize().scale(SHATTER_DRIFT) }
+
     /** 破口到期就清空（下次受击重新判定）。 */
     private fun expireBreach(gameTime: Long) {
         if (breachPanels.isNotEmpty() && gameTime >= breachUntil) breachPanels.clear()
@@ -395,32 +528,72 @@ class EnergyShield : Modifier() {
 
     // ---------------------------------------------------------------- 玻璃表现（第 23 轮，第 26 轮改口径）
 
-    /** **打穿**：受击那一块 + 相邻一圈碎裂（向外飘散 + 淡出），并留下持续整段破口期的淡红轮廓。 */
-    private fun openBreach(level: ServerLevel, holder: Entity, panelIndex: Int) {
-        breachPanels.clear()
-        breachPanels += panelIndex
-        breachPanels += panelNeighbours.getOrElse(panelIndex) { emptySet() }
-        breachUntil = level.gameTime + breachTicks
-
+    /**
+     * **打穿**（投射物路径）：把 [panels] 定为破口，碎裂时每片沿自己法线向外飘。
+     */
+    private fun openBreach(level: ServerLevel, holder: Entity, panels: List<Int>) {
+        markBreach(level, panels)
         spawnGlassPanels(
-            level, holder, breachPanels.toList(),
+            level, holder, panels,
             edgeColor = GLASS_SHATTER_COLOR, edgeScale = GLASS_EDGE_SCALE,
             withFill = true, holdTicks = SHATTER_HOLD_TICKS, fadeTicks = SHATTER_FADE_TICKS,
-            drift = SHATTER_DRIFT,
+            driftOf = panelNormalDrift,
+        )
+        spawnBreachOutline(level, holder, panels)
+    }
+
+    /**
+     * **打穿**（爆炸路径，第 39 轮）：破口区 = 这一发**波及到的全部面板**（可能整整 32 片），
+     * 碎裂时整批沿爆点方向被吹开；朝爆点的片是白热的、**背对爆点的片暗一档**（用户口径「背面的片可以暗一档」）。
+     *
+     * 两批碎裂共用同一个方向向量 ⇒ 各占 1 个 PD 组，加上轮廓一共 3 个组（见 [spawnGlassPanels]）。
+     */
+    private fun openBlastBreach(level: ServerLevel, holder: Entity, panels: BlastPanels, toBlast: Vec3) {
+        markBreach(level, panels.all)
+        val drift = blastDrift(toBlast)
+        spawnGlassPanels(
+            level, holder, panels.facing,
+            edgeColor = GLASS_SHATTER_COLOR, edgeScale = GLASS_EDGE_SCALE,
+            withFill = true, holdTicks = SHATTER_HOLD_TICKS, fadeTicks = SHATTER_FADE_TICKS,
+            driftOf = drift,
         )
         spawnGlassPanels(
-            level, holder, breachPanels.toList(),
+            level, holder, panels.back,
+            edgeColor = GLASS_SHATTER_BACK_COLOR, edgeScale = GLASS_EDGE_SCALE,
+            withFill = true, holdTicks = SHATTER_HOLD_TICKS, fadeTicks = SHATTER_FADE_TICKS,
+            driftOf = drift, fillColor = GLASS_BACK_FILL_COLOR,
+        )
+        spawnBreachOutline(level, holder, panels.all)
+    }
+
+    /** 破口（玩法）：[panels] 这 [breachTicks] 内置为「不格挡」，并记下到期时间。 */
+    private fun markBreach(level: ServerLevel, panels: List<Int>) {
+        breachPanels.clear()
+        breachPanels += panels
+        breachUntil = level.gameTime + breachTicks
+    }
+
+    /** 破口轮廓：常驻整段破口期（最后 [BREACH_OUTLINE_FADE_TICKS] tick 淡出）的淡红提示线。 */
+    private fun spawnBreachOutline(level: ServerLevel, holder: Entity, panels: List<Int>) {
+        spawnGlassPanels(
+            level, holder, panels,
             edgeColor = BREACH_OUTLINE_COLOR, edgeScale = BREACH_OUTLINE_SCALE,
             withFill = false, holdTicks = max(1, breachTicks - BREACH_OUTLINE_FADE_TICKS),
-            fadeTicks = BREACH_OUTLINE_FADE_TICKS, drift = 0.0,
+            fadeTicks = BREACH_OUTLINE_FADE_TICKS,
         )
     }
 
     /**
      * 铺一组玻璃面板：**亮边**（面板轮廓上的点）+ 可选**极淡填充**（面板内部的稀疏点），
-     * 每块面板一个组，挂在持有者身上，[holdTicks] 后开始淡出、[fadeTicks] 内淡完并由 PD 销毁整组。
+     * 成员挂在**以球心为 pivot** 的组上，[holdTicks] 后开始淡出、[fadeTicks] 内淡完并由 PD 销毁整组。
      *
-     * @param drift 沿面板法线向外飘散的距离（方块）；`0.0` = 原地淡出
+     * **面板按飘散位移分组**（第 39 轮，open.md §1.9.2）：PD 的组是 arm / 演出的单位，
+     * 一块面板一个组会让一次爆炸打出 32 条 `armed` 日志。位移**相同**的面板于是共用一个组 ——
+     * 格挡玻璃、破口轮廓、爆炸碎裂（整批沿爆点方向）都只占 **1 个组**；
+     * 只有「投射物打穿、每片沿自己法线向外」那种才不得不一片一组（≤7 组）。
+     *
+     * @param driftOf 每块面板的飘散位移（`null` = 原地淡出）
+     * @param fillColor 填充点的颜色（背对爆点那一批用更淡的）
      */
     private fun spawnGlassPanels(
         level: ServerLevel,
@@ -431,45 +604,42 @@ class EnergyShield : Modifier() {
         withFill: Boolean,
         holdTicks: Int,
         fadeTicks: Int,
-        drift: Double,
+        driftOf: (Polyhedra.Panel) -> Vec3? = { null },
+        fillColor: Color = GLASS_FILL_COLOR,
     ) {
         val manager = wand.pdParticles(level)
-        // 第 33 轮：面板挂在**冻结的锚点**上（不再随人移动）
         val center = shellCenter(holder)
-        for (index in panelIndices) {
-            val panel = shieldPanels.getOrNull(index) ?: continue
-            // ⚠️ 顺序：**先 `followEntity` 再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
-            // 反算相对偏移，而 `followEntity` 会顺手改那个字段（第 13 轮踩过）；成员用**相对球心**的偏移
-            // （`offsetFromPivot`），于是面板随人移动、形状刚性。
+        // ⚠️ 顺序：**先建组再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
+        // 反算相对偏移（第 13 轮踩过）；成员用**相对球心**的偏移（`offsetFromPivot`），于是形状刚性。
+        // 第 36 轮口径：**面板画在生成处就不再动**（不调 `followEntity`）—— 判定跟着玩家，
+        // 所以下一次受击会在玩家**当时的位置**新画一批碎片，旧的那批留在原地看着「掉队」。
+        for ((drift, batch) in panelIndices.mapNotNull { shieldPanels.getOrNull(it) }.groupBy(driftOf)) {
             val group = manager.createGroup(center)
-            // 第 36 轮口径：**面板画在生成处就不再动**（不调 `followEntity`）——
-            // 判定跟着玩家，所以下一次受击会在玩家**当时的位置**新画一批碎片，
-            // 旧的那批留在原地看着「掉队」。成员按「相对球心」的偏移铺开，形状刚性。
-            for (offset in panel.ring) {
-                manager.create()
-                    .position(center.add(offset))
-                    .color(edgeColor)
-                    .scale(edgeScale)
-                    .lifetime(PD_IMMORTAL)
-                    .group(group.id)
-                    .offsetFromPivot(offset)
-                    .spawn()
-            }
-            if (withFill) {
-                for (offset in fillOffsets(panel)) {
+            for (panel in batch) {
+                for (offset in panel.ring) {
                     manager.create()
                         .position(center.add(offset))
-                        .color(GLASS_FILL_COLOR)
-                        .scale(GLASS_FILL_SCALE)
+                        .color(edgeColor)
+                        .scale(edgeScale)
                         .lifetime(PD_IMMORTAL)
                         .group(group.id)
                         .offsetFromPivot(offset)
                         .spawn()
                 }
+                if (withFill) {
+                    for (offset in fillOffsets(panel)) {
+                        manager.create()
+                            .position(center.add(offset))
+                            .color(fillColor)
+                            .scale(GLASS_FILL_SCALE)
+                            .lifetime(PD_IMMORTAL)
+                            .group(group.id)
+                            .offsetFromPivot(offset)
+                            .spawn()
+                    }
+                }
             }
-            if (drift > 0.0) {
-                group.move(panel.center.normalize().scale(drift), fadeTicks, EasingType.EASE_OUT)
-            }
+            if (drift != null) group.move(drift, fadeTicks, EasingType.EASE_OUT)
             group.delay(holdTicks)
             // EASE_OUT：透明度先快后慢 —— 长尾才像「碎开后飘散」，EASE_IN 会在最后一帧啪一下消失
             group.fadeOut(fadeTicks, removeAfter = true, easing = EasingType.EASE_OUT)
@@ -502,6 +672,8 @@ class EnergyShield : Modifier() {
         super.initLore()
         lore(Lore.RESISTANCE, Lore.formatDouble(baseResistance))
         lore(Lore.RESISTANCE_PER_CARD, Lore.formatDouble(resistancePerCard))
+        // 单张卡时的窗口预算（= (基础 + 每张卡) × 系数）：护盾真正的"防 DPS"刻度
+        lore(Lore.RESISTANCE_BUDGET, Lore.formatDouble((baseResistance + resistancePerCard) * RESISTANCE_BUDGET_RATIO))
         lore(Lore.BOUNCE_COST, Lore.formatDouble(baseBounceCost))
         lore(Lore.EXTRA_COST, Lore.formatDouble(extraCostPerPoint))
         lore(Lore.BREACH, (breachTicks / 20).toString())
@@ -515,6 +687,24 @@ class EnergyShield : Modifier() {
 
         /** 超出抗性的部分最多按「抗性的这个倍数」计费（第 35 轮封顶，用户口径 = 2） */
         private const val MAX_EXTRA_RESISTANCE_RATIO = 2.0
+
+        /** 窗口预算的时间窗（tick）：1 秒。用户口径「在一段时间内可以承担的强度」，追问定为 20 tick */
+        private const val BUDGET_WINDOW_TICKS = 20
+
+        /**
+         * 窗口预算 = 抗性 × 本系数（第 39 轮）。
+         *
+         * 为什么不是 1（= 把抗性直接当预算，open.md 登记时的默认口径）：
+         * 强度 5 的火球 > 抗性 4 ⇒ **单发火球就会破口**，连「超出抗性加价」那条路都够不到
+         * （能走到加价的只剩 `4 < 强度 ≤ 4` 这个空集），整套法力定价等于被架空。
+         * 取 2 之后的三个刻度（抗性 4）：**单发火球 5 挡得住、一秒内第二发（累计 10）挡不住、
+         * 大爆 72 / 核弹 144 必破**。推演见 docs/design/combat-pricing.md §4.95。
+         *
+         * 公开：这是与 [baseResistance] / [baseBounceCost] 同级的**手感旋钮**，
+         * 录制流水线也拿它算"单张卡时的窗口预算"（护盾卡片在 `prepare` 阶段还没有 `wand` 引用，
+         * 所以不能直接调 [strengthBudget]）。
+         */
+        const val RESISTANCE_BUDGET_RATIO = 2.0
 
         /**
          * 每条棱上放几个点（含起点，见 [Polyhedra.truncatedIcosahedron]）：
@@ -563,10 +753,16 @@ class EnergyShield : Modifier() {
         /** 碎裂那一下的亮边：更白 */
         private val GLASS_SHATTER_COLOR: Color = Color.ofInt(226, 246, 255, 245)
 
+        /** 爆炸碎裂里**背对爆点**那一批的亮边：同一块玻璃暗一档（不抢正面的镜） */
+        private val GLASS_SHATTER_BACK_COLOR: Color = Color.ofInt(198, 224, 248, 130)
+
         /** 破口轮廓：淡红（提示攻击者「这里能打」），比玻璃暗、比背景亮 */
         private val BREACH_OUTLINE_COLOR: Color = Color.ofInt(255, 118, 118, 150)
 
         /** 填充：极淡的冷白（≈18% 不透明度）：整块玻璃在受击瞬间读起来是「白了一下」 */
         private val GLASS_FILL_COLOR: Color = Color.ofInt(206, 232, 255, 46)
+
+        /** 背对爆点那一批的填充：比正面更淡 */
+        private val GLASS_BACK_FILL_COLOR: Color = Color.ofInt(206, 232, 255, 24)
     }
 }

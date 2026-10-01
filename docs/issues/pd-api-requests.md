@@ -50,6 +50,23 @@
 
 ---
 
+### [需求·可选] 组级 `move` 支持「按成员各自的方向」飘散
+
+- **状态**：未决（本侧已用「一片一组」绕过，代价是拿不回那部分组数 / 日志）
+- **场景**：护盾被打穿时，那一批面板碎片应当**各自沿自己的法线向外**飞；而爆炸吹开的整罩碎片则是
+  **整批沿同一个方向**（爆点方向）。后者一个组就够（第 39 轮已合并），前者只能**一片一个组**（≤7 组）。
+- **现有 API 为什么不够**：`ParticleGroup.move(delta, ...)` 是**组级**指令 —— 整组只有一个位移向量，
+  想按成员方向各自飘就只能多建组；而 PD 每次 arm 组都打一行 INFO（见上一条），
+  组数直接等于日志行数与 arm 开销。
+- **期望 API 形态**：`group.moveAlongOffset(scale, durationTicks, easing)` —— 每个成员沿自己的
+  `offsetFromPivot` 方向平移 `scale × |offsetFromPivot|`（对「球面碎片向外飞」是现成语义）；
+  或 `group.moveEach(deltas: List<Vec3>, durationTicks, easing)`。
+- **影响面**：`magic/modifier/EnergyShield.kt`（`spawnGlassPanels` 按位移分组：位移相同 = 共用一个组）。
+- **临时降级**：投射物打穿用 `panelNormalDrift` 一片一组（≤7 组）；格挡玻璃、破口轮廓、
+  爆炸碎裂（整批沿爆点方向）已经各自合并成 **1 个组**。
+
+---
+
 ## 1. 已知的能力边界（不是缺陷，但接线前必须知道）
 
 | 项 | 现状 | 影响 | 我们的处理 |

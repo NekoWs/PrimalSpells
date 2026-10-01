@@ -452,7 +452,7 @@ object CaptureScenes {
         var holder: TestDummyEntity? = null
         Scene(
             name = name,
-            title = "爆炸：触发即爆（粒子云撑到半径 + 闪电丝 + 外飞 + 烟）",
+            title = "爆炸：触发即爆（粒子云撑到半径 + 外飞 + 烟渐隐）",
             warmupTicks = 24,
             lengthTicks = EXPLOSION_TICKS,
             thirdPerson = false,
@@ -502,7 +502,7 @@ object CaptureScenes {
                         Check(
                             name, t, "burst-particles",
                             particles >= 200,
-                            "爆后 PD 粒子 = $particles（球壳粒子云 + 闪电丝 + 外飞）",
+                            "爆后 PD 粒子 = $particles（球壳粒子云 + 外飞）",
                         ),
                         Check(
                             name, t, "damage-immediate",

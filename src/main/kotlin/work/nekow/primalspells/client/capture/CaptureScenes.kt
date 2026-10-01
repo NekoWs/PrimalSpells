@@ -314,7 +314,7 @@ object CaptureScenes {
                 if (t == SHIELD_LASER_AT) {
                     laser(ctx, atk, sw)
                 }
-                // 第二次大爆前：把法力压到不够（345 > 300），并收掉残余火球
+                // 第二次大爆前：把法力压到不够（45 > 30），并收掉残余火球
                 // —— 后者的橙色拖尾会污染破口窗口的「暖色像素」判据
                 if (t == SHIELD_LOW_MANA_AT) {
                     w.status.mana = SHIELD_LOW_MANA
@@ -375,7 +375,7 @@ object CaptureScenes {
                     SHIELD_BLAST_OK + SHIELD_BLAST_SETTLE -> listOf(
                         Check(
                             name, t, "blast-absorbed",
-                            s != null && !s.breached && w != null && w.status.mana <= manaBeforeBlast - 300.0,
+                            s != null && !s.breached && w != null && w.status.mana <= manaBeforeBlast - 40.0,
                             "breached=${s?.breached} mana=${w?.status?.mana} before=$manaBeforeBlast",
                         ),
                     )
@@ -414,7 +414,7 @@ object CaptureScenes {
                         Check(
                             name, t, "anchor-still-blocks",
                             s != null && !s.breached && w != null &&
-                                w.status.mana <= manaBeforeBlast - 300.0,
+                                w.status.mana <= manaBeforeBlast - 40.0,
                             // 不再断言"伤害数字 = 0"：上一条（壳内那发）的伤害数字还活着，
                             // 这里只判"被抵扣"这个信号
                             "旧位置外侧大爆：mana=${w?.status?.mana}（应比  少一大截 = 被抵扣）",
@@ -612,7 +612,7 @@ object CaptureScenes {
     /** 第一次大爆：法力充足 → 抵扣成功（强度 72、抗性 4 → 345 MP） */
     private const val SHIELD_BLAST_OK = 76
 
-    /** 把法力压到不够（345 > 300），并收掉残余火球，让破口窗口里只剩红色轮廓 */
+    /** 把法力压到不够（45 > 30），并收掉残余火球，让破口窗口里只剩红色轮廓 */
     private const val SHIELD_LOW_MANA_AT = 106
 
     /** 第二次大爆：法力不够 → 打穿 + 破口（放弹 108 → 蓄力到 126 才结算） */
@@ -623,7 +623,7 @@ object CaptureScenes {
 
     /** 测试台法力：满池起步；配合 `charge = 0`（关掉 1000/s 的回复）才能逼出「法力不足」 */
     private const val SHIELD_START_MANA = 3000.0
-    private const val SHIELD_LOW_MANA = 300.0
+    private const val SHIELD_LOW_MANA = 30.0
 
     /** 绕球心的水平公转机位，看向球心。 */
     private fun orbit(

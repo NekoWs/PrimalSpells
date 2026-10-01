@@ -118,10 +118,21 @@ class EnergyShield : Modifier() {
     private fun resistance(): Double =
         baseResistance + resistancePerCard * wand.loadedMagics.count { it is EnergyShield }
 
-    /** 这次格挡要花的 MP：抗性以内只付基础反弹，超出部分每点加价。 */
+    /**
+     * 这次格挡要花的 MP：抗性以内只付基础反弹，超出部分每点加价。
+     *
+     * **第 35 轮加封顶**（用户口径：「大于阈值后不是扣 MP 了吗，改成**最多额外扣阈值的 2 倍**的 MP」，
+     * 追问「阈值指什么」→「**就是抗性的两倍**」）：
+     * 超出抗性的那部分**最多按 `2 × 抗性` 计**，即额外消耗 ≤ `2 × 抗性 × extraCostPerPoint`。
+     *
+     * 为什么加：原来按点数线性加价，一颗大爆（强度 144 / 抗性 4）要 **705 MP** ——
+     * 于是手感是"有蓝就一直不会破、没蓝就一直破"（能不能付得起的悬崖）。
+     * 封顶后同样的核弹只要 **45 MP**（基础 5 + 8 点 × 5），强度高低仍分档（火球 10 / 核弹 45），
+     * 但 T1 的 80 MP 也扛得住一发，破不破取决于**连续挨打**而不是单发的绝对值。
+     */
     private fun bounceCost(strength: Double): Double {
         val resisted = resistance()
-        val over = (strength - resisted).coerceAtLeast(0.0)
+        val over = (strength - resisted).coerceIn(0.0, resisted * MAX_EXTRA_RESISTANCE_RATIO)
         return baseBounceCost + over * extraCostPerPoint
     }
 
@@ -468,6 +479,9 @@ class EnergyShield : Modifier() {
 
         /** 球壳半径（方块）：既是表现面，也是**格挡判定面**与「壳内侧」的界线 */
         private const val SHELL_RADIUS = 1.7
+
+        /** 超出抗性的部分最多按「抗性的这个倍数」计费（第 35 轮封顶，用户口径 = 2） */
+        private const val MAX_EXTRA_RESISTANCE_RATIO = 2.0
 
         /**
          * 每条棱上放几个点（含起点，见 [Polyhedra.truncatedIcosahedron]）：

@@ -212,24 +212,26 @@ object CaptureScenes {
      * `p.caster === player` 排除），拿一根只装火球的法杖，站在 +X 方向 5.5 格外平射 ——
      * 走真实施法路径，护盾走真实弹开路径。被动驱动走真实路径：`Wand.tick(caster, level)`。
      *
-     * 攻击者用的是**强化火球**（`damage_boost` + `fireball` = 强度 8）：抗性 6 之下，单发落在预算内、
-     * 同一个 20 tick 窗口里的第二发才会超预算 —— 这正是"防 DPS"要演示的刻度。
+     * 攻击者用的是**普通火球**（强度 **5**）：第 41 轮把一秒预算按小白锚收紧到 **6** 之后，
+     * "单发挡得住（5 ≤ 6）、同一窗口第二发超预算（10 > 6）"正好落在这一发上。
      *
      * 时间线（tick）：
      * ```
      *  0-19   静止：屏幕上应当**一个粒子都没有**（护盾平时不可见）
-     * 22/48/74/100  四次点射（间隔 26 > 20 tick 窗口）：每一发都**单独**落在预算内 → 挡下、各付 15 MP
-     * 134/146        两发落在**同一个 20 tick 窗口**里：累计 16 > 预算 12 → 挡不住（破口 32 tick）
+     * 22/48/74/100  四次点射（间隔 26 > 20 tick 窗口）：每一发都**单独**落在预算内 → 挡下、各付 5 MP
+     * 134/146        两发落在**同一个 20 tick 窗口**里：累计 10 > 预算 6 → 挡不住（破口 20 tick）
      *                ← 法力充足，所以这一条证明破口来自「窗口预算」而不是「没蓝」（第 39 轮口径）
      * 206    激光：先把法力压到 4（付不起基础 5 MP）→ 打穿（这一发只能靠**命中兜底**拦到）；
      *                强度 0.5 没超出抗性 ⇒ 破口只有基础 20 tick（第 40 轮：破口时长看超出多少）
-     * 234    **原版箭矢**（满蓄力、风速 3 ⇒ 强度 6）：应当被**反弹**回去（第 40 轮新增能力）
-     * 248    小额爆炸（离持有者 5.75 格，强度 ≤ 6）：抵扣成功 → **波及到的片全部出玻璃**
-     * 258    把持有者挪走 3 格（判定应当跟着人）
-     * 264    大爆（摆在**旧球心**处 = 新位置外侧 3 格）：整罩被波及 → 32 片全碎 + 破口吃到 3 秒上限
-     * 280    破口期内再走 3 格：**粉色轮廓跟着人走**（白色碎片留在原地）—— 靠帧目视确认
+     * 234    **原版箭矢**（满蓄力、风速 3 ⇒ 强度 6 = 一支小白箭）：应当被**反弹**回去（第 40 轮新增能力）
+     * 260    小额爆炸（离持有者 5.75 格，强度 ≈6）：抵扣成功 → **波及到的片全部出玻璃**
+     * 270    把持有者挪走 3 格（判定应当跟着人）
+     * 276    大爆（摆在**旧球心**处 = 新位置外侧 3 格）：整罩被波及 → 32 片全碎 + 破口吃到 3 秒上限
+     * 296    破口期内再走 3 格：**粉色轮廓跟着人走**（白色碎片留在原地）—— 靠帧目视确认
      *        ← 若判定没跟着玩家，爆点会落在旧壳**内部** → 护盾根本不触发，所以这条能证明判定跟人
-     * 347    破口到期 → 粒子清零
+     * 340-436 **1 个小白**：每 40 tick 一箭（原版骷髅的真实射速：20 拉弓 + 20 间隔）→ 三发全挡下
+     * 444-483 **3 个小白**：每 13 tick 一箭 → 第二发就把 20 tick 预算打爆 ⇒ 破口（"不再无敌"那条线）
+     * 525    破口到期 → 粒子清零
      * ```
      */
     private fun energyShield(): Scene = run {
@@ -242,6 +244,10 @@ object CaptureScenes {
         var manaBeforeBlast = 0.0
         var manaBeforeArrow = 0.0
         var arrow: Arrow? = null
+        // 小白段的状态在**服务端 tick 上记录**，断言稍后再读 —— 场景的 checksAt 跑在客户端计数器上，
+        // 与服务器 tick 有 ±10 tick 的漂移，直接"在事件当 tick 断言"会抢跑（第 41 轮踩过）。
+        var volleyBreached = false
+        var volleyPanels = 0
         Scene(
             name = name,
             title = "玻璃护盾：平时不可见 → 受击玻璃板 → 超预算挡不住 + 破口 → 爆炸把波及到的片全打碎",
@@ -282,11 +288,10 @@ object CaptureScenes {
                 guardDummy.setItemInHand(InteractionHand.MAIN_HAND, stack)
                 // 攻击者：+X 方向 5.5 格，yaw=90 → 朝 -X 正对护盾持有者
                 attacker = ctx.spawnDummy(CX + 5.5, floorY + 1.0, CZ + 0.5, yaw = 90f)
-                // 强化火球（强度 5 + 3 = 8）：抗性 6 之下"单发挡得住、同窗口第二发超预算"才成立
-                val boost = MagicManager.create("damage_boost")!!
+                // **普通火球**（强度 5）：预算 6 之下"单发挡得住（5 ≤ 6）、同一窗口第二发超预算（10 > 6）"才成立 ——
+                // 第 41 轮把预算按小白锚收紧到 6 之后，+3 的强化火球（8）会一发就超预算，不适合当"点射"探针
                 val bolt = MagicManager.create("fireball")!!
                 val sw = Wand("capture-shooter").also {
-                    it.magics += boost
                     it.magics += bolt
                     it.load()
                     it.status.mana = 1000.0
@@ -299,7 +304,8 @@ object CaptureScenes {
                         // ⚠️ 不能用 `card.strengthBudget()`：它要读卡上的 `wand`，而那一刻 `wand` 还没初始化
                         // （`Magic.wand` 是 lateinit，由 tick/管理器路径写入）——实测会抛
                         // `UninitializedPropertyAccessException` 并把 prepare 记成 FAILED。
-                        "budget=${(card.baseResistance + card.resistancePerCard) * EnergyShield.RESISTANCE_BUDGET_RATIO}"
+                        // 预算是两个常量相乘（第 41 轮起与抗性无关），所以直接算得出来。
+                        "budget=${EnergyShield.SKELETON_DPS * EnergyShield.SKELETONS_HELD}"
                 )
             },
             tick = { ctx, t ->
@@ -357,6 +363,26 @@ object CaptureScenes {
                     h.setOldPosAndRot()
                     ctx.log("holder moved +$SHIELD_MOVE_DISTANCE → ${h.position()}")
                 }
+                // ---- 小白段（第 41 轮）：按原版骷髅的真实射速压护盾 ----
+                if (t == SHIELD_SKELETON_MANA_AT) {
+                    w.status.mana = SHIELD_SKELETON_MANA
+                    ctx.log("skeleton phase: mana refilled to ${w.status.mana}")
+                }
+                if (soloArrowAt(t)) {
+                    ctx.log("1 skeleton: arrow at t=$t（每 $SHIELD_SOLO_GAP tick 一箭 = 一个小白）")
+                    vanillaArrow(ctx, atk, h)
+                }
+                if (volleyArrowAt(t)) {
+                    ctx.log("3 skeletons: arrow at t=$t（每 $SHIELD_VOLLEY_GAP tick 一箭 = 三个小白）")
+                    vanillaArrow(ctx, atk, h)
+                }
+                // 3 个小白的第二发（457）应当把预算打爆 —— 在第 5 tick 上把状态记下来（服务端时刻是准的）
+                if (t == SHIELD_VOLLEY_FIRST + SHIELD_VOLLEY_GAP + 5) {
+                    val shieldCard = shield
+                    volleyBreached = shieldCard != null && shieldCard.breached
+                    volleyPanels = shieldCard?.breachPanelCount ?: 0
+                    ctx.log("volley @$t: breached=$volleyBreached panels=$volleyPanels")
+                }
                 if (t == SHIELD_WALK_AT) {
                     // 破口（264 那次，60 tick）还没到期：挪一步看红色轮廓跟不跟人
                     val pos = h.position()
@@ -399,18 +425,18 @@ object CaptureScenes {
                         // 间隔 26 tick > 窗口 20 ⇒ 每一发都是"窗口里唯一那一发" ⇒ 全都挡得住
                         Check(
                             name, t, "hits-blocked",
-                            s != null && !s.breached && w != null && w.status.mana <= SHIELD_START_MANA - 55.0,
-                            "breached=${s?.breached} mana=${w?.status?.mana}（四次挡下应 = ${SHIELD_START_MANA - 60}）",
+                            s != null && !s.breached && w != null && w.status.mana <= SHIELD_START_MANA - 15.0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}（四次挡下应 = ${SHIELD_START_MANA - 20}）",
                         ),
                     )
                     SHIELD_PAIR_B + SHIELD_HIT_SETTLE -> listOf(
-                        // 第 39 轮的核心断言：两发落在同一个窗口里 ⇒ 累计强度 16 > 预算 12 ⇒ 挡不住。
+                        // 第 39 轮的核心断言：两发落在同一个窗口里 ⇒ 累计强度 10 > 预算 6 ⇒ 挡不住。
                         // 关键在 mana：它还几乎是满的（只花了 5 发的钱）⇒ 破口**不是**"没蓝"造成的
                         Check(
                             name, t, "budget-breach",
                             s != null && s.breached && w != null &&
-                                w.status.mana >= SHIELD_START_MANA - 90.0 && damageNumbers(ctx, holder) > 0,
-                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 90}）" +
+                                w.status.mana >= SHIELD_START_MANA - 40.0 && damageNumbers(ctx, holder) > 0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 40}）" +
                                 " 伤害数字=${damageNumbers(ctx, holder)}",
                         ),
                     )
@@ -467,7 +493,27 @@ object CaptureScenes {
                             "破口面板数=${s?.breachPanelCount}（整罩 32 片全被波及；像素判据量不出这件事）",
                         ),
                     )
+                    SHIELD_SOLO_CHECK_AT -> listOf(
+                        // **1 个小白**（40 tick 一箭）连打 3 发：每发强度 6 = 抗性 6 ⇒ 只付基础 5 MP，
+                        // 而 40 tick 的间隔让每发都是"窗口里唯一那一发" ⇒ 全都挡得住（第 41 轮锚：扛 2 个）
+                        Check(
+                            name, t, "skeleton-dps-held",
+                            s != null && !s.breached && w != null &&
+                                w.status.mana <= SHIELD_SKELETON_MANA - 14.5,
+                            "breached=${s?.breached} mana=${w?.status?.mana}（3 发小白箭应 = ${SHIELD_SKELETON_MANA - 15}）",
+                        ),
+                    )
+
                     SHIELD_SCENE_TICKS - 3 -> listOf(
+                        // **3 个小白**（13 tick 一箭）：第二发就落在同一个 20 tick 窗口里 ⇒ 6 + 6 > 预算 6
+                        // ⇒ 护盾挡不住 —— 这就是"不再友好"那条线（口径：扛 2 个小白，第 3 个破）。
+                        // 读的是 t=462 在服务端记下的状态（见 tick 段），避开客户端计数漂移。
+                        Check(
+                            name, t, "skeleton-volley-breaks",
+                            volleyBreached,
+                            "t=462 记录：breached=$volleyBreached 破口面板数=$volleyPanels" +
+                                "（3 个小白的箭间隔 13 tick ⇒ 两发超预算）",
+                        ),
                         Check(name, t, "breach-expired", s != null && !s.breached, "breached=${s?.breached}"),
                         pdParticleCheck(name, t, ctx),
                     )
@@ -506,6 +552,18 @@ object CaptureScenes {
         return ctx.level.getEntitiesOfClass(DamageNumber::class.java, h.boundingBox.inflate(8.0)).size
     }
 
+    /** 1 个小白：第 n 发在 `SHIELD_SOLO_FIRST + n × 40`。 */
+    private fun soloArrowAt(t: Int): Boolean =
+        t >= SHIELD_SOLO_FIRST &&
+            t < SHIELD_SOLO_FIRST + SHIELD_SOLO_GAP * SHIELD_SOLO_COUNT &&
+            (t - SHIELD_SOLO_FIRST) % SHIELD_SOLO_GAP == 0
+
+    /** 3 个小白：第 n 发在 `SHIELD_VOLLEY_FIRST + n × 13`。 */
+    private fun volleyArrowAt(t: Int): Boolean =
+        t >= SHIELD_VOLLEY_FIRST &&
+            t < SHIELD_VOLLEY_FIRST + SHIELD_VOLLEY_GAP * SHIELD_VOLLEY_COUNT &&
+            (t - SHIELD_VOLLEY_FIRST) % SHIELD_VOLLEY_GAP == 0
+
     /**
      * 从壳外 4 格朝持有者射一支**原版箭矢**（第 40 轮：护盾要能防御/反弹原版投射物）。
      *
@@ -515,8 +573,11 @@ object CaptureScenes {
      */
     private fun vanillaArrow(ctx: CaptureDriver.SceneCtx, shooter: TestDummyEntity, holder: TestDummyEntity): Arrow {
         val floorY = ctx.floorBlockY(CX, CZ)
-        val from = Vector3f(CX + 4.5f, floorY + 2.0f, CZ + 0.5f)
-        val aim = Vector3f(holder.x.toFloat(), floorY + 2.0f, CZ + 0.5f)
+        // ⚠️ 瞄准点必须取**持有者当前**的位置：木桩在第 41 轮的"破口期内走 3 格"之后已经不在 CZ+0.5 了，
+        // 写死 z 会让箭从壳边擦过去（实测就是这条让小白段的三发全部打空）。
+        val aimY = holder.y + holder.bbHeight * 0.55
+        val from = Vector3f(CX + 4.5f, aimY.toFloat(), CZ + 0.5f)
+        val aim = Vector3f(holder.x.toFloat(), aimY.toFloat(), holder.z.toFloat())
         val arrow = Arrow(ctx.level, from.x.toDouble(), from.y.toDouble(), from.z.toDouble(), ItemStack(Items.ARROW), null)
         arrow.owner = shooter
         val dir = aim.sub(from).normalize()
@@ -651,7 +712,7 @@ object CaptureScenes {
      * ⚠️ 末尾留 **20 tick** 余量：大爆的破口轮廓在 `T + 54 停留 + 6 淡出 + 5 余量 = T+65` 才被 PD 销毁，
      * 而收尾断言 `pd-particles-zero` 在倒数第 3 帧 —— 余量给少了这条断言就会和销毁时点抢跑。
      */
-    private const val SHIELD_SCENE_TICKS = 350
+    private const val SHIELD_SCENE_TICKS = 528
 
     /** 补满法力（原版箭矢 / 小额爆炸那两段要在"付得起"的前提下验证格挡） */
     private const val SHIELD_REFILL_AT = 230
@@ -663,7 +724,7 @@ object CaptureScenes {
      * ⚠️ 跟随是客户端 `followEntity` 的行为，服务端读不到渲染位置 ⇒ 这一条**没有自动断言**，
      * 靠产物的帧目视确认（取 280 前后各一帧对比）。
      */
-    private const val SHIELD_WALK_AT = 280
+    private const val SHIELD_WALK_AT = 296
     private const val SHIELD_WALK_DISTANCE = 3.0f
 
     /** 原版箭矢：从壳外 4 格正对持有者射一支（满蓄力 = 速度 3 格/tick ⇒ 强度 = 速度 × 2 = 6） */
@@ -673,7 +734,7 @@ object CaptureScenes {
 
     /** 判定跟人的验证：把持有者往 +X 挪这么远，再把大爆摆在旧球心处 */
     private const val SHIELD_MOVE_DISTANCE = 3.0f
-    private const val SHIELD_MOVE_AT = 258
+    private const val SHIELD_MOVE_AT = 270
 
     /**
      * 小额爆炸（相对竞技场中心 CX 的偏移，木桩在 CX+0.5）：离持有者约 5.75 格 ⇒
@@ -681,11 +742,11 @@ object CaptureScenes {
      * 落在抗性 6 以内 ⇒ 抵扣成功（只付基础 5 MP）。
      */
     private const val SHIELD_SMALL_BLAST_OFFSET = -5.25f
-    private const val SHIELD_SMALL_BLAST_AT = 248
+    private const val SHIELD_SMALL_BLAST_AT = 260
 
     /** 大爆：摆在**旧球心**处 —— 对挪走 3 格后的持有者来说它在壳外 3 格（强度 ≈72，破口吃满上限 3 秒） */
     private const val SHIELD_BIG_BLAST_OFFSET = 0.5f
-    private const val SHIELD_BIG_BLAST_AT = 264
+    private const val SHIELD_BIG_BLAST_AT = 276
 
     /** 放弹到结算的间隔：触发即爆，留几 tick 余量 */
     private const val SHIELD_ANCHOR_SETTLE = 6
@@ -702,7 +763,7 @@ object CaptureScenes {
     private const val SHIELD_SHOT_C = 74
     private const val SHIELD_SHOT_D = 100
 
-    /** 窗口内连挨两发（间隔 12）：累计强度 16 > 预算 12 ⇒ 挡不住（破口 = 20 + 超出 2 点 × 6 = 32 tick） */
+    /** 窗口内连挨两发（间隔 12）：累计强度 10 > 预算 6 ⇒ 挡不住（火球强度 5 ≤ 抗性 6 ⇒ 破口 = 基础 20 tick） */
     private const val SHIELD_PAIR_A = 134
     private const val SHIELD_PAIR_B = 146
 
@@ -717,6 +778,25 @@ object CaptureScenes {
 
     /** 压到的"不够付基础 5 MP"的法力 */
     private const val SHIELD_LOW_MANA = 4.0
+
+    // ---- 小白段（第 41 轮）：按原版骷髅的真实 DPS 压护盾 ----
+
+    /** 小白段开始前补满法力（这一段的账要是干净的：3 发只花 15 MP） */
+    private const val SHIELD_SKELETON_MANA_AT = 340
+    private const val SHIELD_SKELETON_MANA = 3000.0
+
+    /** **1 个小白**：40 tick 一箭（原版：20 tick 拉弓 + 20 tick 间隔 = 2 秒），共 3 发 → 应当全挡下 */
+    private const val SHIELD_SOLO_FIRST = 344
+    private const val SHIELD_SOLO_GAP = 40
+    private const val SHIELD_SOLO_COUNT = 3
+
+    /** 单人小白那一条断言的 tick：最后一发（424）结算完再等 18 tick，避开客户端计数漂移 */
+    private const val SHIELD_SOLO_CHECK_AT = SHIELD_SOLO_FIRST + SHIELD_SOLO_GAP * (SHIELD_SOLO_COUNT - 1) + 18
+
+    /** **3 个小白**：13 tick 一箭（40 / 3）→ 两发就落进同一个 20 tick 窗口 ⇒ 12 > 预算 6 ⇒ 破口 */
+    private const val SHIELD_VOLLEY_FIRST = 444
+    private const val SHIELD_VOLLEY_GAP = 13
+    private const val SHIELD_VOLLEY_COUNT = 4
 
     /** 绕球心的水平公转机位，看向球心。 */
     private fun orbit(

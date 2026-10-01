@@ -44,7 +44,7 @@ import kotlin.math.sqrt
  *   因此也**没有持续状态**（HUD 条已随之删除）。
  * - 每次「格挡真的发生」按强度结算，**两道关**（第 39 轮起）：
  *   1. **窗口预算**：`R = 基础抗性 + 每张卡抗性`，**最近 1 秒（[BUDGET_WINDOW_TICKS] tick）内
- *      已经承担的强度 + 本次 > R × [RESISTANCE_BUDGET_RATIO]** 就直接挡不住
+ *      已经承担的强度 + 本次 > 预算（[SKELETON_DPS] × [SKELETONS_HELD] = 2 个小白的每秒输出）]** 就直接挡不住
  *      —— 用户口径「护盾防的是 DPS 而不是单次伤害，抗性改为在一段时间内可以承担的强度大小」；
  *   2. **法力**：预算内才轮到 `强度 ≤ R` 只付「基础反弹 MP」、`强度 > R` 付
  *      `基础反弹 + (强度 - R) × 每点额外`（超出部分封顶 2 × R，第 35 轮）。
@@ -68,7 +68,8 @@ import kotlin.math.sqrt
  *
  * ## 视觉（延续第 23 轮「受击处展开玻璃」，第 26 轮换掉整罩两段演出）
  *
- * - **格挡成功**：受击方向那一块面板展开一块**白玻璃**（亮边 + 极淡填充，约 0.35 秒淡出）；
+ * - **格挡成功**：受击方向那一块面板展开一块**发光蓝玻璃**（蓝色亮边 + 半透明蓝填充，都是加色全亮，
+ *   约 0.35 秒淡出）—— 第 41 轮按实机反馈从"冷白"改成蓝色，为的是在亮场景里也看得见；
  * - **打穿**：破口区那一片**碎裂**（向外飘散 + 淡出），随后是持续整个破口期的**淡红轮廓**；
  * - 旧的「整罩一闪而碎」「护盾恢复闪一下」两段演出随耐久模型一起删除。
  *
@@ -178,14 +179,20 @@ class EnergyShield : Modifier() {
     private val recentStrength = ArrayDeque<UsedStrength>()
 
     /**
-     * 本杖**一个窗口内能承担的强度总量** = `抗性 × [RESISTANCE_BUDGET_RATIO]`。
+     * 本杖**一个窗口（1 秒）内能承担的强度总量**。
      *
-     * 这是「抗性」的第二个身份：既是**单发阈值**（超出它才加价，见 [bounceCost]），
-     * 也是**窗口预算**（超出它直接挡不住）。为什么取 2 倍见 [RESISTANCE_BUDGET_RATIO]。
+     * 第 41 轮起直接按**原版骷髅（"小白"）的 DPS** 定，而不是"抗性的倍数"：
+     * `预算 = 小白的每秒输出 × 要扛住几个小白`（[SKELETON_DPS] × [SKELETONS_HELD] = **6**）。
+     * 口径来源：骷髅 1.0 攻速 + 20 tick 拉弓 ⇒ **2 秒一箭**、箭伤 `ceil(3.0 × ~2.2) ≈ 6`
+     * ⇒ 一个小白 ≈ **3 强度/秒**。于是 6 = **扛得住 2 个小白、第 3 个就把预算打爆**
+     * （3 个小白的箭间隔 13 tick，两发就落在同一个 20 tick 窗口里 ⇒ 12 > 6 ⇒ 破口）。
+     *
+     * 这是「抗性」之外的第二个身份：抗性是**单发阈值**（一发小白箭的强度正好就是 6，所以单发只付基础 5 MP），
+     * 预算是**每秒承受量**（超出它直接挡不住）。
      *
      * 公开只读：录制流水线靠它断言「预算而非法力」那一段（同 [breached]）。
      */
-    fun strengthBudget(): Double = resistance() * RESISTANCE_BUDGET_RATIO
+    fun strengthBudget(): Double = SKELETON_DPS * SKELETONS_HELD
 
     /** 窗口内已承担的强度总量（顺带把到期项丢掉，所以这个表不会只增不减）。 */
     private fun usedStrength(gameTime: Long): Double {
@@ -770,7 +777,7 @@ class EnergyShield : Modifier() {
             level, holder, panels,
             edgeColor = BREACH_OUTLINE_COLOR, edgeScale = BREACH_OUTLINE_SCALE,
             withFill = false, holdTicks = max(1, ticks - BREACH_OUTLINE_FADE_TICKS),
-            fadeTicks = BREACH_OUTLINE_FADE_TICKS, follow = true,
+            fadeTicks = BREACH_OUTLINE_FADE_TICKS, follow = true, glow = false,
         )
     }
 
@@ -800,6 +807,7 @@ class EnergyShield : Modifier() {
         driftOf: (Polyhedra.Panel) -> Vec3? = { null },
         fillColor: Color = GLASS_FILL_COLOR,
         follow: Boolean = false,
+        glow: Boolean = true,
     ) {
         val manager = wand.pdParticles(level)
         val center = shellCenter(holder)
@@ -823,6 +831,9 @@ class EnergyShield : Modifier() {
                         .position(center.add(offset))
                         .color(edgeColor)
                         .scale(edgeScale)
+                        // 第 41 轮：蓝色亮边走**加色 + 全亮**，实机在亮场景里也一眼看得见
+                        .additive(glow)
+                        .glowing(glow)
                         .lifetime(PD_IMMORTAL)
                         .group(group.id)
                         .offsetFromPivot(offset)
@@ -834,6 +845,8 @@ class EnergyShield : Modifier() {
                             .position(center.add(offset))
                             .color(fillColor)
                             .scale(GLASS_FILL_SCALE)
+                            .additive(glow)
+                            .glowing(glow)
                             .lifetime(PD_IMMORTAL)
                             .group(group.id)
                             .offsetFromPivot(offset)
@@ -874,8 +887,8 @@ class EnergyShield : Modifier() {
         super.initLore()
         lore(Lore.RESISTANCE, Lore.formatDouble(baseResistance))
         lore(Lore.RESISTANCE_PER_CARD, Lore.formatDouble(resistancePerCard))
-        // 单张卡时的窗口预算（= (基础 + 每张卡) × 系数）：护盾真正的"防 DPS"刻度
-        lore(Lore.RESISTANCE_BUDGET, Lore.formatDouble((baseResistance + resistancePerCard) * RESISTANCE_BUDGET_RATIO))
+        // 窗口预算 = 2 个小白的每秒输出（第 41 轮按小白 DPS 定的锚）：护盾真正的"防 DPS"刻度
+        lore(Lore.RESISTANCE_BUDGET, Lore.formatDouble(SKELETON_DPS * SKELETONS_HELD))
         lore(Lore.BOUNCE_COST, Lore.formatDouble(baseBounceCost))
         lore(Lore.EXTRA_COST, Lore.formatDouble(extraCostPerPoint))
         // 破口时长现在是「随超出抗性的程度」在 1 秒 ~ 3 秒之间（第 40 轮）
@@ -904,19 +917,24 @@ class EnergyShield : Modifier() {
         private const val BUDGET_WINDOW_TICKS = 20
 
         /**
-         * 窗口预算 = 抗性 × 本系数（第 39 轮）。
+         * 数值锚：**一个原版骷髅（"小白"）的持续输出 ≈ 3.0 伤害/秒**（第 41 轮，用户口径
+         * 「根据小白的 DPS 作为基础设计所有魔法数值」）。
          *
-         * 为什么不是 1（= 把抗性直接当预算，open.md 登记时的默认口径）：
-         * 强度 5 的火球 > 抗性 4 ⇒ **单发火球就会破口**，连「超出抗性加价」那条路都够不到
-         * （能走到加价的只剩 `4 < 强度 ≤ 4` 这个空集），整套法力定价等于被架空。
-         * 取 2 之后的三个刻度（抗性 4）：**单发火球 5 挡得住、一秒内第二发（累计 10）挡不住、
-         * 大爆 72 / 核弹 144 必破**。推演见 docs/design/combat-pricing.md §4.95。
+         * 推算全部来自原版代码：`RangedBowAttackGoal(this, 1.0, **20**, 15.0)` 是 20 tick 的攻击间隔，
+         * 拉弓还要 20 tick（`pullTime >= 20` 才放）⇒ **2 秒一箭**；`BowItem.getPowerForTime(20) = 1.0`
+         * ⇒ 箭初速 `power × 3.0 = 3.0`；`AbstractArrow.setBaseDamageFromMob(1.0)` ⇒ `baseDamage = 2 + 三角形抖动`
+         * ⇒ 箭伤 `ceil(3.0 × ~2.2) ≈ 6`。⇒ **6 / 2 秒 = 3.0 DPS**。
          *
-         * 公开：这是与 [baseResistance] / [baseBounceCost] 同级的**手感旋钮**，
-         * 录制流水线也拿它算"单张卡时的窗口预算"（护盾卡片在 `prepare` 阶段还没有 `wand` 引用，
-         * 所以不能直接调 [strengthBudget]）。
+         * 全项目的数字都以它为基准折算（见 docs/design/combat-pricing.md §1）：玩家基础弹 ≈ 3 小白、
+         * 护盾 ≈ 2 小白，等等。
          */
-        const val RESISTANCE_BUDGET_RATIO = 2.0
+        const val SKELETON_DPS = 3.0
+
+        /**
+         * 护盾要扛住**几个小白**的持续输出：2 个（= 预算 6）。第 3 个就超预算 ⇒ 破口 ——
+         * 这就是"护盾对小白不再无敌"的那条线。调它就等于调护盾的整体耐久。
+         */
+        const val SKELETONS_HELD = 2.0
 
         /**
          * 每条棱上放几个点（含起点，见 [Polyhedra.truncatedIcosahedron]）：
@@ -959,22 +977,31 @@ class EnergyShield : Modifier() {
         /** **破口轮廓**：常驻整段破口期，最后这点时间用来淡出（时长由 [breachTicksFor] 决定） */
         private const val BREACH_OUTLINE_FADE_TICKS = 6
 
-        /** 格挡那块玻璃的亮边：**接近白**（冷白）—— 实机反馈「击中要变白」 */
-        private val GLASS_EDGE_COLOR: Color = Color.ofInt(226, 242, 255, 245)
+        /**
+         * 格挡那块玻璃的亮边（第 41 轮改）：**发光蓝**。
+         *
+         * 实机反馈「护盾的提示太淡了」（原版骷髅连射时几乎看不见挡没挡住）：冷白在亮场景里和雪/水/云一个色，
+         * 于是改成**蓝边 + 加色发光**（`additive` + `glowing`），对比度靠色相而不是靠亮度。
+         * 稀疏粒子感保留（还是 6 点/棱的点阵，没加密）。
+         */
+        private val GLASS_EDGE_COLOR: Color = Color.ofInt(120, 200, 255, 240)
 
-        /** 碎裂那一下的亮边：更白 */
-        private val GLASS_SHATTER_COLOR: Color = Color.ofInt(226, 246, 255, 245)
+        /** 碎裂那一下的亮边：更亮的蓝白（同一色系，只是更冲） */
+        private val GLASS_SHATTER_COLOR: Color = Color.ofInt(190, 230, 255, 245)
 
         /** 爆炸碎裂里**背对爆点**那一批的亮边：同一块玻璃暗一档（不抢正面的镜） */
-        private val GLASS_SHATTER_BACK_COLOR: Color = Color.ofInt(198, 224, 248, 130)
+        private val GLASS_SHATTER_BACK_COLOR: Color = Color.ofInt(120, 180, 240, 150)
 
         /** 破口轮廓：淡红（提示攻击者「这里能打」），比玻璃暗、比背景亮 */
         private val BREACH_OUTLINE_COLOR: Color = Color.ofInt(255, 118, 118, 150)
 
-        /** 填充：极淡的冷白（≈18% 不透明度）：整块玻璃在受击瞬间读起来是「白了一下」 */
-        private val GLASS_FILL_COLOR: Color = Color.ofInt(206, 232, 255, 46)
+        /**
+         * 填充（第 41 轮改）：**半透明蓝**（≈27% 不透明度 + 加色）—— 受击瞬间整块玻璃读起来是"蓝了一下"，
+         * 在亮背景（雪地/水面/天空）里也压得住，而原来的极淡冷白几乎看不见。
+         */
+        private val GLASS_FILL_COLOR: Color = Color.ofInt(60, 140, 255, 70)
 
         /** 背对爆点那一批的填充：比正面更淡 */
-        private val GLASS_BACK_FILL_COLOR: Color = Color.ofInt(206, 232, 255, 24)
+        private val GLASS_BACK_FILL_COLOR: Color = Color.ofInt(50, 120, 230, 36)
     }
 }

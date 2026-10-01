@@ -25,8 +25,8 @@ class DroneBolt : Projectile() {
     init {
         // 玩家侧定价：2 伤害 / 8 tick 间隔 ≈ 5 DPS（比火球低一档的弱法术）
         mana = 2.0
-        delay = 4
-        recharge = 8
+        delay = 0
+        recharge = 0
         maxAge = 200
         status.damage = 2.0
         hitRadius = 0.2

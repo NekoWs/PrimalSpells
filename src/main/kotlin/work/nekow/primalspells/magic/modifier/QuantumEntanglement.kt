@@ -34,7 +34,7 @@ class QuantumEntanglement : Modifier() {
 
     init {
         mana = 6.0
-        delay = 2
+        delay = 0
 
         effects += object : BaseEffect() {
             override fun onActive() {

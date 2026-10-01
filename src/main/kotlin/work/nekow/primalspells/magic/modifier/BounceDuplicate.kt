@@ -37,7 +37,7 @@ class BounceDuplicate : Modifier() {
         mana = 6.0
 
         /** 该修正增加的施法延迟（单位：tick） */
-        delay = 2
+        delay = 0
 
         effects += Bounce()
 

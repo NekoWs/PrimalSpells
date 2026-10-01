@@ -27,8 +27,8 @@ class TeleportProjectile : Projectile() {
 
     init {
         mana = 4.0
-        delay = 1
-        recharge = 1
+        delay = 0
+        recharge = 0
         maxAge = 100
         speed = 1.0f
         hitRadius = 0.2

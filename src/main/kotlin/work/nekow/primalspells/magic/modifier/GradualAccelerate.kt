@@ -24,7 +24,7 @@ class GradualAccelerate : Modifier() {
 
     init {
         mana = 4.0
-        delay = 1
+        delay = 0
 
         effects += object : BaseEffect() {
 

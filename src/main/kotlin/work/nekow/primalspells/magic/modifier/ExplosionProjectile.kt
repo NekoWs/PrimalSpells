@@ -31,7 +31,7 @@ class ExplosionProjectile : Modifier() {
 
     init {
         mana = 5.0
-        delay = 2
+        delay = 0
 
         effects += object : BaseEffect() {
 

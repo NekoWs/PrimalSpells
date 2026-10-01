@@ -20,7 +20,7 @@ class BounceExplosion : Modifier() {
 
     init {
         mana = 5.0
-        delay = 1
+        delay = 0
 
         // 添加爆炸效果：在弹跳碰撞时触发
         effects += Explosion(onHit = true, onDeath = false)

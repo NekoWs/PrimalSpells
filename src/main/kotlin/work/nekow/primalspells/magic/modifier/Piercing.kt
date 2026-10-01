@@ -21,8 +21,8 @@ class Piercing : Modifier() {
 
     init {
         mana = 200.0
-        delay = 4
-        recharge = 8
+        delay = 0
+        recharge = 0
         effects += object : BaseEffect() {
             override fun onActive() {
                 projectile.maxHitTargets = -1

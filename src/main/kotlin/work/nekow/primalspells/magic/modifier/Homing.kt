@@ -35,7 +35,7 @@ class Homing : Modifier() {
         mana = 4.0
 
         /** 该修正增加的施法延迟（单位：tick） */
-        delay = 1
+        delay = 0
 
         // 向修正效果列表中添加 Tracking 追踪效果
         // 传入追踪范围、强度、生效延迟，自动排除掉落物/矿车/船

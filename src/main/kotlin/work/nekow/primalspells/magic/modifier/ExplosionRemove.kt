@@ -16,7 +16,7 @@ class ExplosionRemove : Modifier() {
 
     init {
         mana = 1.0
-        delay = 1
+        delay = 0
 
         effects += object : BaseEffect() {
 

@@ -30,7 +30,7 @@ class SphereOrbit : Modifier() {
 
     init {
         mana = 5.0
-        delay = 1
+        delay = 0
 
         effects += object : BaseEffect() {
             override val phase = EffectPhase.OVERRIDE

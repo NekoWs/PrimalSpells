@@ -14,7 +14,7 @@ class Volatile : Modifier() {
 
     init {
         mana = 2.0
-        delay = 1
+        delay = 0
 
         effects += object : BaseEffect() {
 

@@ -22,7 +22,7 @@ class Reciprocate : Modifier() {
 
     init {
         mana = 3.0
-        delay = 1
+        delay = 0
 
         effects += object : BaseEffect() {
 

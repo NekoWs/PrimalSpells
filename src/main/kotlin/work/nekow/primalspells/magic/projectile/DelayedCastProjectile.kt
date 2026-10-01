@@ -24,8 +24,8 @@ class DelayedCastProjectile : Projectile(), TriggerSpell {
 
     init {
         mana = 3.0
-        delay = 1
-        recharge = 1
+        delay = 0
+        recharge = 0
         maxAge = 20
         speed = 0f
         hitRadius = 0.0

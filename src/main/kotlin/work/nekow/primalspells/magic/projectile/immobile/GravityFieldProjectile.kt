@@ -16,8 +16,8 @@ class GravityFieldProjectile : Projectile() {
 
     init {
         mana = 10.0
-        delay = 5
-        recharge = 10
+        delay = 0
+        recharge = 0
         maxAge = 200 // 存活 10 秒
         speed = 0f // 静态
         hitRadius = 0.0 // 无碰撞

@@ -16,8 +16,8 @@ class BlackHoleProjectile : Projectile() {
 
     init {
         mana = 12.0
-        delay = 5
-        recharge = 10
+        delay = 0
+        recharge = 0
         maxAge = 200
         speed = 0f
         hitRadius = 0.0

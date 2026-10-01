@@ -23,7 +23,7 @@ data class MagicStatus(
      * 的碎片都吃它）—— 只有真正挂了 `Explosion` 效果的法术才用得上这个字段，
      * 所以「护盾计强度」时必须先确认投射物带 `Explosion`，不能盲加（见 docs/design/combat-pricing.md §3）。
      */
-    var explosionDamage: Double = 6.0,
+    var explosionDamage: Double = 1.5,
 
     /** 爆炸半径（自定义爆炸结算用，不会破坏方块） */
     var explosionRadius: Float = 2.0f,

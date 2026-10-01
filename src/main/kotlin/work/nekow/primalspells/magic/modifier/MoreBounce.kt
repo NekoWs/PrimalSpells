@@ -27,7 +27,7 @@ class MoreBounce : Modifier() {
         mana = 2.0
 
         /** 该修正增加的施法延迟（单位：tick） */
-        delay = 1
+        delay = 0
 
         effects += Bounce(8)
 

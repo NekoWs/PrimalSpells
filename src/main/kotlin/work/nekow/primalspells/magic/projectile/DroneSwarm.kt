@@ -22,8 +22,8 @@ class DroneSwarm : Projectile() {
 
     init {
         mana = 8.0
-        delay = 1
-        recharge = 2
+        delay = 0
+        recharge = 0
         maxAge = 1
         speed = 0f
         hitRadius = 0.0

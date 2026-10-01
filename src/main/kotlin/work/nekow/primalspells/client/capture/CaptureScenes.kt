@@ -324,9 +324,11 @@ object CaptureScenes {
                 if (t == SHIELD_SHOT_A || t == SHIELD_SHOT_B || t == SHIELD_SHOT_C || t == SHIELD_SHOT_D) {
                     sw.spell(atk)
                 }
-                // 第 39 轮「防 DPS」：两发火球挨得足够近（间隔 12 tick），一起落在同一个 20 tick 窗口里
-                // ⇒ 累计强度 10 > 预算 8 ⇒ 第二发挡不住。法力全程充足，所以破口只能来自预算。
-                if (t == SHIELD_PAIR_A || t == SHIELD_PAIR_B) {
+                // 第 39/42 轮「防 DPS」：**按住不放**地连射（每 tick 一发 = 火球基准的 20 发/秒）。
+                // 第 42 轮把火球伤害削到 0.5（间隔归零、改用伤害定价）之后，单发强度 0.5 远在抗性 6 之下，
+                // "两发就破"不再成立 —— 现在要靠**持续输出**把一秒预算（6）堆爆：第 13 发累计 6.5 > 6 ⇒ 破口。
+                // 法力全程充足，所以破口只能来自预算。
+                if (t in SHIELD_BURST_AT until SHIELD_BURST_AT + SHIELD_BURST_SHOTS) {
                     sw.spell(atk)
                 }
                 // 激光回归（第 26 轮）：高速法术（5 格/tick、maxAge 1）在同一 tick 里就穿壳贴脸，
@@ -429,14 +431,14 @@ object CaptureScenes {
                             "breached=${s?.breached} mana=${w?.status?.mana}（四次挡下应 = ${SHIELD_START_MANA - 20}）",
                         ),
                     )
-                    SHIELD_PAIR_B + SHIELD_HIT_SETTLE -> listOf(
-                        // 第 39 轮的核心断言：两发落在同一个窗口里 ⇒ 累计强度 10 > 预算 6 ⇒ 挡不住。
-                        // 关键在 mana：它还几乎是满的（只花了 5 发的钱）⇒ 破口**不是**"没蓝"造成的
+                    SHIELD_BURST_AT + SHIELD_HIT_SETTLE + 16 -> listOf(
+                        // 第 39/42 轮的核心断言：**连射**把 20 tick 窗口堆爆 ⇒ 挡不住。
+                        // 关键在 mana：它还几乎是满的（只花掉十几发的钱）⇒ 破口**不是**"没蓝"造成的
                         Check(
                             name, t, "budget-breach",
                             s != null && s.breached && w != null &&
-                                w.status.mana >= SHIELD_START_MANA - 40.0 && damageNumbers(ctx, holder) > 0,
-                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 40}）" +
+                                w.status.mana >= SHIELD_START_MANA - 140.0 && damageNumbers(ctx, holder) > 0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 140}）" +
                                 " 伤害数字=${damageNumbers(ctx, holder)}",
                         ),
                     )
@@ -763,9 +765,14 @@ object CaptureScenes {
     private const val SHIELD_SHOT_C = 74
     private const val SHIELD_SHOT_D = 100
 
-    /** 窗口内连挨两发（间隔 12）：累计强度 10 > 预算 6 ⇒ 挡不住（火球强度 5 ≤ 抗性 6 ⇒ 破口 = 基础 20 tick） */
-    private const val SHIELD_PAIR_A = 134
-    private const val SHIELD_PAIR_B = 146
+    /**
+     * 连射段（第 42 轮口径）：每 tick 一发，共 [SHIELD_BURST_SHOTS] 发。
+     *
+     * 火球强度现在只有 0.5（伤害 0.5、间隔为基准的 0.05 秒）⇒ 第 13 发累计 6.5 > 预算 6 ⇒ 破口。
+     * 这一条同时是"手感"的证据：**射速确实是每 tick 一发**（20 发/秒），挡不住的只是"堆太多"。
+     */
+    private const val SHIELD_BURST_AT = 130
+    private const val SHIELD_BURST_SHOTS = 16
 
     /** 把法力压到付不起基础 5 MP（并收掉残余火球，让破口窗口里只剩红色轮廓） */
     private const val SHIELD_LOW_MANA_AT = 200

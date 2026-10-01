@@ -102,9 +102,15 @@ object ExplosionFx {
     private val WAVE_START = doubleArrayOf(0.95, 0.66, 0.42)
     /** 相邻两波之间隔多少 tick 出现（"每个有自己的动画出现"的节拍） */
     private const val WAVE_GAP = 4
-    /** 每波淡入/淡出时长 */
+    /** 每波淡入时长 */
     private const val WAVE_FADE_IN = 2
-    private const val WAVE_FADE_OUT = 3
+    /** 收束：把整波缩到中心的比例（0 = 完全收进核心）与时长 */
+    private const val RUSH_SCALE = 0.05f
+    private const val RUSH_TICKS = 4
+    /** 相邻波的收束错开（外波先吸） */
+    private const val RUSH_STAGGER = 2
+    /** 线段两端外扩比例：抵消 LINE 贴图两端各 ≈0.2 的渐隐，避免虚线 */
+    private const val SEGMENT_OVERLAP = 0.22
     /** 丝线绕核的螺旋圈数 */
     private const val FILAMENT_TWIST = 0.5
     private const val FILAMENT_SPIRAL = 0.33
@@ -233,20 +239,39 @@ object ExplosionFx {
                         .add(lateral.scale(cos(spin) * r * FILAMENT_SPIRAL))
                         .add(normal.scale(sin(spin) * r * FILAMENT_SPIRAL))
                 }
-                // stagger = 1：丝线**逐段扫出**（这就是"每个有自己的动画出现"）
-                Draw.polyline(manager, points, nominalWidth, true, null, true, true, gradient, 1, group)
+                // 逐段铺：**段间两端各外扩 20%** 让 LINE 贴图两端渐隐的部分互相补上（否则是虚线，用户实测反馈）；
+                // `stagger` 让丝线**逐段扫出**（"每个有自己的动画出现"）
+                for (i in 0 until points.size - 1) {
+                    val a = points[i]
+                    val b = points[i + 1]
+                    val ext = b.subtract(a).scale(SEGMENT_OVERLAP)
+                    val from = a.subtract(ext)
+                    val to = b.add(ext)
+                    val segLen = from.distanceTo(to)
+                    val look = ParticleVisual().style(ParticleStyle.LINE)
+                        .anisoWorld(segLen.toFloat(), nominalWidth)
+                        .alignTo(from, to)
+                        .glowing(true)
+                        .additive(true)
+                    val color = gradient.colorAt(i.toDouble() / (points.size - 1).toDouble())
+                    manager.create()
+                        .position(from.add(to).scale(0.5))
+                        .color(color)
+                        .visual(look)
+                        .lifetime(chargeTicks + 2)
+                        .delay(i)
+                        .group(group.id)
+                        .spawn()
+                }
             }
             val appearAt = wave * WAVE_GAP
             group.delay(appearAt)
             group.fadeIn(WAVE_FADE_IN)
-            // 每波撑到自己那段窗口的末尾就收掉 → 观感是"一层层收进去"，最后一波撑到蓄力结束
-            val holdUntil = if (wave < WAVE_COUNT - 1) {
-                (chargeTicks - WAVE_GAP * (WAVE_COUNT - 1 - wave)) - WAVE_FADE_OUT
-            } else {
-                chargeTicks - 2
-            }
-            group.delay((holdUntil - appearAt - WAVE_FADE_IN).coerceAtLeast(0))
-            group.fadeOut(WAVE_FADE_OUT, removeAfter = true, easing = EasingType.EASE_IN)
+            // 收束：外波先吸、内波后吸，最后一批正好在爆发前收进核心（`scale` 连"到轴心的距离"一起缩 → 缩到中心）
+            val rushAt = chargeTicks - RUSH_TICKS - (WAVE_COUNT - 1 - wave) * RUSH_STAGGER
+            group.delay((rushAt - appearAt - WAVE_FADE_IN).coerceAtLeast(0))
+            group.scale(RUSH_SCALE, RUSH_TICKS, EasingType.EASE_IN)
+            group.fadeOut(RUSH_TICKS, removeAfter = true, easing = EasingType.EASE_IN)
         }
     }
 

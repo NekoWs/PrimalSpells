@@ -58,6 +58,22 @@ object ShieldGuard {
             shield.absorbProjectile(level, wand, entity, projectile)
         }
 
+    /**
+     * 尝试让 [entity] 手上的护盾**防御/反弹一枚原版投射物**（第 40 轮；入口是 `ProjectileImpactEvent`）。
+     *
+     * 与 [absorbProjectile] 同一套路：原版箭矢 3 格/tick，可能在同一 tick 内就贴到身上，
+     * 所以除了每 tick 的扫场，命中那一刻还要再问一次护盾。
+     *
+     * @return true = 已格挡（调用方应**取消这次命中**；投射物已被反弹）
+     */
+    fun absorbVanillaProjectile(
+        level: ServerLevel,
+        entity: LivingEntity,
+        projectile: net.minecraft.world.entity.projectile.Projectile,
+    ): Boolean = withShield(entity) { shield, wand ->
+        shield.absorbVanillaProjectile(level, wand, entity, projectile)
+    }
+
     /** 按「主手 → 副手」找出带护盾的法杖，交给护盾自己判断；第一把说不挡就试下一把。 */
     private inline fun withShield(entity: LivingEntity, action: (EnergyShield, Wand) -> Boolean): Boolean {
         for (hand in HANDS) {

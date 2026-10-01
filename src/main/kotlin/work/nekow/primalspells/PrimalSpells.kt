@@ -11,6 +11,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.slf4j.Logger
 import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.TestDummyEntity
+import work.nekow.primalspells.event.ProjectileShieldHandler
 import work.nekow.primalspells.event.ShieldDummyCommand
 import work.nekow.primalspells.event.WandCommand
 import work.nekow.primalspells.event.WandEventHandler
@@ -40,6 +41,8 @@ import work.nekow.primalspells.wand.WandManager
 class PrimalSpells(bus: IEventBus, container: ModContainer) {
     init {
         NeoForge.EVENT_BUS.register(WandEventHandler)
+        // 原版投射物的护盾兜底（第 40 轮：护盾能防御/反弹箭矢、火球…）
+        NeoForge.EVENT_BUS.register(ProjectileShieldHandler)
         // 测试指令：/primalspells shielddummy [cards|clear]（详见类注释）
         NeoForge.EVENT_BUS.register(ShieldDummyCommand)
         NeoForge.EVENT_BUS.register(WandCommand)

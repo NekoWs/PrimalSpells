@@ -2,6 +2,19 @@ package work.nekow.primalspells.magic.modifier
 
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.projectile.FireworkRocketEntity
+import net.minecraft.world.entity.projectile.LlamaSpit
+import net.minecraft.world.entity.projectile.Projectile as VanillaProjectile
+import net.minecraft.world.entity.projectile.ShulkerBullet
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow
+import net.minecraft.world.entity.projectile.arrow.ThrownTrident
+import net.minecraft.world.entity.projectile.hurtingprojectile.DragonFireball
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball
+import net.minecraft.world.entity.projectile.hurtingprojectile.SmallFireball
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull
+import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.AbstractWindCharge
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
@@ -35,9 +48,12 @@ import kotlin.math.sqrt
  *      —— 用户口径「护盾防的是 DPS 而不是单次伤害，抗性改为在一段时间内可以承担的强度大小」；
  *   2. **法力**：预算内才轮到 `强度 ≤ R` 只付「基础反弹 MP」、`强度 > R` 付
  *      `基础反弹 + (强度 - R) × 每点额外`（超出部分封顶 2 × R，第 35 轮）。
- * - **挡不住 = 破口**（预算爆掉或法力不够）：这一发照常命中持有者，破口区在 [breachTicks] 内
- *   不挡任何东西，并常驻显示淡红色轮廓。破口区**就是碎裂的那一片**：
- *   投射物是「受击面板 + 相邻一圈」（**定向破口**），爆炸则是**所有被波及到的面板**（见下）。
+ * - **挡不住 = 破口**（预算爆掉或法力不够）：这一发照常命中持有者，破口区在 [breachTicksFor] 算出的
+ *   时长内不挡任何东西，并常驻显示淡红色轮廓（**这道红轮廓跟着持有者走**，第 40 轮口径）。
+ *   破口区**就是碎裂的那一片**：投射物是「受击面板 + 相邻一圈」（**定向破口**），
+ *   爆炸则是**所有被波及到的面板**（见下）。
+ * - **破口时长按"超出抗性多少"定**（第 40 轮）：`1 秒 + 超出每点 6 tick`，封顶 3 秒。
+ * - **原版投射物也算**（第 40 轮）：箭矢/三叉戟/火球/雪球/药水… 走同一套判定，挡下即**反弹**回去。
  * - **爆炸按影响范围选片**（第 39 轮）：面心到爆心 ≤ 爆炸半径的面板**全部**入选 ——
  *   半径 6 的核弹摆在壳外 3 格时 32 片全被波及（于是整罩碎裂）；抵扣成功时这些片**全亮一下玻璃**，
  *   挡不住时它们**全碎**（朝爆点的片白热、背对爆点的片暗一档）。
@@ -69,7 +85,7 @@ class EnergyShield : Modifier() {
     override val id = "energy_shield"
 
     /** 基础抗性：强度不超过它的攻击只付基础反弹 MP */
-    var baseResistance: Double = 2.0
+    var baseResistance: Double = 4.0
 
     /** 每张护盾卡额外提供的抗性（多张卡 = 更能扛连续低强度攻击） */
     var resistancePerCard: Double = 2.0
@@ -80,13 +96,19 @@ class EnergyShield : Modifier() {
     /** 强度超出抗性后，每一点额外消耗的 MP */
     var extraCostPerPoint: Double = 5.0
 
-    /** 打穿后的破口持续 tick（60 = 3 秒） */
-    var breachTicks: Int = 60
+    /** 破口的基础时长（tick）：20 = 1 秒。第 40 轮起按超出抗性的程度加长，见 [breachTicksFor] */
+    var baseBreachTicks: Int = 20
+
+    /** 破口时长：强度每超出抗性 1 点加这么多 tick（第 40 轮） */
+    var breachTicksPerPoint: Double = 6.0
+
+    /** 破口时长的上限（tick）：60 = 3 秒（原来的固定值，现在是最坏情况） */
+    var maxBreachTicks: Int = 60
 
     /**
      * 破口的面板下标（空 = 没有破口）。
      *
-     * 只在内存里：破口是 3 秒的瞬时状态，不值得进存档（也不该跨重登保留）。
+     * 只在内存里：破口是几秒的瞬时状态，不值得进存档（也不该跨重登保留）。
      */
     private val breachPanels = HashSet<Int>()
 
@@ -94,10 +116,11 @@ class EnergyShield : Modifier() {
     private var breachUntil = 0L
 
     /**
-     * 曾经**在壳外出现过**的投射物（`System.identityHashCode` → 最后一次在壳外出现的 gameTime）。
+     * 曾经**在壳外出现过**的投射物（身份键 → 最后一次在壳外出现的 gameTime）。
      *
-     * 键用身份哈希：`Magic` 只有法术名（`id: String`）没有实例级 UUID，同一种法术会有多份实例。
-     * 代价是对象被回收后哈希可能重复（概率极低），最坏情况是"某发生成在壳里的法术被误挡一次"。
+     * 键：自家法术用 `System.identityHashCode`（`Magic` 只有法术名 `id: String` 没有实例级 UUID），
+     * 原版投射物用实体网络 id。代价是对象被回收后哈希可能重复（概率极低），
+     * 最坏情况是"某发生成在壳里的法术被误挡一次"。
      *
      * 第 38 轮加：生存模式实测「持盾朝攻击者走过去会被打中，且法力不掉、护盾不展示」——
      * 因为球心跟着持有者走，**壳会"迎着"投射物扩张**，弹会在某一 tick 直接落到壳内，
@@ -113,10 +136,34 @@ class EnergyShield : Modifier() {
     /**
      * 当前是否处于破口状态。
      *
-     * 破口是**瞬时**状态（[breachTicks] 后自动消失），不进存档；这个只读口子给测试/调试用
-     * （录制流水线靠它断言「法力不足 → 打穿 + 破口」这一段真的发生了）。
+     * 破口是**瞬时**状态（[breachTicksFor] 决定的时长后自动消失），不进存档；这个只读口子给测试/调试用
+     * （录制流水线靠它断言「打穿 + 破口」那几段真的发生了）。
      */
-    val breached: Boolean get() = breachPanels.isNotEmpty()
+    val breached: Boolean get() = breachPanels.isEmpty().not()
+
+    /**
+     * 破口覆盖了**几块面板**（0 = 没破口）。
+     *
+     * 同样是给测试/调试用的只读口子：第 39/40 轮的表现口径是"爆炸**波及到的片全部**显示"，
+     * 而**像素判据量不出这件事** —— 32 片的点阵在共享顶点/棱处大量重叠（1056 个点只落在 ~420 个位置上），
+     * 所以"整罩"的粉色像素只有 7 片时的 ~1.7 倍，而不是 4 倍。判定直接问面板数才靠谱。
+     */
+    val breachPanelCount: Int get() = breachPanels.size
+
+    /**
+     * 一次「挡不住」开出的破口时长（第 40 轮用户口径：「破盾的冷却改为**根据超出抗性的部分**决定」）。
+     *
+     * `超出 = max(0, 强度 − 抗性)` → `基础 [baseBreachTicks] + 每点 [breachTicksPerPoint]`，
+     * 封顶 [maxBreachTicks]。抗性 6 时的刻度：箭矢/火球（强度 5~6，超出 0）→ **1 秒**；
+     * 强化火球（8，超出 2）→ **1.6 秒**；爆炸类（强度 60+，超出 50+）→ 吃满 **3 秒**。
+     *
+     * 注意用的是**这一发自己的强度**：窗口预算爆掉时也是这么算（那一发可能很弱，
+     * 破口就短）—— 用户口径说的是"超出抗性的部分"，不是"超出预算的部分"。
+     */
+    private fun breachTicksFor(strength: Double): Int {
+        val over = (strength - resistance()).coerceAtLeast(0.0)
+        return (baseBreachTicks + over * breachTicksPerPoint).toInt().coerceIn(baseBreachTicks, maxBreachTicks)
+    }
 
     // ---------------------------------------------------------------- DPS 预算（第 39 轮）
 
@@ -159,7 +206,7 @@ class EnergyShield : Modifier() {
      * 2. 预算内再看法力：付不起 [bounceCost] 同样挡不住（既有口径：法力不够 = 挡不住）；
      * 3. 都过了才记账 + 扣法力。
      *
-     * 破口期间不需要在这里排除：破口一开就 [breachTicks]（60 tick = 3 秒），
+     * 破口期间不需要在这里排除：破口一开就是 [breachTicksFor] 算出的时长（1~3 秒），
      * 那段时间整个格挡判定根本走不到这里。
      *
      * @return true = 这一发挡得住（已记账、已扣法力）
@@ -236,15 +283,24 @@ class EnergyShield : Modifier() {
         val level = holder.level() as? ServerLevel ?: return
         expireBreach(level.gameTime)
 
-        // 剪枝：场上没有投射物时不必做任何遍历
-        if (MagicManager.projectiles.isEmpty()) return
-
         val shellCenter = shellCenter(holder)
-        for (p in MagicManager.projectiles) {
-            if (!p.alive) continue
-            if (p.caster === holder) continue          // 自己施放的法术不弹（出生在面前，否则出生即被弹回）
-            if (p.maxHitTargets < 0) continue          // 穿透：完全无视护盾
-            tryBlock(level, holder, shellCenter, p)
+
+        // 自家法术：场上没有投射物就跳过这一段（剪枝）
+        if (MagicManager.projectiles.isNotEmpty()) {
+            for (p in MagicManager.projectiles) {
+                if (!p.alive) continue
+                if (p.caster === holder) continue      // 自己施放的法术不弹（出生在面前，否则出生即被弹回）
+                if (p.maxHitTargets < 0) continue      // 穿透：完全无视护盾
+                tryBlock(level, holder, shellCenter, p)
+            }
+        }
+
+        // 原版投射物（第 40 轮）：箭矢/三叉戟/火球/雪球/药水… 走同一套穿越判定与强度结算。
+        // 只在壳体周围一圈内查询 —— 场上没有东西时这一句几乎不花钱（宽相位 AABB 查询）。
+        val reach = SHELL_RADIUS + VANILLA_SWEEP_RANGE
+        val box = AABB.ofSize(shellCenter, reach * 2.0, reach * 2.0, reach * 2.0)
+        for (p in level.getEntitiesOfClass(net.minecraft.world.entity.projectile.Projectile::class.java, box)) {
+            tryBlockVanilla(level, holder, shellCenter, p)
         }
     }
 
@@ -277,52 +333,147 @@ class EnergyShield : Modifier() {
      */
     private fun tryBlock(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: Projectile): Boolean {
         if (p.hitRadius <= 0.0) return false          // 不碰撞实体的法术（爆炸点等）走爆炸那条路
-        val pos = p.status.pos
         // 本引擎的 `velocity` 就是「每 tick 位移」（`Move` 用它做位置积分），所以上一 tick 的位置
         // 恰好是 `pos - velocity`。用它拼出这一 tick 的位移线段 —— 不做扫掠就会漏掉单 tick
         // 位移超过壳厚度的法术（laser 5 格/tick）。
-        val prev = Vector3f(pos).sub(p.status.velocity)
+        val velocity = p.status.velocity
+        val hit = resolveIncoming(
+            level, holder, shellCenter, p.status.pos, velocity,
+            System.identityHashCode(p), strengthOf(p),
+        ) ?: return false
+
+        // 挡下了：以壳面法线反射，并把投射物推到壳外 0.05 格（下一 tick 必然离开判定面）
+        val speed = velocity.length()
+        velocity.normalize().reflect(hit.normal).mul(speed)
+        p.status.pos = Vector3f(hit.normal).mul(0.05f).add(hit.point)
+        return true
+    }
+
+    /**
+     * 对**一枚原版投射物**做一次格挡判定（第 40 轮用户口径：「护盾能够防御/反弹原版的投射物」）。
+     *
+     * 规则与自家法术**完全同一套**（同一条穿越判定、同一套强度/预算/法力/破口），差别只有两点：
+     * 强度取自 [vanillaStrength] 的档位表，反弹要用原版的 `deltaMovement` + 归属（[reflectVanilla]）。
+     * 所以「打上来的箭会被弹回去、还可能打回射手」是同一个口径的自然结果。
+     *
+     * @return true = 已格挡（调用方应取消这次命中）；false = 不归护盾管 / 挡不住
+     */
+    private fun tryBlockVanilla(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: VanillaProjectile): Boolean {
+        val strength = vanillaStrength(p) ?: return false           // 钓钩、末影之眼…护盾不管
+        val owner = p.owner
+        if (owner === holder) return false                          // 自己的弹不弹（弓、药水）
+        if (owner != null && holder.isAlliedTo(owner)) return false // 队友 / 自己宠物的不弹
+
+        val velocity = p.deltaMovement
+        val hit = resolveIncoming(
+            level, holder, shellCenter,
+            Vector3f(p.x.toFloat(), p.y.toFloat(), p.z.toFloat()),
+            Vector3f(velocity.x.toFloat(), velocity.y.toFloat(), velocity.z.toFloat()),
+            p.id, strength,
+        ) ?: return false
+        reflectVanilla(p, hit, holder)
+        return true
+    }
+
+    /**
+     * 把原版投射物**反弹**回去：速度按壳面法线镜像、大小不变，位置推到壳外一点，
+     * 并把归属改成持有者 —— 于是它再也打不到持有者，却能打回原来的射手。
+     *
+     * `needsSync = true` 是必须的：速度是服务端权威字段，不置这一位客户端看不到反弹。
+     */
+    private fun reflectVanilla(p: VanillaProjectile, hit: ShellHit, holder: Entity) {
+        val velocity = p.deltaMovement
+        val speed = velocity.length()
+        if (speed > 1e-6) {
+            // MC 的 `Vec3` 没有 reflect：自己按「v − 2(v·n)n」做镜像（与自家法术的 JOML reflect 同义）
+            val n = hit.normal.toVec3()
+            val unit = velocity.normalize()
+            p.deltaMovement = unit.subtract(n.scale(2.0 * unit.dot(n))).scale(speed)
+        }
+        p.setPos(hit.point.x + hit.normal.x * 0.1, hit.point.y + hit.normal.y * 0.1, hit.point.z + hit.normal.z * 0.1)
+        p.owner = holder
+        p.needsSync = true
+    }
+
+    /**
+     * **原版投射物的命中兜底**（`ProjectileImpactEvent` → `ShieldGuard.absorbVanillaProjectile`）。
+     *
+     * 为什么需要它：原版箭矢 3 格/tick、火球更快，而扫场跑在持有者的实体 tick 里 ——
+     * 弹可能在同一 tick 内就贴到身上（与自家 `laser` 是同一个理由，见 [absorbProjectile]）。
+     *
+     * @return true = 已格挡（调用方取消这次命中；投射物已被反弹）
+     */
+    fun absorbVanillaProjectile(level: ServerLevel, wand: Wand, holder: Entity, projectile: VanillaProjectile): Boolean {
+        if (wand.loadedMagics.firstOrNull { it is EnergyShield } !== this) return false
+        if (!holder.isAlive) return false
+        this.wand = wand
+        expireBreach(level.gameTime)
+        return tryBlockVanilla(level, holder, shellCenter(holder), projectile)
+    }
+
+    /** 挡下时的壳面进入点与法线（调用方据此做自己的那套反射）。 */
+    private class ShellHit(val point: Vector3f, val normal: Vector3f)
+
+    /**
+     * 一次格挡判定的**公共部分** —— 自家法术（[tryBlock]）与原版投射物（[tryBlockVanilla]）共用。
+     *
+     * 只做与"是什么弹"无关的事：穿越判定 → 破口方向检查 → 强度结算 → 破口或玻璃。
+     * 反射交给调用方（自家的弹是 `status.pos/velocity`，原版是 `deltaMovement` + 归属）。
+     *
+     * @param identity [seenOutside] 的身份键：自家法术没有实例 UUID 用 `identityHashCode`，
+     *   原版投射物直接用实体网络 id（两套 id 的取值域几乎不重叠，撞了就最坏误挡一次）
+     * @return 挡下时的壳面进入点与法线；null = 不归护盾管，或挡不住（已开破口）
+     */
+    private fun resolveIncoming(
+        level: ServerLevel,
+        holder: Entity,
+        shellCenter: Vec3,
+        pos: Vector3f,
+        velocity: Vector3f,
+        identity: Int,
+        strength: Double,
+    ): ShellHit? {
+        val prev = Vector3f(pos).sub(velocity)
 
         // 先登记「这一 tick 它在壳外」——下一步就可能被壳"追上"而落到壳内
         val ex = pos.x - shellCenter.x
         val ey = pos.y - shellCenter.y
         val ez = pos.z - shellCenter.z
         if (ex * ex + ey * ey + ez * ez > SHELL_RADIUS * SHELL_RADIUS) {
-            seenOutside[System.identityHashCode(p)] = level.gameTime
+            seenOutside[identity] = level.gameTime
         }
         val stale = seenOutside.entries.iterator()
         while (stale.hasNext()) {
             if (level.gameTime - stale.next().value > seenOutsideTtl) stale.remove()
         }
 
-        val seen = System.identityHashCode(p) in seenOutside
-        val hitPoint = shellEntry(prev, pos, shellCenter, allowInsideStart = seen) ?: return false
+        val seen = identity in seenOutside
+        val hitPoint = shellEntry(prev, pos, shellCenter, allowInsideStart = seen) ?: return null
         val normal = Vector3f(hitPoint).sub(Vector3f(shellCenter.x.toFloat(), shellCenter.y.toFloat(), shellCenter.z.toFloat()))
-        if (normal.lengthSquared() < 1e-6f) return false
+        if (normal.lengthSquared() < 1e-6f) return null
         normal.normalize()
-        if (p.status.velocity.dot(normal) >= 0) return false   // 正在远离壳面：不是「打进来」
+        if (velocity.dot(normal) >= 0) return null             // 正在远离壳面：不是「打进来」
 
-        val panelIndex = nearestPanelIndex(Vec3(normal.x.toDouble(), normal.y.toDouble(), normal.z.toDouble())) ?: return false
-        if (panelIndex in breachPanels) return false           // 破口方向：直接放行（连 MP 都不花）
+        val panelIndex = nearestPanelIndex(normal.toVec3()) ?: return null
+        if (panelIndex in breachPanels) return null            // 破口方向：直接放行（连 MP 都不花）
 
-        val strength = strengthOf(p)
         if (!payForBlock(level.gameTime, strength)) {
-            // 挡不住（窗口预算爆掉 / 法力不够）：投射物照常飞（一行都不改），护盾这边付出破口
-            openBreach(level, holder, breachArea(panelIndex))
-            return false
+            // 挡不住（窗口预算爆掉 / 法力不够）：弹照常飞（一行都不改），护盾这边付出破口
+            openBreach(level, holder, breachArea(panelIndex), strength)
+            return null
         }
 
-        // 挡下了：以壳面法线反射，并把投射物推到壳外 0.05 格（下一 tick 必然离开判定面）
-        val speed = p.status.velocity.length()
-        p.status.velocity.normalize().reflect(normal).mul(speed)
-        p.status.pos = Vector3f(normal).mul(0.05f).add(hitPoint)
+        // 挡下了：受击那块面板亮一下（玻璃是"盖章"式的，不跟人 —— 见第 36 轮口径）
         spawnGlassPanels(
             level, holder, listOf(panelIndex),
             edgeColor = GLASS_EDGE_COLOR, edgeScale = GLASS_EDGE_SCALE,
             withFill = true, holdTicks = HIT_HOLD_TICKS, fadeTicks = HIT_FADE_TICKS,
         )
-        return true
+        return ShellHit(hitPoint, normal)
     }
+
+    /** JOML → MC 的向量转换（壳面法线两种库都要用：反射用 JOML，原版的 `move`/`reflect` 用 `Vec3`）。 */
+    private fun Vector3f.toVec3(): Vec3 = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
 
     /**
      * **替持有者吃掉一次爆炸**（`ShieldGuard` 在 `Explosion` 结算伤害前调用）。
@@ -357,7 +508,7 @@ class EnergyShield : Modifier() {
         val strength = falloffDamage * radius
         val panels = blastPanels(toBlast, radius)
         if (!payForBlock(level.gameTime, strength)) {
-            openBlastBreach(level, holder, panels, toBlast)
+            openBlastBreach(level, holder, panels, toBlast, strength)
             return false
         }
         // 挡下了：波及到的片**全部出玻璃**（这就是「护盾遇到爆炸」看得见的那一下）
@@ -388,6 +539,32 @@ class EnergyShield : Modifier() {
                 p.status.explosionRadius.coerceAtLeast(0f)
         }
         return strength
+    }
+
+    /**
+     * **原版投射物**的强度（第 40 轮）：只认"真会打人"的那些，其余（钓钩、末影之眼…）返回 `null` = 护盾不管。
+     *
+     * - **箭矢 / 光谱箭**：`速度 × 2` —— 原版箭伤就是 `ceil(速度 × baseDamage)`，而 `baseDamage` 默认 **2.0**
+     *   （`AbstractArrow.baseDamage` 是私有的、只有 `setBaseDamage`，所以这里按默认值估）；
+     * - **三叉戟**：同一条速度公式，但原版基准是 8 → 用 [TRIDENT_DAMAGE_PER_SPEED]；
+     * - **火球 / 骷髅头 / 风弹…**：直接取原版代码里的直击伤害（`SmallFireball` 5、`WitherSkull` 8…），
+     *   大火的爆炸威力按一档估（`LargeFireball` 12）；
+     * - **雪球 / 鸡蛋 / 药水**这类投掷物：**0** —— 挡下来只花基础 5 MP，但**值得挡**（比如伤害药水）；
+     * - 没列出来的原版投射物一律不管（`else -> null`），免得"一个钓钩飞过来也要扣蓝"。
+     */
+    private fun vanillaStrength(p: VanillaProjectile): Double? = when (p) {
+        is ThrownTrident -> p.deltaMovement.length() * TRIDENT_DAMAGE_PER_SPEED
+        is AbstractArrow -> p.deltaMovement.length() * ARROW_DAMAGE_PER_SPEED
+        is SmallFireball -> 5.0
+        is WitherSkull -> 8.0
+        is LargeFireball -> 12.0
+        is DragonFireball -> 6.0
+        is AbstractWindCharge -> 2.0
+        is ShulkerBullet -> 4.0
+        is LlamaSpit -> 1.0
+        is FireworkRocketEntity -> 4.0
+        is ThrowableItemProjectile -> 0.0
+        else -> null
     }
 
     /**
@@ -529,17 +706,19 @@ class EnergyShield : Modifier() {
     // ---------------------------------------------------------------- 玻璃表现（第 23 轮，第 26 轮改口径）
 
     /**
-     * **打穿**（投射物路径）：把 [panels] 定为破口，碎裂时每片沿自己法线向外飘。
+     * **打穿**（投射物 / 原版投射物路径）：把 [panels] 定为破口，碎裂时每片沿自己法线向外飘。
+     *
+     * @param strength 这一发的强度 —— 破口时长由它超出抗性的程度决定（[breachTicksFor]）
      */
-    private fun openBreach(level: ServerLevel, holder: Entity, panels: List<Int>) {
-        markBreach(level, panels)
+    private fun openBreach(level: ServerLevel, holder: Entity, panels: List<Int>, strength: Double) {
+        val ticks = markBreach(level, panels, strength)
         spawnGlassPanels(
             level, holder, panels,
             edgeColor = GLASS_SHATTER_COLOR, edgeScale = GLASS_EDGE_SCALE,
             withFill = true, holdTicks = SHATTER_HOLD_TICKS, fadeTicks = SHATTER_FADE_TICKS,
             driftOf = panelNormalDrift,
         )
-        spawnBreachOutline(level, holder, panels)
+        spawnBreachOutline(level, holder, panels, ticks)
     }
 
     /**
@@ -548,8 +727,8 @@ class EnergyShield : Modifier() {
      *
      * 两批碎裂共用同一个方向向量 ⇒ 各占 1 个 PD 组，加上轮廓一共 3 个组（见 [spawnGlassPanels]）。
      */
-    private fun openBlastBreach(level: ServerLevel, holder: Entity, panels: BlastPanels, toBlast: Vec3) {
-        markBreach(level, panels.all)
+    private fun openBlastBreach(level: ServerLevel, holder: Entity, panels: BlastPanels, toBlast: Vec3, strength: Double) {
+        val ticks = markBreach(level, panels.all, strength)
         val drift = blastDrift(toBlast)
         spawnGlassPanels(
             level, holder, panels.facing,
@@ -563,23 +742,35 @@ class EnergyShield : Modifier() {
             withFill = true, holdTicks = SHATTER_HOLD_TICKS, fadeTicks = SHATTER_FADE_TICKS,
             driftOf = drift, fillColor = GLASS_BACK_FILL_COLOR,
         )
-        spawnBreachOutline(level, holder, panels.all)
+        spawnBreachOutline(level, holder, panels.all, ticks)
     }
 
-    /** 破口（玩法）：[panels] 这 [breachTicks] 内置为「不格挡」，并记下到期时间。 */
-    private fun markBreach(level: ServerLevel, panels: List<Int>) {
+    /**
+     * 破口（玩法）：[panels] 在 [breachTicksFor] 算出的时长内置为「不格挡」，并记下到期时间。
+     *
+     * @return 这次破口的时长（tick），破口轮廓的演出要跟它对齐
+     */
+    private fun markBreach(level: ServerLevel, panels: List<Int>, strength: Double): Int {
+        val ticks = breachTicksFor(strength)
         breachPanels.clear()
         breachPanels += panels
-        breachUntil = level.gameTime + breachTicks
+        breachUntil = level.gameTime + ticks
+        return ticks
     }
 
-    /** 破口轮廓：常驻整段破口期（最后 [BREACH_OUTLINE_FADE_TICKS] tick 淡出）的淡红提示线。 */
-    private fun spawnBreachOutline(level: ServerLevel, holder: Entity, panels: List<Int>) {
+    /**
+     * 破口轮廓：常驻整段破口期（最后 [BREACH_OUTLINE_FADE_TICKS] tick 淡出）的淡红提示线。
+     *
+     * **它跟随持有者移动**（第 40 轮用户口径：「修改红色的破盾视觉，跟随着被破盾的护盾持有者移动」）：
+     * 判定跟着玩家走，破口的方向也是相对玩家算的 —— 红色轮廓留在原地就会与真正的破口错位。
+     * 白色的碎片与格挡玻璃仍然是"盖章"式的（第 36 轮口径不变）。
+     */
+    private fun spawnBreachOutline(level: ServerLevel, holder: Entity, panels: List<Int>, ticks: Int) {
         spawnGlassPanels(
             level, holder, panels,
             edgeColor = BREACH_OUTLINE_COLOR, edgeScale = BREACH_OUTLINE_SCALE,
-            withFill = false, holdTicks = max(1, breachTicks - BREACH_OUTLINE_FADE_TICKS),
-            fadeTicks = BREACH_OUTLINE_FADE_TICKS,
+            withFill = false, holdTicks = max(1, ticks - BREACH_OUTLINE_FADE_TICKS),
+            fadeTicks = BREACH_OUTLINE_FADE_TICKS, follow = true,
         )
     }
 
@@ -594,6 +785,8 @@ class EnergyShield : Modifier() {
      *
      * @param driftOf 每块面板的飘散位移（`null` = 原地淡出）
      * @param fillColor 填充点的颜色（背对爆点那一批用更淡的）
+     * @param follow true = 这一批**跟着持有者移动**（破口轮廓用，见 [spawnBreachOutline]）；
+     *   false（默认）= 画在生成处不动（第 36 轮口径：碎片盖章）
      */
     private fun spawnGlassPanels(
         level: ServerLevel,
@@ -606,15 +799,18 @@ class EnergyShield : Modifier() {
         fadeTicks: Int,
         driftOf: (Polyhedra.Panel) -> Vec3? = { null },
         fillColor: Color = GLASS_FILL_COLOR,
+        follow: Boolean = false,
     ) {
         val manager = wand.pdParticles(level)
         val center = shellCenter(holder)
-        // ⚠️ 顺序：**先建组再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
-        // 反算相对偏移（第 13 轮踩过）；成员用**相对球心**的偏移（`offsetFromPivot`），于是形状刚性。
-        // 第 36 轮口径：**面板画在生成处就不再动**（不调 `followEntity`）—— 判定跟着玩家，
-        // 所以下一次受击会在玩家**当时的位置**新画一批碎片，旧的那批留在原地看着「掉队」。
+        val lift = Vec3(0.0, shellCenterOffset(holder), 0.0)
+        // ⚠️ 顺序：**先建组（含 followEntity）再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
+        // 反算相对偏移（第 13 轮踩过：`followEntity` 会顺手改那个 pivot 字段）。
+        // 成员用**相对球心**的偏移（`offsetFromPivot`），而 followEntity 的偏移量正好是"脚底 → 球心"，
+        // 两者同源 ⇒ 形状刚性、跟着人走时不会错位。
         for ((drift, batch) in panelIndices.mapNotNull { shieldPanels.getOrNull(it) }.groupBy(driftOf)) {
             val group = manager.createGroup(center)
+            if (follow) group.followEntity(holder.uuid, lift)
             for (panel in batch) {
                 for (offset in panel.ring) {
                     manager.create()
@@ -676,7 +872,8 @@ class EnergyShield : Modifier() {
         lore(Lore.RESISTANCE_BUDGET, Lore.formatDouble((baseResistance + resistancePerCard) * RESISTANCE_BUDGET_RATIO))
         lore(Lore.BOUNCE_COST, Lore.formatDouble(baseBounceCost))
         lore(Lore.EXTRA_COST, Lore.formatDouble(extraCostPerPoint))
-        lore(Lore.BREACH, (breachTicks / 20).toString())
+        // 破口时长现在是「随超出抗性的程度」在 1 秒 ~ 3 秒之间（第 40 轮）
+        lore(Lore.BREACH, "${baseBreachTicks / 20}~${maxBreachTicks / 20}")
     }
 
     companion object {
@@ -684,6 +881,15 @@ class EnergyShield : Modifier() {
 
         /** 球壳半径（方块）：既是表现面，也是**格挡判定面**与「壳内侧」的界线 */
         private const val SHELL_RADIUS = 1.7
+
+        /** 原版投射物的搜索范围（方块）：以球心为中心、`SHELL_RADIUS + 本值` 的立方体内查实体 */
+        private const val VANILLA_SWEEP_RANGE = 4.0
+
+        /** 原版箭矢的伤害系数：`AbstractArrow.baseDamage` 默认 2.0（私有字段，只有 setter，故按默认值估） */
+        private const val ARROW_DAMAGE_PER_SPEED = 2.0
+
+        /** 原版三叉戟的伤害系数：`ThrownTrident` 的基准伤害是 8（同一条 `速度 × 系数` 公式） */
+        private const val TRIDENT_DAMAGE_PER_SPEED = 8.0
 
         /** 超出抗性的部分最多按「抗性的这个倍数」计费（第 35 轮封顶，用户口径 = 2） */
         private const val MAX_EXTRA_RESISTANCE_RATIO = 2.0
@@ -744,7 +950,7 @@ class EnergyShield : Modifier() {
         private const val SHATTER_FADE_TICKS = 12
         private const val SHATTER_DRIFT = 0.35
 
-        /** **破口轮廓**：常驻整段破口期，最后这点时间用来淡出（时长由 [breachTicks] 决定） */
+        /** **破口轮廓**：常驻整段破口期，最后这点时间用来淡出（时长由 [breachTicksFor] 决定） */
         private const val BREACH_OUTLINE_FADE_TICKS = 6
 
         /** 格挡那块玻璃的亮边：**接近白**（冷白）—— 实机反馈「击中要变白」 */

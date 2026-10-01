@@ -3,7 +3,9 @@ package work.nekow.primalspells.client.capture
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.DyeColor
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.projectile.arrow.Arrow
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.DamageNumber
@@ -210,18 +212,24 @@ object CaptureScenes {
      * `p.caster === player` 排除），拿一根只装火球的法杖，站在 +X 方向 5.5 格外平射 ——
      * 走真实施法路径，护盾走真实弹开路径。被动驱动走真实路径：`Wand.tick(caster, level)`。
      *
+     * 攻击者用的是**强化火球**（`damage_boost` + `fireball` = 强度 8）：抗性 6 之下，单发落在预算内、
+     * 同一个 20 tick 窗口里的第二发才会超预算 —— 这正是"防 DPS"要演示的刻度。
+     *
      * 时间线（tick）：
      * ```
      *  0-19   静止：屏幕上应当**一个粒子都没有**（护盾平时不可见）
-     * 22/48/74/100  四次点射（间隔 26 > 20 tick 窗口）：每一发都**单独**落在预算内 → 挡下、各付 10 MP
-     * 134/146        两发火球落在**同一个 20 tick 窗口**里：累计 10 > 预算 8 → 挡不住
-     *                ← 法力充足，所以这一条证明破口来自「窗口预算」而不是「没蓝」（第 39 轮新口径）
-     * 226    激光：先把法力压到 4（付不起基础 5 MP）→ 打穿（这一发只能靠**命中兜底**拦到）
-     * 292    小额爆炸（离持有者 5.75 格，强度 ≤ 6）：抵扣成功 → **波及到的片全部出玻璃**
-     * 302    把持有者挪走 3 格（判定应当跟着人）
-     * 308    大爆（摆在**旧球心**处 = 新位置外侧 3 格）：整罩被波及 → 32 片全碎 + 破口
+     * 22/48/74/100  四次点射（间隔 26 > 20 tick 窗口）：每一发都**单独**落在预算内 → 挡下、各付 15 MP
+     * 134/146        两发落在**同一个 20 tick 窗口**里：累计 16 > 预算 12 → 挡不住（破口 32 tick）
+     *                ← 法力充足，所以这一条证明破口来自「窗口预算」而不是「没蓝」（第 39 轮口径）
+     * 206    激光：先把法力压到 4（付不起基础 5 MP）→ 打穿（这一发只能靠**命中兜底**拦到）；
+     *                强度 0.5 没超出抗性 ⇒ 破口只有基础 20 tick（第 40 轮：破口时长看超出多少）
+     * 234    **原版箭矢**（满蓄力、风速 3 ⇒ 强度 6）：应当被**反弹**回去（第 40 轮新增能力）
+     * 248    小额爆炸（离持有者 5.75 格，强度 ≤ 6）：抵扣成功 → **波及到的片全部出玻璃**
+     * 258    把持有者挪走 3 格（判定应当跟着人）
+     * 264    大爆（摆在**旧球心**处 = 新位置外侧 3 格）：整罩被波及 → 32 片全碎 + 破口吃到 3 秒上限
+     * 280    破口期内再走 3 格：**粉色轮廓跟着人走**（白色碎片留在原地）—— 靠帧目视确认
      *        ← 若判定没跟着玩家，爆点会落在旧壳**内部** → 护盾根本不触发，所以这条能证明判定跟人
-     * 374    破口到期（368）→ 粒子清零
+     * 347    破口到期 → 粒子清零
      * ```
      */
     private fun energyShield(): Scene = run {
@@ -232,6 +240,8 @@ object CaptureScenes {
         var shooterWand: Wand? = null
         var attacker: TestDummyEntity? = null
         var manaBeforeBlast = 0.0
+        var manaBeforeArrow = 0.0
+        var arrow: Arrow? = null
         Scene(
             name = name,
             title = "玻璃护盾：平时不可见 → 受击玻璃板 → 超预算挡不住 + 破口 → 爆炸把波及到的片全打碎",
@@ -272,8 +282,11 @@ object CaptureScenes {
                 guardDummy.setItemInHand(InteractionHand.MAIN_HAND, stack)
                 // 攻击者：+X 方向 5.5 格，yaw=90 → 朝 -X 正对护盾持有者
                 attacker = ctx.spawnDummy(CX + 5.5, floorY + 1.0, CZ + 0.5, yaw = 90f)
+                // 强化火球（强度 5 + 3 = 8）：抗性 6 之下"单发挡得住、同窗口第二发超预算"才成立
+                val boost = MagicManager.create("damage_boost")!!
                 val bolt = MagicManager.create("fireball")!!
                 val sw = Wand("capture-shooter").also {
+                    it.magics += boost
                     it.magics += bolt
                     it.load()
                     it.status.mana = 1000.0
@@ -323,8 +336,13 @@ object CaptureScenes {
                     MagicManager.projectiles.forEach { it.alive = false }
                 }
                 if (t == SHIELD_REFILL_AT) {
-                    // 小额爆炸那一段要在"付得起"的前提下验证抵扣，所以先把法力补回来
+                    // 箭矢 / 小额爆炸那两段要在"付得起"的前提下验证格挡，所以先把法力补回来
                     w.status.mana = SHIELD_REFILL_MANA
+                }
+                // ---- 原版投射物（第 40 轮）：满蓄力箭矢从壳外 4 格射来 ⇒ 应当被弹回去 ----
+                if (t == SHIELD_ARROW_AT) {
+                    manaBeforeArrow = w.status.mana
+                    arrow = vanillaArrow(ctx, atk, h)
                 }
                 if (t == SHIELD_SMALL_BLAST_AT) {
                     // 小额爆炸：摆在 5.75 格外 ⇒ 强度 = 144 × (1 − d/6) ≤ 6，落在「抗性 4 < 强度 ≤ 预算 8」里
@@ -338,6 +356,13 @@ object CaptureScenes {
                     h.setPos(pos.x + SHIELD_MOVE_DISTANCE, pos.y, pos.z)
                     h.setOldPosAndRot()
                     ctx.log("holder moved +$SHIELD_MOVE_DISTANCE → ${h.position()}")
+                }
+                if (t == SHIELD_WALK_AT) {
+                    // 破口（264 那次，60 tick）还没到期：挪一步看红色轮廓跟不跟人
+                    val pos = h.position()
+                    h.setPos(pos.x, pos.y, pos.z + SHIELD_WALK_DISTANCE)
+                    h.setOldPosAndRot()
+                    ctx.log("holder walked +Z$SHIELD_WALK_DISTANCE during breach → ${h.position()}（红色轮廓应当跟着走）")
                 }
                 if (t == SHIELD_BIG_BLAST_AT) {
                     // 爆点摆在**旧球心**处：对挪走后的持有者来说它在 3 格外（壳外 ⇒ 触发），
@@ -370,23 +395,35 @@ object CaptureScenes {
                         ),
                     )
                     SHIELD_SHOT_D + SHIELD_HIT_SETTLE -> listOf(
-                        // 四次点射都落在抗性之外一点点：每次 10 MP（基础 5 + 超出 1 点 × 5）。
+                        // 四次点射（强化火球 = 强度 8）：每次 15 MP（基础 5 + 超出 2 点 × 5）。
                         // 间隔 26 tick > 窗口 20 ⇒ 每一发都是"窗口里唯一那一发" ⇒ 全都挡得住
                         Check(
                             name, t, "hits-blocked",
-                            s != null && !s.breached && w != null && w.status.mana <= SHIELD_START_MANA - 35.0,
-                            "breached=${s?.breached} mana=${w?.status?.mana}（四次挡下应 = ${SHIELD_START_MANA - 40}）",
+                            s != null && !s.breached && w != null && w.status.mana <= SHIELD_START_MANA - 55.0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}（四次挡下应 = ${SHIELD_START_MANA - 60}）",
                         ),
                     )
                     SHIELD_PAIR_B + SHIELD_HIT_SETTLE -> listOf(
-                        // 第 39 轮的核心断言：两发落在同一个窗口里 ⇒ 累计强度 10 > 预算 8 ⇒ 挡不住。
+                        // 第 39 轮的核心断言：两发落在同一个窗口里 ⇒ 累计强度 16 > 预算 12 ⇒ 挡不住。
                         // 关键在 mana：它还几乎是满的（只花了 5 发的钱）⇒ 破口**不是**"没蓝"造成的
                         Check(
                             name, t, "budget-breach",
                             s != null && s.breached && w != null &&
-                                w.status.mana >= SHIELD_START_MANA - 60.0 && damageNumbers(ctx, holder) > 0,
-                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 60}）" +
+                                w.status.mana >= SHIELD_START_MANA - 90.0 && damageNumbers(ctx, holder) > 0,
+                            "breached=${s?.breached} mana=${w?.status?.mana}（应仍 ≥${SHIELD_START_MANA - 90}）" +
                                 " 伤害数字=${damageNumbers(ctx, holder)}",
+                        ),
+                    )
+                    SHIELD_ARROW_AT + SHIELD_ARROW_SETTLE -> listOf(
+                        // 第 40 轮：**原版箭矢**被挡下并**弹回去** —— 护盾付了基础 5 MP，
+                        // 而箭最后停在壳外（若它穿过去命中持有者，会插在持有者身上、x 不会超过壳）
+                        Check(
+                            name, t, "vanilla-arrow-reflected",
+                            arrow != null && w != null &&
+                                w.status.mana <= manaBeforeArrow - 4.0 &&
+                                arrow.x > (holder?.x ?: 0.0) + 1.0,
+                            "mana=${w?.status?.mana}（应 = ${manaBeforeArrow - 5}）" +
+                                " 箭 x=${arrow?.x}（持有者 x=${holder?.x}）",
                         ),
                     )
                     SHIELD_LASER_AT + 8 -> listOf(
@@ -398,9 +435,15 @@ object CaptureScenes {
                                 w.status.mana >= SHIELD_LOW_MANA - 0.5 && damageNumbers(ctx, holder) > 0,
                             "breached=${s?.breached} mana=${w?.status?.mana} 伤害数字=${damageNumbers(ctx, holder)}",
                         ),
+                        // 破口区 = 受击面板 + 相邻一圈 ⇒ 7 片（五边形受击时 6 片）
+                        Check(
+                            name, t, "breach-area-one-ring",
+                            s != null && s.breachPanelCount in 6..7,
+                            "破口面板数=${s?.breachPanelCount}（受击面板 + 相邻一圈）",
+                        ),
                     )
                     SHIELD_SMALL_BLAST_AT + SHIELD_ANCHOR_SETTLE -> listOf(
-                        // 小额爆炸被抵扣：法力掉 5~15（强度 ≤6）且**没有**破口 ——
+                        // 小额爆炸被抵扣：强度 ≈6 在抗性 6 以内 ⇒ 只付基础 5 MP、**没有**破口 ——
                         // 也就是说这一发只是把「波及到的片」全亮了一下（第 39 轮的表现口径）
                         Check(
                             name, t, "small-blast-absorbed",
@@ -416,6 +459,12 @@ object CaptureScenes {
                             name, t, "blast-triggers-after-move",
                             s != null && s.breached,
                             "breached=${s?.breached}（爆点在旧球心：触发 = 判定确实跟着玩家）",
+                        ),
+                        // 第 39 轮的"波及到的片全部显示"：半径 6 的爆炸摆在壳外 3 格 ⇒ **32 片全部**入选
+                        Check(
+                            name, t, "blast-reaches-all-panels",
+                            s != null && s.breachPanelCount == 32,
+                            "破口面板数=${s?.breachPanelCount}（整罩 32 片全被波及；像素判据量不出这件事）",
                         ),
                     )
                     SHIELD_SCENE_TICKS - 3 -> listOf(
@@ -455,6 +504,26 @@ object CaptureScenes {
     private fun damageNumbers(ctx: CaptureDriver.SceneCtx, holder: TestDummyEntity?): Int {
         val h = holder ?: return 0
         return ctx.level.getEntitiesOfClass(DamageNumber::class.java, h.boundingBox.inflate(8.0)).size
+    }
+
+    /**
+     * 从壳外 4 格朝持有者射一支**原版箭矢**（第 40 轮：护盾要能防御/反弹原版投射物）。
+     *
+     * 用真实的 `Arrow` 实体 + `shoot(power = 3)`（满蓄力速度 3 格/tick）走原版投射物路径：
+     * 强度 = 速度 × 2 = **6**（原版箭伤公式），抗性 6 ⇒ 只付基础 5 MP。
+     * 归属设成攻击者 —— 这样"自己的弹不弹"这条规则不会被这条断言绕过。
+     */
+    private fun vanillaArrow(ctx: CaptureDriver.SceneCtx, shooter: TestDummyEntity, holder: TestDummyEntity): Arrow {
+        val floorY = ctx.floorBlockY(CX, CZ)
+        val from = Vector3f(CX + 4.5f, floorY + 2.0f, CZ + 0.5f)
+        val aim = Vector3f(holder.x.toFloat(), floorY + 2.0f, CZ + 0.5f)
+        val arrow = Arrow(ctx.level, from.x.toDouble(), from.y.toDouble(), from.z.toDouble(), ItemStack(Items.ARROW), null)
+        arrow.owner = shooter
+        val dir = aim.sub(from).normalize()
+        arrow.shoot(dir.x.toDouble(), dir.y.toDouble(), dir.z.toDouble(), SHIELD_ARROW_SPEED, 0.0f)
+        ctx.level.addFreshEntity(arrow)
+        ctx.log("vanilla arrow fired: from=$from → holder=${holder.position()}")
+        return arrow
     }
 
     /**
@@ -577,32 +646,46 @@ object CaptureScenes {
     private const val EXPLOSION_RADIUS = 6.0f
 
     /**
-     * 护盾场景总长（tick）：静止 20 + 四次点射 + 窗口内连挨两发 + 法力不足 + 小爆 + 挪位 + 大爆 + 破口 + 余量。
+     * 护盾场景总长（tick）：静止 20 + 四次点射 + 窗口内连挨两发 + 法力不足 + 原版箭矢 + 小爆 + 挪位 + 大爆 + 余量。
      *
-     * ⚠️ 末尾留 **22 tick** 余量（大爆的破口轮廓在 `T+65` 才被 PD 销毁：54 停留 + 6 淡出 + 5 余量，
-     * 而收尾断言 `pd-particles-zero` 在倒数第 3 帧）—— 余量给少了这条断言就会和销毁时点抢跑。
+     * ⚠️ 末尾留 **20 tick** 余量：大爆的破口轮廓在 `T + 54 停留 + 6 淡出 + 5 余量 = T+65` 才被 PD 销毁，
+     * 而收尾断言 `pd-particles-zero` 在倒数第 3 帧 —— 余量给少了这条断言就会和销毁时点抢跑。
      */
-    private const val SHIELD_SCENE_TICKS = 390
+    private const val SHIELD_SCENE_TICKS = 350
 
-    /** 补满法力（小额爆炸那一段要在"付得起"的前提下验证抵扣） */
-    private const val SHIELD_REFILL_AT = 288
+    /** 补满法力（原版箭矢 / 小额爆炸那两段要在"付得起"的前提下验证格挡） */
+    private const val SHIELD_REFILL_AT = 230
     private const val SHIELD_REFILL_MANA = 3000.0
+
+    /**
+     * 破口还没到期时把持有者往 +Z 挪 3 格：**粉色破口轮廓应当跟着人走**、白色碎片留在原地（第 40 轮口径）。
+     *
+     * ⚠️ 跟随是客户端 `followEntity` 的行为，服务端读不到渲染位置 ⇒ 这一条**没有自动断言**，
+     * 靠产物的帧目视确认（取 280 前后各一帧对比）。
+     */
+    private const val SHIELD_WALK_AT = 280
+    private const val SHIELD_WALK_DISTANCE = 3.0f
+
+    /** 原版箭矢：从壳外 4 格正对持有者射一支（满蓄力 = 速度 3 格/tick ⇒ 强度 = 速度 × 2 = 6） */
+    private const val SHIELD_ARROW_AT = 234
+    private const val SHIELD_ARROW_SPEED = 3.0f
+    private const val SHIELD_ARROW_SETTLE = 8
 
     /** 判定跟人的验证：把持有者往 +X 挪这么远，再把大爆摆在旧球心处 */
     private const val SHIELD_MOVE_DISTANCE = 3.0f
-    private const val SHIELD_MOVE_AT = 302
+    private const val SHIELD_MOVE_AT = 258
 
     /**
      * 小额爆炸（相对竞技场中心 CX 的偏移，木桩在 CX+0.5）：离持有者约 5.75 格 ⇒
-     * 衰减后伤害 = 24 × (1 − 5.75/6) ≈ 1、强度 = 强度 × 半径 6 ≤ **6** ⇒
-     * 落在「抗性 4 < 强度 ≤ 预算 8」这条带里 ⇒ 抵扣成功（付 5 + 2 点 × 5 ≈ 15 MP）。
+     * 衰减后伤害 = 24 × (1 − 5.75/6) ≈ 1、强度 = 衰减后伤害 × 半径 6 ≈ **6** ⇒
+     * 落在抗性 6 以内 ⇒ 抵扣成功（只付基础 5 MP）。
      */
     private const val SHIELD_SMALL_BLAST_OFFSET = -5.25f
-    private const val SHIELD_SMALL_BLAST_AT = 292
+    private const val SHIELD_SMALL_BLAST_AT = 248
 
-    /** 大爆：摆在**旧球心**处 —— 对挪走 3 格后的持有者来说它在壳外 3 格（强度 ≈60，必破） */
+    /** 大爆：摆在**旧球心**处 —— 对挪走 3 格后的持有者来说它在壳外 3 格（强度 ≈72，破口吃满上限 3 秒） */
     private const val SHIELD_BIG_BLAST_OFFSET = 0.5f
-    private const val SHIELD_BIG_BLAST_AT = 308
+    private const val SHIELD_BIG_BLAST_AT = 264
 
     /** 放弹到结算的间隔：触发即爆，留几 tick 余量 */
     private const val SHIELD_ANCHOR_SETTLE = 6
@@ -613,21 +696,21 @@ object CaptureScenes {
     /** 静止段（不挨打）：屏幕上应当一个粒子都没有 */
     private const val SHIELD_IDLE_END = 20
 
-    /** 四次点射的 tick：火球 `delay 4 / recharge 10` → 间隔取 26，保证每一发都单独落在一个窗口里 */
+    /** 四次点射的 tick：火球 `delay 4 / recharge 10`（强化再 +2）→ 间隔取 26，每发都单独落在一个窗口里 */
     private const val SHIELD_SHOT_A = 22
     private const val SHIELD_SHOT_B = 48
     private const val SHIELD_SHOT_C = 74
     private const val SHIELD_SHOT_D = 100
 
-    /** 窗口内连挨两发（间隔 12 = recharge）：累计强度 10 > 预算 8 ⇒ 第二发挡不住 */
+    /** 窗口内连挨两发（间隔 12）：累计强度 16 > 预算 12 ⇒ 挡不住（破口 = 20 + 超出 2 点 × 6 = 32 tick） */
     private const val SHIELD_PAIR_A = 134
     private const val SHIELD_PAIR_B = 146
 
     /** 把法力压到付不起基础 5 MP（并收掉残余火球，让破口窗口里只剩红色轮廓） */
-    private const val SHIELD_LOW_MANA_AT = 220
+    private const val SHIELD_LOW_MANA_AT = 200
 
     /** 激光：5 格/tick 的高速法术只能靠「命中兜底」拦下（第 26 轮回归） */
-    private const val SHIELD_LASER_AT = 226
+    private const val SHIELD_LASER_AT = 206
 
     /** 测试台法力：满池起步；配合 `charge = 0`（关掉 1000/s 的回复）才能逼出「法力不足」 */
     private const val SHIELD_START_MANA = 3000.0

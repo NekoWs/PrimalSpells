@@ -188,7 +188,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 逐粒子贴图 / 子矩形 UV | `Builder.texture(name)` / `.uv(u0,v0,u1,v1)`（或 `.visual(ParticleVisual().uv(...))`） |
 | 拉长的丝线 | `anisoWorld(长, 粗)`（**世界格数**）+ `alignTo(from, to)`（长轴对齐到线段）+ `billboard(false)` |
 | 一条折线一个调用 | `Draw.polyline(points, thickness, taper, texture, additive, glowing, colorFn, …)` —— **每段一颗粒子**，内部自动 `anisoWorld(段长, 粗)` + `alignTo`；`taper = true` 时自动用 `LINE` 贴图并两端收细 |
-| 发光溢出 | `additive(true)`（加色）+ `glowing(true)`（全亮不受光照） |
+| 发光溢出 | `additive(true)`（加色）+ `glowing(true)`（全亮不受光照）—— **护盾玻璃在用**（第 41 轮：亮场景里靠色相与加色拉开对比度） |
 | 分批出现 | `Builder.delay(ticks)`，或 `Draw.*` 的 `stagger` |
 | 换外观 | **没有更新通道** → `remove()` 后重新生成 |
 

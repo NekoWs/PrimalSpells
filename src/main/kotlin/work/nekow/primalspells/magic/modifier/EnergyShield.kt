@@ -81,6 +81,23 @@ class EnergyShield : Modifier() {
     private var breachUntil = 0L
 
     /**
+     * 曾经**在壳外出现过**的投射物（`System.identityHashCode` → 最后一次在壳外出现的 gameTime）。
+     *
+     * 键用身份哈希：`Magic` 只有法术名（`id: String`）没有实例级 UUID，同一种法术会有多份实例。
+     * 代价是对象被回收后哈希可能重复（概率极低），最坏情况是"某发生成在壳里的法术被误挡一次"。
+     *
+     * 第 38 轮加：生存模式实测「持盾朝攻击者走过去会被打中，且法力不掉、护盾不展示」——
+     * 因为球心跟着持有者走，**壳会"迎着"投射物扩张**，弹会在某一 tick 直接落到壳内，
+     * 于是 [shellEntry] 的前提「起点在壳外」不成立 → 整发不挡。
+     * 有这张表就能区分两种情况：**壳追上来的弹**（曾在壳外）照挡；
+     * **本来就生成在壳里的法术**（从没在壳外出现过）仍然不挡（贴脸施法漏过去是设计）。
+     */
+    private val seenOutside = HashMap<Int, Long>()
+
+    /** 表项过期时长（tick）：20 秒没再在壳外出现就丢掉，避免只增不减。 */
+    private val seenOutsideTtl = 400L
+
+    /**
      * 当前是否处于破口状态。
      *
      * 破口是**瞬时**状态（[breachTicks] 后自动消失），不进存档；这个只读口子给测试/调试用
@@ -197,7 +214,20 @@ class EnergyShield : Modifier() {
         // 位移超过壳厚度的法术（laser 5 格/tick）。
         val prev = Vector3f(pos).sub(p.status.velocity)
 
-        val hitPoint = shellEntry(prev, pos, shellCenter) ?: return false
+        // 先登记「这一 tick 它在壳外」——下一步就可能被壳"追上"而落到壳内
+        val ex = pos.x - shellCenter.x
+        val ey = pos.y - shellCenter.y
+        val ez = pos.z - shellCenter.z
+        if (ex * ex + ey * ey + ez * ez > SHELL_RADIUS * SHELL_RADIUS) {
+            seenOutside[System.identityHashCode(p)] = level.gameTime
+        }
+        val stale = seenOutside.entries.iterator()
+        while (stale.hasNext()) {
+            if (level.gameTime - stale.next().value > seenOutsideTtl) stale.remove()
+        }
+
+        val seen = System.identityHashCode(p) in seenOutside
+        val hitPoint = shellEntry(prev, pos, shellCenter, allowInsideStart = seen) ?: return false
         val normal = Vector3f(hitPoint).sub(Vector3f(shellCenter.x.toFloat(), shellCenter.y.toFloat(), shellCenter.z.toFloat()))
         if (normal.lengthSquared() < 1e-6f) return false
         normal.normalize()
@@ -303,14 +333,25 @@ class EnergyShield : Modifier() {
     /**
      * 位移线段 `from → to` 与球壳的**进入点**，`null` = 这一 tick 没有从外侧穿进壳里。
      *
-     * 起点已在壳内时直接返回 `null` —— 那属于「法术本来就生成在壳里」，
+     * 起点已在壳内时**默认**返回 `null` —— 那属于「法术本来就生成在壳里」，
      * 挡不住也不该播格挡表现（贴脸施法就是这么漏过去的）。
+     *
+     * [allowInsideStart]（第 38 轮）放开这个限制，用于「**壳迎上来**」的情况：
+     * 弹本来在壳外（[seenOutside] 记过），持有者朝它走过去时壳先把它罩住，
+     * 这一 tick 起点已经在壳内 —— 那就把当前位置当作进入点，照挡。
      */
-    private fun shellEntry(from: Vector3f, to: Vector3f, center: Vec3): Vector3f? {
+    private fun shellEntry(
+        from: Vector3f,
+        to: Vector3f,
+        center: Vec3,
+        allowInsideStart: Boolean = false,
+    ): Vector3f? {
         val fx = from.x - center.x
         val fy = from.y - center.y
         val fz = from.z - center.z
-        if (fx * fx + fy * fy + fz * fz < SHELL_RADIUS * SHELL_RADIUS) return null
+        if (fx * fx + fy * fy + fz * fz < SHELL_RADIUS * SHELL_RADIUS) {
+            return if (allowInsideStart) Vector3f(from) else null
+        }
 
         val dx = to.x - from.x
         val dy = to.y - from.y

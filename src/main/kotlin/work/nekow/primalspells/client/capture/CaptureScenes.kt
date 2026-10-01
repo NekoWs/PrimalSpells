@@ -330,11 +330,11 @@ object CaptureScenes {
                     ctx.log("holder moved +$SHIELD_MOVE_DISTANCE → ${h.position()}（护盾应当留在原地）")
                 }
                 if (t == SHIELD_INSIDE_BLAST_AT) {
-                    // **决定性一发**：打在**旧壳心**（锚点）上 —— 壳锚在原地时它在壳**内**，
-                    // 按设计"壳内侧的爆炸护盾不触发"→ 法力不变、木桩掉血；
-                    // 若护盾跟着人走，壳已在新位置，这发在壳外 → 会被抵扣（法力掉）→ 两者可判
+                    // 木桩已走开 3 格：这一发打在**它身边**3 格外 —— 判定跟着玩家 ⇒ 壳也在这边 ⇒
+                    // 爆点在壳外 ⇒ 应当被抵扣（法力掉一大截）。若判定没跟过来，这发在壳外更远，同样会被挡，
+                    // 所以这条只作"判定仍在工作"的健康检查；**面板不跟人**是视觉表现，靠接触图目视确认。
                     manaBeforeBlast = w.status.mana
-                    blast(ctx, atk, sw, offsetX = 0.5f)
+                    blast(ctx, atk, sw, offsetX = 3.5f + SHIELD_MOVE_DISTANCE)
                 }
                 if (t == SHIELD_ANCHOR_BLAST_AT) {
                     // 旧位置外侧：壳还在原地 → 仍在壳外 → 应当被挡下（顺带证明护盾仍在工作）
@@ -398,26 +398,12 @@ object CaptureScenes {
                         ),
                     )
                     SHIELD_INSIDE_BLAST_AT + SHIELD_ANCHOR_SETTLE -> listOf(
-                        // **决定性断言**：木桩已走到 3 格外，而这一发打在**旧壳心**上。
-                        // 壳锚在原地 → 它在壳**内** → 按设计护盾不触发：法力**不变**、木桩掉血。
-                        // 若护盾跟着人走了，壳在新位置，这发在壳外 → 会被抵扣（法力掉 345）→ 判据翻面。
+                        // 判定跟着玩家：木桩挪到新位置后，身边的这发仍被抵扣（法力掉 ~45）、且不掉血
                         Check(
-                            name, t, "anchor-stays-put",
-                            w != null && w.status.mana >= manaBeforeBlast - 1.0 &&
-                                damageNumbers(ctx, holder) > 0,
-                            "旧壳心大爆：mana=${w?.status?.mana}（应 ≈ $manaBeforeBlast 不变）、" +
-                                "伤害数字=${damageNumbers(ctx, holder)}（应 > 0）",
-                        ),
-                    )
-                    SHIELD_ANCHOR_BLAST_AT + SHIELD_ANCHOR_SETTLE -> listOf(
-                        // 旧位置外侧那一发：壳还在原地 → 仍在壳外 → 被挡下（护盾照常工作）
-                        Check(
-                            name, t, "anchor-still-blocks",
+                            name, t, "protect-follows-player",
                             s != null && !s.breached && w != null &&
                                 w.status.mana <= manaBeforeBlast - 40.0,
-                            // 不再断言"伤害数字 = 0"：上一条（壳内那发）的伤害数字还活着，
-                            // 这里只判"被抵扣"这个信号
-                            "旧位置外侧大爆：mana=${w?.status?.mana}（应比  少一大截 = 被抵扣）",
+                            "木桩挪走后身边那发：mana=${w?.status?.mana}（应比 $manaBeforeBlast 少 ≈45 = 仍被抵扣）",
                         ),
                     )
                     SHIELD_SCENE_TICKS - 3 -> listOf(

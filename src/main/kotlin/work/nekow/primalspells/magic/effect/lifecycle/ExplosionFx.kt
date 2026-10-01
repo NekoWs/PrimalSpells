@@ -61,10 +61,6 @@ object ExplosionFx {
 
     /** 火花（外飞粒子）：MC 粒子的量级 */
     private const val SPARK_DOT = 0.13
-    /** 内部闪电丝的可见粗 */
-    private const val BOLT_WIDTH = 0.05
-    /** 壳裂弧段的可见粗 */
-    private const val CRACK_WIDTH = 0.045
 
     /** 球壳点的可见直径：随半径**轻微**变化（大爆稍大），上限 0.42 —— "多而小" */
     private fun shellDot(radius: Float): Double = (radius * 0.055).coerceIn(0.14, 0.42)
@@ -87,21 +83,16 @@ object ExplosionFx {
     private const val FLASH_LIFETIME = 4
     private val FLASH_COLOR = Color.ofInt(245, 253, 255, 255)
 
-    private const val BOLT_COUNT = 10
-    private const val BOLT_SEGMENTS = 10
-    private val BOLT_COLOR = Color.ofInt(225, 250, 255, 255)
-
     private const val OUT_COUNT = 64
     private const val OUT_LIFETIME = 14
     private const val OUT_SPEED = 0.55
     private val OUT_COLOR = Color.ofInt(205, 240, 255, 255)
 
-    private const val CRACK_COUNT = 6
-    private const val CRACK_SEGMENTS = 6
-
     private const val SMOKE_COUNT = 22
     private const val SMOKE_IN_TICKS = 3
     private const val SMOKE_FADE_TICKS = 8
+    /** 烟消失时缩到原来的比例（逐渐变小消失） */
+    private const val SMOKE_SHRINK = 0.35f
     private val SMOKE_COLOR = Color.ofInt(130, 136, 142, 255)
 
     // =====================================================================================
@@ -113,9 +104,7 @@ object ExplosionFx {
         if (radius <= 0f) return
         burstFlash(manager, center, radius)
         burstShell(manager, center, radius)
-        burstBolts(manager, center, radius)
         burstOutward(manager, center, radius)
-        burstCracks(manager, center, radius)
         burstAfterglow(manager, center, radius)
     }
 
@@ -164,28 +153,6 @@ object ExplosionFx {
         return (area / (spacing * spacing)).roundToInt().coerceIn(80, SHELL_MAX_POINTS)
     }
 
-    /** 内部闪电丝：从中心向外的锯齿细线。 */
-    private fun burstBolts(manager: ParticleManager, center: Vec3, radius: Float) {
-        val group = manager.createGroup(center)
-        val nominalWidth = lineWorld(BOLT_WIDTH).toFloat()
-        ParticleShapes.fibonacciSphere(BOLT_COUNT).forEachIndexed { index, dir ->
-            val axis = normalize(dir)
-            val lateral = tangentOf(axis)
-            val normal = axis.cross(lateral)
-            val points = ArrayList<Vec3>(BOLT_SEGMENTS)
-            for (i in 0 until BOLT_SEGMENTS) {
-                val t = i.toDouble() / (BOLT_SEGMENTS - 1).toDouble()
-                val jag = if (i % 2 == 0) 1.0 else -1.0
-                points += center.add(axis.scale(radius * 1.02 * t))
-                    .add(lateral.scale(jag * radius * 0.09 * t))
-                    .add(normal.scale(if (i % 3 == 0) radius * 0.05 * t else 0.0))
-            }
-            Draw.polyline(manager, points, nominalWidth, true, null, true, true, ColorSource.of(BOLT_COLOR), 0, group)
-        }
-        group.fadeIn(1)
-        group.fadeOut(SHELL_GROW_TICKS + SHELL_HOLD_TICKS, removeAfter = true, easing = EasingType.EASE_OUT)
-    }
-
     /** 向外飞散的小颗粒：一次性初速，之后两端自行积分。 */
     private fun burstOutward(manager: ParticleManager, center: Vec3, radius: Float) {
         val visual = dotVisual(SPARK_DOT)
@@ -201,37 +168,11 @@ object ExplosionFx {
         }
     }
 
-    /** **壳裂**：几条沿球面的细弧向外漂散（每段一颗粒子的折线）。 */
-    private fun burstCracks(manager: ParticleManager, center: Vec3, radius: Float) {
-        val group = manager.createGroup(center)
-        val nominalWidth = lineWorld(CRACK_WIDTH).toFloat()
-        ParticleShapes.fibonacciSphere(CRACK_COUNT).forEachIndexed { index, dir ->
-            val axis = normalize(dir)
-            val lateral = tangentOf(axis)
-            val normal = axis.cross(lateral)
-            val points = ArrayList<Vec3>(CRACK_SEGMENTS)
-            for (i in 0 until CRACK_SEGMENTS) {
-                val t = i.toDouble() / (CRACK_SEGMENTS - 1).toDouble()
-                val angle = (t - 0.5) * 1.5 + index
-                val r = radius * 0.92
-                points += center.add(axis.scale(r))
-                    .add(lateral.scale(cos(angle) * r * 0.28))
-                    .add(normal.scale(sin(angle) * r * 0.28))
-            }
-            Draw.polyline(
-                manager, points, nominalWidth, true, null, true, true,
-                ColorSource.of(SHELL_RIM_COLOR), 0, group,
-            )
-        }
-        group.delay(SHELL_GROW_TICKS + 2)
-        group.fadeIn(2)
-        group.move(Vec3(0.0, radius * 0.06, 0.0), SHELL_FADE_TICKS, EasingType.EASE_OUT)
-        group.fadeOut(SHELL_FADE_TICKS, removeAfter = true, easing = EasingType.EASE_OUT)
-    }
-
     /** 余韵：少量柔边"烟"上浮 + 贴地一圈小点。 */
     private fun burstAfterglow(manager: ParticleManager, center: Vec3, radius: Float) {
-        val smoke = manager.createGroup(center)
+        // 烟云的轴心略高于爆心：`scale` 会把「到轴心的距离」和粒子尺寸一起缩，
+        // 轴心放这里才读得出「烟自己在变小」，而不是被吸回爆心
+        val smoke = manager.createGroup(center.add(0.0, radius * 0.22, 0.0))
         val smokeLife = SHELL_GROW_TICKS + SMOKE_IN_TICKS + SMOKE_FADE_TICKS + 2
         val smokeDot = (radius * 0.09).coerceIn(0.25, 0.7)
         ParticleShapes.fibonacciSphere(SMOKE_COUNT).forEachIndexed { index, dir ->
@@ -249,7 +190,9 @@ object ExplosionFx {
         }
         smoke.delay(SHELL_GROW_TICKS)
         smoke.fadeIn(SMOKE_IN_TICKS)
-        smoke.fadeOut(SMOKE_FADE_TICKS, removeAfter = true, easing = EasingType.EASE_OUT)
+        // 逐渐变小消失：收缩与淡出同一窗口（EASE_IN = 越到后面缩得越快）
+        smoke.scale(SMOKE_SHRINK, SMOKE_FADE_TICKS, EasingType.EASE_IN)
+        smoke.fadeOut(SMOKE_FADE_TICKS, removeAfter = true, easing = EasingType.EASE_IN)
 
         val ground = manager.createGroup(center)
         Draw.circle(

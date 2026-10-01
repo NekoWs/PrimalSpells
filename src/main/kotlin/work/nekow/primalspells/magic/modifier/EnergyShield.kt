@@ -276,9 +276,25 @@ class EnergyShield : Modifier() {
         return strength
     }
 
-    /** 球壳球心（世界坐标）：相对脚底抬高到身体中段（[shellCenterOffset]），比眼睛位置更贴近「包裹全身」。 */
+    /**
+     * 球壳球心（世界坐标）：相对脚底抬高到身体中段（[shellCenterOffset]），比眼睛位置更贴近「包裹全身」。
+     *
+     * **第 33 轮起静态锚定**：第一次求值时把它冻住，此后**不再跟随持有者** ——
+     * 用户口径「本来就是玩家附近出现护盾片，让这个出现的护盾片**不再跟随玩家**就行了，
+     * 因为现在如果玩家移动，这个护盾片会和玩家一起动，很奇怪」。
+     * 目前没有收回路径，所以冻住后一直有效（要挪位置 = 重新展开时把 anchor 置空）。
+     *
+     * 保护判定（在壳内/壳外、爆炸中心到壳心距离）全部读这个值 → 护盾留在原地，
+     * 继续保护**落在它半径内**的人；数值规则不变（固定 5 + 每点 5 MP、破口 60 tick）。
+     */
     private fun shellCenter(holder: Entity): Vec3 =
-        holder.position().add(0.0, shellCenterOffset(holder), 0.0)
+        anchor ?: holder.position().add(0.0, shellCenterOffset(holder), 0.0).also { anchor = it }
+
+    /** 冻结的球壳球心；`null` = 还没展开（下次求值时按当时的持有者位置重新锚定）。 */
+    private var anchor: Vec3? = null
+
+    // 注：护盾目前是「只要持有就展开」，没有收回/重开生命周期，所以锚点冻结后一直有效；
+    // 将来若做「重新施法挪位置」，在那条路径上把 `anchor` 置空即可重新锚定。
 
     /** 球壳球心相对脚底的偏移：身体中段（身高 55%）。 */
     private fun shellCenterOffset(holder: Entity): Double = holder.bbHeight * 0.55
@@ -376,16 +392,15 @@ class EnergyShield : Modifier() {
         drift: Double,
     ) {
         val manager = wand.pdParticles(level)
-        val bodyOffset = shellCenterOffset(holder)
-        val feet = holder.position()
-        val center = feet.add(0.0, bodyOffset, 0.0)
+        // 第 33 轮：面板挂在**冻结的锚点**上（不再随人移动）
+        val center = shellCenter(holder)
         for (index in panelIndices) {
             val panel = shieldPanels.getOrNull(index) ?: continue
             // ⚠️ 顺序：**先 `followEntity` 再铺成员** —— 客户端 arm 时按「成员 spawn 位置 − 组 `pivot` 字段」
             // 反算相对偏移，而 `followEntity` 会顺手改那个字段（第 13 轮踩过）；成员用**相对球心**的偏移
             // （`offsetFromPivot`），于是面板随人移动、形状刚性。
-            val group = manager.createGroup(feet)
-            group.followEntity(holder.uuid, Vec3(0.0, bodyOffset, 0.0))
+            val group = manager.createGroup(center)
+            // 静态锚定：不调 followEntity，成员按「相对球心」的偏移铺开，形状刚性、位置固定
             for (offset in panel.ring) {
                 manager.create()
                     .position(center.add(offset))

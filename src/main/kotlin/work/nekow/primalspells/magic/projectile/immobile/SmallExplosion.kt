@@ -16,8 +16,7 @@ class SmallExplosion : Projectile() {
         maxAge = 1
         speed = 0f
         hitRadius = 0.0
-        // 蓄力 8 tick（0.4 s）：内爆看起来是"埋下去、蓄一下、炸"，见 ExplosionFx
-        effects += Explosion(onDeath = true, onHit = false, chargeTicks = 8)
+        effects += Explosion(onDeath = true, onHit = false)
     }
 
     override fun onSpell() {

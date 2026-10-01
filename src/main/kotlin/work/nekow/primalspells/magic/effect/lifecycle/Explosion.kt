@@ -13,66 +13,32 @@ import work.nekow.primalspells.magic.core.ShieldGuard
 import work.nekow.primalspells.registry.ModDamageTypes
 import kotlin.math.sqrt
 import work.nekow.primalspells.magic.effect.BaseEffect
-import work.nekow.primalspells.util.Deferred
 
 /**
  * 爆炸效果 —— 用 [MagicStatus] 的 `explosionRadius` / `explosionDamage` 触发自定义爆炸：
- * **蓄力（内爆）→ 爆发**，按距离衰减的伤害与击退，**不破坏方块**。
+ * **触发即爆**（音效 + [ExplosionFx.burst] 粒子 + 按距离衰减的伤害与击退），**不破坏方块**。
  *
- * 第 28 轮起爆炸分两拍（用户口径）：
- * 1. [ExplosionFx.implode]：黑色核心球（爆炸半径的 1/3）+ 蓄力线条 + 向心聚拢粒子，持续 [chargeTicks]；
- * 2. 蓄力结束才结算：音效 + [ExplosionFx.burst]（球体放大到爆炸半径 + 向外飞散）+ 伤害与击退。
+ * 第 28~31 轮曾有过「先内爆蓄力、蓄力结束再结算」的版本；**第 32 轮按用户口径整体移除**
+ * （「把爆炸的蓄力阶段给移除掉，直接爆」）—— 表现层只保留爆发那一拍。
  *
- * 也就是说**爆炸现在是可以躲的**：伤害被推迟到蓄力结束（伤害时机与视觉一致）。
- * 原版爆炸粒子（`ParticleTypes.EXPLOSION*`）已全部删除。
- *
- * @param onHit   碰撞（实体或方块）时开始蓄力
- * @param onDeath 投射物死亡时开始蓄力
- * @param chargeTicks 蓄力时长（tick）；<= 0 = 按半径自动推（[ExplosionFx.autoChargeTicks]）
+ * @param onHit   碰撞（实体或方块）时爆炸
+ * @param onDeath 投射物死亡时爆炸
  */
 class Explosion(
     val onHit: Boolean = true,
-    val onDeath: Boolean = false,
-    private val chargeTicks: Int = 0,
+    val onDeath: Boolean = false
 ) : BaseEffect() {
 
-    /** 同一发弹可能既触发 `onHit` 又触发 `onDie`：一次爆炸只安排一次蓄力（否则会打两次伤害） */
-    private var scheduled = false
-
     override fun onHitEntity(target: Entity) {
-        if (onHit) startCharge(Vector3f(status.pos))
+        if (onHit) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage)
     }
 
     override fun onHitBlock(pos: Vector3f) {
-        if (onHit) startCharge(Vector3f(pos))
+        if (onHit) customExplode(caster, pos, status.explosionRadius, status.explosionDamage)
     }
 
     override fun onDie() {
-        if (onDeath) startCharge(Vector3f(status.pos))
-    }
-
-    /**
-     * 开始蓄力，并把「蓄力结束的结算」排进 [Deferred]（服务端延迟队列，由 `MagicManager` 每 tick 推）。
-     *
-     * 位置要**冻结**一份：`status.pos` 是会继续被投射物改写的活对象，
-     * 直接捕获它会让爆炸中心在蓄力期间跟着弹走。
-     */
-    private fun startCharge(center: Vector3f) {
-        if (scheduled) return
-        scheduled = true
-        val level = caster.level() as? ServerLevel ?: return
-        val radius = status.explosionRadius
-        if (radius <= 0f) return
-        val damage = status.explosionDamage
-        val ticks = if (chargeTicks > 0) chargeTicks else ExplosionFx.autoChargeTicks(radius)
-        val frozen = Vector3f(center)
-        ExplosionFx.implode(
-            ParticleManager.of(level),
-            Vec3(frozen.x.toDouble(), frozen.y.toDouble(), frozen.z.toDouble()),
-            radius,
-            ticks,
-        )
-        Deferred.after(level, ticks) { customExplode(caster, frozen, radius, damage) }
+        if (onDeath) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage)
     }
 
     companion object {
@@ -102,7 +68,7 @@ class Explosion(
                 0.9f + serverLevel.random.nextFloat() * 0.2f
             )
 
-            // 2. 爆发表现：球体放大到爆炸半径 + 向外飞散的粒子（原版爆炸粒子已删除）
+            // 2. 爆发表现（原版爆炸粒子已删除；第 32 轮起没有蓄力，触发即爆）
             ExplosionFx.burst(ParticleManager.of(serverLevel), Vec3(cx, cy, cz), radius)
 
             // 3. 实体伤害 + 击退

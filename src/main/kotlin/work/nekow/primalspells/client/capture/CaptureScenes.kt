@@ -89,7 +89,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(blackHole(), gravityField(), energyShield(), implosion())
+    fun all(): List<Scene> = listOf(blackHole(), gravityField(), energyShield(), explosion())
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -440,28 +440,26 @@ object CaptureScenes {
 
 
     /**
-     * **内爆**：定点爆炸的蓄力（黑色核心球 + 蓄力线条 + 向心聚拢粒子）→ 爆发（球体放大到半径 + 向外飞散）。
+     * **爆炸**：触发即爆 —— 球壳粒子云撑到爆炸半径 + 内部闪电丝 + 向外飞散 + 收干净。
      *
-     * 与前三个场景不同，这里**故意用中灰摄影棚**：蓄力段的核心球是**黑色**的，在原来的黑底棚里根本看不见；
-     * 中灰（r≈g≈b）既不参与「暖色亮像素」判据、也不参与蓝判据，却能让黑球成为可判定的暗区。
+     * 用**中灰摄影棚**：爆炸的青白色粒子在灰底上对比清楚，且灰底（r≈g≈b）不参与蓝判据。
      *
-     * 时间线（tick）：`20` 放一颗 `large_explosion`（半径 6 / 蓄力 18 tick / 0.9 s）→ `38` 爆发 → `78` 结束。
-     * 场心放一个木桩：蓄力期间**不该**出现伤害数字（伤害推迟到爆发），爆发后才该出现 —— 这是
-     * 「蓄力结束才结算」的直接证据。
+     * 时间线（tick）：`20` 放一颗 `large_explosion`（半径 6）→ **同 tick 立刻结算** → `78` 结束。
+     * 场心放一个木桩：**放弹后立刻**就该出现伤害数字（第 32 轮起没有蓄力）。
      */
-    private fun implosion(): Scene = run {
-        val name = "implosion"
+    private fun explosion(): Scene = run {
+        val name = "explosion"
         var holder: TestDummyEntity? = null
         Scene(
             name = name,
-            title = "内爆：黑色核心 + 蓄力线条 + 向心聚拢 → 爆发球放大到半径",
+            title = "爆炸：触发即爆（粒子云撑到半径 + 闪电丝 + 外飞 + 烟）",
             warmupTicks = 24,
-            lengthTicks = IMPLOSION_TICKS,
+            lengthTicks = EXPLOSION_TICKS,
             thirdPerson = false,
             moveCamera = true,
             fov = 60,
             camera = { ctx, t ->
-                orbit(ctx, centerLift = IMPLOSION_CENTER_LIFT, radius = 12.0, lift = 3.0, degPerTick = 1.0, tick = t)
+                orbit(ctx, centerLift = EXPLOSION_CENTER_LIFT, radius = 12.0, lift = 3.0, degPerTick = 1.0, tick = t)
             },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
@@ -475,21 +473,22 @@ object CaptureScenes {
                     pitch = 0f,
                 )
                 holder = ctx.spawnDummy(CX + 0.5, floorY + 1.0, CZ + 0.5)
-                ctx.log("$name prepared: radius=$IMPLOSION_RADIUS charge=$IMPLOSION_CHARGE_TICKS")
+                ctx.log("$name prepared: radius=$EXPLOSION_RADIUS")
             },
             tick = { ctx, t ->
-                if (t != IMPLOSION_CAST) return@Scene
+                if (t != EXPLOSION_CAST) return@Scene
                 val guard = holder ?: return@Scene
                 val floorY = ctx.floorBlockY(CX, CZ)
                 val bolt = MagicManager.create("large_explosion") as Projectile
-                // ⚠️ 施法者必须是**别人**：applyDamageAndKnockback 会排除 source 实体，
-                // 用木桩自己当施法者 → 爆炸永远打不到它（诊断时踩到）
+                // ⚠️ 施法者必须是**别人**：applyDamageAndKnockback 会排除 source 实体
                 bolt.caster = ctx.player
-                bolt.wand = Wand("capture-implosion")
+                bolt.wand = Wand("capture-explosion")
                 bolt.position = Vector3f(CX + 0.5f, floorY + 2.0f, CZ + 0.5f)
                 bolt.velocity = Vector3f(0f, 0f, 0f)
                 bolt.spell()
                 MagicManager.add(bolt)
+                // guard 只是场心的靶子，这里显式用一下，避免"未使用"告警
+                check(guard.isAlive)
             },
             finish = {
                 holder?.remove(Entity.RemovalReason.DISCARDED)
@@ -499,49 +498,36 @@ object CaptureScenes {
                     ParticleManager.of(ctx.level).getEngine().particleCount()
                 }.getOrDefault(-1)
                 when (t) {
-                    IMPLOSION_CAST + 6 -> listOf(
-                        Check(
-                            name, t, "charge-particles",
-                            particles in 200..1200,
-                            "蓄力期 PD 粒子 = $particles（黑核 130 + 亮边 168 + 三波丝线 216 + 向心 48 ≈ 560）",
-                        ),
-                        Check(
-                            name, t, "charge-no-damage-yet",
-                            damageNumbers(ctx, holder) == 0,
-                            "蓄力期间伤害数字 = ${damageNumbers(ctx, holder)}（应为 0：伤害推迟到爆发）",
-                        ),
-                    )
-                    IMPLOSION_CAST + IMPLOSION_CHARGE_TICKS + 4 -> listOf(
+                    EXPLOSION_CAST + 3 -> listOf(
                         Check(
                             name, t, "burst-particles",
-                            particles >= 120,
-                            "爆发期 PD 粒子 = $particles（球体 300 + 外飞 26 + 尚在淡出的核心）",
+                            particles >= 200,
+                            "爆后 PD 粒子 = $particles（球壳粒子云 + 闪电丝 + 外飞）",
                         ),
                         Check(
-                            name, t, "burst-damage-landed",
+                            name, t, "damage-immediate",
                             damageNumbers(ctx, holder) > 0,
-                            "爆发后伤害数字 = ${damageNumbers(ctx, holder)}（应 > 0）",
+                            "放弹后伤害数字 = ${damageNumbers(ctx, holder)}（第 32 轮起无蓄力，应当立刻有）",
                         ),
                     )
-                    IMPLOSION_TICKS - 3 -> listOf(pdParticleCheck(name, t, ctx))
+                    EXPLOSION_TICKS - 3 -> listOf(pdParticleCheck(name, t, ctx))
                     else -> emptyList()
                 }
             },
         )
     }
 
-    /** 内爆场景：爆炸中心相对脚底的高度（与机位球心一致） */
-    private const val IMPLOSION_CENTER_LIFT = 1.0
+    /** 爆炸场景：爆炸中心相对脚底的高度（与机位球心一致） */
+    private const val EXPLOSION_CENTER_LIFT = 1.0
 
-    /** 内爆场景总长（tick）：放弹 20 + 蓄力 18 + 爆发尾 20 + 余量 */
-    private const val IMPLOSION_TICKS = 78
+    /** 爆炸场景总长（tick）：放弹 20 + 爆发尾 40 + 余量 */
+    private const val EXPLOSION_TICKS = 78
 
     /** 放弹 tick */
-    private const val IMPLOSION_CAST = 20
+    private const val EXPLOSION_CAST = 20
 
-    /** 与 `large_explosion` 一致：半径 6 / 蓄力 18 tick */
-    private const val IMPLOSION_RADIUS = 6.0f
-    private const val IMPLOSION_CHARGE_TICKS = 18
+    /** 与 `large_explosion` 一致：半径 6 */
+    private const val EXPLOSION_RADIUS = 6.0f
 
     /** 护盾场景总长（tick）：静止 20 + 四次点射 + 两次大爆（各含 18 tick 蓄力）+ 破口 60 + 激光 + 余量 */
     private const val SHIELD_SCENE_TICKS = 232

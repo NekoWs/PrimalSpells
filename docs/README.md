@@ -11,6 +11,7 @@
 
 | 文档 | 内容 | 什么时候读 |
 |---|---|---|
+| [collaboration.md](collaboration.md) | **协作方式**：需求默认委派给子代理 `local/qwen3.8-flash-next` 开发、主 agent 只验收；打回上限、证据口径、主 agent 的改动权限 | **每次新对话接到开发需求**（默认流程） |
 | [architecture.md](architecture.md) | 分层架构、法术对象模型、牌堆与施法流程、投射物生命周期、持久化、网络、客户端 | **第一次接触本项目**；要改核心机制、排查「为什么没生效」 |
 | [code-map.md](code-map.md) | 逐包逐文件的代码导航 + 「我要改 X → 去哪个文件」 | 知道要改什么、但不知道文件在哪 |
 | [spell-development.md](spell-development.md) | 新增投射物 / 修饰器 / 特效 / 物品 / 资源 / 语言键的完整步骤与注册点 | 要添加或修改法术内容 |

@@ -19,6 +19,7 @@ import work.nekow.primalspells.client.input.ClientContainerDragHandler
 import work.nekow.primalspells.client.input.SpellSlotScrollHandler
 import work.nekow.primalspells.client.render.DroneEntityModel
 import work.nekow.primalspells.client.render.DroneEntityRenderer
+import work.nekow.primalspells.client.render.ParticleTextures
 import work.nekow.primalspells.client.tooltip.ClientPouchTooltip
 import work.nekow.primalspells.client.tooltip.ClientTooltipHandler
 import work.nekow.primalspells.client.capture.CaptureDriver
@@ -63,6 +64,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
             if (!builtinsReady) {
                 builtinsReady = true
                 ParticleManager.registerBuiltinTextures()
+                ParticleTextures.register()
             }
         }
 

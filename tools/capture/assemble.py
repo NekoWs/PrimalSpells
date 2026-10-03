@@ -60,7 +60,11 @@ SCENES = {
         "length": 108, "title": "黑洞：进场长出 → 稳态 → 向心塌缩", "decay": "gradual",
     },
     "gravity_field": {
-        "length": 130, "title": "重力场：球形范围 + 下坠粒子 + 落地波环", "decay": "instant",
+        "length": 130, "title": "重力场：球形范围 + 下坠粒子 + 落地波环",
+        # 第 47 轮由 instant 改 gradual：静止场（重力场/黑洞）现在有**共用的退场余晖**
+        # （`Trajectory.emitFieldAfterglow`，寿命 6~24 tick 错开），本体一死是**逐颗淡出**、不再是一刀切断。
+        # 原先的 instant 记的是"那时确实没有退场动画"；设计变了，口径跟着改（黑洞那边本来就是 gradual）。
+        "decay": "gradual",
     },
     "explosion": {
         "length": 78,
@@ -72,6 +76,15 @@ SCENES = {
         # 暖色判据下的退场是**阈值悬崖**（球体 alpha 淡出 6 tick，但像素判据只看到跨阈值那一帧）——
         # 与玻璃面板同理；「收干净」由  +  负责
         "decay": "instant",
+    },
+    # 火球拖尾（第 43 轮）：跟拍一颗飞行中的火球，看 Noita 式的分层火花尾迹。
+    # 粒子是**橙黄加法混合**的火花，用 `orange` 判据（`warm` 会漏掉一半以上的火花，见 orange_mask）。
+    # 退场：火球 t≈30 撞墙消失，余烬寿命错开（8~26 tick）陆续到点 —— 是**逐帧衰减**，用 gradual。
+    "fireball_trail": {
+        "length": 72,
+        "title": "火球拖尾：白热核 + 沿轨迹的符文余痕（跟拍）",
+        "metric": "orange",
+        "decay": "gradual",
     },
     "energy_shield": {
         "length": 528,
@@ -160,6 +173,23 @@ def warm_mask(path: Path) -> "np.ndarray":
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, b = a[..., 0], a[..., 2]
     return (r > WARM_MIN) & ((r - b) > WARM_BLUE_GAP)
+
+
+#: 「亮橙像素」判据（第 43 轮新增，给火球拖尾用）：橙黄发光的**粒子**，门槛比 [warm_mask] 低一档。
+#:
+#: 为什么要单独一条：`warm` 要求 `r > 150 且 r − b > 60`，那是给爆炸的**饱和暖色**标定的；
+#: 而拖尾是**加法混合**的橙黄火花 —— 叠在黑底上整体偏亮偏黄（实测尾迹像素均值 ≈ (175, 120, 60)，
+#: 一大半落在 `r−b` 40~60 之间），用 `warm` 量会漏掉一半以上的火花（实测同一帧 warm=219 / orange=441）。
+#: 反过来这条也不会把摄影棚误判进来：黑混凝土亮度很低（r≈30）、空气/天空是蓝的（r−g 为负）。
+ORANGE_MIN = 130
+ORANGE_BLUE_GAP = 40
+ORANGE_GREEN_GAP = 15
+
+
+def orange_mask(path: Path) -> "np.ndarray":
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (r > ORANGE_MIN) & ((r - b) > ORANGE_BLUE_GAP) & ((r - g) > ORANGE_GREEN_GAP)
 
 
 #: 「暗核心」判据（第 28 轮）：内爆的黑色核心球在中灰棚里是**唯一**的暗区。
@@ -273,14 +303,18 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     blue_cover = [int(blue_mask(f).sum()) for f in frames]
     red_cover = [int(red_mask(f).sum()) for f in frames]
     warm_cover = [int(warm_mask(f).sum()) for f in frames]
+    orange_cover = [int(orange_mask(f).sum()) for f in frames]
     dark_cover = [int(dark_mask(f).sum()) for f in frames]
     # 标准判据（空场起飞 / 真的渲染 / 退场 / 静止窗口）用哪一个像素判据：默认蓝（冷色粒子），
-    # 爆炸场景声明 `metric: warm`（暖色粒子）。粉色破口判据始终独立于它。
-    cover = warm_cover if spec.get("metric", "blue") == "warm" else blue_cover
+    # 爆炸场景声明 `metric: warm`（饱和暖色）；火球拖尾声明 `metric: orange`（加法混合的橙黄火花，
+    # 见 `orange_mask` 的标定说明）。粉色破口判据始终独立于它。
+    metric = spec.get("metric", "blue")
+    cover = {"warm": warm_cover, "orange": orange_cover}.get(metric, blue_cover)
     result["cover"] = cover
     result["blue_cover"] = blue_cover
     result["red_cover"] = red_cover
     result["warm_cover"] = warm_cover
+    result["orange_cover"] = orange_cover
     result["dark_cover"] = dark_cover
     peak = max(cover)
     peak_idx = cover.index(peak)

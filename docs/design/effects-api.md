@@ -184,12 +184,13 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 | 想要 | 用法 |
 |---|---|
 | 柔边圆点 / 线段贴图 | `ParticleVisual().style(ParticleStyle.SOFT_DOT / LINE / SQUARE)`（内置 16×16，两端各自生成，不占带宽） |
-| 自定义贴图 | `ParticleManager.registerTexture(name, pngBytes)`（幂等；**同名第一次生效**，换图请换名字；未知名字回落纯白方块、不丢粒子） |
+| 自定义贴图 | `ParticleManager.registerTexture(name, pngBytes)`（幂等；**同名第一次生效**，换图请换名字；未知名字回落纯白方块、不丢粒子）。本模组已有用例：`primalspells:rune_spark`（`client/render/ParticleTextures.kt`，第 45 轮）。⚠️ 贴图 **16×16 ⇒ `texScale = 1`** ⇒ `anisoWorld(w, h)` 的 `w/h` **就是世界格整宽**；注册时机必须在**首个客户端 tick**（会碰 `RenderSystem`） |
 | 逐粒子贴图 / 子矩形 UV | `Builder.texture(name)` / `.uv(u0,v0,u1,v1)`（或 `.visual(ParticleVisual().uv(...))`） |
-| 拉长的丝线 | `anisoWorld(长, 粗)`（**世界格数**）+ `alignTo(from, to)`（长轴对齐到线段）+ `billboard(false)` |
+| 拉长的丝线 | `anisoWorld(长, 粗)`（**世界格数**）+ `alignTo(from, to)`（长轴对齐到线段）+ `billboard(false)`。⚠️ **`alignTo` 会强制关掉广告牌**（PD KDoc 明说）：它只适合「转个方向看得出来」的**拉长形状**；对称点状精灵（圆点/菱形）用它**纯亏** —— 会变成固定朝向的薄片，侧看一条线、正视几乎看不见（第 46 轮踩过） |
 | 一条折线一个调用 | `Draw.polyline(points, thickness, taper, texture, additive, glowing, colorFn, …)` —— **每段一颗粒子**，内部自动 `anisoWorld(段长, 粗)` + `alignTo`；`taper = true` 时自动用 `LINE` 贴图并两端收细 |
 | 发光溢出 | `additive(true)`（加色）+ `glowing(true)`（全亮不受光照）—— **护盾玻璃在用**（第 41 轮：亮场景里靠色相与加色拉开对比度） |
 | 分批出现 | `Builder.delay(ticks)`，或 `Draw.*` 的 `stagger` |
+| **越靠后越暗** | **没有衰减通道** → 只能在**生成时**把颜色与 alpha 一起按「离头部的远近」压低（第 43 轮拖尾就是这么分层的） |
 | 换外观 | **没有更新通道** → `remove()` 后重新生成 |
 
 **尺寸口径（别再按 `scale` 当格数估）**
@@ -201,7 +202,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
   `LINE` 可见粗 ≈ **0.7 × 尺寸**（两端各 ≈ 0.2 × 长度渐隐）。密铺间距按「≤ 0.3 × 可见直径」给就无方块感/空隙。
   `ExplosionFx` 里的 `dotWorld()` / `lineWorld()` 就是这套反推。
 
-**三个必踩的坑（均已实测）**
+**五个必踩的坑（均已实测）**
 
 1. **内置贴图要在渲染线程就绪之后再确保**：`ParticleManager.registerBuiltinTextures()` 会碰 `RenderSystem`，
    放在 `FMLClientSetupEvent` 里会抛 `Rendersystem called from wrong thread` 把客户端打崩；
@@ -216,6 +217,21 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
    这样 `rel` 里自然带上"脚底 → 球心"的抬升；传 offset 只会让 `rel` 少掉同样的量（表现为整组下沉/偏移）。
    推论：**跟随时渲染位置 = 实体位置 + (成员 spawn 位置 − createGroup 时的轴心)**，与 `offsetFromPivot`
    无关（客户端 arm 只读 spawn 位置），所以"跟不跟、抬多高"全由这两个量决定。
+
+4. **`track` 驱动的位置在客户端是「落后一格」的**（第 47 轮踩，与 1.0.13 无关，是原版插值语义）：
+   `ParticleHandle.track(...)` 走 PD 的 `TrackBuffer`，客户端把相邻两条权威位置当作
+   `xo → x` 两端点、按 partialTick 插值 ⇒ **屏幕上看到的位置最多落后权威位置一整 tick**
+   （`partialTick = 0` 时正好落后一格位移）。而程序化粒子是「生成即静止、按绝对位置渲染」的，
+   两者混用时会出现「尾迹跑到本体前面一格」。要么把尾迹的锚点也放在**上一 tick 的权威位置**上
+   （`Trajectory` 的做法），要么让这一层也只由同一种驱动方式产生。
+
+5. **加法混合下 alpha 就是亮度权重，而且没有「随时间淡出」这一说**（第 43 轮踩）：
+   用 `additive(true)` 的粒子，`Color.of(..., a)` 的 `a` 直接决定它叠上去多亮
+   （PD `BridgeParticle.getLayer` 里 `translucent = additive || alpha < 1`，走 `ADDITIVE_PARTICLE` 管线）；
+   而**逐 tick 改颜色/透明度没有入口**（`Builder` 的外观生成时定死），`lifetime` 到点又是**整颗消失**、
+   不是渐隐 —— 这两条合起来推出一个反直觉的结论：**「越靠尾越暗」只能在生成时一次性写进颜色与 alpha**。
+   所以 `Trajectory` 是按「离头部的距离」分组给色的（头部 `hot=1` → 全白不透明；尾部 `hot≈0.2` → 主色 + 压暗 + 半透），
+   而不是「先生成再逐 tick 变暗」。⚠️ 别把这条当成缺陷去提需求：Noita 式拖尾本来就可以用「颜色分层 + 寿命」表达。
 
 ## 1. 目标
 

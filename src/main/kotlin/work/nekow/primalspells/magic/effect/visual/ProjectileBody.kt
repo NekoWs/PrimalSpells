@@ -3,6 +3,8 @@ package work.nekow.primalspells.magic.effect.visual
 import net.minecraft.server.level.ServerLevel
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleHandle
+import work.nekow.particledrawing.api.ParticleStyle
+import work.nekow.particledrawing.api.ParticleVisual
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.util.pdParticles
@@ -15,8 +17,14 @@ import work.nekow.primalspells.util.pdParticles
  *
  * 阶段：[EffectPhase.VISUAL] —— 在位置积分与轨道修正之后执行，读到的是本 tick 的最终位置。
  *
+ * ## 外观（第 44 轮按实机反馈改）
+ *
+ * 用户口径：拖尾改细之后，「本体粒子太突兀」。原因是它一直用的是 PD 的**默认贴图** ——
+ * 一颗**硬边纯白方块**（`TextureCache.defaultWhite`），在白热小核与细火花旁边就是一个白方块。
+ * 现在改成 `SOFT_DOT`（柔边圆点）+ 加色 + 全亮：读成一团柔光，尺寸也按"实际格数"给。
+ *
  * @param color 本体粒子颜色
- * @param scale 本体粒子缩放
+ * @param scale 本体粒子缩放（编辑器单位：渲染整宽 = 值 × 0.2 格 × 贴图尺寸系数）
  */
 class ProjectileBody(
     val color: Color,
@@ -49,6 +57,11 @@ class ProjectileBody(
             .position(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
             .color(color)
             .scale(scale)
+            .visual(
+                ParticleVisual().style(ParticleStyle.SOFT_DOT)
+                    .glowing(true)
+                    .additive(true),
+            )
             .lifetime(-1) // 永存，由 onDie 显式移除
             .spawn()
     }

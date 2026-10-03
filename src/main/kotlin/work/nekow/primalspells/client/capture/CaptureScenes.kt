@@ -19,6 +19,7 @@ import work.nekow.primalspells.wand.WandManager
 import java.io.File
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -91,7 +92,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(blackHole(), gravityField(), energyShield(), explosion())
+    fun all(): List<Scene> = listOf(blackHole(), gravityField(), energyShield(), explosion(), fireballTrail())
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -561,6 +562,214 @@ object CaptureScenes {
         MagicManager.add(projectile)
     }
 
+    /**
+     * **火球拖尾**：跟拍一颗飞行中的火球，看「分层火花尾迹」到底长什么样（第 43 轮新增）。
+     *
+     * 为什么单独一个场景：其它场景的机位都是**绕固定球心公转**，而拖尾的验收点是
+     * 「沿飞行方向拉出的那一条」—— 必须让火球**跑出画面中段**、相机跟着它走，才能看出
+     * 「白热芯 + 主色余烬 + 会掉下来的火花」这三层是不是真的成立。
+     *
+     * 机位 [trailCam] 挂在火球**后上方偏一侧**（后 3.2 / 上 1.6 / 侧 2.4 格），
+     * 所以画面里是「火球向右飞出 + 身后的尾迹被甩在左边」的侧后视角。
+     *
+     * 时间线（tick）：`0` 施法（法师站在 +Z 侧朝 -Z 平射）→ 火球以 ~1 格/tick 飞出 →
+     * 命中墙面后自己消失（相机随后停在最后位置，看尾迹在原地飘落/淡出）→ 到 `length` 必须收干净。
+     */
+    private fun fireballTrail(): Scene = run {
+        val name = "fireball_trail"
+        var wand: Wand? = null
+        Scene(
+            name = name,
+            title = "火球拖尾：白热核 + 沿轨迹的符文余痕（跟拍）",
+            warmupTicks = 24,
+            lengthTicks = TRAIL_TICKS,
+            fov = 70,
+            // 相机不跟着 player 走（player 就是施法者，站着不动），但**朝向每 tick 由机位函数给**：
+            // `moveCamera = true` + 返回「火球当前位置」当目标点即可（见 trailCam）。
+            moveCamera = true,
+            camera = { ctx, t -> trailCam(ctx, t) },
+            prepare = { ctx ->
+                val floorY = ctx.floorBlockY(CX, CZ)
+                ctx.buildStudio(CX, CZ, floorY, half = TRAIL_STUDIO_HALF, wallHeight = TRAIL_STUDIO_HEIGHT)
+                ctx.setup(
+                    spectator = true,
+                    // 站在 +Z 侧、面朝 -Z（yaw 180）：火球沿 -Z 平射，尾迹留在 +Z 一侧的空中
+                    x = CX + 0.5,
+                    y = floorY + 1.0,
+                    z = CZ + TRAIL_CAST_OFFSET,
+                    yaw = 180f,
+                    pitch = 0f,
+                )
+                wand = Wand("capture-trail").also { w ->
+                    w.innate += MagicManager.create("fireball") ?: error("fireball 未注册")
+                    w.status.mana = 1000.0
+                    w.load()
+                }
+                ctx.log("$name prepared: floorY=$floorY castZ=${CZ + TRAIL_CAST_OFFSET}")
+            },
+            start = { ctx ->
+                val floorY = ctx.floorBlockY(CX, CZ)
+                // 施法点 = 眼睛高度；`placeForCast` 不发包（服务端权威），机位仍然由 camera() 给
+                ctx.placeForCast(CX + 0.5, floorY + 1.0 + EYE_HEIGHT, CZ + TRAIL_CAST_OFFSET)
+                // ⚠️ **必须显式定住施法朝向**（第 43 轮踩）：`placeForCast` 只改位置、不改朝向，
+                // 而 `Wand.spell` 读的是玩家当前朝向 —— 预热期机位函数已经在改它了，于是火球会
+                // **沿预热的视角斜着飞**（实测 (0.30,-0.21,-0.34)：既偏 +X 又朝下），
+                // t≈17 一头扎进地面，尾迹刚建起来就断。这里定成「朝 -Z 平射」，与场景设计一致。
+                ctx.player.setYRot(180f)
+                ctx.player.setXRot(0f)
+                ctx.player.setOldPosAndRot()
+                val ok = wand!!.spell(ctx.player)
+                ctx.log("$name cast -> $ok, projectiles=${MagicManager.projectiles.size}")
+            },
+            tick = { ctx, t ->
+                // 诊断：每 4 tick 记一行「火球位置 / 速度 / 寿命 / 在场投射物数」——
+                // 第 43 轮就是靠它看出「火球沿预热视角斜飞、t≈17 扎进地面」的（像素判据量不出这件事）
+                if (t % 4 == 0) {
+                    val alive = MagicManager.projectiles.firstOrNull { it.id == "fireball" && it.alive }
+                    val state = if (alive == null) "gone" else (
+                        "pos=(%.2f,%.2f,%.2f) v=(%.3f,%.3f,%.3f) age=%d".format(
+                            alive.status.pos.x, alive.status.pos.y, alive.status.pos.z,
+                            alive.status.velocity.x, alive.status.velocity.y, alive.status.velocity.z,
+                            alive.status.age,
+                        )
+                        )
+                    ctx.log("trail diag t=$t n=${MagicManager.projectiles.size} bolt=$state")
+                }
+                // 到点主动收掉火球（而不是等它撞墙）：撞墙时刻取决于棚子尺寸与拖拽，
+                // 显式收掉才能让「尾迹逐颗消散」的窗口刚好落在场景后半段（退场判据要 ≥4 帧的渐隐）
+                if (t == TRAIL_DEATH_TICK) {
+                    MagicManager.projectiles.filter { it.id == "fireball" }.forEach { it.alive = false }
+                    ctx.log("trail: bolt released at t=$t (尾迹开始逐颗消散)")
+                }
+            },
+            checksAt = { ctx, t ->
+                when (t) {
+                    // 飞出十几 tick 之后，尾迹应当已经积累出一整条（每 tick 6~11 颗 × 十几 tick）
+                    TRAIL_PARTICLE_CHECK -> listOf(
+                        Check(
+                            name, t, "trail-built-up",
+                            pdParticleCount(ctx) >= TRAIL_MIN_PARTICLES,
+                            "PD 粒子 = ${pdParticleCount(ctx)}（尾迹三层累积，应 ≥$TRAIL_MIN_PARTICLES）",
+                        ),
+                    )
+                    TRAIL_TICKS - 3 -> listOf(
+                        Check(
+                            name, t, "trail-cleaned-up",
+                            MagicManager.projectiles.none { it.id == "fireball" },
+                            "残留火球 = ${MagicManager.projectiles.count { it.id == "fireball" }}",
+                        ),
+                        pdParticleCheck(name, t, ctx),
+                    )
+                    else -> emptyList()
+                }
+            },
+        )
+    }
+
+    /**
+     * 火球拖尾场景：总长（tick）。
+     *
+     * ⚠️ 长度必须 ≥ `收球 tick + 死亡补撒的最长寿命 + 余量`（第 43 轮踩）：
+     * 死亡补撒的余烬寿命是 8~26 tick、在 `t=[TRAIL_DEATH_TICK]` 撒下，最晚到 `33+26=59` 才到点 ——
+     * 场景只给到 60 时，收尾的 `pd-particles-zero` 当场抓到「还剩 1 颗」（差 2 tick 的余量）。
+     *
+     * 时间线：`t=0` 施法 → 火球朝 -Z 平射（0.5 格/tick，`drag` 很小所以几乎匀速）→
+     * `t=[TRAIL_DEATH_TICK]` 主动收掉（走 `onDie` 真实路径，顺带撒一把死亡余烬）→
+     * 之后 **39 tick 看尾迹逐颗到点消散**（退场渐变的采样窗口）。
+     */
+    private const val TRAIL_TICKS = 72
+
+    /** 收掉火球的 tick：显式收（不等撞墙），保证「消散窗口」落在场景后半段 */
+    private const val TRAIL_DEATH_TICK = 33
+
+    /** 施法点相对场景中心的 +Z 偏移（棚子够深，机位一直被包在棚内） */
+    private const val TRAIL_CAST_OFFSET = 9.0
+
+    /** 影棚半宽（格）：**要够大**，否则回望机位的侧向偏移会把镜头塞进墙里（整屏黑） */
+    private const val TRAIL_STUDIO_HALF = 12
+
+    /**
+     * 影棚墙高（格）：**必须够高**（第 43 轮踩）。
+     *
+     * 跟拍机位在火球上方 2.5 格 —— 墙只有 12 高时，相机上升后就从墙体上沿**穿到棚外**，
+     * 画面变成「一堵黑墙 + 外面的草地」，尾迹只剩墙角一小撮（实测峰值从 1369 掉到 149）。
+     */
+    private const val TRAIL_STUDIO_HEIGHT = 22
+
+    /** 尾迹建起来之后采样粒子的 tick（此时火球已飞出一整条尾迹） */
+    private const val TRAIL_PARTICLE_CHECK = 20
+
+    /** 这条断言的下限：15 tick × 每 tick 6~11 颗，取一个保守值（尾迹同时存活的粒子远多于此） */
+    private const val TRAIL_MIN_PARTICLES = 18
+
+    /** 跟拍机位：跟在火球**后上方偏一侧**，视线锁在火球上（火球没了就停在最后位置）。 */
+    private fun trailCam(ctx: CaptureDriver.SceneCtx, t: Int): Pose {
+        val floorY = ctx.floorBlockY(CX, CZ)
+        val bolt = MagicManager.projectiles.firstOrNull { it.id == "fireball" && it.alive }
+        if (bolt != null) {
+            lastTrailX = bolt.status.pos.x
+            lastTrailY = bolt.status.pos.y
+            lastTrailZ = bolt.status.pos.z
+            trailSeen = true
+            val v = bolt.status.velocity
+            val horizontal = sqrt(v.x * v.x + v.z * v.z)
+            if (horizontal > 1e-4f) {
+                lastTrailDirX = v.x / horizontal
+                lastTrailDirZ = v.z / horizontal
+            }
+        }
+        val target = lastTrailTarget()
+        // 机位 = 目标点 + 前向 × 前置距离 + 侧向 × 侧距 + 上方抬升（前向取水平方向，避免俯冲时翻镜头）
+        val x = target.x + lastTrailDirX * TRAIL_CAM_AHEAD + lastTrailDirZ * TRAIL_CAM_SIDE
+        val z = target.z + lastTrailDirZ * TRAIL_CAM_AHEAD - lastTrailDirX * TRAIL_CAM_SIDE
+        val y = max(target.y + TRAIL_CAM_LIFT, floorY + 2.0)
+        val dx = target.x - x
+        val dy = target.y - y
+        val dz = target.z - z
+        val yaw = Math.toDegrees(atan2(-dx, dz)).toFloat()
+        val pitch = (-Math.toDegrees(atan2(dy, sqrt(dx * dx + dz * dz)))).toFloat()
+        return Pose(x, y, z, yaw, pitch)
+    }
+
+    /** 火球消失后相机停在最后看到的位置（没有它就退回施法点上方）。 */
+    private fun lastTrailTarget(): Vector3f =
+        if (trailSeen) Vector3f(lastTrailX, lastTrailY, lastTrailZ) else Vector3f(CX + 0.5f, 4f, CZ + 0.5f)
+
+    // 跟拍机位跨 tick 的缓存（相机函数每个 tick 都要用上一帧的朝向，火球消失后还要停在原地）
+    private var trailSeen = false
+    private var lastTrailX = 0f
+    private var lastTrailY = 0f
+    private var lastTrailZ = 0f
+    private var lastTrailDirX = 0f
+    private var lastTrailDirZ = -1f
+
+    // ---- 跟拍机位常量 ----
+
+    /**
+     * 相机沿**飞行方向**的前置距离（格）：**正值 = 机位在火球前方**。
+     *
+     * ⚠️ 为什么是"前置"而不是跟在后面（第 43 轮连试四组量出来的）：
+     * 尾迹永远是**朝后**铺的 —— 相机跟在后面时，尾迹从相机脚下往远方延伸，
+     * 尾端很快超出同步半径、屏幕上也压成一条纵深线；而且机位会被"挤"到影棚墙角外
+     * （实测出现过整屏黑墙、整屏草地）。改成**前方回望**：火球朝相机飞来，
+     * 尾迹从它身后朝远处铺开，构图稳定、尾迹完整，也不会撞墙。
+     */
+    private const val TRAIL_CAM_AHEAD = 2.0
+
+    /**
+     * 相机侧向偏移（格）：决定"从多斜的角度回望"。
+     *
+     * 与飞行方向的夹角 θ 决定尾迹在屏幕上的投影比（≈sin θ），同时两者一起决定机位到火球的距离
+     * （`√(A²+S²)`，越远颗粒子越小、像素判据越吃亏）：
+     * `A=5 / S=8` → 9.4 格、θ=58°（太远）；`A=3 / S=5` → 5.8 格、θ=59°；
+     * 最终 `A=2 / S=4.2` → **4.65 格**、θ≈64°：第 45 轮把尾迹改短改细之后，
+     * 只有靠到这个距离才看得出「一颗颗菱形」而不是一条糊线。
+     */
+    private const val TRAIL_CAM_SIDE = 4.2
+
+    /** 相机相对火球抬高（格）：略微俯视，尾迹朝画面下方铺开而不是被本体挡住 */
+    private const val TRAIL_CAM_LIFT = 2.5
+
     /** 场上的伤害数字实体数量：护盾挡下时一个都不会有，打穿时才出现（「真的打到了」的直接证据）。 */
     private fun damageNumbers(ctx: CaptureDriver.SceneCtx, holder: TestDummyEntity?): Int {
         val h = holder ?: return 0
@@ -880,7 +1089,11 @@ object CaptureScenes {
      * 它属于 dev-only 的录制工具（`client/capture/`），万一 PD 改名也只影响录制，不影响发布产物。
      */
     private fun pdParticleCheck(scene: String, tick: Int, ctx: CaptureDriver.SceneCtx): Check {
-        val count = runCatching { ParticleManager.of(ctx.level).getEngine().particleCount() }.getOrDefault(-1)
+        val count = pdParticleCount(ctx)
         return Check(scene, tick, "pd-particles-zero", count == 0, "remaining=$count")
     }
+
+    /** 本维度当前存活的 PD 粒子数（读不到给 -1，判定会如实失败而不是假装通过）。 */
+    private fun pdParticleCount(ctx: CaptureDriver.SceneCtx): Int =
+        runCatching { ParticleManager.of(ctx.level).getEngine().particleCount() }.getOrDefault(-1)
 }

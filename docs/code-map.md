@@ -81,7 +81,7 @@
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
-| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**程序化粒子集用 PD 的 `ParticleBatch`、刚性形状/编排动画用 `ParticleGroup`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [issues/resolved.md](issues/resolved.md) 第 10/15 轮、[design/effects-api.md](design/effects-api.md) §0.3 |
+| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**拖尾自第 43 轮起是 Noita 火花弹式三层**（白热核 `LINE` / 连续丝线 `LINE` / 受重力余烬 `SOFT_DOT`，见 `Trajectory` 的类注释与 [issues/resolved.md](issues/resolved.md) 第 43 轮）。**程序化粒子集用 PD 的 `ParticleBatch`、刚性形状/编排动画用 `ParticleGroup`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [issues/resolved.md](issues/resolved.md) 第 10/15 轮、[design/effects-api.md](design/effects-api.md) §0.3 |
 
 ### 法杖、物品、实体
 
@@ -141,6 +141,7 @@
 | `input/SpellSlotScrollHandler.kt` | 滚轮选槽（法杖与小包共用，纯客户端输入） |
 | `input/ClientContainerDragHandler.kt` | Ctrl+左键拖拽交换（走原版 PICKUP 协议） |
 | `render/DroneEntityModel.kt` + `DroneEntityRenderer.kt` | 无人机模型/渲染器 |
+| `render/ParticleTextures.kt` | 本模组**自定义粒子贴图**登记（`primalspells:rune_spark` → `textures/particle/rune_spark.png`）；由 `PrimalSpellsClient` 在**首个客户端 tick** 调一次（碰 `RenderSystem`，不能放 `FMLClientSetupEvent`） |
 
 ### Java mixin
 
@@ -232,5 +233,6 @@
 | `assets/primalspells/items/<id>.json` | 物品定义（1.21+ 数据驱动格式） |
 | `assets/primalspells/models/item/<id>.json` | 物品模型 |
 | `assets/primalspells/textures/{item,entity}/*.png` | 法术物品贴图与无人机实体贴图 |
+| `assets/primalspells/textures/particle/*.png` | **粒子贴图**（PD `registerTexture` 用；当前只有 `rune_spark.png`，见第 45 轮） |
 | `assets/primalspells/lang/zh_cn.json`、`en_us.json` | 语言文件（两侧键集合一致） |
 | `data/primalspells/damage_type/projectile.json` | 伤害类型数据（与 `registry/ModDamageTypes.kt` 对应） |

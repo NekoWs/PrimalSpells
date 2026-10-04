@@ -306,7 +306,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 9. 与 ParticleDrawing 的接口现状
 
-- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.12-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.14-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 集合类粒子（黑洞球壳、被吸入粒子、下落粒子）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
@@ -397,8 +397,8 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   1.0.11-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。
 - 历史 problem 记录：未决需求见 [issues/pd-api-requests.md](issues/pd-api-requests.md)，已闭环条目见 [issues/resolved.md](issues/resolved.md) 附录 B
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
-- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.12-ALPHA**），本模组的
-  `particledrawing_version_range=[1.0.12-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
+- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.14-ALPHA**），本模组的
+  `particledrawing_version_range=[1.0.14-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
   `attachTo`/`trackAll`，或 §7.3 的 `ParticleBatch`/三入口锚点，或 1.0.10 的 `setVelocityAll`/`applyForceAll`）
   会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：

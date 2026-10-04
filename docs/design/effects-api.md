@@ -5,10 +5,10 @@
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。当前卡在「程序化粒子的贴图/UV/各向异性/朝向/加色」这一组能力上，需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
-（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.13-ALPHA`）。
+（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.14-ALPHA`）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
-**当前锁定版本：`1.0.13-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
+**当前锁定版本：`1.0.14-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
 `-sources.jar` 为准，不看旧版本记忆）。
 
 **触发条件**（满足任一即进入本政策）：
@@ -204,7 +204,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > **文档状态（2026-09 结构重构时补记，2026-09-29 更新版本）**
 > - 本文件原在仓库根（`effects-api-design.md`），现已归入 `docs/design/`。
-> - 依赖版本：**1.0.13-ALPHA**（`lib/particledrawing-1.0.13-ALPHA.jar`，附 `-sources.jar`），
+> - 依赖版本：**1.0.14-ALPHA**（`lib/particledrawing-1.0.14-ALPHA.jar`，附 `-sources.jar`），
 >   由 `gradle.properties` 的 `particledrawing_version` 驱动；下方正文中出现的 1.0.6 等版本号是**当时的历史记录**。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
 > - 1.0.9-ALPHA 相对 1.0.8 的 API 增量：**`api/ParticleBatch`**（程序化粒子集：`add`/`trackAll`/`trackEach`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）、
@@ -233,7 +233,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 状态：**播放器侧 API 轮子已实现**（`particledrawing` 仓库，§5 全部落地并通过 `gradlew build` + 单测）。
 > 魔法模组端（`primalspells`）动画/特效接线**后续再做**。
 > 涉及仓库：
-> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.13-ALPHA）
+> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.14-ALPHA）
 > - 魔法模组：`D:\Backup\IDEA Projects\PrimalSpells`（`primalspells`，MC 26.2 / NeoForge 26.2.0.59 / Java 25）
 
 ---

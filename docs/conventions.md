@@ -30,7 +30,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  │  ├─ Modifier.kt            修饰器基类（effects() 克隆注入）
 │  │  └─ TriggerSpell.kt        触发法术接口（payload 组装）
 │  ├─ projectile/               投射物（非 MC Entity 的服务端对象）
-│  │  ├─ Projectile.kt          投射物基类：装配 Position/Velocity/Move/ProjectileBody，命中分派
+│  │  ├─ Projectile.kt          投射物基类：装配 Position/Velocity/Move，命中分派
 │  │  ├─ Fireball.kt DroneBolt.kt TriggerFireball.kt Laser.kt TeleportProjectile.kt
 │  │  ├─ DelayedCastProjectile.kt DroneSwarm.kt
 │  │  └─ immobile/              静止/定点类投射物
@@ -40,7 +40,7 @@ src/main/kotlin/work/nekow/primalspells/
 │     ├─ BaseEffect.kt          特效基类：六钩子 + phase + 同类叠加辅助（stackScale/isStackPrimary）
 │     ├─ geometry/              空间与运动：Position, Velocity, Move, Bounce, Tracking, ConstantAcceleration
 │     ├─ lifecycle/             时机与结算：Trigger, DelayedTrigger, Hurt, Explosion（+ ExplosionFx 表现层）, AreaFieldEffect, BlackHole, GravityField
-│     └─ visual/                粒子表现：ProjectileBody（本体）, Trajectory（拖尾）
+│     └─ visual/                粒子表现：Trajectory（头部本体标记 + 拖尾）
 ├─ wand/                        法杖运行时状态
 │  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（小数 tick + 余数累加）、NBT 序列化（槽位保序）
 │  ├─ WandTier.kt               法杖等级表（六级 + 调试杖：法力/充能速度/施放延迟/充能时间/槽位/施放数）+ 蓄能型变体 + 创建时掷点，见 design/wand-tiers.md
@@ -108,7 +108,7 @@ magic/modifier  ──→ magic/core, magic/effect
 | 对象 | 规则 | 示例 |
 |---|---|---|
 | 包 | 全小写、单数、语义分组 | `magic.effect.geometry` |
-| 类/对象 | PascalCase，名词 | `ProjectileBody`, `WandManager` |
+| 类/对象 | PascalCase，名词 | `Trajectory`, `WandManager` |
 | 文件 | 与其中主类同名（一个文件一个对外类） | `Trajectory.kt` → `class Trajectory` |
 | 法术 `id` | snake_case，与资源名严格一致 | `bounce_explosion` |
 | 法术物品资源 | `assets/primalspells/items/<id>.json`、`models/item/<id>.json`、`textures/item/<id>.png` | 三件套必须齐 |

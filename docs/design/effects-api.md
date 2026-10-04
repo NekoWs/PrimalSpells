@@ -129,7 +129,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 |---|---|---|---|
 | 粒子固定不动 | `create()…spawn()`（不设速度、不发位置指令） | 0 | `GravityField` 范围球壳 |
 | 匀速直线运动 | 生成时一次 `setVelocity(v)`，之后交给 PD 逐 tick 积分 | 0 | `GravityField` 下落粒子、`Trajectory` 拖尾 |
-| 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleBatch.trackAll(positions)`** | 1 包/tick（批量，与粒子数无关） | `ProjectileBody`（单体）。本模组没有「自己算位置」的批量使用者了 |
+| 跟随一个非实体点（逐 tick 变位置） | 单体 `handle.track(pos)`；**多粒子用一次 `ParticleBatch.trackAll(positions)`** | 1 包/tick（批量，与粒子数无关） | 本模组没有「自己算位置」的逐 tick 跟随者了：本体标记改由 `Trajectory` 的头部 `track` 承担 |
 | **每 tick 变化的每粒子速度**（受力随位置变化） | **`ParticleBatch.setVelocityAll(velocities)`**（1.0.10 起）：速度每 tick 重算、一包下发，**位置积分归 PD**（`pos += vel`） | **1 包/tick**（与粒子数无关） | `BlackHole` 被吸入粒子（`v ← v·阻尼 + 向心加速度`） |
 | **组级编排：跟随 + 旋转/淡入淡出/平移** | **`Draw.<形状>(...)` 返回 `ParticleGroup`**，再 `.followEntity(uuid, offset)` / `.spin(axis, radPerTick)` / `.fadeIn` / `.fadeOut(ticks, removeAfter)` / `.move(delta, ticks, easing)`；都在**客户端本地求值**。**1.0.12 起口径变干净了**：`move`/`movePath` **不再改 arm 基准轴心**（轴心只由 `setPivot`/`followEntity` 决定）；`scale`/`pulse` **连「粒子到轴心的距离」一起缩放**；多条 `rotate`/`spin` 的角度**累加**（后一条不覆盖前一条的相位）；**增量追加的指令按「从现在起」读**（长寿组运行期 `delay(n).fadeOut(m)` 就是「n tick 后开始、m tick 淡完」）。顺序仍建议「先绑定轴心再铺成员」，那样最直观。⚠️ **尺寸别按 `scale` 当格数估**：`quadSize = scale × 0.1 × texScale`，实测 `texScale ≈ 2.1` → 实际格数 ≈ `scale × 0.213` | **0 包/tick** | `EnergyShield`（第 16 轮：**每块五/六边形面板一个组**，固定球体 + 逐块 `fadeIn`/`fadeOut` + `spin`）、`BlackHole` 退场后的 `ParticleBatch`、`GravityField` 球壳（`Draw.sphere` + `spin`）与波环/井环 |
 | 恒定 / 分段恒定的力 | `handle.applyForce(accel, ticks)`；整组用 `ParticleBatch.applyForceAll(加速列表, ticks)`：两端同规则积分，只在施力时发一次 | 施力次数 | `GravityField` 下坠粒子（第 15 轮起：`spawnParticle(..., acceleration = Vec3(0,-0.01,0))` → 一次施力、两端逐 tick 积分，**0 逐 tick 包**）；黑洞的力随距离变化，仍用 `setVelocityAll` |
@@ -555,7 +555,7 @@ Java 用法示例见 §6.5。
 
 ### 6.2 投射物本体（程序化）
 
-沿用/重命名 `Trajectory`（或新建 `magic/effect/ProjectileBody.kt`）：`onActive` 创建 `ParticleHandle`，`onTick` `handle.move(status.pos, 1, LINEAR)`，`onDie` `remove()`。本体颜色/大小/发光由各投射物子类参数化（如 `Fireball` 传橙色、`Laser` 传亮白）。
+沿用/重命名 `Trajectory`（**已定稿：不新建该类，本体标记并入 `Trajectory` 的头部**）：`onActive` 创建 `ParticleHandle`，`onTick` `handle.move(status.pos, 1, LINEAR)`，`onDie` `remove()`。本体颜色/大小/发光由各投射物子类参数化（如 `Fireball` 传橙色、`Laser` 传亮白）。
 
 > 本体走服务端权威程序化粒子系统，其客户端渲染层已有 `xo/x` partialTick 插值，跟随平滑无需新锚点机制。
 

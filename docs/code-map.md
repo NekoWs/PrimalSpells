@@ -17,7 +17,7 @@
 | 改命中伤害 | `magic/effect/lifecycle/Hurt.kt` | `magic/core/MagicStatus.kt`（`damage`） |
 | 改爆炸表现 / 范围 / 蓄力时长 | `magic/effect/lifecycle/ExplosionFx.kt`（内爆 → 爆发）、`Explosion.kt`（蓄力与结算时机）、各法术的 `chargeTicks` | `magic/core/MagicStatus.kt`（`explosion*`）、[design/combat-pricing.md](design/combat-pricing.md) §4 |
 | 改区域场（黑洞 / 重力场） | `magic/effect/lifecycle/AreaFieldEffect.kt`（**首 tick 固定维度** + 半径/迟缓/拉拽/投射物施力钩子） | `BlackHole.kt` / `GravityField.kt`（参数与 PD 粒子）、`util/PdParticles.kt`（粒子管理器与生成入口） |
-| 改投射物外观（粒子） | `magic/effect/visual/ProjectileBody.kt`（本体）、`Trajectory.kt`（拖尾） | `util/PdParticles.kt`（管理器 + `spawnParticle`）、`lib/particledrawing`（`ParticleBatch`/`ParticleHandle` 在这里） |
+| 改投射物外观（粒子） | `magic/effect/visual/Trajectory.kt`（头部本体菱形 + 拖尾） | `util/PdParticles.kt`（管理器 + `spawnParticle`）、`lib/particledrawing`（`ParticleEmitter`/`ParticleBatch`/`ParticleHandle` 在这里） |
 | 改「效果谁先跑」 | `magic/core/EffectPhase.kt`（阶段表） | `magic/core/Magic.kt`（排序执行） |
 | 加一个新的法术 | 见 [spell-development.md](spell-development.md) | `magic/core/MagicManager.kt`（注册） |
 | 改某法术的数值 | `magic/projectile/<类>.kt` 或 `magic/modifier/<类>.kt` 的字段 | id ↔ 类见 §3 |
@@ -81,7 +81,7 @@
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
-| `effect/visual/{ProjectileBody,Trajectory}.kt` | 粒子表现（particledrawing）：投射物本体、拖尾。**拖尾自第 43 轮起是 Noita 火花弹式三层**（白热核 `LINE` / 连续丝线 `LINE` / 受重力余烬 `SOFT_DOT`，见 `Trajectory` 的类注释与 [issues/resolved.md](issues/resolved.md) 第 43 轮）。**程序化粒子集用 PD 的 `ParticleBatch`、刚性形状/编排动画用 `ParticleGroup`**（原自研 `ParticleSwarm` 已在第 10 轮删除），见 [issues/resolved.md](issues/resolved.md) 第 10/15 轮、[design/effects-api.md](design/effects-api.md) §0.3 |
+| `effect/visual/Trajectory.kt` | 粒子表现（particledrawing）：**头部一颗 `track` 白热菱形（本体标记，逐渲染帧丝滑）+ 按里程发射的符文尾迹**（`ParticleEmitter`；长度/密度/出生尺寸/尺寸与透明度曲线**全是参数**）；细碎符文、静止场 ambient、死亡补撒走 `spawnAll` 批量 + 寿命曲线。**原 `ProjectileBody`（柔光点）已删除**（同一位置两套时钟会看成闪烁）。见 `Trajectory` 类注释、[design/effects-api.md](design/effects-api.md) §0.1、[issues/resolved.md](issues/resolved.md) 第 48 轮 |
 
 ### 法杖、物品、实体
 

@@ -68,7 +68,7 @@
 effects += Position(position)          // 出生点
 effects += Velocity(velocity * speed)  // 初速（speed 是倍率）
 effects += Move(dragCoeff, hitRadius, throughBlocks, selfDamage)   // 每 tick 推进 + 碰撞
-effects += ProjectileBody(bodyColor)   // 本体粒子
+effects += Trajectory(color)           // 拖尾（头部菱形即本体标记）
 ```
 
 随后 `super.spell()` 按阶段触发 `onActive()`：`Position`/`Velocity`（`SETUP`）先写入出生点与初速，修饰器注入的效果（`MODIFIER`）随后在有效状态上改数值 —— 所以 `SpeedBoost`、`GradualAccelerate` 这类修饰器才能改到初速。
@@ -109,7 +109,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 | | `AreaFieldEffect` | 区域场基类：**每 tick** 结算 —— 范围内刷新迟缓 + 按半径拉拽 + **对半径内投射物施力（黑洞口把法术吸进去、重力场往下压）**；实体离开范围立即撤销迟缓。视觉由子类用 PD 粒子实现（`spawnVisuals`/`updateVisuals`/`clearVisuals` 三个钩子） |
 | | `BlackHole` | 半径 5 引力场：迟缓 I + 把生物与**魔法投射物**拉向中心；PD 粒子每 tick 1 个（紫色、随机切向初速、**本模组积分位置**、吸力随距离增强 + 阻尼，抵达中心 0.1 格才销毁） |
 | | `GravityField` | 半径 5 重力场：迟缓 IV + 给**魔法投射物**向下的力；PD 粒子两层 —— 半径 5 的半透明球壳标识范围（96 个永存），以及上半球表面生成、竖直下落、碰到下半球表面即销毁的下落粒子 |
-| `visual/` | `ProjectileBody` | 一个永存粒子贴在投射物当前位置（`track`，天然带客户端插值） |
+| `visual/` | `Trajectory` | 头部一颗 `track` 白热菱形（本体标记）+ 发射器尾迹（按里程发射、寿命曲线驱动） |
 | | `Trajectory` | 在投射物后方喷拖尾粒子（发射点反向偏移）；速度≈0 时退化为原地氛围粒子 |
 
 **同类效果叠加**：统一用 `BaseEffect.stackScale`（√N）与 `isStackPrimary`（只有首个同类实例改写状态），
@@ -142,7 +142,7 @@ effects += ProjectileBody(bodyColor)   // 本体粒子
 | `MODIFIER`（默认） | SETUP 之后 | 位置积分**之前** | 修饰器注入的效果（改速度/伤害/爆炸参数），以及 `Trajectory`、`Hurt`、`Trigger`、`Explosion` 等 |
 | `MOTION` | — | 中间 | `Move` —— 每 tick **唯一**推进 `status.pos` |
 | `OVERRIDE` | — | 积分**之后** | `SelfOrbit`、`SphereOrbit`、`QuantumEntanglement.OrbitEffect` —— 绝对定位，不再被积分位移叠加 |
-| `VISUAL` | — | 最后 | `ProjectileBody`、`Trajectory` —— 读本 tick 的最终位置发粒子 |
+| `VISUAL` | — | 最后 | `Trajectory` —— 读本 tick 的最终位置发粒子 |
 
 一句话规则：**改速度留在默认阶段，写位置用 `OVERRIDE`，读最终位置用 `VISUAL`。**
 
@@ -200,13 +200,13 @@ for p in projectiles:
                              ├─ MODIFIER：修饰器注入的效果（改速度/伤害）
                              ├─ MOTION  ：Move 阻尼 → 子步进碰撞 → 命中回调 → status.pos 推进
                              ├─ OVERRIDE：轨道类绝对定位（SelfOrbit / SphereOrbit / 量子纠缠复制体）
-                             └─ VISUAL  ：ProjectileBody / Trajectory 读最终位置发粒子
+                             └─ VISUAL  ：Trajectory 读最终位置发粒子
     status.age++
     if status.age >= maxAge: alive = false
 projectiles.addAll(pendingAdd); pendingAdd.clear()
 ```
 
-死亡路径：`alive = false` → 下一 tick 的循环开头 `die()` → effects `onDie()`（`Explosion` 的 `onDeath = true`、`DelayedTrigger` 释放 payload、`TeleportProjectile` 传送施法者、`ProjectileBody` 移除粒子）。
+死亡路径：`alive = false` → 下一 tick 的循环开头 `die()` → effects `onDie()`（`Explosion` 的 `onDeath = true`、`DelayedTrigger` 释放 payload、`TeleportProjectile` 传送施法者、`Trajectory` 停发射器并移除头部粒子）。
 
 `ServerStoppingEvent` 时 `MagicManager.projectiles.clear()`（投射物不跨存档存活）；`WandManager` 同时落盘法杖。
 

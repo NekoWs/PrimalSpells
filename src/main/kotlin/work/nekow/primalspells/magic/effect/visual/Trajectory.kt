@@ -28,13 +28,19 @@ import kotlin.math.sqrt
  * 拖尾特效（ParticleDrawing **1.0.14 的新模型**）：**头部一颗最大最亮的白热菱形 + 身后一条密集、
  * 逐个收细淡出、末尾消失的符文尾迹**。
  *
- * ## 三层结构
+ * ## 三层结构（**头部与尾迹故意错开一 tick**）
  *
  * | 层 | PD 原语 | 读数 |
  * |---|---|---|
- * | **① 尾迹**（主体） | `ParticleEmitter`（**按里程**发射） | 出生最大最白 → 沿来路单向收细收淡 → 末尾消失 |
- * | **② 头部白热菱形** | 单颗 `ParticleHandle` + `track`（永存） | 「第一个最大的」那颗本体标记 |
+ * | **① 头部白热菱形** | 单颗 `ParticleHandle` + `track`（永存） | 「第一个最大的」本体标记；**逐渲染帧丝滑前进** |
+ * | **② 尾迹** | `ParticleEmitter`（**按里程**发射，锚点比头部晚一 tick） | 密而可数 → 沿来路单向收细收淡 → 末尾消失 |
  * | **③ 细碎符文** | `spawnAll` 一次性撒点（带寿命曲线） | 贴着弹体一闪即散的质感层 |
+ *
+ * ⚠️ **为什么头部不能用"尾迹最前那一颗"充数**（第 48 轮实机反馈："法术前进的帧率只有大约 20"）：
+ * `track` 由客户端按 partialTick 在 `prevPos → pos` 之间插值，与 MC 原版粒子同一节奏 ⇒ 丝滑；
+ * 而发射器锚点是「20Hz 采样 + 速度 × partialTick 外推」，拿它当"眼睛跟着的那个点"就会看出 tick 台阶。
+ * 反过来，两条通路的相位若不固定，就会出现"小的拖尾在本体前面"与"闪烁"（同一根因的两种表现）。
+ * 所以：**头部管丝滑、尾迹管留痕，锚点压到上上 tick 保证尾迹永远在头部之后**（见 [prevPrevPos]）。
  *
  * ## 为什么换成发射器（0.14 之前做不到的两件事）
  *
@@ -72,18 +78,21 @@ class Trajectory(
     private var seed: Int = 0
 
     /**
-     * 上一 tick 的权威位置（= 本 tick **动作前**的位置）。
-     * 发射器锚点要的正是它：PD 按「上一 tick 位置 + 速度 × partialTick」求本帧位置，
-     * 与 `track` 的 `lerp(prev, pos, partialTick)` 同语义（见 [ensureEmitter]）。
+     * 上一 tick 的权威位置（= 本 tick **动作前**的位置）：头部 `track` 的那一对插值端点里的前一个。
      */
     private var prevPos: Vec3? = null
 
     /**
-     * 头部那颗白热菱形：**只有一颗**、永存、每 tick `track` 到权威位置。
+     * 再前一 tick 的权威位置。**尾迹发射器锚在它上面**（比头部整整晚一个 tick）。
      *
-     * 为什么不用发射器：发射器是「持续产出粒子」，而头部要的是**恒存的一颗**；它与尾迹共享
-     * `track` / `Anchor.Movable` 同一套 partialTick 插值语义 ⇒ 两者天然对齐（见 [ensureEmitter]）。
+     * 为什么要故意晚一 tick：头部走 `track`（客户端按 partialTick 在 `prevPos → pos` 之间插值，逐渲染帧、
+     * 丝滑），发射器锚点走的是「锚点位置 + 速度 × partialTick」**外推**——两条通路的相位并不严格相等。
+     * 把锚点压到"上上 tick"，发射器的位置就恒 ≤ `prevPos` ≤ 头部渲染位置，**任何相位下都不会越过头部**；
+     * 同时相位差固定（不再摆动）⇒ 那次"闪烁"也一起消失。
      */
+    private var prevPrevPos: Vec3? = null
+
+    /** 头部那颗白热菱形：单颗、永存、`track` 跟走 —— 它就是"法术本体"，也是丝滑前进的那个点。 */
     private var head: ParticleHandle? = null
 
     /** 尾迹发射器（服务端只维护这份声明；客户端逐渲染帧发射）。 */
@@ -94,6 +103,9 @@ class Trajectory(
 
     override fun onActive() {
         seed = System.identityHashCode(this)
+        prevPos = null
+        prevPrevPos = null
+        head = null
     }
 
     override fun onTick() {
@@ -101,8 +113,11 @@ class Trajectory(
         val manager = wand.pdParticles(level)
         val pos = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
         val velocity = Vec3(status.velocity.x.toDouble(), status.velocity.y.toDouble(), status.velocity.z.toDouble())
-        // 本 tick **动作前**的位置：锚点要的正是它（客户端按 `上一 tick 位置 + 速度 × partialTick` 求本帧位置）
+        // 三个位置：pos = 本 tick 权威位置；anchorPos = 本 tick 动作前的位置（头部 track 的插值区间起点）；
+        // lagAnchor = 再前一 tick 的位置（尾迹发射器的锚点，见 [prevPrevPos]）
         val anchorPos = prevPos ?: pos
+        val lagAnchor = prevPrevPos ?: anchorPos
+        prevPrevPos = anchorPos
         prevPos = pos
 
         val speed = velocity.length()
@@ -118,10 +133,10 @@ class Trajectory(
         val speedFactor = (speed / SPEED_FOR_FULL).coerceIn(0.0, 1.0).toFloat()
         val strength = (intensity * (0.55f + 0.45f * speedFactor)).coerceIn(0f, 1f)
 
-        // ① 尾迹：声明式发射器（高刷出现/淡出、带宽 O(1)）
-        ensureEmitter(manager, anchorPos, velocity, speed, strength)
-        // ② 头部白热菱形：单颗、永存、跟走
+        // ① 头部白热菱形：单颗、永存、`track` —— 丝滑前进的"本体"
         ensureHead(manager, pos)
+        // ② 尾迹：发射器（锚点比头部晚一 tick ⇒ 永不越到前面）
+        ensureEmitter(manager, lagAnchor, velocity, speed, strength)
         // ③ 贴着弹体、快速向附近散开又很快消失的细小符文（只做质感，不做长度）
         emitMotes(manager, anchorPos, dir, side, up, strength)
     }
@@ -150,6 +165,7 @@ class Trajectory(
         val side = perpendicular(dir)
         val up = dir.cross(side).normalize()
         prevPos = null
+        prevPrevPos = null
         if (speed < MIN_SPEED) {
             emitFieldAfterglow(manager, pos, side, up)
             return
@@ -178,23 +194,43 @@ class Trajectory(
     // =====================================================================================
 
     /**
-     * **声明/更新尾迹发射器**。
+     * ① **头部白热菱形**：单颗、永存、每 tick `track` 到权威位置。
      *
-     * 发给 PD 的是一句声明（「沿这个锚点、每 [TRAIL_SPACING] 格一颗、活 life tick、出生 0.5 格、
-     * 沿寿命线性收到 0.2 倍、最后一段淡到透明」），**发射发生在客户端、按渲染帧、用锚点的插值位置
-     * 推进里程** —— 所以「投射物在渲染帧上走到哪，尾迹就铺到哪」，不再有 tick 量化与相位差。
+     * 为什么必须是 `track`（而不是让尾迹最前那颗充当头部）：`track` 由客户端按 **partialTick 在
+     * `prevPos → pos` 之间插值**，与 MC 原版粒子同一套渲染节奏 ⇒ **逐渲染帧、丝滑前进**；而发射器的
+     * 锚点是 20Hz 采样 + 速度外推，用它当"头"就会看出 20Hz 台阶（第 48 轮实机反馈："法术前进的帧率
+     * 只有大约 20"）。头部负责"丝滑 + 标记本体"，尾迹负责"密而渐隐的痕"，两者用 [prevPrevPos] 的
+     * 一 tick 错位保证永不互相穿插。
+     */
+    private fun ensureHead(manager: ParticleManager, pos: Vec3) {
+        if (intensity <= 0f) return
+        if (head == null) {
+            head = manager.create()
+                .position(pos.x, pos.y, pos.z)
+                .color(hotColor(1f))          // 纯白热
+                .visual(runeVisual(HEAD_BLOCKS)) // 0.60 格（世界格口径）= 与尾迹出生那颗同尺寸 ⇒ 接上不留台阶
+                .lifetime(-1)                 // 永存，由 [onDie] 移除
+                .spawn()
+        }
+        head?.track(pos.x, pos.y, pos.z)
+    }
+
+    /**
+     * ② **尾迹发射器**。
      *
-     * ⚠️ 锚点必须给**上一 tick 的位置**（[anchorPos]，即本 tick 动作前的位置）：PD 的
-     * `ClientEmitterManager` 是按「`上一 tick 位置 + 速度 × partialTick`」求本帧位置的
-     * （与 `track` 的 `lerp(prev, pos, partialTick)` 同语义）⇒ 尾迹与本体/头部天然对齐，
-     * 既不需要"延迟一 tick"的绕法，也不会有一颗粒子冒到本体前面。
+     * 发给 PD 的是一句声明（「沿这个锚点、每 [TRAIL_SPACING] 格一颗、活 life tick、出生 0.50 格、
+     * 沿寿命收细淡出」），**发射发生在客户端、按渲染帧、用锚点的插值位置推进里程**。
+     *
+     * ⚠️ 锚点给的是 **`lagAnchor` = 上上 tick 的位置**（见 [prevPrevPos]）：比头部整整晚一 tick，
+     * 于是任何 partialTick 相位下都不会有尾迹粒子冒到本体前面（实机反馈过的"小的拖尾出现在最大的
+     * 本体前面"与"闪烁"都源于两套时钟的相位差）。
      *
      * 寿命只在速度明显变化时重挂（[SPEED_REBUILD_RATIO]）：`life = 长度 ÷ 速度 ÷ 可见占比`，
      * 而 `EmitterHandle` 不能改寿命，所以速度漂了就只能重新声明一次（旧粒子各自走完寿命，不受影响）。
      */
     private fun ensureEmitter(
         manager: ParticleManager,
-        anchorPos: Vec3,
+        lagAnchor: Vec3,
         velocity: Vec3,
         speed: Double,
         strength: Float,
@@ -204,7 +240,7 @@ class Trajectory(
         // 末段约 15% 寿命是淡出区（设计要求"末尾完全消失"），实测"可见/名义 ≈ 0.85"（第 48 轮）。
         val life = (length / speed / TRAIL_VISIBLE_FRACTION).roundToInt()
             .coerceIn(TRAIL_LIFE_MIN, TRAIL_LIFE_MAX)
-        val anchor = Anchor.Movable(anchorPos, velocity)
+        val anchor = Anchor.Movable(lagAnchor, velocity)
         val current = emitter
         if (current != null && abs(speed - emitterSpeed) <= emitterSpeed * SPEED_REBUILD_RATIO) {
             current.updateAnchor(anchor) // 每 tick 挪锚点（PD 侧只在变化时发包）
@@ -213,14 +249,16 @@ class Trajectory(
         current?.stop()
         val headHot = (TRAIL_HOT_HEAD_BASE + (1f - TRAIL_HOT_HEAD_BASE) * strength).coerceIn(0f, 1f)
         emitter = manager.emitter(anchor)
-            .spacing(TRAIL_SPACING)                                  // 密：每 0.15 格一颗
+            .spacing(TRAIL_SPACING)                                   // 密：每 0.15 格一颗
             .life(life)
             .color(hotColor(headHot).withAlpha(TRAIL_ALPHA))          // 出生即白热；alpha 压低见 [TRAIL_ALPHA]
-            .scale(TRAIL_SCALE_HEAD)                                  // 出生 0.50 格（本体 0.60，略小一些）
+            .scale(TRAIL_SCALE_HEAD)                                  // 出生 0.50 格（头部 0.60，略小一些）
             .texture(ParticleTextures.RUNE_SPARK)
             .glowing(true)
             .additive(true)
-            // 尺寸乘数：线性收到 0.2 倍（0.50 → 0.10 格）——"逐渐变小"
+            // 尺寸乘数：从**本体大小**（1.0 = 0.60 格）沿寿命**线性**收到 0.17（= 0.10 格）。
+            // ⚠️ 别在前段加陡降（曾经用过「前 1/3 寿命掉到 55%」）：那会在本体与尾迹之间留一道
+            // 尺寸台阶，实机反馈「本体明显比后面的拖尾要大，要之前的连续感」。要连续就线性、从同一尺寸起铺。
             .sizeCurve(
                 CurveKey.at(0, 1f),
                 CurveKey.at(life, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
@@ -233,21 +271,6 @@ class Trajectory(
             .maxAlive(TRAIL_MAX_ALIVE)
             .spawn()
         emitterSpeed = speed
-    }
-
-    /** ② **头部白热菱形**：单颗、永存、`track` 到权威位置（与尾迹共享同一套 partialTick 插值语义）。 */
-    private fun ensureHead(manager: ParticleManager, pos: Vec3) {
-        if (intensity <= 0f) return
-        if (head == null) {
-            head = manager.create()
-                .position(pos.x, pos.y, pos.z)
-                .color(hotColor(1f))          // 纯白热
-                .scale(TRAIL_SCALE_CORE)      // 0.60 格：比尾迹出生那颗（0.50）更大 ⇒「头部最大」
-                .visual(runeVisualScaled())
-                .lifetime(-1)                 // 永存，由 [onDie] 移除
-                .spawn()
-        }
-        head?.track(pos.x, pos.y, pos.z)
     }
 
     // =====================================================================================
@@ -416,15 +439,6 @@ class Trajectory(
             .glowing(true)
             .additive(true)
 
-    /**
-     * **符文菱形（scalar 尺寸版）**：与 [runeVisual] 同一张贴图，但尺寸交给粒子的 scalar `scale`。
-     * 头部那颗用它 —— 它的尺寸要与尾迹的 `scale` 口径一致（尾迹走发射器的 `scale`）。
-     */
-    private fun runeVisualScaled(): ParticleVisual =
-        ParticleVisual().texture(ParticleTextures.RUNE_SPARK)
-            .glowing(true)
-            .additive(true)
-
     // =====================================================================================
     // 确定性随机
     // =====================================================================================
@@ -510,11 +524,20 @@ class Trajectory(
         const val SPEED_REBUILD_RATIO = 0.20
 
         /**
-         * 出生 / 末端尺寸（**scalar**，编辑器单位）：贴图 16×16 ⇒ texScale = 1 ⇒ 渲染整宽 = `scale × 0.2` 格，
-         * 所以 0.50 格 = 2.5、0.10 格 = 0.5。出生尺寸按用户口径「**和本体差不多大、略小一些**」。
+         * 尾迹出生 / 末端尺寸（**scalar**，编辑器单位）：贴图 16×16 ⇒ texScale = 1 ⇒ 渲染整宽 = `scale × 0.2` 格，
+         * 所以 0.60 格 = 3.0、0.10 格 = 0.5。
+         *
+         * 出生尺寸 = **头部那颗的大小**（都是 0.60 格）：用户口径「本体明显比后面的拖尾要大」⇒ 要的是
+         * **连续感**，所以从本体大小起铺、只做温和递减，中间不留尺寸台阶。
+         * （尾迹锚点比头部晚一 tick ≈ 0.4 格，两颗 0.60 格的菱形半径各 0.3 格 ⇒ 正好盖住这点错位，看不出缝。）
          */
-        const val TRAIL_SCALE_HEAD = 2.5f
+        const val TRAIL_SCALE_HEAD = 3.0f
         const val TRAIL_SCALE_TAIL = 0.5f
+
+        /** 头部白热菱形（[runeVisual] 的**世界格**口径）：0.60 格，比尾迹出生那颗大 ⇒「头部最大」 */
+        const val HEAD_BLOCKS = 0.60
+
+        /** 头部白热菱形（[runeVisual] 的**世界格**口径）：0.60 格 —— 与尾迹出生那颗**同尺寸**（连续感） */
 
         /**
          * 出生时的固定 alpha（加色混合下 alpha 就是亮度权重）。
@@ -532,10 +555,6 @@ class Trajectory(
          * 出生时的白热档位（再乘 strength）：**头部那颗要是整条尾迹里最亮最白的**（用户口径「白热菱形」）。
          */
         const val TRAIL_HOT_HEAD_BASE = 0.85f
-
-        // ---- ② 头部白热菱形（单颗、永存、track 跟走） ----
-        /** 0.60 格（3.0 × 0.2）：比尾迹出生那颗（0.50 格）更大 ⇒「头部最大」在尺寸上无歧义 */
-        const val TRAIL_SCALE_CORE = 3.0f
 
         // ---- ③ 细碎符文（只做质感，不拉长尾迹） ----
         const val MOTE_BASE = 3.5f

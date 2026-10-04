@@ -66,7 +66,7 @@ PrimalSpells/
 | **Magic** | 法术基类：`id`、`mana`、`delay`、`recharge`、`effects`、`lore`、生命周期钩子 | `magic/core/Magic.kt` |
 | **Projectile** | 特殊法术：不是 MC 实体，而是服务端 Kotlin 对象，靠每 tick 的 effect 驱动位置与命中 | `magic/projectile/Projectile.kt` |
 | **Modifier**（原 `Revise`） | 修饰器：施法时把自身携带的 effect 注入到本次施法的投射物上，或改动参数（伤害/速度/弹跳…） | `magic/core/Modifier.kt`、`magic/modifier/` |
-| **Effect** | 挂在投射物上的可组合行为：几何（`Move`/`Velocity`…）、时机与结算（`Hurt`/`Explosion`/`Trigger`…）、表现（`ProjectileBody`/`Trajectory`） | `magic/effect/` |
+| **Effect** | 挂在投射物上的可组合行为：几何（`Move`/`Velocity`…）、时机与结算（`Hurt`/`Explosion`/`Trigger`…）、表现（`Trajectory`） | `magic/effect/` |
 | **MagicStatus** | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 | `magic/core/MagicStatus.kt` |
 | **EffectPhase** | 效果执行阶段（SETUP/MODIFIER/MOTION/OVERRIDE/VISUAL），决定效果谁先跑 | `magic/core/EffectPhase.kt` |
 | **Wand** | 法杖运行时对象：牌堆（`drawPile`/`hand`/`discardPile`）、法力与冷却、NBT 序列化 | `wand/Wand.kt` |

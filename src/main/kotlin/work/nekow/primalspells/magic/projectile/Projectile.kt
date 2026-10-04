@@ -5,7 +5,7 @@ import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.effect.geometry.Move
 import work.nekow.primalspells.magic.effect.geometry.Position
-import work.nekow.primalspells.magic.effect.visual.ProjectileBody
+import work.nekow.primalspells.magic.effect.visual.Trajectory
 import work.nekow.primalspells.magic.effect.geometry.Velocity
 import work.nekow.primalspells.util.HitResult
 import work.nekow.primalspells.util.HitType
@@ -41,7 +41,7 @@ abstract class Projectile: Magic() {
         // 内建效果按阶段执行（见 EffectPhase）：
         //   SETUP  —— Position / Velocity 写入出生点与初速
         //   MOTION —— Move 每 tick 做位置积分与碰撞
-        //   VISUAL —— ProjectileBody / Trajectory 读本 tick 的最终位置发粒子
+        //   VISUAL —— Trajectory 读本 tick 的最终位置发粒子
         // 修饰器注入的效果默认落在 MODIFIER 阶段：onActive 在 SETUP 之后（能改初速/伤害），
         // onTick 在 MOTION 之前（改的是速度这类输入量）。
         effects += Position(position)
@@ -52,7 +52,8 @@ abstract class Projectile: Magic() {
             throughBlocks = throughBlocks,
             selfDamage = selfDamage,
         )
-        effects += ProjectileBody(bodyColor)
+        // 本体标记交给 Trajectory 的头部白热菱形（`track`，逐渲染帧丝滑）：不再单独挂一个柔光点，
+        // 否则同一个"本体位置"会有两套时钟（track vs 发射器锚点），相位差会看成闪烁。
 
         effects.forEach {
             it.projectile = this

@@ -55,7 +55,7 @@ class IceShard : Projectile() {
 }
 ```
 
-> 想额外附加效果时，**不要**手动加 `Position`/`Velocity`/`Move`/`ProjectileBody`——`Projectile.spell()` 已自动装配，重复加会让投射物按两倍速度前进。
+> 想额外附加效果时，**不要**手动加 `Position`/`Velocity`/`Move`——`Projectile.spell()` 已自动装配，重复加会让投射物按两倍速度前进。
 
 ### `Projectile` 可调字段速查
 
@@ -72,7 +72,7 @@ class IceShard : Projectile() {
 | `hitRadius` | 0.0 | 实体碰撞半径，**0 = 不做实体检测** |
 | `throughBlocks` | false | true = 穿墙但不消失（会写 `status.atBlock`） |
 | `selfDamage` | false | 是否允许命中施法者 |
-| `bodyColor` | `Color.WHITE` | `ProjectileBody` 的颜色 |
+| `bodyColor` | `Color.WHITE` | 拖尾与头部的主色（传给 `Trajectory`） |
 | `status.damage` | 0.0 | 命中伤害 |
 | `status.explosionRadius` / `explosionDamage` | 2.0f / 5.0 | `Explosion` 效果使用（只做伤害与击退，不破坏方块） |
 
@@ -363,7 +363,7 @@ class MyPassive : Modifier() {
 
 1. **改 `id` 会破坏存档**：法杖存档与物品组件里存的是 id 字符串；改名后旧法杖会找不到法术（`create` 返回 null）。
 2. **`Magic.clone()` 不是拷贝**：它是 `MagicManager.create(id)!!`——依赖「继承父投射物状态」的逻辑会拿到一份**全新默认实例**（`ClusterBomb`/`ExplosionProjectile` 的注释就与实现相反）。
-3. **不要重复挂内建 effect**：`Projectile.spell()` 已加 `Position/Velocity/Move/ProjectileBody`。
+3. **不要重复挂内建 effect**：`Projectile.spell()` 已加 `Position/Velocity/Move`。
 4. **`hitRadius = 0` 不做实体检测**：不写它就永远不会命中实体（但会撞方块）。
 5. **`speed` 是倍率不是速度上限**：`velocity = 视线单位向量 * speed`；`Move` 之后每 tick 只受阻尼影响。
 6. **`mana` 为负是返还**：`Wand.consumeMana` 靠符号实现，别写 `mana = 0` 又指望返还。

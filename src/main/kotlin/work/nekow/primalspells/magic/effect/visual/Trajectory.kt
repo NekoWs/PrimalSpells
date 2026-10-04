@@ -2,9 +2,16 @@ package work.nekow.primalspells.magic.effect.visual
 
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
+import work.nekow.particledrawing.api.Anchor
 import work.nekow.particledrawing.api.Color
+import work.nekow.particledrawing.api.CurveKey
+import work.nekow.particledrawing.api.EmitterHandle
+import work.nekow.particledrawing.api.ParticleBatch
+import work.nekow.particledrawing.api.ParticleHandle
 import work.nekow.particledrawing.api.ParticleManager
+import work.nekow.particledrawing.api.ParticleSpawnSpec
 import work.nekow.particledrawing.api.ParticleVisual
+import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.client.render.ParticleTextures
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
@@ -18,55 +25,72 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * 拖尾特效：Noita「火花弹」式的分层粒子尾迹（替换原来「每 tick 两颗随机小点」的写法）。
+ * 拖尾特效（ParticleDrawing **1.0.14 的新模型**）：**头部一颗最大最亮的白热菱形 + 身后一条密集、
+ * 逐个收细淡出、末尾消失的符文尾迹**。
  *
- * ## 三层结构（一次 [onTick] 里按「谁更靠前」的顺序铺）
+ * ## 三层结构
  *
- * | 层 | 贴图 | 位置 | 运动 | 读数 |
- * |---|---|---|---|---|
- * | **bead 白热核** | `LINE` 贴图 + 方比例 | `[-0.05R, -0.30R]` 段上（贴着本体） | 随投射物同向、略快 → 被本体甩在后面 | 一颗过曝白黄亮核 |
- * | **filament 丝线** | `LINE`（两端渐隐） | `[-0.02R, -0.38R]` 段上（本体后一小段） | 近零速 → 几乎钉在被抛下的位置 | 白热 → 主色的连续亮芯 |
- * | **ember 余烬** | `SOFT_DOT` | `[-0.12R, -1.05R]` 段上，带侧向散开 | 反向初速 + 侧向扩散 + **恒定下坠力** | 主色 → 压暗主色的火花 |
+ * | 层 | PD 原语 | 读数 |
+ * |---|---|---|
+ * | **① 尾迹**（主体） | `ParticleEmitter`（**按里程**发射） | 出生最大最白 → 沿来路单向收细收淡 → 末尾消失 |
+ * | **② 头部白热菱形** | 单颗 `ParticleHandle` + `track`（永存） | 「第一个最大的」那颗本体标记 |
+ * | **③ 细碎符文** | `spawnAll` 一次性撒点（带寿命曲线） | 贴着弹体一闪即散的质感层 |
  *
- * 三件事让它读起来「细」而不是「一串点」：
- * 1. **贴图**：`LINE` 两端各渐隐 ≈0.2×长度、`SOFT_DOT` 边缘柔化 —— 不再是一排硬边方块；
- * 2. **运动**：丝线层近零速「钉」在轨迹上、余烬层才反向散开并受重力 —— 于是一根**连续的亮芯**
- *    外面挂一圈**向外飘落的火花**，而不是均匀的一串珠子；
- * 3. **颜色**：每层都在「白热」与法术主色之间插值（[color] 仍是各法术原来的输入），
- *    头部更白、尾部更接近主色并被压暗 —— 明暗有层次。
+ * ## 为什么换成发射器（0.14 之前做不到的两件事）
  *
- * ## 静止时（黑洞 / 重力场 / `delayed_cast`）
+ * 旧实现是「服务端每 tick 按里程采样、逐颗 `create().spawn()` + `recolor`/`resize` 补间」，
+ * 而且因为程序化粒子按绝对位置渲染、本体走 `track` 被 partialTick 插值，只能把采样段**整体延迟
+ * 一 tick** 才勉强做到「拖尾在本体后面」。两条根本限制（都读源码核实过）：
  *
- * 速度 ≈ 0 时不铺尾迹，改撒**缓漂的余烬 + 偶发白核**（[emitAmbient]）：位置按黄金角摊在球面上、
- * 速度朝外且很慢、寿命随机，读起来是「一颗在缓慢吐火星的球」，而不是原地点几个点。
+ * 1. 旧**运行时通路没有逐帧求值** —— 缓动只在 `onClientTick`（20Hz）推进，非运动粒子还要按
+ *    `particleBatchSize` 轮转分批（PD 自己注释"时走时停"）⇒ 出现/淡出都是 tick 量化的、高刷不顺；
+ * 2. 插值语义不统一 —— 程序化粒子绝对位置 vs `track` 的 partialTick 插值。
  *
- * ## 带宽
+ * 0.14 的发射器把这两条一起解决了：**服务端只声明一次，客户端按渲染帧、用锚点的插值位置推进里程**，
+ * 于是「出现/消淡逐帧、带宽 O(1)」，而且锚点与 `track` 是**同一套插值语义**（见 [ensureEmitter]）。
+ * 游戏语义仍留在本侧：长度按格给、寿命＝长度÷速度、强度倍率都由这里算好再翻译成参数。
  *
- * 每颗粒子只在**生成那次**下发（位置 + 一次速度 + 一次恒定力），之后位置积分、寿命回收、渲染全归 PD：
- * 全程**零逐 tick 位置包**（对比 `handle.track` 驱动是每 tick 每粒子一包）。
+ * ## 静止时（黑洞 / 重力场 / `delayed_cast`，`speed ≈ 0`）
  *
- * ## 随机数是**确定性**的（[hash01]）
- *
- * 不用 `Random`：同一颗投射物在同一 tick 永远得到同一组偏移。理由是本项目的实机录制
- * （`tools/capture/`）与离线自检要求**可复现**，纯随机会让同一份代码两次录出不同画面。
- * 取偏移用「整数哈希 + 位段」而不是递推序列，避免相邻粒子取到相邻值而聚成串。
+ * 不铺尾迹，改撒**缓漂的余烬 + 偶发白核**（[emitAmbient]）。位置要摊在球壳上 ⇒ 发射器（点发射）
+ * 表达不了，走 `spawnAll` 批量生成 + 批量速度。
  *
  * 阶段：[EffectPhase.VISUAL] —— 在位置积分之后执行，读到本 tick 的最终位置与速度。
  *
  * @param color     拖尾**主色**（各法术原本传入的颜色：火球橙、激光青、黑洞紫…）
  * @param intensity 整体倍率（粒子数与尺寸同乘），默认 1；给 0 即完全关闭该法术的尾迹
+ * @param length    拖尾长度（**格**，与速度无关；给 0 也等于关闭本效果的尾迹），默认 [TRAIL_BLOCKS]
  */
 class Trajectory(
     val color: Color,
     val intensity: Float = 1f,
+    val length: Double = TRAIL_BLOCKS,
 ) : BaseEffect() {
     override val phase = EffectPhase.VISUAL
 
-    /** 上一 tick 的位置：尾迹沿「上一帧 → 本帧」这段位移铺，而不是全挤在本帧的头部。 */
+    /** 本效果的稳定身份（确定性随机的"哪一颗投射物"那一维）。 */
+    private var seed: Int = 0
+
+    /**
+     * 上一 tick 的权威位置（= 本 tick **动作前**的位置）。
+     * 发射器锚点要的正是它：PD 按「上一 tick 位置 + 速度 × partialTick」求本帧位置，
+     * 与 `track` 的 `lerp(prev, pos, partialTick)` 同语义（见 [ensureEmitter]）。
+     */
     private var prevPos: Vec3? = null
 
-    /** 本效果的稳定身份（哈希里"哪一颗投射物"那一维），避免同一 tick 的多颗投射物形状雷同。 */
-    private var seed: Int = 0
+    /**
+     * 头部那颗白热菱形：**只有一颗**、永存、每 tick `track` 到权威位置。
+     *
+     * 为什么不用发射器：发射器是「持续产出粒子」，而头部要的是**恒存的一颗**；它与尾迹共享
+     * `track` / `Anchor.Movable` 同一套 partialTick 插值语义 ⇒ 两者天然对齐（见 [ensureEmitter]）。
+     */
+    private var head: ParticleHandle? = null
+
+    /** 尾迹发射器（服务端只维护这份声明；客户端逐渲染帧发射）。 */
+    private var emitter: EmitterHandle? = null
+
+    /** 声明发射器时用的速度：速度明显变化就重挂（寿命 = 长度 ÷ 速度，速度变了寿命也得变）。 */
+    private var emitterSpeed: Double = 0.0
 
     override fun onActive() {
         seed = System.identityHashCode(this)
@@ -77,7 +101,8 @@ class Trajectory(
         val manager = wand.pdParticles(level)
         val pos = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
         val velocity = Vec3(status.velocity.x.toDouble(), status.velocity.y.toDouble(), status.velocity.z.toDouble())
-        val from = prevPos ?: pos
+        // 本 tick **动作前**的位置：锚点要的正是它（客户端按 `上一 tick 位置 + 速度 × partialTick` 求本帧位置）
+        val anchorPos = prevPos ?: pos
         prevPos = pos
 
         val speed = velocity.length()
@@ -93,19 +118,12 @@ class Trajectory(
         val speedFactor = (speed / SPEED_FOR_FULL).coerceIn(0.0, 1.0).toFloat()
         val strength = (intensity * (0.55f + 0.45f * speedFactor)).coerceIn(0f, 1f)
 
-        // ⚠️ **锚点必须用上一 tick 的位置 [from]，不能用本 tick 的 [pos]**（第 47 轮修）：
-        //   本体粒子走 `handle.track(...)`，PD 在客户端按 `TrackBuffer` 的 `previous → current`
-        //   两端点做 partialTick 插值 ⇒ 屏幕上看到的本体位置**永远落后权威位置最多一整 tick**
-        //   （`partialTick = 0` 时正好落后一格位移）。而尾迹粒子是「生成即静止」、按绝对位置渲染的
-        //   ⇒ 若拿 [pos] 当锚点，尾迹最前那一颗会**系统性地跑到本体前面一格**
-        //   （用户实机截图圈出来的就是它）。锚点放到 [from] 上，两者就落在同一个插值端点上、一起前进。
-        val anchor = from
-        // ① 扫过的余痕：从锚点沿来路往后铺一串**逐渐变小变淡**的符文菱形 —— 尾迹的主体与轮廓
-        emitSmear(manager, anchor, pos, dir, strength)
-        // ② 锚点上的那颗白热符文核：把「法术弹在哪」点出来（与本体粒子的渲染位置对齐）
-        emitCore(manager, anchor)
+        // ① 尾迹：声明式发射器（高刷出现/淡出、带宽 O(1)）
+        ensureEmitter(manager, anchorPos, velocity, speed, strength)
+        // ② 头部白热菱形：单颗、永存、跟走
+        ensureHead(manager, pos)
         // ③ 贴着弹体、快速向附近散开又很快消失的细小符文（只做质感，不做长度）
-        emitMotes(manager, anchor, dir, side, up, strength)
+        emitMotes(manager, anchorPos, dir, side, up, strength)
     }
 
     /**
@@ -114,8 +132,15 @@ class Trajectory(
      * ⚠️ 寿命**必须错开**（[DEATH_LIFETIME_MIN]..[DEATH_LIFETIME_MAX]）：早先给的是同一个常数，
      * 结果整批火花在同一 tick 到点、全局曲线是个**悬崖** —— 实机录制的退场判据
      * （`50% → 5%` 的跨度 ≥4 帧）当场把它抓出来了。错开之后是逐颗收掉的**渐隐**。
+     *
+     * 0.14 起整批走 `spawnAll`（一次包）+ 批量速度/力（各一次包），不再逐颗下发。
      */
     override fun onDie() {
+        head?.remove()
+        head = null
+        emitter?.stop()
+        emitter = null
+        emitterSpeed = 0.0
         val level = caster.level() as? ServerLevel ?: return
         val manager = wand.pdParticles(level)
         val pos = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
@@ -124,161 +149,188 @@ class Trajectory(
         val dir = if (speed > MIN_SPEED) velocity.scale(1.0 / speed) else Vec3(0.0, 1.0, 0.0)
         val side = perpendicular(dir)
         val up = dir.cross(side).normalize()
+        prevPos = null
         if (speed < MIN_SPEED) {
             emitFieldAfterglow(manager, pos, side, up)
-            prevPos = null
             return
         }
+        val specs = ArrayList<ParticleSpawnSpec>(DEATH_SPARKS)
+        val velocities = ArrayList<Vec3>(DEATH_SPARKS)
         repeat(DEATH_SPARKS) { i ->
             val theta = GOLDEN_ANGLE * i + hash01(seed, i + 401) * TAU
             val outward = side.scale(cos(theta)).add(up.scale(sin(theta)))
-            val drift = outward.normalize().scale(DEATH_SPEED * (0.5 + hash01(seed, i + 421))).add(dir.scale(-DEATH_SPEED * 0.4))
+            velocities += outward.normalize().scale(DEATH_SPEED * (0.5 + hash01(seed, i + 421)))
+                .add(dir.scale(-DEATH_SPEED * 0.4))
             val lifetime = DEATH_LIFETIME_MIN +
                 (hash01(seed, i + 481) * (DEATH_LIFETIME_MAX - DEATH_LIFETIME_MIN)).toInt()
             val size = MOTE_SIZE_MIN + (MOTE_SIZE_MAX - MOTE_SIZE_MIN) * hash01(seed, i + 461)
-            manager.create()
-                .position(pos)
+            specs += ParticleSpawnSpec().position(pos)
                 .color(hotColor(0.55f + 0.45f * hash01(seed, i + 441).toFloat()))
                 .visual(runeVisual(size * 1.6))
                 .lifetime(lifetime)
-                .spawn()
-                ?.setVelocity(drift)
-                ?.applyForce(FALLING, FORCE_FOREVER)
+                .fadeOut(tailFade(lifetime), EasingType.LINEAR)
         }
-        prevPos = null
+        launch(manager, specs, velocities, FALLING)
     }
 
     // =====================================================================================
-    // 三层（① 余痕 / ② 白热核 / ③ 细碎符文）
+    // ① 尾迹发射器
     // =====================================================================================
 
     /**
-     * ① **扫过的余痕**（第 45 轮用户选定的形状）：从**锚点**（= 上一 tick 的权威位置，见 [onTick]）
-     * 沿来路往后，铺一串**逐渐变小变淡**的符文菱形。
+     * **声明/更新尾迹发射器**。
      *
-     * 为什么这样能得到「清晰的轮廓」：
-     * - 余痕由**沿轨迹排列**的菱形组成（不是围着路径乱散的点云）⇒ 读成"一道划过的痕迹"；
-     * - 每颗菱形都是**广告牌**（`ParticleVisual` 默认 billboard = true）⇒ 任何视角都正面朝向相机，
-     *   ⚠️ **别给这一层加 `alignTo`**：它会强制 `billboard = false`，菱形就变成固定朝向的**薄片**
-     *   （第 46 轮用户实机反馈「正视几乎就是一个薄片」）。符文是对称菱形，串形状靠的是
-     *   位置 + 尺寸 + 亮度的梯度，不需要旋转它；
-     * - 尺寸与亮度按「离本体多远」单调递减（贴着本体的最大最亮）⇒ 有明确的方向与锥度。
+     * 发给 PD 的是一句声明（「沿这个锚点、每 [TRAIL_SPACING] 格一颗、活 life tick、出生 0.5 格、
+     * 沿寿命线性收到 0.2 倍、最后一段淡到透明」），**发射发生在客户端、按渲染帧、用锚点的插值位置
+     * 推进里程** —— 所以「投射物在渲染帧上走到哪，尾迹就铺到哪」，不再有 tick 量化与相位差。
      *
-     * 速度**不给**：粒子留在原地由 PD 积分，本体继续飞 —— 「扫过」这个语义是位置关系带来的，
-     * 不需要速度，所以这一层也是 0 逐 tick 包。
+     * ⚠️ 锚点必须给**上一 tick 的位置**（[anchorPos]，即本 tick 动作前的位置）：PD 的
+     * `ClientEmitterManager` 是按「`上一 tick 位置 + 速度 × partialTick`」求本帧位置的
+     * （与 `track` 的 `lerp(prev, pos, partialTick)` 同语义）⇒ 尾迹与本体/头部天然对齐，
+     * 既不需要"延迟一 tick"的绕法，也不会有一颗粒子冒到本体前面。
      *
-     * @param anchor 锚点（上一 tick 的权威位置）—— 与本体粒子的插值端点对齐，见 [onTick]
-     * @param pos    本 tick 的权威位置（只用来量「这一 tick 走了多远」，决定余痕的纵向展开）
+     * 寿命只在速度明显变化时重挂（[SPEED_REBUILD_RATIO]）：`life = 长度 ÷ 速度 ÷ 可见占比`，
+     * 而 `EmitterHandle` 不能改寿命，所以速度漂了就只能重新声明一次（旧粒子各自走完寿命，不受影响）。
      */
-    private fun emitSmear(manager: ParticleManager, anchor: Vec3, pos: Vec3, dir: Vec3, strength: Float) {
-        if (strength <= 0f) return
-        val lateral = perpendicular(dir)
-        // 这一 tick 本体走了多远：余痕的总纵向展开量（静止/极慢时退化为不展开，不会铺成一条线）
-        val travel = pos.distanceTo(anchor)
-        repeat(SMEAR_COUNT) { i ->
-            // t = 0 贴着本体（最大最亮）→ t = 1 最远最淡
-            val t = i.toDouble() / (SMEAR_COUNT - 1).coerceAtLeast(1)
-            val along = anchor.subtract(dir.scale(travel * t))
-            val jitter = (hash01(seed, status.age + i + 601) - 0.5) * SMEAR_JITTER
-            val center = along.add(lateral.scale(jitter))
-            val visual = runeVisual(SMEAR_SIZE_MAX - (SMEAR_SIZE_MAX - SMEAR_SIZE_MIN) * t)
-            // 越远越淡：hot 从 0.55 递减到 0.05（配合 hotColor 的增益曲线）
-            val hot = ((SMEAR_HOT_NEAR - (SMEAR_HOT_NEAR - SMEAR_HOT_FAR) * t) * strength).toFloat()
-            manager.create()
-                .position(center)
-                .color(hotColor(hot))
-                .visual(visual)
-                .lifetime(SMEAR_LIFETIME)
-                .spawn()
+    private fun ensureEmitter(
+        manager: ParticleManager,
+        anchorPos: Vec3,
+        velocity: Vec3,
+        speed: Double,
+        strength: Float,
+    ) {
+        if (intensity <= 0f || strength <= 0f || length <= 0.0) return
+        // 寿命 = (length ÷ 速度) ÷ 可见占比：**length 是"肉眼可见的那一段"的格数**。
+        // 末段约 15% 寿命是淡出区（设计要求"末尾完全消失"），实测"可见/名义 ≈ 0.85"（第 48 轮）。
+        val life = (length / speed / TRAIL_VISIBLE_FRACTION).roundToInt()
+            .coerceIn(TRAIL_LIFE_MIN, TRAIL_LIFE_MAX)
+        val anchor = Anchor.Movable(anchorPos, velocity)
+        val current = emitter
+        if (current != null && abs(speed - emitterSpeed) <= emitterSpeed * SPEED_REBUILD_RATIO) {
+            current.updateAnchor(anchor) // 每 tick 挪锚点（PD 侧只在变化时发包）
+            return
         }
+        current?.stop()
+        val headHot = (TRAIL_HOT_HEAD_BASE + (1f - TRAIL_HOT_HEAD_BASE) * strength).coerceIn(0f, 1f)
+        emitter = manager.emitter(anchor)
+            .spacing(TRAIL_SPACING)                                  // 密：每 0.15 格一颗
+            .life(life)
+            .color(hotColor(headHot).withAlpha(TRAIL_ALPHA))          // 出生即白热；alpha 压低见 [TRAIL_ALPHA]
+            .scale(TRAIL_SCALE_HEAD)                                  // 出生 0.50 格（本体 0.60，略小一些）
+            .texture(ParticleTextures.RUNE_SPARK)
+            .glowing(true)
+            .additive(true)
+            // 尺寸乘数：线性收到 0.2 倍（0.50 → 0.10 格）——"逐渐变小"
+            .sizeCurve(
+                CurveKey.at(0, 1f),
+                CurveKey.at(life, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
+            )
+            // 透明度乘数：前 8 成寿命几乎不淡、末段迅速化掉——"逐渐变淡、末尾消失"
+            .alphaCurve(
+                CurveKey.at(0, 1f),
+                CurveKey.at(life, 0f, EasingType.EASE_IN_CUBIC),
+            )
+            .maxAlive(TRAIL_MAX_ALIVE)
+            .spawn()
+        emitterSpeed = speed
     }
 
-    /** ② 本体上当帧的一颗**白热符文核**：把「法术弹在哪」点出来（柔光晕已按用户口径删除）。 */
-    private fun emitCore(manager: ParticleManager, pos: Vec3) {
+    /** ② **头部白热菱形**：单颗、永存、`track` 到权威位置（与尾迹共享同一套 partialTick 插值语义）。 */
+    private fun ensureHead(manager: ParticleManager, pos: Vec3) {
         if (intensity <= 0f) return
-        val visual = runeVisual(CORE_SIZE)
-        manager.create()
-            .position(pos)
-            .color(hotColor(1f))
-            .visual(visual)
-            .lifetime(CORE_LIFETIME)
-            .spawn()
+        if (head == null) {
+            head = manager.create()
+                .position(pos.x, pos.y, pos.z)
+                .color(hotColor(1f))          // 纯白热
+                .scale(TRAIL_SCALE_CORE)      // 0.60 格：比尾迹出生那颗（0.50）更大 ⇒「头部最大」
+                .visual(runeVisualScaled())
+                .lifetime(-1)                 // 永存，由 [onDie] 移除
+                .spawn()
+        }
+        head?.track(pos.x, pos.y, pos.z)
     }
+
+    // =====================================================================================
+    // ③ 细碎符文 / 静止场 / 死亡补撒：一次性撒点，批量下发
+    // =====================================================================================
 
     /**
      * ③ **细碎符文**：贴着弹体、快速向附近散开、很快消失的小菱形（只做质感，不做长度）。
      *
-     * 尺寸 0.05~0.09 格、速度 0.10~0.22 格/tick、寿命 2~5 tick ⇒ `v·t` 只有 0.2~1.0 格，
-     * 散开一小段就没了 —— 用户口径「很细小的粒子很快的向附近散开消失」。
-     * 出生带压在本体后方 0.05~0.45 格，不参与"拉长尾迹"（那是 [emitSmear] 的活）。
+     * 尺寸 0.05~0.09 格、速度 0.10~0.22 格/tick、寿命 2~5 tick ⇒ `v·t` 只有 0.2~1.0 格。
+     * 出生带压在本体后方 0.05~0.45 格，不参与"拉长尾迹"（那是 [ensureEmitter] 的活）。
+     *
+     * 位置要逐颗抖开 ⇒ 发射器（点发射）表达不了，走 `spawnAll`（一次包）+ 批量速度/力（各一次包）；
+     * 淡出改用寿命曲线（`fadeOut`），不再逐颗发更新包。
      */
     private fun emitMotes(
         manager: ParticleManager,
-        pos: Vec3,
+        base: Vec3,
         dir: Vec3,
         side: Vec3,
         up: Vec3,
         strength: Float,
     ) {
-        if (strength <= 0f) return
+        if (intensity <= 0f || strength <= 0f) return
         val count = (MOTE_BASE * intensity * (0.6f + 0.4f * strength)).roundToInt().coerceIn(1, MOTE_MAX)
+        val specs = ArrayList<ParticleSpawnSpec>(count)
+        val velocities = ArrayList<Vec3>(count)
         repeat(count) { i ->
             val back = MOTE_BACK_MIN + (MOTE_BACK_MAX - MOTE_BACK_MIN) * hash01(seed, status.age + i + 91)
-            val along = pos.subtract(dir.scale(back))
+            val along = base.subtract(dir.scale(back))
             val theta = GOLDEN_ANGLE * i + hash01(seed, status.age + i + 111) * TAU
             val radius = MOTE_RADIUS * sqrt(hash01(seed, status.age + i + 131))
             val offset = side.scale(radius * cos(theta)).add(up.scale(radius * sin(theta)))
-            val spawn = along.add(offset)
             val outward = if (offset.lengthSqr() < 1e-9) side else offset.normalize()
             val speed = MOTE_SPEED_MIN + (MOTE_SPEED_MAX - MOTE_SPEED_MIN) * hash01(seed, status.age + i + 151)
+            velocities += outward.scale(speed).add(dir.scale(-MOTE_BACK_SPEED))
             val size = MOTE_SIZE_MIN + (MOTE_SIZE_MAX - MOTE_SIZE_MIN) * hash01(seed, status.age + i + 211)
             // 亮度压到 0.18~0.62：火花是「余光」，不能抢过余痕与本体的对比（用户口径「飞出去的小粒子太扎眼」）
             val hot = 0.18f + 0.44f * hash01(seed, status.age + i + 191).toFloat()
-            val visual = runeVisual(size)
-            manager.create()
-                .position(spawn)
+            val life = MOTE_LIFETIME_MIN +
+                (hash01(seed, status.age + i + 231) * (MOTE_LIFETIME_MAX - MOTE_LIFETIME_MIN)).toInt()
+            specs += ParticleSpawnSpec().position(along.add(offset))
                 .color(hotColor(hot * strength))
-                .visual(visual)
-                .lifetime(
-                    MOTE_LIFETIME_MIN +
-                        (hash01(seed, status.age + i + 231) * (MOTE_LIFETIME_MAX - MOTE_LIFETIME_MIN)).toInt()
-                )
-                .spawn()
-                ?.setVelocity(outward.scale(speed).add(dir.scale(-MOTE_BACK_SPEED)))
-                ?.applyForce(FALLING, FORCE_FOREVER)
+                .visual(runeVisual(size))
+                .lifetime(life)
+                .fadeOut(life, EasingType.LINEAR)   // 整段寿命均匀淡出（等价于旧的 recolor 到 alpha 0）
         }
+        launch(manager, specs, velocities, FALLING)
     }
 
     /**
-     * **静止场的退场余晖**（黑洞 / 重力场这类 `speed = 0` 的投射物，第 47 轮补）。
+     * **静止场的退场余晖**（黑洞 / 重力场这类 `speed = 0` 的投射物）。
      *
-     * 为什么必须单独有一条：飞行的法术有「余痕」这条尾巴，本体一死，尾迹会在 [SMEAR_LIFETIME]
-     * 里逐颗到点 ⇒ 退场天然是渐隐（实机判据量到 5~9 帧）。而**静止场没有尾迹** ——
-     * 它的粒子全靠 [emitAmbient] 每 tick 现撒，本体一死就**断供**，屏幕上剩下的几颗寿命又短，
-     * 于是退场判据量到 `50%→5%` 只跨 **3 帧**（要求 ≥4）。这条余晖就是给它补一段"慢慢收掉"。
+     * 为什么必须单独有一条：飞行的法术有尾迹，本体一死，尾迹在寿命里逐颗淡出 ⇒ 退场天然渐隐；
+     * 而**静止场没有尾迹**，粒子全靠 [emitAmbient] 每 tick 现撒，本体一死就**断供**，退场判据
+     * （`50%→5%`）会落在断崖上（第 47 轮实测只有 3 帧）。这条余晖就是给它补一段"慢慢收掉"。
      *
-     * 手法与 [emitSmear] 一致：**寿命错开 + 从小到大、从亮到暗**，位置摊在球壳上，
-     * 速度朝外很慢 —— 读起来是"场把自己散掉了"，而不是"啪一下关灯"。
+     * 手法：**寿命错开 + 从小到大、从亮到暗**，位置摊在球壳上、速度朝外很慢 —— 读起来是
+     * "场把自己散掉了"，而不是"啪一下关灯"。
      */
     private fun emitFieldAfterglow(manager: ParticleManager, pos: Vec3, side: Vec3, up: Vec3) {
+        val forward = side.cross(up).normalize()
+        val specs = ArrayList<ParticleSpawnSpec>(AFTERGLOW_DOTS)
+        val velocities = ArrayList<Vec3>(AFTERGLOW_DOTS)
         repeat(AFTERGLOW_DOTS) { i ->
-            val forward = side.cross(up).normalize()
             val theta = GOLDEN_ANGLE * i + hash01(seed, i + 811) * TAU
             val z = 2.0 * hash01(seed, i + 821) - 1.0
             val r = sqrt(max(0.0, 1.0 - z * z))
             val outward = side.scale(r * cos(theta)).add(up.scale(r * sin(theta))).add(forward.scale(z))
-            val spawn = pos.add(outward.scale(AFTERGLOW_RADIUS_MIN + (AFTERGLOW_RADIUS_MAX - AFTERGLOW_RADIUS_MIN) * hash01(seed, i + 831)))
+            velocities += outward.scale(AFTERGLOW_SPEED * (0.4 + 0.9 * hash01(seed, i + 871)))
             val lifetime = AFTERGLOW_LIFETIME_MIN +
                 (hash01(seed, i + 841) * (AFTERGLOW_LIFETIME_MAX - AFTERGLOW_LIFETIME_MIN)).toInt()
             val size = AFTERGLOW_SIZE_MIN + (AFTERGLOW_SIZE_MAX - AFTERGLOW_SIZE_MIN) * hash01(seed, i + 851)
-            manager.create()
-                .position(spawn)
+            specs += ParticleSpawnSpec()
+                .position(pos.add(outward.scale(AFTERGLOW_RADIUS_MIN + (AFTERGLOW_RADIUS_MAX - AFTERGLOW_RADIUS_MIN) * hash01(seed, i + 831))))
                 .color(hotColor(0.6f + 0.4f * hash01(seed, i + 861).toFloat()))
                 .visual(runeVisual(size))
                 .lifetime(lifetime)
-                .spawn()
-                ?.setVelocity(outward.scale(AFTERGLOW_SPEED * (0.4 + 0.9 * hash01(seed, i + 871))))
+                // ⚠️ 只在寿命**最后 1/4** 淡出：第 47 轮的教训是这一层要比它替掉的旧行为**更亮或相当**
+                //    （整段均匀淡出会把"接住塌缩"的那几帧压暗，判据反而变差）。
+                .fadeOut(tailFade(lifetime), EasingType.LINEAR)
         }
+        launch(manager, specs, velocities, null)
     }
 
     /**
@@ -290,38 +342,60 @@ class Trajectory(
     private fun emitAmbient(manager: ParticleManager, pos: Vec3) {
         if (intensity <= 0f) return
         val dust = (AMBIENT_BASE * intensity).roundToInt().coerceIn(1, AMBIENT_MAX)
+        val specs = ArrayList<ParticleSpawnSpec>(dust + 1)
+        val velocities = ArrayList<Vec3>(dust + 1)
         repeat(dust) { i ->
             val outward = spherePoint(i, 251)
-            val spawn = pos.add(outward.scale(AMBIENT_RADIUS_MIN + (AMBIENT_RADIUS_MAX - AMBIENT_RADIUS_MIN) * hash01(seed, status.age + i + 291)))
-            manager.create()
-                .position(spawn)
+            velocities += outward.scale(AMBIENT_SPEED * (0.4 + 0.9 * hash01(seed, status.age + i + 311)))
+            specs += ParticleSpawnSpec()
+                .position(pos.add(outward.scale(AMBIENT_RADIUS_MIN + (AMBIENT_RADIUS_MAX - AMBIENT_RADIUS_MIN) * hash01(seed, status.age + i + 291))))
                 .color(hotColor(0.35f * intensity))
                 .visual(runeVisual(AMBIENT_DOT))
                 .lifetime(AMBIENT_LIFETIME)
-                .spawn()
-                ?.setVelocity(outward.scale(AMBIENT_SPEED * (0.4 + 0.9 * hash01(seed, status.age + i + 311))))
+                .fadeOut(tailFade(AMBIENT_LIFETIME), EasingType.LINEAR)
         }
         if (hash01(seed, status.age / AMBIENT_MOTE_PERIOD + 701) < AMBIENT_MOTE_CHANCE) {
-            val spawn = pos.add(spherePoint(status.age, 331).scale(AMBIENT_MOTE_RADIUS))
-            manager.create()
-                .position(spawn)
+            specs += ParticleSpawnSpec()
+                .position(pos.add(spherePoint(status.age, 331).scale(AMBIENT_MOTE_RADIUS)))
                 .color(hotColor(0.9f))
                 .visual(runeVisual(CORE_SIZE))
                 .lifetime(AMBIENT_MOTE_LIFETIME)
-                .spawn()
+                .fadeOut(tailFade(AMBIENT_MOTE_LIFETIME), EasingType.LINEAR)
         }
+        launch(manager, specs, velocities, null)
     }
 
     // =====================================================================================
-    // 外观与颜色
+    // 批量下发与外观
     // =====================================================================================
+
+    /**
+     * 一次包生成整批 + 一次包批量速度 + 一次包批量力（[force] 为 null 时省掉力那一步）。
+     * 这是 0.14 之前的"逐颗 `create().spawn()?.setVelocity()?.applyForce()`"的替代。
+     */
+    private fun launch(
+        manager: ParticleManager,
+        specs: List<ParticleSpawnSpec>,
+        velocities: List<Vec3>,
+        force: Vec3?,
+    ) {
+        if (specs.isEmpty()) return
+        val handles = manager.spawnAll(specs)
+        val batch = ParticleBatch(manager)
+        batch.addAll(handles)
+        if (velocities.isNotEmpty()) batch.setVelocityAll(velocities)
+        if (force != null) batch.applyForceAll(List(specs.size) { force }, FORCE_FOREVER)
+    }
+
+    /** 寿命末段的淡出时长（只在最后约 1/4 淡出；太短会"啪一下没"，太长会把这一层整体压暗）。 */
+    private fun tailFade(lifetime: Int): Int =
+        (lifetime / 4).coerceAtLeast(1).coerceAtMost(lifetime)
 
     /**
      * 白热 ↔ 主色：`hot` 越大越白（头部），越小越接近法术主色并压暗（尾部）。
      *
-     * **亮度只能在这里定**：PD 没有「逐 tick 改外观/透明度」的通道（外观生成时定死），
-     * 而这批粒子又走加法混合 —— 于是「越靠尾越暗」只能在**生成时**把颜色与 alpha 一起压低，
-     * 让短寿命与低亮度同时收掉一颗火花（加法混合下 alpha 就是亮度权重，见 PD `BridgeParticle.getLayer`）。
+     * 亮度只能在生成时定：颜色与 alpha 一起压低，让短寿命与低亮度同时收掉一颗火花
+     * （加法混合下 alpha 就是亮度权重，见 PD `BridgeParticle.getLayer`）。
      */
     private fun hotColor(hot: Float): Color {
         val h = hot.coerceIn(0f, 1f)
@@ -334,14 +408,20 @@ class Trajectory(
      * **符文菱形**（自定义贴图 `ParticleTextures.RUNE_SPARK`）：本模组拖尾的统一形状。
      *
      * 尺寸口径：贴图 16×16 ⇒ `texScale = 1` ⇒ `anisoWorld(w, w)` 的 `w` **就是世界格整宽**；
-     * 菱形只占贴图的 14/16，所以「看着的直径 ≈ 0.85 × [blocks]」。
-     *
-     * 加色 + 全亮：亮部叠亮做出"魔法发光"，而形状本身是**硬边轮廓**（不是柔边圆点），
-     * 所以轮廓清楚 —— 这正是用户第 45 轮要的「清晰的轮廓 + MC 魔法感」。
+     * 菱形只占贴图的 14/16，且外圈有 1px 全透明描边（这就是"密而不叠"里那道分隔缝的来处）。
      */
     private fun runeVisual(blocks: Double): ParticleVisual =
         ParticleVisual().texture(ParticleTextures.RUNE_SPARK)
             .anisoWorld(blocks.toFloat(), blocks.toFloat())
+            .glowing(true)
+            .additive(true)
+
+    /**
+     * **符文菱形（scalar 尺寸版）**：与 [runeVisual] 同一张贴图，但尺寸交给粒子的 scalar `scale`。
+     * 头部那颗用它 —— 它的尺寸要与尾迹的 `scale` 口径一致（尾迹走发射器的 `scale`）。
+     */
+    private fun runeVisualScaled(): ParticleVisual =
+        ParticleVisual().texture(ParticleTextures.RUNE_SPARK)
             .glowing(true)
             .additive(true)
 
@@ -381,7 +461,7 @@ class Trajectory(
         /** 尾部压暗下限：让尾端明显比头部暗，但不会黑成脏点 */
         const val DIM_FLOOR = 0.45f
 
-        /** 尾部透明度下限：加法混合下 alpha 就是亮度权重（PD 没有衰减通道） */
+        /** 尾部透明度下限：加法混合下 alpha 就是亮度权重 */
         const val ALPHA_FLOOR = 0.35f
 
         /** `hot` → 亮度 / alpha 的增益（把中低段拉起来，见 [hotColor]） */
@@ -389,8 +469,8 @@ class Trajectory(
         const val ALPHA_GAIN = 1.5f
 
         /**
-         * `hot` → 白热程度的强度。**余痕是主体**，所以别调大：调大整条尾迹会褪成白黄、丢掉主色。
-         * 白热只该出现在核（`hot=1`）与余痕最前那一两颗（`hot≈0.55`）。
+         * `hot` → 白热程度的强度。**尾迹是主体**，所以别调大：调大整条尾迹会褪成白黄、丢掉主色。
+         * 白热只该出现在头部那颗（`hot=1`）与尾迹出生那一两颗。
          */
         const val COLOR_TOWARD_WHITE = 0.75f
 
@@ -401,35 +481,61 @@ class Trajectory(
         const val TAU = 2.0 * PI
         const val GOLDEN_ANGLE = 2.399963229728653
 
-        // ---- ② 白热核（本体上的那一颗） ----
+        /** 静止场 ambient 里那颗「偶发白热核」的尺寸（格） */
         const val CORE_SIZE = 0.13
-        const val CORE_LIFETIME = 3
 
-        // ---- ① 扫过的余痕（尾迹主体：沿轨迹排开、逐渐变小变淡的符文菱形） ----
-        /** 每 tick 铺几颗（沿「上一帧 → 本帧」均分） */
-        const val SMEAR_COUNT = 5
-
-        /** 尺寸（格）：贴着本体的最大 → 最远的最小 */
-        const val SMEAR_SIZE_MAX = 0.38
-        const val SMEAR_SIZE_MIN = 0.16
-
-        /** `hot`：贴着本体的最亮（0.55）→ 最远的几乎只剩主色（0.08） */
-        const val SMEAR_HOT_NEAR = 0.55
-        const val SMEAR_HOT_FAR = 0.08
-
-        /** 侧向抖动（格）：给"手划过的痕迹"一点不齐，但不是随机点云 */
-        const val SMEAR_JITTER = 0.045
+        // ---- ① 尾迹发射器 ----
+        /**
+         * 元素间距（格）：第 48 轮用户口径「要的是**密、但不叠** —— 菱形很多、不会因为重叠而增加
+         * 不透明度，外侧一圈透明描边把它们分开」。0.15 格 ≈ 7 颗/格。
+         */
+        const val TRAIL_SPACING = 0.15
 
         /**
-         * 寿命（tick）：本体每 tick 都补新的、旧的到点消失 ⇒ 尾迹长度 ≈ 速度 × 本值
-         * （火球 0.5 格/tick × 8 ≈ **4 格**）。
-         *
-         * ⚠️ 这个值同时决定**退场曲线的坡度**：本体死亡后余痕不再补充，`寿命` 就是整条尾迹
-         * 散尽所需的 tick 数。给 6 时退场判据量到 `50%→5%` 只跨 **3 帧**（要求 ≥4）——
-         * 第 46 轮一度调到 8 才过关；第 47 轮用户嫌尾迹长，回到 **7**（尾迹 ≈ 速度 × 7），
-         * 退场那 4 帧的余量改由死前补撒承担（[DEATH_SPARKS] / [DEATH_LIFETIME_MAX]）。
+         * 拖尾长度（格）的**默认值**（= Trajectory 构造函数 `length` 的缺省）：
+         * 口径是**肉眼可见的那一段长度**（不是"元素寿命 × 速度"的名义长度 —— 后者要除以
+         * [TRAIL_VISIBLE_FRACTION]）。与速度无关。
          */
-        const val SMEAR_LIFETIME = 7
+        const val TRAIL_BLOCKS = 3.5
+
+        /**
+         * 可见占比：寿命后段是淡出区，肉眼看不到。实测（第 48 轮，EASE_IN_CUBIC 淡出）≈0.85，
+         * 所以元素寿命按 `1 / 本值` 放宽，让**可见长度 ≈ [length]**。
+         */
+        const val TRAIL_VISIBLE_FRACTION = 0.85
+        const val TRAIL_LIFE_MIN = 4
+        const val TRAIL_LIFE_MAX = 40
+
+        /** 速度相对变化超过这个比例就重挂发射器（寿命 = 长度 ÷ 速度） */
+        const val SPEED_REBUILD_RATIO = 0.20
+
+        /**
+         * 出生 / 末端尺寸（**scalar**，编辑器单位）：贴图 16×16 ⇒ texScale = 1 ⇒ 渲染整宽 = `scale × 0.2` 格，
+         * 所以 0.50 格 = 2.5、0.10 格 = 0.5。出生尺寸按用户口径「**和本体差不多大、略小一些**」。
+         */
+        const val TRAIL_SCALE_HEAD = 2.5f
+        const val TRAIL_SCALE_TAIL = 0.5f
+
+        /**
+         * 出生时的固定 alpha（加色混合下 alpha 就是亮度权重）。
+         *
+         * 「密而不叠」的关键：0.15 格间距下相邻菱形在几何上必然接触，若每颗都满 alpha，加色叠加会把
+         * 近头那一段堆成一条白带。压到 0.62 后两颗重叠处约 1.2×（而不 2.0×），配上 `rune_spark.png`
+         * 外圈那 1px 全透明描边 + 柔边，相邻菱形就各自可辨。
+         */
+        const val TRAIL_ALPHA = 0.62f
+
+        /** 单个发射器的存活上限（防间距给得太小把客户端灌满） */
+        const val TRAIL_MAX_ALIVE = 512
+
+        /**
+         * 出生时的白热档位（再乘 strength）：**头部那颗要是整条尾迹里最亮最白的**（用户口径「白热菱形」）。
+         */
+        const val TRAIL_HOT_HEAD_BASE = 0.85f
+
+        // ---- ② 头部白热菱形（单颗、永存、track 跟走） ----
+        /** 0.60 格（3.0 × 0.2）：比尾迹出生那颗（0.50 格）更大 ⇒「头部最大」在尺寸上无歧义 */
+        const val TRAIL_SCALE_CORE = 3.0f
 
         // ---- ③ 细碎符文（只做质感，不拉长尾迹） ----
         const val MOTE_BASE = 3.5f
@@ -445,7 +551,7 @@ class Trajectory(
         const val MOTE_LIFETIME_MIN = 2
         const val MOTE_LIFETIME_MAX = 4
 
-        /** 恒定下坠力（blocks/tick²）：寿命只有 2~5 tick，一点点"重量感"就够 */
+        /** 恒定下坠力（blocks/tick²）：寿命只有几 tick，一点点"重量感"就够 */
         val FALLING: Vec3 = Vec3(0.0, -0.012, 0.0)
         const val FORCE_FOREVER = -1
 

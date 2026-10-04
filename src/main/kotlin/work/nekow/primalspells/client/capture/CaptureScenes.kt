@@ -8,6 +8,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
+import work.nekow.particledrawing.core.client.ClientParticleEngine
 import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.MagicManager
@@ -648,8 +649,8 @@ object CaptureScenes {
                     TRAIL_PARTICLE_CHECK -> listOf(
                         Check(
                             name, t, "trail-built-up",
-                            pdParticleCount(ctx) >= TRAIL_MIN_PARTICLES,
-                            "PD 粒子 = ${pdParticleCount(ctx)}（尾迹三层累积，应 ≥$TRAIL_MIN_PARTICLES）",
+                            pdClientParticleCount() >= TRAIL_MIN_PARTICLES,
+                            "客户端 PD 粒子 = ${pdClientParticleCount()}（尾迹累积，应 ≥$TRAIL_MIN_PARTICLES）",
                         ),
                     )
                     TRAIL_TICKS - 3 -> listOf(
@@ -659,6 +660,12 @@ object CaptureScenes {
                             "残留火球 = ${MagicManager.projectiles.count { it.id == "fireball" }}",
                         ),
                         pdParticleCheck(name, t, ctx),
+                        // 尾迹粒子现在活在**客户端**（发射器）⇒ 泄漏也要在客户端这一侧看
+                        Check(
+                            name, t, "pd-client-particles-zero",
+                            pdClientParticleCount() == 0,
+                            "client remaining=${pdClientParticleCount()}",
+                        ),
                     )
                     else -> emptyList()
                 }
@@ -1093,7 +1100,17 @@ object CaptureScenes {
         return Check(scene, tick, "pd-particles-zero", count == 0, "remaining=$count")
     }
 
-    /** 本维度当前存活的 PD 粒子数（读不到给 -1，判定会如实失败而不是假装通过）。 */
+    /** 服务端当前存活的 PD 粒子数（读不到给 -1，判定会如实失败而不是假装通过）。 */
     private fun pdParticleCount(ctx: CaptureDriver.SceneCtx): Int =
         runCatching { ParticleManager.of(ctx.level).getEngine().particleCount() }.getOrDefault(-1)
+
+    /**
+     * **客户端**当前存活的 PD 粒子数。
+     *
+     * ⚠️ 第 48 轮起尾迹改用**发射器**（PD 1.0.14）：粒子在客户端按渲染帧生成、服务端只有声明 ⇒
+     * 旧的「服务端 PD 粒子数 ≥ 18」必然接近 0 而误报。口径跟着模型走：这一层的证据改从客户端取
+     * （dev-only 录制工具只读一个数字；PD 改名也只影响录制，不影响发布产物）。
+     */
+    private fun pdClientParticleCount(): Int =
+        runCatching { ClientParticleEngine.instance()?.activeCount() ?: -1 }.getOrDefault(-1)
 }

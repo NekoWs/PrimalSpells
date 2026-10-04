@@ -13,10 +13,32 @@
 
 ---
 
-**当前未决：0 条。** 第 48 轮那组需求已由 **ParticleDrawing 1.0.14-ALPHA** 全部落地
-（`d998e36`：*运行时发射器、逐粒子寿命曲线与批量生成，组级逐成员漂移*）—— 逐条对照见
-[resolved.md](resolved.md) 附录 B。本侧已在第 48 轮完成迁移（`Trajectory.kt` 改发射器 + 寿命曲线 +
-`spawnAll`/批量速度力）。
+**当前未决：2 条单点**（第 48 轮迁移中撞到的两个小缺口；那组四条已由 1.0.14 落地，见下）。
+
+### [需求] 发射器无「逐粒子位置抖动 / 偏移」
+
+- **状态**：未决
+- **场景**：拖尾除了"沿路径铺一串"，还需要一点点**侧向不齐**（本侧原先用 0.045 格的抖动做"手划过的痕迹"）。
+- **现有 API 为什么不够**：`ParticleEmitter` 只有 `spacing`/`interval`/`life`/`scale`/`color`/`velocity`/曲线，
+  **没有 offset / jitter / spread**；要逐颗抖开就只能回到 `spawnAll` 逐颗给位置（那就是"每颗一发"，发射器省下的带宽又还回去了）。
+- **期望形态**：`emitter.jitter(格)`（垂直运动方向的随机偏移，确定性哈希）+ 可选 `offsetAlong(前后偏移)`；
+  或 `spread(半径, 数量)` 之类的面/体发射口。
+- **影响面**：`magic/effect/visual/Trajectory.kt`（当前被迫放弃侧向抖动）。
+- **临时降级**：不加抖动（链条更直、观感尚可，用户未反对）。
+
+### [需求] `EmitterHandle` 不能改 `life` / 曲线
+
+- **状态**：未决
+- **场景**：本侧 `life = 拖尾长度 ÷ 速度 ÷ 可见占比`；投射物**带阻力**，速度逐 tick 衰减（实测 0.485 → 0.382 格/tick），
+  寿命必须跟着变，否则尾迹长度会漂。
+- **现有 API 为什么不够**：`EmitterHandle` 只提供 `updateAnchor` / `spacing` / `interval` / `stop`；
+  `life` 与曲线是**声明时定死**的 ⇒ 本侧只能在速度漂移超过 20% 时 `stop()` + 重新 `spawn()` 一次。
+- **期望形态**：`EmitterHandle.life(ticks)` / `.curve(...)` / `.scale(...)`（与 `ParticleEmitter` 同名同义，
+  走小包更新，已生成的粒子不受影响）。
+- **影响面**：`Trajectory.ensureEmitter`（当前的重挂逻辑 + `SPEED_REBUILD_RATIO` 阈值）。
+- **临时降级**：速度相对变化 >20% 就重挂声明（旧粒子各自走完寿命，视觉无跳变）。
+
+---
 
 ### ~~[需求组] 把「预制动画」那层能力下沉为**运行时发射器**（Trail/Emitter 一等公民）~~ ✅ 已由 1.0.14-ALPHA 实现
 

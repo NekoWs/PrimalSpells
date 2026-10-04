@@ -4,8 +4,12 @@
 
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。当前卡在「程序化粒子的贴图/UV/各向异性/朝向/加色」这一组能力上，需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
-ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期（当前锁定 **1.0.12-ALPHA**）。
+ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
+（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.13-ALPHA`）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
+
+**当前锁定版本：`1.0.13-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
+`-sources.jar` 为准，不看旧版本记忆）。
 
 **触发条件**（满足任一即进入本政策）：
 
@@ -26,6 +30,66 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > 区分清楚：「**不得自行另写一套实现**」这条红线**始终有效**（只要工作碰了 PD API）；
 > 有时机限制的只是「产出末尾的清单」与「登记到 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)」。
+
+### 0.1 读法：**目标模型 → 现有能力 → 临时降级**（2026-10-04 重写）
+
+本文过去的写法是「碰到边界就记一条坑」，于是越写越像一份**绕行指南**：调一次观感就要改一次代码，
+而每次绕法自己又会制造新缺陷（相位差、缺颗空档、淡出不匀、逐 tick 跳变）。现在改成三段式，按顺序读：
+
+| 段 | 回答什么 | 在哪 | 权威出处 |
+|---|---|---|---|
+| **A 目标模型** | 我们**想表达**什么（与 PD 无关的意图层） | §0.1.1 | 本节 |
+| **B 现有能力** | PD 1.0.13 **实际给到**什么（尤其"哪条通路才是逐帧的"） | §0.1.2、§0.4 | PD 源码（`lib/particledrawing-*-sources.jar`） |
+| **C 临时降级** | 缺口期间我们**怎么绕**、代价是什么、落地后删什么 | §0.1.3、§0.3 | 本节 |
+
+**顺序不可颠倒**：先定 A、对着 B 列出缺口（→ 登记到 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)），
+**然后**才选 C。碰边界才补记 C，是本文件此前最大的结构性问题。
+
+#### 0.1.1 A｜目标模型：四个原语
+
+| 原语 | 我们想要的语义 | 谁在用 |
+|---|---|---|
+| **发射器 Emitter** | 挂在锚点上，按**里程或时间**发射；**出现/消隐逐帧**；服务端只声明一次 | 拖尾（`Trajectory`）、爆炸火星、护盾碎屑 |
+| **寿命曲线 Curve** | 每颗粒子的 size / alpha / color 随**自己的寿命**演化（关键帧或 easing），写进 spawn 声明 | 拖尾余痕、退场余晖、烟雾 |
+| **锚点 Anchor** | 位置 + 朝向 + 速度 + **上一位置**，且插值语义对所有粒子**一致** | 拖尾头部/本体、护盾面板组 |
+| **批量 Batch** | 一整条尾迹一次下发；批量 spawn + 批量曲线 | 密集尾迹（≈23 颗/投射物） |
+
+**不变量**：① 确定性（同种子两次录制出同一画面）；② 带宽 O(声明) 而非 O(粒子)；③ **观感参数化**——
+调长度/密度/尺寸曲线只改参数、不改代码（这条正是前几轮反复改写的成本来源）。
+
+#### 0.1.2 B｜现有能力：PD 有两条通路，差别是"逐帧"还是"逐 tick"
+
+| 能力 | **运行时通路**（`ParticleManager.create()` + `ParticleHandle`） | **动画/脚本通路**（`Anchor` + 指令/表达式） |
+|---|---|---|
+| 求值频率 | **每 game tick 推进**；非运动粒子还按 `particleBatchSize` **轮转分批**（粒子多时会饿死部分粒子，PD 注释原话"时走时停"） | **每渲染帧**（`ClientAnimationManager.frameTick(partialTick)`，`ProcessClock` 推帧内毫秒） |
+| 出现时机 | 服务端每 tick 一颗颗 `spawn()`；`delay(ticks: Int)` 只有整 tick | 由动画时钟/指令决定 |
+| 位置插值 | `track` 按 partialTick 插值；**程序化粒子是绝对坐标、不插值** | 锚点相对坐标，渲染层按 partialTick 插值 |
+| 寿命曲线 | 无声明式曲线；靠 `recolor`/`resize` 各下 1 个更新包补间 | `FadeIn/FadeOut/Recolor/ScaleBy/MovePath/Pulse/Expression`（按 ms） |
+| 批量 | `ParticleBatch`（力/速度/位置）；**spawn 与曲线仍逐颗** | 组级 `fadeOut/scale/movePath/recolor` |
+| 外观 | 贴图/UV/朝向/加色**生成时定死**；颜色（含 alpha）与 scalar 缩放可后改 | 同 |
+
+**一句话**：**"高刷"不是缺几个函数，而是运行时粒子没有逐帧求值通路**；PD 里逐帧、曲线、锚点、批量
+这四样**都已经存在**，只是原先锁在预制动画/脚本那条通路上。
+
+> ✅ **2026-10-04：PD 1.0.14-ALPHA 把这条打通了** —— 多了**第三条通路：运行时发射器**
+> （`api/ParticleEmitter` + `EmitterHandle`，`ClientEmitterManager.frameTick(partialTick)` 逐渲染帧发射、
+> `Anchor.Movable` 用「上一 tick 位置 + 速度 × partialTick」取本帧位置）。于是"逐帧、曲线、锚点、批量"
+> 运行时也能用，本侧第 48 轮已把拖尾迁上去（见 §0.1.3 的作废说明与 [../issues/resolved.md](../issues/resolved.md) 附录 B）。
+
+#### 0.1.3 C｜临时降级（**2026-10-04 起整段作废**）
+
+> ⚠️ 下表四条缺口**已由 PD 1.0.14-ALPHA 全部补齐**（发射器 / `prevPosition` / 寿命曲线 / `spawnAll`），
+> 本侧已迁移。保留此表只为读懂旧代码与旧提交；**新接线不要再照着绕**。三条通路的选择见 §0.1.2。
+
+| 缺口（对应需求组条目） | 本侧临时降级 | 代价 | 落地后 |
+|---|---|---|---|
+| 运行时发射器（需求 1） | 服务端每 tick 按里程采样、逐颗 `create().spawn()` + `recolor`/`resize` | 出现是 20Hz（高刷下"一跳一跳"）；每颗 3 个包 | 整段换成 `emitter(...)` 声明 |
+| 插值语义不统一（需求 2） | 拖尾采样段**整体延迟一 tick** | 拖尾恒定滞后本体 ≈0.4 格 | 删掉延迟、直接对齐 |
+| spawn 内无曲线（需求 3） | 生成时把"头部白热 / 末端压暗"**烘焙**进颜色与 alpha | 调色 = 改代码；淡出另付 2 个包 | 换成 `fadeOut/shrinkTo/curve` |
+| 无批量 spawn（需求 4） | 逐颗下发 | 密集尾迹包数线性增长 | 一次下发 |
+
+> ⚠️ **历史包袱提醒**：§0.3 的「接线范式」与 §0.4 的「必踩的坑」都是上表的**降级细则** ——
+> 它们回答"现在怎么绕"，不回答"PD 能力如何"。读它们时别把降级当成能力事实。
 
 ### 0.2 职责边界判定准则（什么属于 PD、什么属于本模组）
 
@@ -59,7 +123,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 本项目就踩过：自研 `ParticleSwarm` 的锚定模式本可用 `attachTo` 直接表达，结果多写了整套簿记，
 并因此接连踩了「捕获偏移」「索引配对」「重复身体偏移」「重建滑入」四个坑（见 [../issues/README.md](../issues/resolved.md)）。
 
-### 0.3 现有接线范式（2026-09-30 更新，接线前先看这张表）
+### 0.3 C｜降级细则：现有接线范式（接线前先看这张表；属 §0.1.3）
 
 | 需求 | 用哪套 API | 每 tick 带宽 | 本项目落点 |
 |---|---|---|---|
@@ -140,7 +204,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 
 > **文档状态（2026-09 结构重构时补记，2026-09-29 更新版本）**
 > - 本文件原在仓库根（`effects-api-design.md`），现已归入 `docs/design/`。
-> - 依赖版本：**1.0.12-ALPHA**（`lib/particledrawing-1.0.12-ALPHA.jar`，附 `-sources.jar`），
+> - 依赖版本：**1.0.13-ALPHA**（`lib/particledrawing-1.0.13-ALPHA.jar`，附 `-sources.jar`），
 >   由 `gradle.properties` 的 `particledrawing_version` 驱动；下方正文中出现的 1.0.6 等版本号是**当时的历史记录**。
 > - §10 中标记为 ⏳ 的「PrimalSpells 依赖升 1.0.6 + 迁移 `Trajectory.kt`」**已经完成**：`Trajectory` 使用 `ParticleManager.create()` Builder。
 > - 1.0.9-ALPHA 相对 1.0.8 的 API 增量：**`api/ParticleBatch`**（程序化粒子集：`add`/`trackAll`/`trackEach`/`forEach`/`removeIf`/`ensureSize`/`evictDead`/`clear`）、
@@ -169,12 +233,12 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 状态：**播放器侧 API 轮子已实现**（`particledrawing` 仓库，§5 全部落地并通过 `gradlew build` + 单测）。
 > 魔法模组端（`primalspells`）动画/特效接线**后续再做**。
 > 涉及仓库：
-> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.12-ALPHA）
+> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.13-ALPHA）
 > - 魔法模组：`D:\Backup\IDEA Projects\PrimalSpells`（`primalspells`，MC 26.2 / NeoForge 26.2.0.59 / Java 25）
 
 ---
 
-### 0.4 外观能力（ParticleDrawing 1.0.13 起）与尺寸口径
+### 0.4 B｜外观能力（ParticleDrawing 1.0.13 起）与尺寸口径（属 §0.1.2 的能力事实）
 
 第 29 轮起程序化粒子终于能"指定外观"。参考实现：`magic/effect/lifecycle/ExplosionFx.kt`
 （爆炸「内爆 → 爆发」，对齐用户给的参考 `.refs/explosion-vfx/`）。**动特效前先读这一节。**
@@ -202,7 +266,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
   `LINE` 可见粗 ≈ **0.7 × 尺寸**（两端各 ≈ 0.2 × 长度渐隐）。密铺间距按「≤ 0.3 × 可见直径」给就无方块感/空隙。
   `ExplosionFx` 里的 `dotWorld()` / `lineWorld()` 就是这套反推。
 
-**五个必踩的坑（均已实测）**
+**五个必踩的坑（降级期实测；每条都是 §0.1.3 某条降级的细则，不是 PD 的能力事实）**
 
 1. **内置贴图要在渲染线程就绪之后再确保**：`ParticleManager.registerBuiltinTextures()` 会碰 `RenderSystem`，
    放在 `FMLClientSetupEvent` 里会抛 `Rendersystem called from wrong thread` 把客户端打崩；

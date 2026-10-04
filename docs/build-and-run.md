@@ -53,7 +53,7 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
   第 17~19 轮为绕开旧语义自己算过游标，新版语义下会重复计时（第 20 轮踩过）。
 - 上一版本为 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
-- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.12-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
+- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.13-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
 
 ## 3. 常用命令
 

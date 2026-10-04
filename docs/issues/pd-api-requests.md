@@ -8,12 +8,76 @@
 > **出现时机**：需求清单与登记**只在本次功能要求涉及 ParticleDrawing API 时**才出现
 > （特效接线、升级导致 API 变化、需求要求用它的能力）；与之无关的工作不要在这里添条目。
 >
-> 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.12-ALPHA`
-> （`lib/particledrawing-1.0.12-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
+> 当前锁定版本：`gradle.properties` 的 `particledrawing_version=1.0.13-ALPHA`
+> （`lib/particledrawing-1.0.13-ALPHA.jar`，另附 `-sources.jar` 便于核对签名）。
 
 ---
 
-**当前未决：0 条。** 第 23/28 轮登记的「贴图 / UV / 各向异性 / 朝向 / 加色」整组能力
+**当前未决：0 条。** 第 48 轮那组需求已由 **ParticleDrawing 1.0.14-ALPHA** 全部落地
+（`d998e36`：*运行时发射器、逐粒子寿命曲线与批量生成，组级逐成员漂移*）—— 逐条对照见
+[resolved.md](resolved.md) 附录 B。本侧已在第 48 轮完成迁移（`Trajectory.kt` 改发射器 + 寿命曲线 +
+`spawnAll`/批量速度力）。
+
+### ~~[需求组] 把「预制动画」那层能力下沉为**运行时发射器**（Trail/Emitter 一等公民）~~ ✅ 已由 1.0.14-ALPHA 实现
+
+- **状态**：✅ **已落地**（ParticleDrawing `1.0.14-ALPHA`，commit `d998e36`）。逐条对照：
+  - ① 运行时发射器 → `api/ParticleEmitter`（`spacing`/`interval`/`intervalMs`/`life`/`scale`/`visual(...)`/
+    `maxAlive`）+ `EmitterHandle`（`updateAnchor`/`stop`）；`ClientEmitterManager.frameTick(partialTick)`
+    **逐渲染帧**发射，`Anchor.Movable` 按「上一 tick 位置 + 速度 × partialTick」取本帧位置。
+  - ② 插值语义统一 → `ParticleSpawnSpec.prevPosition(prev)`（首帧插值端点，与 `track` 同语义）；
+    发射器锚点本身即该语义 ⇒ 本侧不再需要"延迟一 tick"。
+  - ③ 寿命曲线写进 spawn → `ParticleCurve`/`CurveKey`/`ParticleLifeCurve` + `fadeOut`/`shrinkTo` 糖。
+  - ④ 批量生成 → `ParticleManager.spawnAll(specs)` / `ParticleBatch.spawnAll`。
+  - 额外 → 组级**逐成员漂移**（更早那条需求）一并实现。
+- 以下为**登记时的原文**（保留以便读懂当时的降级设计，勿据此重新提需求）：
+- **背景（为什么按"组"提）**：本模组前几轮的做法是"碰到边界就绕"——采样段延迟一 tick、按里程逐颗
+  `create().spawn()`、把"头部白热/末端压暗"烘焙进生成时的颜色与 alpha。结果是：**特效每调一次参
+  就要改一次代码**（用户这几轮把长度 8 格→3.5 格、间距 0.5→0.15 格，每次都是一次重写 + 重录 + 判读），
+  而且绕法本身会制造新缺陷（相位差、缺颗空档）。
+- **根因**：PD **已有**声明式、逐帧求值的一整套 ——
+  `Anchor`（`Fixed`/`Entity`/`Movable` + 朝向，且"渲染层每 game tick 用当前锚点变换映射，再按
+  partialTick 插值"）、指令集（`FadeIn`/`FadeOut`/`Recolor`/`ScaleBy`/`Translate`/`RotateOnce`/
+  `MovePath`/`Spin`/`Pulse`/`Expression`，按 ms 计时）、组级 `fadeOut`/`scale`/`movePath`/`recolor`。
+  但这套只对"播放一段预制动画"开放；运行时通路（`ParticleManager.create()` + `ParticleHandle`）
+  只有"生成时定死外观 + 逐颗指令"。
+
+- **1｜运行时发射器（Emitter）**
+  - **期望形态**：`manager.emitter(anchor).spacing(格).life(ticks).sizeCurve(...).alphaCurve(...)
+    .colorCurve(...).spawn()`；发射在**客户端按渲染帧求值**（用锚点的插值位置推进"按里程/按时间"两种口径），
+    服务端只声明一次、变更时更新。
+  - **现状为什么不够**：只能服务端每 tick 采样、逐颗下发 ⇒ 出现的时刻被 tick 量化，**高刷下"一跳一跳
+    地长出来"**；带宽是 O(粒子)（每颗 1 spawn + 2 update 包）。
+  - **收益**：出现/淡出逐帧；带宽 O(1)；"长度/密度/尺寸曲线"从代码变成**参数**。
+
+- **2｜位置指令的插值语义统一（程序化粒子 ↔ `track` 粒子）**
+  - **期望形态**：`Anchor.Movable` 那套"每 tick 下发 pos+velocity、渲染层按 partialTick 插值"的语义，
+    请同样给程序化粒子与 `track` 粒子：或加 `interpolate = false` 开关，或暴露客户端 `partialTick` /
+    已渲染位置供服务端查询。
+  - **现状为什么不够**：`track` 走 `TrackBuffer` 插值、程序化粒子按**绝对位置**渲染且不插值；服务端拿不到
+    partialTick ⇒ 同类粒子在屏幕上相差最多**一整 tick 位移**（第 48 轮实测 0.45 格，判读抓到过"小菱形冒在
+    头部菱形前面"）。本侧只能把采样段整体延迟一 tick 绕开。
+  - **临时降级**：采样段延迟一 tick（拖尾严格在身后，恒定滞后约 0.4 格）。
+
+- **3｜逐粒子寿命曲线写进 spawn 包**
+  - **期望形态**：`Builder.fadeOut(ticks, easing)` / `.shrinkTo(scale, ticks, easing)` /
+    `.curve(通道, 关键帧)` —— 声明式、零额外带宽。
+  - **现状为什么不够**：表达"寿命内淡出 + 收缩"要额外 2 个更新包（`recolor` + `resize`）；密集尾迹
+    （≈23 颗/投射物）就是 ≈70 个包。
+
+- **4｜批量 spawn / 批量寿命曲线**
+  - **期望形态**：`ParticleBatch` 已有批量力/速度/位置；请补批量 spawn 与批量曲线，让"一条尾迹"一次下发。
+  - **现状**：只能逐颗。
+
+- **本侧边界（不会推给 PD 的部分）**：游戏语义留在本模组 —— "拖尾长度按格给、寿命＝长度÷速度、按里程
+  发射、总强度倍率、静止场走另一套分支"这些仍由我们算，PD 只提供机制（发射器/曲线/插值/批量）。
+- **影响面**：`magic/effect/visual/Trajectory.kt`、`ProjectileBody.kt`、`ExplosionFx.kt`、
+  `EnergyShield.kt`（这四处都在用"逐颗 spawn + 逐颗更新包"的绕法）。
+
+---
+
+### ~~[需求组] 程序化粒子需要「贴图 / UV / 各向异性 / 朝向 / 加色」整组能力~~ ✅ 已由 1.0.13-ALPHA 实现
+
+第 23/28 轮登记的「贴图 / UV / 各向异性 / 朝向 / 加色」整组能力
 已由 **ParticleDrawing 1.0.13-ALPHA** 全部实现 —— 逐条对照与「本侧因此改成了什么」见
 [resolved.md](resolved.md) 附录 B。口径与坑见 [design/effects-api.md](../design/effects-api.md) §0.4。
 

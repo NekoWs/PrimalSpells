@@ -212,10 +212,17 @@ magic/modifier  ──→ magic/core, magic/effect
 ## 9. 外部依赖政策：ParticleDrawing（硬性）
 
 `particledrawing` 是本模组的**必需前置**（`neoforge.mods.toml`：`required` + `AFTER`），
-仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.12-ALPHA`）。
+仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.13-ALPHA`）。
 它是粒子能力的**唯一实现方**，PrimalSpells 只负责接线。
 
 **红线：遇到它的 API 缺陷 / 签名不符 / 能力缺失时，不得在本模组自行编写另一套实现。**
+
+- **顺序（2026-10-04 补，硬性）**：先按 [design/effects-api.md](design/effects-api.md) §0.1 的三段式走 ——
+  ① 写清**目标模型**（我们想表达什么，与 PD 无关）；② 对着 PD 的**现有能力**（含"哪条通路才是逐帧的"）
+  列出缺口并登记到 [issues/pd-api-requests.md](issues/pd-api-requests.md)；③ **然后**才选临时降级，
+  并在代码注释里标明"这是降级、需求落地后删"。
+  **先绕后记账**（碰到边界才补一条坑）是本项目此前最大的结构性问题：它让每次观感调参都变成改代码，
+  而且绕法自己会制造新缺陷（相位差、缺颗空档、淡出不匀）。
 
 - 先**停止**该接入点的尝试（不要猜签名反复试、不要反射绕过、不要改 `lib/` 下的 jar、
   不要把它的逻辑复制/内联到本仓库、不要用别的机制伪装实现同一 API 语义）。
@@ -227,12 +234,12 @@ magic/modifier  ──→ magic/core, magic/effect
   影响面 / 临时降级（含恢复条件）。
 - 允许的例外：用原版 `ServerLevel.sendParticles` 实现**本就不属于 ParticleDrawing 职责**的效果
   （如爆炸/黑洞/重力场的球体采样，统一走 `util/ParticleShapes.kt`）；禁止的是「把 ParticleDrawing 该做的事在本侧重生一份」。
-- 接线前先看能力清单：[design/effects-api.md](design/effects-api.md) §0.2/§0.3 给出「什么归 PD、什么归本模组」的判定准则与
-  现有范式表 —— 集合类粒子用 `ParticleBatch`、锚定用 `attachTo`、**不要自研粒子集合**（第 10 轮删除的
-  `ParticleSwarm` 就是反例：自写的句柄/寿命簿记接连引出四个 bug）。
+- 接线前先看：[design/effects-api.md](design/effects-api.md) §0.1（**模型 → 能力 → 降级**三段式）、
+  §0.2（什么归 PD、什么归本模组）、§0.3（降级细则/现有范式表）—— 集合类粒子用 `ParticleBatch`、
+  锚定用 `attachTo`、**不要自研粒子集合**（第 10 轮删除的 `ParticleSwarm` 就是反例：自写的句柄/寿命簿记接连引出四个 bug）。
 - 升级依赖的固定流程（都用 `gradle.properties` 做单一数据源，不再手改 `mods.toml`）：
   新 jar 放 `lib/` → 改 `particledrawing_version`（jar 文件名版本段）与 `particledrawing_version_range`
-  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.12-ALPHA,)`，写 `[1.0.12,)` 不匹配 `1.0.12-ALPHA`）→
+  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.13-ALPHA,)`，写 `[1.0.13,)` 不匹配 `1.0.13-ALPHA`）→
   `./gradlew build --no-build-cache`；
   **构建失败就回到上面两条（停下 + 提需求），不要就地绕开**。
 

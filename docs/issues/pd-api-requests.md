@@ -17,7 +17,7 @@
 
 ---
 
-**当前未决：3 条。**
+**当前未决：2 条。**
 
 ### [需求] 发射器无「逐粒子位置抖动 / 偏移」
 
@@ -41,22 +41,6 @@
   走小包更新，已生成的粒子不受影响）。
 - **影响面**：`Trajectory.ensureEmitter`（当前的重挂逻辑 + `SPEED_REBUILD_RATIO` 阈值）。
 - **临时降级**：速度相对变化 >20% 就重挂声明（旧粒子各自走完寿命，视觉无跳变）。
-
-### [需求] `armed` 日志降级为 DEBUG / 可开关
-
-- **状态**：未决
-- **场景**：护盾每次受击都会**新画一批面板碎片**（用户口径：碎片不跟人、每次都新画），
-  每个面板一个组 → 一次受击 arms **32 个组**（截角二十面体 = 12 五边形 + 20 六边形），
-  生存模式实战里日志被刷屏。
-- **日志原文**（用户实机提供）：
-  `[wo.ne.pa.co.cl.ClientAnimationProgramManager/]: [ParticleDrawing] program 0e45113d-beab-4714-abc1-b1f05f9d26d4 armed: 72 particles, 0 instructions, anchorOffset=1`
-- **现有 API 为什么不够**：`core/client/ClientAnimationProgramManager` 每次 arm 组都打一行 **INFO**，
-  使用方在模组侧关不掉（也不该让使用方去改 log4j 配置来消音前置模组）。
-- **期望 API 形态**：arm 日志降到 **DEBUG**；或提供 `ParticleManager.setDebugLogging(enabled)` /
-  一个配置项，让使用方按需开关。
-- **影响面**：`magic/modifier/EnergyShield.kt`（`spawnPanels`：每次受击重建 32 组）、
-  `magic/effect/lifecycle/ExplosionFx.kt`（爆发时一次建 5~8 组）。
-- **临时降级**：无（只影响日志可读性，不影响功能；生存模式里会持续刷屏）。
 
 ---
 

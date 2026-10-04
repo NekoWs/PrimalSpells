@@ -978,6 +978,7 @@ group.rotate(SHELL_SPIN_AXIS, lateBy * SHELL_SPIN_RADIANS_PER_TICK, 0)  // 瞬�
 实测整场录制 `armed` 日志 **39 行**（此前**一次受击**就是 32 行）；一次整罩爆炸是 **3 个组**
 （1080 + 1080 + ~1056 颗粒子），不再是 64 组。
 PD 侧那条「`armed` 降级为 DEBUG」的需求保留在 [pd-api-requests.md](pd-api-requests.md)（本侧无权关前置模组的日志）；
+（**后注（2026-10-04）：已闭环**，arm 行在 1.0.14-ALPHA 改为 DEBUG + 两个开关，见附录 B。）
 同时新增一条**可选**需求：组级 `move` 只能整组一个方向向量，想要"每片各自外飞"就不得不一片一组。
 
 ### 39.4 验证
@@ -1212,7 +1213,7 @@ AoE 单体 = 2.7 U、`drone_bolt` = 1.7 U、**护盾 = 2 U**。
 | 48.6 | **连续感** | 尾迹出生尺寸 0.50 → **= 头部 0.60 格**，并**去掉前段陡降**（曾用「前 1/3 寿命掉到 55%」，会在本体与尾迹之间留尺寸台阶）；两颗同尺寸菱形（半径各 0.3 格）顺手盖住 48.4 那 0.4 格的错位 |
 | 48.7 | **删掉本体柔光点 `ProjectileBody`** | 用户口径「如果能丝滑前进的话就去掉」。它同样走 `track`、与头部重复标记同一位置，两套时钟还会看成闪烁；`Projectile` 不再装配、类文件删除，文档 15 处同步（`architecture`/`conventions`/`README`/`spell-development`/`code-map`/`effects-api`） |
 | 48.8 | **判据口径跟着模型搬**（不是放宽） | 尾迹粒子现在**只活在客户端**（发射器，服务端只有声明）⇒ 场景里那条"服务端 PD 粒子数 ≥ 18"必然误报；改读客户端引擎 `ClientParticleEngine.activeCount()`，并**新增**客户端侧"零残留"检查（粒子搬了家，泄漏检查也得跟过去） |
-| 48.9 | **PD 侧闭环** | 本轮登记的需求组（运行时发射器 / 插值语义统一 / spawn 内寿命曲线 / 批量生成）已由 **ParticleDrawing 1.0.14-ALPHA**（`d998e36`，顺带做了更早那条"组级逐成员漂移"）全部落地，本侧随之迁移：拖尾 = 一句发射器声明（`spacing`/`life`/`scale`/`sizeCurve`/`alphaCurve`），一次性撒点走 `spawnAll` + 批量速度/力 + 曲线；那组需求随即从需求单**移入本节**（需求单现在只剩 **3 条未决**：发射器抖动、`EmitterHandle` 改寿命/曲线、`armed` 日志） |
+| 48.9 | **PD 侧闭环** | 本轮登记的需求组（运行时发射器 / 插值语义统一 / spawn 内寿命曲线 / 批量生成）已由 **ParticleDrawing 1.0.14-ALPHA**（`d998e36`，顺带做了更早那条"组级逐成员漂移"）全部落地，本侧随之迁移：拖尾 = 一句发射器声明（`spacing`/`life`/`scale`/`sizeCurve`/`alphaCurve`），一次性撒点走 `spawnAll` + 批量速度/力 + 曲线；那组需求随即从需求单**移入本节**（需求单现在只剩 **2 条未决**：发射器抖动、`EmitterHandle` 改寿命/曲线） |
 
 **验证（实机录制 + 独立判读）**：`fireball_trail` **PASS**（72/72 帧、丢帧 0、场景内断言 4/4、退场渐变 10~13 帧、日志 0 异常）；
 "严格在本体之后"逐帧检查 **0/28 帧**越界；`gravity_field` PASS（退场 9~13 帧）；`black_hole` 仍只失败在**既有**那条退场判据
@@ -1448,6 +1449,23 @@ Noita 火花弹的观感恰恰相反（`SPARK_LIFETIME 2~6` 这一档才是它�
   方向平移 `scale × |offsetFromPivot|`）或 `group.moveEach(deltas, durationTicks, easing)`。
 - **落地**：1.0.14-ALPHA（`d998e36`）加了组级**逐成员漂移**。
 - **本侧现状**：尚未迁移（护盾仍"一片一组"）；迁移后能拿回那部分组数与日志。
+
+**同批闭环的更早一条：`armed` 日志降级为 DEBUG / 可开关**（第 41 轮登记，2026-10-04 核实）
+
+- **登记原文（场景）**：护盾每次受击都会**新画一批面板碎片**（碎片不跟人、每次新画），每个面板一个组
+  → 一次受击 arms **32 个组**（截角十二面体 = 12 五边形 + 20 六边形），生存模式实战里日志被刷屏。
+  实机日志原文：`[ParticleDrawing] program <uuid> armed: 72 particles, 0 instructions, anchorOffset=1`。
+- **当时的缺口**：`core/client/ClientAnimationProgramManager` 每次 arm 组都打一行 **INFO**，
+  使用方在模组侧关不掉（也不该让使用方改 log4j 配置来消音前置模组）。
+- **期望形态**：arm 日志降到 DEBUG，或给一个开关。
+- **落地（含在 1.0.14-ALPHA）**：arm 正常行改为 **DEBUG**；开关有两处 ——
+  运行期 `ParticleManager.setDebugLogging(true)`，或客户端配置 `debugProgramLogging`（默认 `false`）；
+  **异常分支**（"armed with zero known particles … client spawn packets missing?"）仍留 INFO，这是有意的
+  （那是真出问题时的诊断）。
+- **本侧处理**：**无需改动**（默认就安静了）。排查"程序到底有没有 arm、arm 了几颗粒子"时再打开开关。
+- **核实方式**：从 `lib/particledrawing-1.0.14-ALPHA-sources.jar` 抽出的
+  `api/ParticleManager.kt`（`fun setDebugLogging`）与 `core/client/ClientAnimationProgramManager.kt`
+  （INFO/DEBUG 两条 `LOGGER` 分支 + `DebugFlags.verboseProgramLogging` 判断）逐条对上。
 
 ### 1.0.13-ALPHA：外观整组（第 23/28 轮登记 → 第 29 轮接线）
 

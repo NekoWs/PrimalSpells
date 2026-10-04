@@ -26,4 +26,3 @@
 5. 新信息一律写进 `docs/` 对应文档，本文件保持为纯指针。
 6. 前置模组 `particledrawing`（ParticleDrawing，ALPHA）出现 API 缺陷或能力缺失时，**不得在本模组自行另写一套替代实现**：停止该接入点的尝试，把「ParticleDrawing API 修改需求」列在产出末尾并登记到 `docs/issues/pd-api-requests.md`。**该清单只在本次功能要求涉及 ParticleDrawing API 时才出现**（政策全文见 `docs/conventions.md` 第 9 节与 `docs/design/effects-api.md` 第 0 节）。
 7. 提交信息按 `docs/conventions.md` 第 10 节的 `目的：内容` 格式：简短、只说大概干了什么、不复述具体改动。
-8. **每次新对话接到开发需求，默认走「委派」流程**：把需求翻成自包含 prompt 交给子代理 `local/qwen3.8-flash-next` 开发，主 agent 只验收、不亲手写代码（仅保留验收中的小瑕疵修改权）；连续 2 轮不通过即停下通知用户。**本地 qwen 约 30 tok/s，交付慢是常态：一律后台委派、等它自己报完成，慢不构成失败或接管的理由。** 流程、责权、证据与上限见 `docs/collaboration.md`；用户当次指令优先。

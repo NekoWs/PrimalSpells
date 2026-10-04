@@ -54,9 +54,8 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 - 上一版本为 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
 - `lib/` 只保留当前版本的 jar（`particledrawing-1.0.14-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
-  **两个 jar 都在 `build.gradle` 里接线**：主 jar 进 `compileOnly` + `localRuntime`；`-sources.jar` 同时进 `compileOnly`
-  与 `pdSources`（外加 `idea.module.scopes`）—— Gradle 的 file 依赖**没有 sources 变体**，这是为了让 **IDEA 里悬停/跳转能看到 KDoc**。
-  源码 jar 里只有 `.kt`/`.java`（**不含 `.class`**，已核对），所以挂在编译期 classpath 上不影响构建产物。
+  源码 jar **不接进构建**（只作对照用）：Gradle 的 file 依赖没有 sources 变体，2026-10-04 试过
+  `compileOnly` + `idea.module.scopes` 想让 IDEA 悬停看到 KDoc，**实测没生效**，已撤回 —— 别再试这条。
 
 ## 3. 常用命令
 

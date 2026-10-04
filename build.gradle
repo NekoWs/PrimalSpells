@@ -124,9 +124,6 @@ tasks.matching { it.name == 'runCapture' }.configureEach {
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
-
-    // 前置模组的**源码 jar**（只为 IDE 里悬停/跳转看 KDoc，见 idea.module.scopes）
-    pdSources
 }
 
 dependencies {
@@ -144,18 +141,6 @@ dependencies {
     // compileOnly = 只用于编译期接口；localRuntime = 只在本机开发运行环境里加载，不传递给下游。
     compileOnly files("lib/particledrawing-${particledrawing_version}.jar")
     localRuntime files("lib/particledrawing-${particledrawing_version}.jar")
-
-    // —— 源码 jar：只为「IDEA 里悬停函数能看到 KDoc」——
-    // ⚠️ Gradle 的 **file 依赖没有 sources 变体**，IntelliJ 的 Gradle 导入不会自动把同目录的
-    //    `-sources.jar` 挂到 `files(...)` 依赖上（所以此前悬停只有 `/* compiled code */`）。
-    //    这里显式做两件事：
-    //    ① 放进 `compileOnly`：源码 jar 里只有 `.kt`/`.java` 源文件、**不含 `.class`**（已核对），
-    //       因此不会遮蔽或污染 classpath，但会让这个库进入 IntelliJ 的 Gradle 模型（Kotlin 插件据此索引 KDoc）；
-    //    ② 用 idea 插件的 module scopes 把它挂到 IDEA 模块的 COMPILE 作用域（legacy 导入模型下直接生效）。
-    //    若用新版 Gradle 导入器仍看不到 KDoc：改用 `./gradlew publishToMavenLocal`（PD 侧）+
-    //    `mavenLocal()` + 依赖坐标，那条路上 IDE 会自动识别 `-sources` 分类器。
-    compileOnly files("lib/particledrawing-${particledrawing_version}-sources.jar")
-    pdSources files("lib/particledrawing-${particledrawing_version}-sources.jar")
 }
 
 tasks.withType(ProcessResources).configureEach {
@@ -207,8 +192,5 @@ idea {
     module {
         downloadSources = true
         downloadJavadoc = true
-        // 本地 file 依赖的源码 jar 不受 downloadSources 影响（它只对 Maven 模块依赖生效），
-        // 所以要显式把 pdSources 配置挂进 IDEA 模块的 COMPILE 作用域 —— 悬停/跳转才有 KDoc。
-        scopes.COMPILE.plus += [configurations.pdSources]
     }
 }

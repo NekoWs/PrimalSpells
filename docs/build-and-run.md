@@ -333,3 +333,9 @@ wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thi
 法杖新增主副手原版itemUsed高度回调与空手对照；60°/90°视角按两枚符印专属色域逐帧检查，排除模型和焦点掩盖断档。充能柱只读脚下坐标，t65–77独立观察完整收尾，t78再重复施法，避免效果重叠污染断言。
 在当前录制之前遗留其它场景目录时，不把历史帧当成本轮证据；仅装配本轮6个目录（可在build/capture/round59out放6个指向out对应目录的Junction，再 `python tools/capture/assemble.py --out build/capture/round59out`）。
 结果回填design/wand-casting.md；运行日志异常门禁保持。
+
+### 第60轮模块/状态时序验收
+
+选择black_hole,black_hole_moving,spell_resonance,wand_casting,wand_casting_first_person,wand_casting_wide,wand_casting_front,wand_aim。
+客户端场景采样原生模型属性验证待机变化、主副手施法后亮态和300ms后复原；像素门禁验证t29（施法下一tick）两种冷却已经可见。短退场适配本轮要求，具体门槛见design/wand-casting.md。
+本轮独立装配目录build/capture/round60out仅包含8个对应场景的Junction，不把旧场景媒体计为新证据。日志异常门禁不变。

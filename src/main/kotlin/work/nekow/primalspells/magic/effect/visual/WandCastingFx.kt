@@ -14,8 +14,8 @@ import kotlin.math.sin
 
 /** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
-    const val EQUIP_TICKS = 16
-    const val EXIT_TICKS = 16
+    const val EQUIP_TICKS = 8
+    const val EXIT_TICKS = 6
     private const val GEM_FORWARD = 0.85
     private const val GEM_UP = 0.25
     private const val GEM_SIDE = 0.38
@@ -43,10 +43,10 @@ object WandCastingFx {
                 ax=cos(theta)*1.2;az=sin(theta)*1.2;
                 bx=cos(theta+2*PI/3)*1.2;bz=sin(theta+2*PI/3)*1.2;
                 scatter=sin(i*91.71)*0.5+0.5;
-                dissolve=min(1,max(0,(t-retireAt-scatter*150)/600));
-                x=fx+ax+(bx-ax)*q;y=fy+dissolve*dissolve*(0.15+scatter*0.25);
+                dissolve=min(1,max(0,(t-retireAt-scatter*50)/200));
+                x=fx+ax+(bx-ax)*q;y=fy+sin(t*0.004+i*0.55)*0.018+dissolve*dissolve*(0.08+scatter*0.08);
                 z=fz+az+(bz-az)*q;
-                sc=min(1,max(0,(t/600-q)*24))*sqrt(1-dissolve);
+                sc=min(1,max(0,(t/260-q)*24))*(1-dissolve);
                 r=0.26;g=0.78;b=0.86;a=1;
             """)
             // 两枚块状菱形符印持续陪伴宝石；呼吸只改变尺寸，不周期关闭可见性。
@@ -61,33 +61,36 @@ object WandCastingFx {
                 vy=ry+(ay+(by-ay)*u)*0.075;
                 x=hx+cos(yaw)*vx+ux*vy;
                 y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
-                sc=min(1,max(0,(t-600)/200))*(0.9+0.1*sin(t*0.003+lane*PI))*sqrt(remaining);
+                sc=min(1,max(0,(t-260)/100))*(0.9+0.1*sin(t*0.003+lane*PI))*sqrt(remaining);
                 r=0.38+lane*0.16;g=0.92;b=1;a=1;
             """)
-            group(48, 0.09375f, """
-                lane=floor(3*i/n);q=3*i/n-lane;theta=PI/2+yaw+lane*2*PI/3;
-                done=min(1,max(0,(t-delayEnd-q*120)/400));
-                ax=cos(theta)*(1.29+done*0.1);az=sin(theta)*(1.29+done*0.1);
-                bx=cos(theta+2*PI/3)*(1.29+done*0.1);bz=sin(theta+2*PI/3)*(1.29+done*0.1);
-                x=fx+ax+(bx-ax)*q;y=fy+0.015+done*0.2;z=fz+az+(bz-az)*q;
-                sc=min(1,max(0,(dp-q)*18))*delayOn*(1-done)*remaining;
+            // 施法后束印张开卸能，白色夹片回位表示施放间隔恢复；从第一帧就完整可见。
+            group(8, 0.046875f, """
+                lane=floor(i/4);node=i-lane*4;
+                done=min(1,max(0,(t-delayEnd)/160));
+                vx=(lane*2-1)*(0.24+0.12*(1-dp)*(1-dp)+(node-floor(node/2)*2)*0.045);
+                vy=(floor(node/2)*2-1)*0.10;
+                x=hx+cos(yaw)*vx+ux*vy;y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
+                sc=delayOn*(1-done)*remaining;
                 r=0.92;g=0.96;b=1;a=1;
             """)
-            // 三根充能柱始终使用脚下坐标，视线俯仰和宝石位置不改变其形状。
-            group(36, 0.125f, """
+            group(36, 0.09375f, """
                 lane=floor(i/12);node=i-lane*12;row=floor(node/3);col=node-row*3-1;
                 theta=PI/2+yaw+lane*2*PI/3;
-                done=min(1,max(0,(t-rechargeEnd-row*20)/400));
+                done=min(1,max(0,(t-rechargeEnd-row*15)/160));
                 rad=1.08+done*0.08;
                 x=fx+cos(theta)*rad-sin(theta)*col*0.105;
                 z=fz+sin(theta)*rad+cos(theta)*col*0.105;
                 y=fy+0.075+row*0.125+done*done*0.22;
-                sc=rechargeOn*min(1,max(0,(rp*4-row)*3-0.5))*(1-done)*remaining;
-                r=0.96;g=0.66;b=0.25;a=1;
+                shape=1-abs(row-1.5)*0.18-abs(col)*0.12;
+                sc=rechargeOn*shape*(1-done)*remaining;
+                lit=min(1,max(0,floor(rp*4-row+1)));
+                lit=lit*min(1,3-row)+floor(rp)*max(0,row-2);
+                r=0.16+lit*0.12;g=0.32+lit*0.34;b=0.72+lit*0.28;a=1;
             """)
             group(1, 0.0625f, """
                 x=hx;y=hy;z=hz;
-                sc=min(1,max(0,(t-600)/200))*remaining;
+                sc=min(1,max(0,(t-260)/100))*remaining;
                 r=0.72;g=1;b=0.95;a=1;
             """)
             update()
@@ -115,7 +118,7 @@ object WandCastingFx {
                 hx=fx+dx*$GEM_FORWARD+cos(yaw)*side+ux*$GEM_UP;
                 hy=fy-0.06+eh+dy*$GEM_FORWARD+uy*$GEM_UP;
                 hz=fz+dz*$GEM_FORWARD+sin(yaw)*side+uz*$GEM_UP;
-                remaining=1-min(1,max(0,(t-retireAt)/750));
+                remaining=1-min(1,max(0,(t-retireAt)/250));
                 $code
             """.trimIndent())
             groups += group
@@ -184,6 +187,12 @@ object WandCastingFx {
         return Held(player, wand).also { states[player.uuid] = it }
     }
 
+    /** 结算完成立即发布真实冷却状态，避免等待下一次会话tick。 */
+    fun cooldownsChanged(caster: Entity, wand: Wand) {
+        val player = caster as? ServerPlayer ?: return
+        if (selected(player) === wand) state(player, wand).update()
+    }
+
     /** 切杖/放下播放有限退场；死亡、维度变化、登出立即清理，避免追踪失效实体。 */
     fun tick(server: MinecraftServer) {
         retiring.removeAll {
@@ -232,6 +241,7 @@ object WandCastingFx {
     fun cast(caster: Entity, wand: Wand) {
         val player = caster as? ServerPlayer ?: return
         if (selected(player) !== wand) return
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(player, work.nekow.primalspells.network.WandCastPayload(wand.id))
         val center = origin(caster, wand)
         val forward = work.nekow.primalspells.wand.WandAim.direction(caster, center)
         val manager = ParticleManager.of(caster.level())
@@ -239,18 +249,18 @@ object WandCastingFx {
         repeat(24) { i ->
             group.add(manager.create().position(center).color(Color.ofInt(195, 253, 240))
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<6) 0.1875f else 0.125f, 0.125f)
-                    .glowing(true).additive(false)).lifetime(10).spawn())
+                    .glowing(true).additive(false)).lifetime(6).spawn())
         }
         group.setVariable("cx", center.x).setVariable("cy", center.y).setVariable("cz", center.z)
             .setVariable("dx", forward.x).setVariable("dy", forward.y).setVariable("dz", forward.z)
             .expression("""
-                p=min(1,t/400);h=sin(i*127.1)*43758.5453;h=h-floor(h);
+                p=min(1,t/200);h=sin(i*127.1)*43758.5453;h=h-floor(h);
                 angle=i*2.399963;spread=sin(PI*p)*(0.08+h*0.16);
                 x=cx+dx*p*(0.25+h*0.45)+cos(angle)*spread;
                 y=cy+dy*p*(0.25+h*0.45)+sin(angle)*spread;
                 z=cz+dz*p*(0.25+h*0.45)+sin(angle*1.71)*spread;
                 sc=(1-p)*(1-p);r=0.73;g=1;b=0.92;a=1;
-            """.trimIndent()).destroyAfter(10)
+            """.trimIndent()).destroyAfter(6)
     }
 
     /** 登出清理活动法阵；有限退场组的销毁已由PD调度。 */

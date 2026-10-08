@@ -32,3 +32,48 @@ newmtl gem_dark
 Kd 0.141176 0.254902 0.470588
 Ka 0.25 0.25 0.25
 map_Kd base
+
+newmtl gem_glow1
+Kd 0.380392 0.588235 0.803922
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow1_light
+Kd 0.576471 0.752941 0.945098
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow1_dark
+Kd 0.349020 0.435294 0.596078
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow2
+Kd 0.576471 0.717647 0.866667
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow2_light
+Kd 0.709804 0.831373 0.960784
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow2_dark
+Kd 0.552941 0.611765 0.725490
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow3
+Kd 0.772549 0.847059 0.929412
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow3_light
+Kd 0.843137 0.909804 0.980392
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow3_dark
+Kd 0.760784 0.792157 0.850980
+Ka 1 1 1
+map_Kd base

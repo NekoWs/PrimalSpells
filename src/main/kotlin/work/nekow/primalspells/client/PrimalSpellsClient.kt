@@ -21,6 +21,9 @@ import work.nekow.primalspells.client.render.DroneEntityModel
 import work.nekow.primalspells.client.render.DroneEntityRenderer
 import work.nekow.primalspells.client.render.ParticleTextures
 import work.nekow.primalspells.client.render.WandHandPose
+import work.nekow.primalspells.client.render.WandModelProperty
+import net.neoforged.neoforge.client.event.RegisterRangeSelectItemModelPropertyEvent
+import net.minecraft.resources.Identifier
 import work.nekow.primalspells.registry.ModItems
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent
 import work.nekow.primalspells.client.tooltip.ClientPouchTooltip
@@ -50,6 +53,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
     init {
         // 1. 网络包的客户端处理器
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
+        ClientPayloadSink.wandCast = { WandModelProperty.flash(it.wandId) }
         ClientPayloadSink.screenShake = { ScreenShakeClient.onShake(it) }
 
         // 2. 实机录制驱动（开发期自动化测试的「眼睛」）：
@@ -83,7 +87,12 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.addListener<ClientPlayerNetworkEvent.LoggingOut> {
             // 4. 清理只增不减的客户端缓存
             WandHudRenderer.clear()
+            WandModelProperty.clear()
             SpellSlotTracker.clear()
+        }
+
+        bus.addListener<RegisterRangeSelectItemModelPropertyEvent> { event ->
+            event.register(Identifier.fromNamespaceAndPath(PrimalSpells.MODID, "wand_motion"), WandModelProperty.CODEC)
         }
 
         bus.addListener<RegisterClientExtensionsEvent> { event ->

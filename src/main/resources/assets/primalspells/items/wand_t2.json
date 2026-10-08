@@ -1,6 +1,285 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "primalspells:item/wand_t2"
+    "type": "minecraft:composite",
+    "models": [
+      {
+        "type": "minecraft:model",
+        "model": "primalspells:item/wand"
+      },
+      {
+        "type": "minecraft:range_dispatch",
+        "property": "primalspells:wand_motion",
+        "crystal": false,
+        "fallback": {
+          "type": "minecraft:model",
+          "model": "primalspells:item/wand_motion_00"
+        },
+        "entries": [
+          {
+            "threshold": 0,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_00"
+            }
+          },
+          {
+            "threshold": 1,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_01"
+            }
+          },
+          {
+            "threshold": 2,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_02"
+            }
+          },
+          {
+            "threshold": 3,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_03"
+            }
+          },
+          {
+            "threshold": 4,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_04"
+            }
+          },
+          {
+            "threshold": 5,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_05"
+            }
+          },
+          {
+            "threshold": 6,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_06"
+            }
+          },
+          {
+            "threshold": 7,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_07"
+            }
+          },
+          {
+            "threshold": 8,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_08"
+            }
+          },
+          {
+            "threshold": 9,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_09"
+            }
+          },
+          {
+            "threshold": 10,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_10"
+            }
+          },
+          {
+            "threshold": 11,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_11"
+            }
+          },
+          {
+            "threshold": 12,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_12"
+            }
+          },
+          {
+            "threshold": 13,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_13"
+            }
+          },
+          {
+            "threshold": 14,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_14"
+            }
+          },
+          {
+            "threshold": 15,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_15"
+            }
+          },
+          {
+            "threshold": 16,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_16"
+            }
+          },
+          {
+            "threshold": 17,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_17"
+            }
+          },
+          {
+            "threshold": 18,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_18"
+            }
+          },
+          {
+            "threshold": 19,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_19"
+            }
+          },
+          {
+            "threshold": 20,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_20"
+            }
+          },
+          {
+            "threshold": 21,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_21"
+            }
+          },
+          {
+            "threshold": 22,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_22"
+            }
+          },
+          {
+            "threshold": 23,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_23"
+            }
+          },
+          {
+            "threshold": 24,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_24"
+            }
+          },
+          {
+            "threshold": 25,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_25"
+            }
+          },
+          {
+            "threshold": 26,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_26"
+            }
+          },
+          {
+            "threshold": 27,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_27"
+            }
+          },
+          {
+            "threshold": 28,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_28"
+            }
+          },
+          {
+            "threshold": 29,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_29"
+            }
+          },
+          {
+            "threshold": 30,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_30"
+            }
+          },
+          {
+            "threshold": 31,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_motion_31"
+            }
+          }
+        ]
+      },
+      {
+        "type": "minecraft:range_dispatch",
+        "property": "primalspells:wand_motion",
+        "crystal": true,
+        "fallback": {
+          "type": "minecraft:model",
+          "model": "primalspells:item/wand_crystal_0"
+        },
+        "entries": [
+          {
+            "threshold": 0,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_0"
+            }
+          },
+          {
+            "threshold": 1,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_1"
+            }
+          },
+          {
+            "threshold": 2,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_2"
+            }
+          },
+          {
+            "threshold": 3,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_3"
+            }
+          }
+        ]
+      }
+    ]
   }
 }

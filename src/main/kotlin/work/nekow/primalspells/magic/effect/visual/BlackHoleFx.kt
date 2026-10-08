@@ -75,9 +75,9 @@ class BlackHoleFx {
     fun clear() {
         sucked?.clear()
         sucked = null
-        boundary?.scale(0.08f, 10, EasingType.EASE_IN)?.destroyAfter(12)
+        boundary?.scale(0.08f, 4, EasingType.EASE_IN)?.destroyAfter(6)
         boundary = null
-        core?.scale(0.05f, 16, EasingType.EASE_IN)?.destroyAfter(18)
+        core?.scale(0.05f, 6, EasingType.EASE_IN)?.destroyAfter(8)
         core = null
     }
 

@@ -168,6 +168,7 @@ class Wand(var id: String) {
         status.recharge += rechargeResidual
         status.lastDelay = status.delay
         status.lastRecharge = status.recharge
+        work.nekow.primalspells.magic.effect.visual.WandCastingFx.cooldownsChanged(caster, this)
         return true
     }
 

@@ -43,6 +43,8 @@ object ClientTooltipHandler {
         }
         if (Minecraft.getInstance().hasAltDown()) {
             addStatLines(event, wandId)
+            event.tooltipElements.add(Either.left(Component.translatable("tooltip.primalspells.stabilizing_seal").withStyle(ChatFormatting.WHITE)))
+            event.tooltipElements.add(Either.left(Component.translatable("tooltip.primalspells.charging_crystal").withStyle(ChatFormatting.BLUE)))
         } else {
             event.tooltipElements.add(Either.left(
                 Component.translatable("tooltip.primalspells.hold_alt").withStyle(ChatFormatting.DARK_GRAY)

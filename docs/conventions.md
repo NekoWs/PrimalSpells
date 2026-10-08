@@ -321,3 +321,7 @@ magic/modifier  ──→ magic/core, magic/effect
 ### 第59轮新增文件落位
 
 WandUseAnimationMixin.java与ItemInHandRendererAccessor.java放src/main/java/work/nekow/primalspells/mixin/，仅列入primalspells.mixins.json的client列表。前者处理原版成功使用的高度路径，后者用于客户端实机高度回归；公共服务端代码不引用它们。包结构和旧文件位置未变，无旧→新迁移。
+
+### 第60轮新增落位
+
+client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪光状态；network/WandCastPayload.kt为成功施法模型通知，通过ClientPayloadSink转发，公共侧不引用客户端。现有tools/wands/generate_models.py生成主体、待机模块及宝石亮态，原资源路径保留，无旧→新迁移。

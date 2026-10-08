@@ -1,5 +1,7 @@
 package work.nekow.primalspells.client.capture
 
+import net.minecraft.client.Minecraft
+import work.nekow.primalspells.client.render.WandModelProperty
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.ItemStack
 import work.nekow.particledrawing.api.ParticleManager
@@ -29,6 +31,23 @@ object WandCastingScenes {
         var switchCast = false
         var offhandBlocked = false
         var offhandCast = false
+        val clientChecks = java.util.concurrent.ConcurrentSkipListMap<String, Boolean>()
+        var firstFrame = -1f
+        fun sampleModel(t: Int) {
+            Minecraft.getInstance().execute {
+                val mc = Minecraft.getInstance(); val player = mc.player ?: return@execute
+                val stack = if (t >= 160) player.offhandItem else player.mainHandItem
+                val frame = WandModelProperty().get(stack, mc.level, player, 0)
+                val light = WandModelProperty(true).get(stack, mc.level, player, 0)
+                when(t) {
+                    20 -> firstFrame = frame
+                    25 -> clientChecks["native-idle-module-frame-changes"] = frame != firstFrame && firstFrame >= 0f
+                    30 -> clientChecks["successful-cast-lights-crystal"] = light > 0f
+                    40 -> clientChecks["crystal-afterglow-is-short"] = light == 0f
+                    180 -> clientChecks["offhand-cast-lights-crystal"] = light > 0f
+                }
+            }
+        }
         fun equip(): Pair<ItemStack, Wand> {
             val stack = ItemStack(ModItems.WAND.get())
             val wand = WandManager[WandManager.createWand(stack)]
@@ -55,6 +74,7 @@ object WandCastingScenes {
                 val x = if (t in 75..130) 0.5 + sin((t-75)*0.04)*1.5 else 0.5
                 Pose(x, ctx.floorBlockY(0, 0)+1.0, 0.5, if (t in 75..130) (t-75)*1.2f else 0f, pitch)
             }, tick = { ctx, t ->
+                if (t in listOf(20,25,30,40,180)) sampleModel(t)
                 if (t == 8) ctx.player.setItemInHand(InteractionHand.MAIN_HAND, firstStack)
                 if (t == 9) {
                     val mana = first.status.mana
@@ -83,7 +103,7 @@ object WandCastingScenes {
                 if (t == 160) ctx.player.setItemInHand(InteractionHand.OFF_HAND, firstStack)
                 if (t == 161) offhandBlocked = !first.spell(ctx.player)
                 if (t == 178) offhandCast = first.spell(ctx.player)
-                if (front && t == 180) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 180) MagicManager.projectiles.forEach { it.alive = false }
                 if (t == 190) {
                     ctx.player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY)
                     MagicManager.projectiles.forEach { it.alive = false }
@@ -100,11 +120,11 @@ object WandCastingScenes {
                 80 -> listOf(Check(name, t, "repeated-cast-does-not-restart-equip", repeatCast && WandCastingFx.ready(ctx.player, first), "cast=$repeatCast"))
                 120 -> listOf(Check(name, t, "switch-wand-restarts-equip-only-once", switchBlocked && switchCast && WandCastingFx.ready(ctx.player, second), "blocked=$switchBlocked cast=$switchCast"))
                 144 -> listOf(Check(name, t, "put-away-keeps-finite-exit-animation", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
-                158 -> listOf(Check(name, t, "put-away-cleans-after-exit", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
-                198 -> listOf(Check(name, t, "offhand-exit-still-visible", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                148 -> listOf(Check(name, t, "put-away-cleans-after-exit", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                192 -> listOf(Check(name, t, "offhand-exit-still-visible", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 208 -> listOf(Check(name, t, "offhand-exit-cleaned", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 180 -> listOf(Check(name, t, "offhand-has-equip-and-casting", offhandBlocked && offhandCast, "blocked=$offhandBlocked cast=$offhandCast"))
-                219 -> listOf(Check(name, t, "projectiles-cleaned", MagicManager.projectiles.isEmpty(), "shots=${MagicManager.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                219 -> listOf(Check(name, t, "projectiles-cleaned", MagicManager.projectiles.isEmpty(), "shots=${MagicManager.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")) + clientChecks.map { (label, ok) -> Check(name, t, label, ok, "result=$ok") }
                 else -> emptyList()
             } })
     }

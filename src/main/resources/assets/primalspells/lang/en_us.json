@@ -120,5 +120,7 @@
   "item.primalspells.repulsion_field": "Repulsion Field",
   "lore.primalspells.repulsion_field.desc": "A 4-block field pushes magic and vanilla projectiles, including your own, for 6 seconds.",
   "item.primalspells.freeze_charge": "Freeze Charge",
-  "lore.primalspells.freeze_charge.desc": "Direct damage x0.75. Freezes on hit for 1.5s, followed by 2s immunity. Hits of 4+ damage shatter ice for +2 damage."
+  "lore.primalspells.freeze_charge.desc": "Direct damage x0.75. Freezes on hit for 1.5s, followed by 2s immunity. Hits of 4+ damage shatter ice for +2 damage.",
+  "tooltip.primalspells.stabilizing_seal": "White seals close: casting interval recovered",
+  "tooltip.primalspells.charging_crystal": "Blue conduits fill: spell sequence recharged"
 }

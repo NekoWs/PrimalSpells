@@ -120,5 +120,7 @@
   "item.primalspells.repulsion_field": "斥力场",
   "lore.primalspells.repulsion_field.desc": "展开半径4格的斥力场，推开魔法与原版投射物（包括自己的），持续6秒。",
   "item.primalspells.freeze_charge": "冰冻附魔",
-  "lore.primalspells.freeze_charge.desc": "直接伤害乘0.75，命中后冻结1.5秒，解冻后免疫2秒。4点以上重击额外造成2点碎冰伤害。"
+  "lore.primalspells.freeze_charge.desc": "直接伤害乘0.75，命中后冻结1.5秒，解冻后免疫2秒。4点以上重击额外造成2点碎冰伤害。",
+  "tooltip.primalspells.stabilizing_seal": "白色束印回位：施放间隔结束",
+  "tooltip.primalspells.charging_crystal": "蓝色导晶充满：法术序列重整完毕"
 }

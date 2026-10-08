@@ -52,5 +52,6 @@ object WandEventHandler {
         val player = event.entity as? ServerPlayer ?: return
         // 施法记录按玩家 UUID 缓存在静态表里，登出即清理
         WandItem.forgetCastState(player.uuid)
+        work.nekow.primalspells.magic.effect.visual.WandCastingFx.forget(player.uuid)
     }
 }

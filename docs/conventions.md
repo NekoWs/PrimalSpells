@@ -300,3 +300,9 @@ magic/modifier  ──→ magic/core, magic/effect
 配方装配SpellAssembly位于magic/core；SpellResonance/SpellInteractions位于magic/effect/lifecycle；
 公开PD API造型PixelVfx位于magic/effect/visual；实机验收SpellQualityScenes位于client/capture。
 本轮不搬动旧文件，无旧→新路径迁移。
+
+
+### 第56轮新增文件落位
+
+持杖会话与PD造型WandCastingFx放在magic/effect/visual；开发录制WandCastingScenes放在client/capture。
+说明见design/wand-casting.md。本轮没有文件迁移；公开侧不引用Minecraft客户端类，CameraType只在录制驱动使用。

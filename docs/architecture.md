@@ -446,3 +446,10 @@ MagicManager在本tick投射物推进与pendingAdd合并后执行同维度SpellI
 Projectile.motionEnabled只控制位置积分；collisionEnabled独立控制接触查询，区域场必须关闭后者，不能关闭前者代替。
 发射初速统一乘1.6；继承当前世界速度的子弹必须使用SpellAssembly.launch，抵消基础速度/速度卡/全局倍率，不能二次放大。
 Tracking从age=0的首tick生效，零距离方向不归一化。throughBlocks仅跳过方块检测，不跳过本tick位置更新。
+
+
+### 第56轮持杖预热与出生点
+
+真实玩家持杖会话先经过16tick装备预热，Wand.spell在抽牌/扣法力前阻止未就绪施法；不能用status.delay代替这段会话计时。
+WandCastingFx.origin是汇聚点与持杖弹体出生点的共同来源；普通delay/recharge继续用原计数及余数结算，只由视觉读取。
+放下/切杖/死亡/跨维度/登出必须删除该会话的永存PD组。会话不保存到NBT，非玩家及直接配方调用保留原有施法入口。

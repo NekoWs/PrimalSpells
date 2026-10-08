@@ -22,6 +22,7 @@
 | ↳ [issues/pd-api-requests.md](issues/pd-api-requests.md) | 要提给 ParticleDrawing 的 **API 需求**（未决）+ 能力边界 | 接粒子特效、升级前置模组 |
 | [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
 | [design/minecraft-visuals.md](design/minecraft-visuals.md) | MC实色粒子与44张像素法术卡规范 | 修改视觉或贴图 |
+| [design/wand-casting.md](design/wand-casting.md) | 第56轮持杖三角法阵、汇聚待机、装备预热和双冷却动画 | 修改持杖/施法表现 |
 | [design/spell-quality.md](design/spell-quality.md) | 第54轮当前质感、修饰配方继承、跨投射物反应与高配档 | 修改特效或法术联动 |
 | [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
 | [design/spell-expansion.md](design/spell-expansion.md) | 第52轮七张法术卡：水晶/电弧/远距/光束/斥力/冰冻，数值与组合验收 | 修改新增法术与组合 |

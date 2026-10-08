@@ -136,6 +136,7 @@ object WandManager {
     }
 
     fun load(level: ServerLevel) {
+        work.nekow.primalspells.magic.effect.visual.WandCastingFx.clear()
         val data = WandSavedData.getOrCreate(level)
         // 先清空：整合服务器在同一 JVM 内换世界/重载会再次触发 ServerStartedEvent，
         // 不清空会把上一个世界的法杖残留下来。
@@ -294,6 +295,7 @@ object WandManager {
 
     @SubscribeEvent
     fun onServerStopping(event: ServerStoppingEvent) {
+        work.nekow.primalspells.magic.effect.visual.WandCastingFx.clear()
         save(event.server.overworld())
         // 世界要关了：主世界引用随之失效（服务器正在停机，此后的懒加载只能返回 default）。
         overworld = null
@@ -302,5 +304,6 @@ object WandManager {
     @SubscribeEvent
     fun onTick(event: ServerTickEvent.Pre) {
         tick(event.server.overworld())
+        work.nekow.primalspells.magic.effect.visual.WandCastingFx.tick(event.server)
     }
 }

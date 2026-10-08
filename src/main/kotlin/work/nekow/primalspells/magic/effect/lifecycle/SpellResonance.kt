@@ -23,8 +23,6 @@ class SpellResonance : BaseEffect() {
         val manager = ParticleManager.of(level)
         val center = pos()
         val count = projectile.modifiers.values.sum()
-        if (status.age == 0 && projectile.maxAge > 1) PixelVfx.ring(manager, center, projectile.launchDirection,
-            0.18, tint(), 8, 2.5f)
         if (status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
             PixelVfx.burst(manager, center, tint(), 8 + count * 3, 0.045, 4, 0.0)
         }

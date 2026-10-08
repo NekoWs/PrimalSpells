@@ -142,6 +142,10 @@ class Wand(var id: String) {
         // 否则 WandManager 的回收判定会把它当成无人持有；玩家两处都会记，重复写同一张表无副作用。
         WandManager.markHeld(WandID(id), caster.uuid, caster.level().gameTime)
         status.failedReason.clear()
+        if (!work.nekow.primalspells.magic.effect.visual.WandCastingFx.ready(caster, this)) {
+            status.failedReason.add("Equip charge")
+            return false
+        }
         if (status.delay > 0.0) {
             status.failedReason.add("Delay ${fmt(status.delay)}/${fmt(delayTicks())}")
             return false
@@ -199,7 +203,7 @@ class Wand(var id: String) {
             work.nekow.primalspells.magic.core.SpellAssembly.apply(p, validRevises)
             p.caster = caster
             p.wand = this
-            p.position = caster.eyePosition.toVector3f().sub(0F, 0.1F, 0F)
+            p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toVector3f()
             p.velocity = caster.lookAngle.toVector3f().normalize()
             p.spell()
             status.recharge += p.recharge

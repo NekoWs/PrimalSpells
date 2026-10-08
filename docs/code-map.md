@@ -271,3 +271,7 @@
 
 第55轮：Projectile中的LAUNCH_SPEED_SCALE统一初速，collisionEnabled区分区域场接触与运动；
 Tracking不再有延迟参数。SpellQualityScenes新增spell_stability短时碰撞/追踪/晶体预算回归，PD长时断线仍在issues/open.md。
+
+
+第56轮：持杖法阵/待机/冷却/装备预热在magic/effect/visual/WandCastingFx.kt，WandManager驱动会话，
+Wand.spell检查装备预热，castHand使用共同施法点；实机流程在client/capture/WandCastingScenes.kt。

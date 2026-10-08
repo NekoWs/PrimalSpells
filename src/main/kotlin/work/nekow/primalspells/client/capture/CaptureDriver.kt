@@ -1,6 +1,7 @@
 package work.nekow.primalspells.client.capture
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.CameraType
 import net.minecraft.client.Screenshot
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.Registries
@@ -307,6 +308,7 @@ object CaptureDriver {
         sceneLog.appendLine("warmupTicks\t${next.warmupTicks}")
         sceneLog.appendLine("thirdPerson\t${next.thirdPerson}")
         mc.options.fov().set(next.fov)
+        mc.options.cameraType = if (next.thirdPerson) CameraType.THIRD_PERSON_BACK else CameraType.FIRST_PERSON
         log("=== scene ${next.name} start (warmup=${next.warmupTicks}, length=${next.lengthTicks}) ===")
         server.execute {
             inServer(next.name, "prepare") { next.prepare(ctx(server)) }

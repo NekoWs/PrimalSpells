@@ -9,7 +9,7 @@ import work.nekow.primalspells.util.ScreenShake
 
 /**
  * 半径五格的黑洞：生物迟缓 I，生物与魔法投射物按 0.12/(距离+0.5) 拉向中心。
- * 服务端结算由 AreaFieldEffect 驱动，暗核、吸积盘与星尘表现委托 BlackHoleFx。
+ * 服务端结算由 AreaFieldEffect 驱动，暗核与星尘表现委托 BlackHoleFx。
  * 范围内保持低幅镜头呼吸；视觉退场由 PD 组自行播放，不再重建三拍球壳。
  */
 class BlackHole : AreaFieldEffect(
@@ -21,7 +21,7 @@ class BlackHole : AreaFieldEffect(
     private var opened = false
 
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
-        visuals.spawn(manager, center, projectile.areaScale, projectile.storedEnergy)
+        visuals.spawn(manager, center, projectile.areaScale)
         if (!opened) {
             opened = true
             ScreenShake.shake(manager.level, center, radius = 24.0, amplitude = 0.45f, ticks = 8)

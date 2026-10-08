@@ -301,3 +301,14 @@ python tools/capture/assemble.py          # 合成 + 判定
 新增spell_stability（180tick）：短时双黑洞互吸携带共同前向速度穿过石墙（t45结束以隔离已确认的PD长时断线），首tick追踪、统一1.6倍初速、穿刺弹穿墙积分、晶体粒子预算与清理。
 PD批量速度超过512成员的断线已在客户端日志确认；当前前置存在此缺陷，不能把双场短时PASS当成长时稳定修复。
 修复前置后须复验至少120tick移动星尘（覆盖60tick粒子寿命积累）和513/1024成员批量更新。
+
+
+### 9.9 第56轮持杖法阵
+
+runCapture -Pcapture=black_hole,black_hole_moving,spell_resonance,wand_casting,wand_casting_first_person录制移除黑洞环和真实持杖流程。
+wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thirdPerson切换。预热阶段测试法杖放入背包，
+避免WandManager回收后测试继续调用已unload的旧引用；这是测试夹具生命周期要求。
+玩法、视觉与清理口径见design/wand-casting.md。
+
+
+黑洞环移除后，移动像素检查取固定边界星点色板，保留原游戏tick与60px双向位移门槛；不用已删除的内盘色板判空。

@@ -96,7 +96,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all()
+    fun all(): List<Scene> = listOf(blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -107,13 +107,16 @@ object CaptureScenes {
         var wand: Wand? = null
         Scene(
             name = name,
-            title = if (moving) "黑洞：移动跟随 / 急停回圆 / 反向拉伸" else "黑洞：暗核 / 双层吸积盘 → 旋转稳态 → 塌缩淡出",
+            title = if (moving) "黑洞：暗核与边界星点移动跟随" else "黑洞：暗核 / 星尘吸入与旋流 / 收束退场",
             warmupTicks = 24,
             lengthTicks = lengthTicks,
             fov = 70,
             camera = { ctx, t -> orbit(ctx, FIELD_CENTER_LIFT, radius = 13.0, lift = 3.0, degPerTick = 4.0, tick = if (moving) 0 else t) },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
+                // 每场独立清掉摄影棚内部遮挡，避免上次穿墙回归的石墙进入新预览。
+                for (x in -12..12) for (z in -12..12) for (y in floorY+1..floorY+12)
+                    ctx.level.setBlock(net.minecraft.core.BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2)
                 ctx.buildStudio(CX, CZ, floorY)
                 ctx.setup(
                     spectator = true,

@@ -57,6 +57,8 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "wand_casting_first_person": {"length": 220, "title": "第一视角持杖 / 汇聚点与冷却", "decay": "instant", "quiet": (0, 8), "fade_window": (185, 200)},
+    "wand_casting": {"length": 220, "title": "三角法阵展开 / 汇聚待机 / 双冷却 / 切杖", "decay": "instant", "quiet": (0, 8), "fade_window": (185, 200)},
     "spell_stability": {"length": 180, "title": "双场穿墙 / 即时追踪 / 晶体预算", "decay": "gradual", "quiet": (0, 8)},
     "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
@@ -69,10 +71,10 @@ SCENES = {
     #        none    = 这一场有**两套互不相干的视觉系统**（玻璃板 + 爆炸烟）或收场不是蓝色像素，
     #                  全局峰值不可靠，退场交给场景专属判据（必须在 spec 里另有对应断言）
     "black_hole": {
-        "length": 108, "title": "黑洞：暗核 / 双层吸积盘 → 旋转塌缩", "decay": "gradual",
+        "length": 108, "title": "黑洞：暗核 / 星尘吸入 / 收束退场", "decay": "gradual",
     },
     "black_hole_moving": {
-        "length": 108, "title": "黑洞：移动跟随 / 急停回圆 / 反向拉伸", "decay": "gradual",
+        "length": 108, "title": "黑洞：暗核与边界星点移动跟随", "decay": "gradual",
     },
     "gravity_field_moving": {
         "length": 130, "title": "重力场：移动球壳与地面井环跟随", "decay": "gradual",
@@ -463,21 +465,21 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
              f"尾段 {lo}-{hi} 有 {visible} 帧仍可见、末帧 {seg[-1] if seg else '-'}"),
         )
     if scene == "black_hole_moving":
-        # 固定镜头只取DISC_INNER色板，排除外环惯性与DUST_BRIGHT星尘（214/186/255）。
-        # 用 frames.tsv 的游戏 tick 定位，避免丢帧导致时间窗偏移；低亮外环和历史星尘不参与。
+        # 固定镜头只取BOUNDARY_COLOR色板；固定吸积盘与外环已经移除。
+        # 用frames.tsv游戏tick定位；已发射的历史星尘不参与本体跟随判据。
         rows = [row.split("\t") for row in (sdir / "frames.tsv").read_text(encoding="utf-8").splitlines() if row.strip()]
         centers = []
         for tick in (18, 41, 66):
             row = min(rows, key=lambda row: abs(int(row[1]) - tick))
             with Image.open(sdir / "frames" / f"{int(row[0]):05d}.png") as im:
                 rgb = np.asarray(im.convert("RGB"), dtype=np.int16)
-            # DISC_INNER=218/188/255；RGB编码取整有1档误差，窄容差仍与星尘色板分离。
-            _, xs = np.where((rgb[:, :, 0] >= 216) & (rgb[:, :, 0] <= 220)
-                & (rgb[:, :, 1] >= 187) & (rgb[:, :, 1] <= 190) & (rgb[:, :, 2] >= 250))
+            # BOUNDARY_COLOR=110/74/174；容忍RGB取整，仍与两种运动星尘色板分离。
+            _, xs = np.where((rgb[:, :, 0] >= 108) & (rgb[:, :, 0] <= 112)
+                & (rgb[:, :, 1] >= 72) & (rgb[:, :, 1] <= 76) & (rgb[:, :, 2] >= 172) & (rgb[:, :, 2] <= 176))
             centers.append(float(np.median(xs)) if len(xs) else float("nan"))
         start, first_stop, reversed_stop = centers
         result["asserts"].append((
-            "明亮内盘随本体往返移动", start - first_stop > 60 and reversed_stop - start > 60,
+            "边界星点随本体往返移动", start - first_stop > 60 and reversed_stop - start > 60,
             f"t=18/41/66 横向中心 {centers}，两侧离开出生点均须 >60px",
         ))
 

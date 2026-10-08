@@ -156,9 +156,9 @@ class Wand(var id: String) {
         status.delay = 0.0
         status.recharge = 0.0
         draw(cast)
-        castHand(caster, hand)
-        // 法杖自己的delay是完整刻最小间隔，与卡牌累加值取大。
-        status.delay = max(status.delay, delayTicks()).coerceAtLeast(0.0)
+        val delayReset = castHand(caster, hand)
+        // 通常以法杖delay为完整刻下限；成功施放链锯时允许清零，后置卡仍可追加delay。
+        status.delay = (if (delayReset) status.delay else max(status.delay, delayTicks())).coerceAtLeast(0.0)
         status.recharge = status.recharge.coerceAtLeast(0.0)
         status.lastDelay = status.delay
         status.lastRecharge = status.recharge
@@ -173,7 +173,8 @@ class Wand(var id: String) {
      * @param caster 施法者实体
      * @param hand   当前手牌列表（本方法负责清空）
      */
-    private fun castHand(caster: Entity, hand: ArrayList<Magic>) {
+    private fun castHand(caster: Entity, hand: ArrayList<Magic>): Boolean {
+        var delayReset = false
         val magics = arrayListOf<Magic>()
         magics += hand
 
@@ -207,6 +208,7 @@ class Wand(var id: String) {
                 castVisualPlayed = true
             }
             status.recharge += p.recharge
+            if (p.resetsCastDelay) { status.delay = 0.0; delayReset = true }
             status.delay += p.delay
 
             status.lastDelay = status.delay
@@ -217,6 +219,7 @@ class Wand(var id: String) {
         // 手牌在 payload 抽取完成后统一丢弃：过早 discard 会触发 reload，
         // 导致触发法术（TriggerSpell）重新抽到刚施放的牌（含自身）。
         discard()
+        return delayReset
     }
 
     /**

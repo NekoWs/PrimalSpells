@@ -377,3 +377,15 @@ OSHI是Minecraft自带的操作系统/硬件信息库。此处异常发生在Cra
 本次已重建两种位宽、同步WMI、修正PerfOS错误值类型；英文Counter仍错误87，OSHI仍返回null，Windows拒绝重启WMI服务。待用户重启后复验。通过条件：OSHI当前PID非null、CPU时间/物理与虚拟内存为真实有效数据；新runCapture日志无对应异常，总体日志门禁通过。
 
 修复尝试后63d重新启动客户端并补录spell_mechanics：220帧/零丢帧/26项全通过；`build/capture/final63d.log`仍含同样5条OSHI异常，PerfOS字段类型警告已消失。用户选择稍后手动保存工作并重启，禁止本轮自动重启；重启后的系统/录制复验尚未进行。
+
+## 第64轮验收范围（2026-10-09）
+
+最终8场：`spell_timing`、`spell_mechanics`、`expansion_arc`、`expansion_combinations`、`expansion_crystals`、`crystal_lifecycle`、`spell_resonance`、`spell_stability`。1520帧、零丢帧、79/79项玩法断言通过，逐场帧数/像素可见性/退场与媒体门禁通过。新增延迟/链锯场12项，水晶生命周期场7项；真实施法、伤害、牌序与清理均走原运行时。
+
+最终画廊`build/capture/final64/index.html`，报告`report.txt`，逐场来源`runs.tsv`，帧/断言统计`summary.tsv`；该独立目录只含本轮8场，不混入此前录制。7场来自64b，延迟/链锯场来自最终64c；原日志分别存于`build/capture/final64b.log`与`final64c.log`。64a另补录第一人称施法220帧/16项通过，未计入上述8场总数。
+
+人工检查水晶四个外侧视角的填充面、白闪及到期真实爆炸；延迟载体释放前收拢、释放后与荷载同位置飞散；基础及延寿加速链锯切割均可见。图标仍用现有像素生成器，最终43张卡。
+
+总体报告仍FAIL：新客户端启动仍含既有OSHI/Perflib/JNA的5条异常，没有调整日志门禁或隐藏错误。用户尚待手动重启，法术验收通过不能作为系统计数器恢复的证明。
+
+新增两场的退场判据使用已有`collapse`门禁（50%→5%至少4帧），分别实测5/7帧；初版夹具误用“瞬间消失≤3帧”口径，已按晶体爆炸/锯齿飞散语义修正。最低可见性、空场、零残留和日志异常门禁未放宽。

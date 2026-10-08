@@ -20,10 +20,16 @@ class CrystalReaction : BaseEffect() {
     private var detonated = false
     private var stuck = false
     private var visualScale = 1.0
+    private var blinkTicks = 0
+    private var white = false
     private val charged = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<work.nekow.primalspells.magic.projectile.Projectile, Boolean>())
 
     /** 预警状态供场景验收及将来的 HUD 读取，不开放状态改写。 */
     val isArmed: Boolean get() = countdown >= 0
+    val hasDetonated: Boolean get() = detonated
+    /** 剩余时间越短，白色脉冲的半周期越短（完整刻）。 */
+    val warningHalfPeriod: Int get() = ((remaining() + 7) / 8).coerceIn(1, 5)
+    private fun remaining() = minOf(projectile.maxAge - status.age, if (countdown >= 0) countdown + 1 else Int.MAX_VALUE).coerceAtLeast(0)
 
     override fun onActive() { level = caster.level() as? ServerLevel }
 
@@ -40,7 +46,9 @@ class CrystalReaction : BaseEffect() {
     fun arm() {
         if (countdown >= 0 || detonated || !projectile.alive) return
         countdown = 3
-        group?.recolor(Color.ofInt(255, 185, 82, 255), 2)?.pulse(1.25f, 2, 1)
+        white = true
+        blinkTicks = 0
+        group?.recolor(Color.WHITE, 1)?.pulse(1.12f, 1, 1)
     }
 
     override fun onTick() {
@@ -54,7 +62,7 @@ class CrystalReaction : BaseEffect() {
             group = work.nekow.primalspells.magic.effect.visual.PixelVfx.crystal(ParticleManager.of(world), center, status.freezeTicks > 0)
             group?.scaleTo(projectile.areaScale.toFloat(), 3, work.nekow.particledrawing.core.easing.EasingType.EASE_OUT)
             visualScale = projectile.areaScale
-            if (countdown >= 0) group?.recolor(Color.ofInt(255, 185, 82), 1)
+            if (white) group?.recolor(Color.WHITE, 1)
         }
         if (visualScale != projectile.areaScale) {
             group?.scaleTo(projectile.areaScale.toFloat(), 2)
@@ -64,12 +72,26 @@ class CrystalReaction : BaseEffect() {
             ParticleManager.of(world), center.add(0.0, 0.85, 0.0), Color.ofInt(210, 245, 210), 8, 0.02, 5, -0.002)
         if (lastCenter != center) group?.updateAnchor(lastCenter ?: center, center)
         lastCenter = center
+        if (remaining() <= 40 && ++blinkTicks >= warningHalfPeriod) {
+            blinkTicks = 0
+            white = !white
+            group?.recolor(if (white) Color.WHITE else if (status.freezeTicks > 0)
+                Color.ofInt(119, 213, 240) else Color.ofInt(114, 216, 185), 1)
+        }
         if (countdown >= 0 && countdown-- == 0) {
-            detonated = true
-            projectile.alive = false
-            Explosion.customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, world, projectile)
+            detonate()
         }
     }
+
+    private fun detonate() {
+        if (detonated) return
+        val world = level ?: return
+        detonated = true
+        projectile.alive = false
+        Explosion.customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, world, projectile)
+    }
+
+    override fun onExpire() { detonate() }
 
     /** 普通弹/电弧/光束打入晶簇会储能并引爆；同一弹体只充能一次。 */
     fun charge(incoming: work.nekow.primalspells.magic.projectile.Projectile) {

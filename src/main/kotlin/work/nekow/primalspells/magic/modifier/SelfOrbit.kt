@@ -7,7 +7,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** 环绕半径=2+驱动速度×2（最多12格）；角速度=驱动速度×0.6/半径。
+/** 环绕半径=2+驱动速度×0.5（最多6格）；角速度=驱动速度×0.6/半径。
  * 在GUIDANCE阶段给出位移，实体/地形命中仍完全由Move扫掠处理。
  */
 class SelfOrbit : Modifier() {
@@ -15,10 +15,10 @@ class SelfOrbit : Modifier() {
     override val id = "self_orbit"
 
     /** 半径比例系数 */
-    private val radiusFactor = 2.0f
+    private val radiusFactor = 0.5f
 
     /** 半径上限 */
-    private val radiusCap = 12.0f
+    private val radiusCap = 6.0f
 
     /** 最大角速度 */
     private val maxAngularSpeed = 0.4f

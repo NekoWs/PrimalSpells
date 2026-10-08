@@ -19,7 +19,7 @@ import work.nekow.primalspells.magic.effect.BaseEffect
  * 并以 1/16 格子的步长扫掠检测实体与方块碰撞。
  *
  * 阶段：[EffectPhase.MOTION] —— 这是每个 tick **唯一**推进 `status.pos` 的地方。
- * 想在积分之后绝对定位的效果必须声明 [EffectPhase.OVERRIDE]（如 `SelfOrbit`/`SphereOrbit`）。
+ * 想在积分之后绝对定位的效果必须声明 [EffectPhase.OVERRIDE]（如 `SelfOrbit`）。
  *
  * **命中语义（常被误认成 bug，实为特性）**：投射物停在实体体内时，碰撞检测每个 tick
  * 都会再次命中同一实体，命中回调可被反复触发。穿刺玩法（`Piercing` 把 `maxHitTargets`

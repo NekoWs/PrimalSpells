@@ -18,7 +18,7 @@ import work.nekow.primalspells.wand.Wand
 /** 第54轮：真实法杖发射、生命周期和跨投射物反应的实机回归。 */
 object SpellQualityScenes {
     /** 注册联动验收场景。 */
-    fun all(): List<Scene> = listOf(resonance(), stability(), mechanics())
+    fun all(): List<Scene> = listOf(resonance(), stability(), mechanics(), SpellTimingScenes.scene(), CrystalLifecycleScene.scene())
     private fun cast(ctx: CaptureDriver.SceneCtx, ids: List<String>, x: Double, y: Double, z: Double,
         yaw: Float = 0f, pitch: Float = 0f, source: Entity = ctx.player) {
         source.setPos(x, y, z); source.setYRot(yaw); source.setXRot(pitch); source.setOldPosAndRot()
@@ -170,17 +170,16 @@ object SpellQualityScenes {
                         ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,AABB.ofSize(Vec3.ZERO,100.0,200.0,100.0)).forEach { it.discard() }
                         val targets=(0 until count).map { ctx.spawnDummy(-10.0+it*gap,floor+1.0,5.0) }
                         val p=probe("chain_bolt",mods,targets.first().boundingBox.center.toVector3f())
-                        if ("extended_lifetime" !in mods) p.maxAge=12
                         p.hitEntity(targets.first())
                         while(p.alive && p.status.age<p.maxAge) { p.tick();p.status.age++ }
                         val result=ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,AABB.ofSize(Vec3.ZERO,100.0,200.0,100.0)).size
                         p.alive=false;p.die();targets.forEach { it.discard() };return result
                     }
                     val short=arcCount(emptyList(),2.8,8);val long=arcCount(listOf("extended_lifetime"),2.8,8)
-                    record("arc-lifetime-search-budget",short==3 && long==8,"short=$short extended=$long")
-                    val near=arcCount(emptyList(),8.0,2);val far=arcCount(listOf("speed_boost"),8.0,2)
+                    record("arc-lifetime-search-budget",short==4 && long==8,"short=$short extended=$long")
+                    val near=arcCount(emptyList(),4.0,2);val far=arcCount(listOf("speed_boost"),4.0,2)
                     record("arc-speed-search-radius",near==1 && far==2,"normal=$near fast=$far")
-                    for(mod in listOf("self_orbit","sphere_orbit")) {
+                    for(mod in listOf("self_orbit")) {
                         val radii=(0..1).map { fast ->
                             val p=probe("fireball",listOf(mod)+if(fast==1)listOf("speed_boost")else emptyList())
                             p.collisionEnabled=false
@@ -188,7 +187,7 @@ object SpellQualityScenes {
                             val radius=Vec3(p.status.pos).distanceTo(ctx.player.eyePosition)
                             p.alive=false;p.die();radius
                         }
-                        record("speed-expands-$mod",radii[0]>2.5 && radii[1]>radii[0]+.5,"radii=$radii")
+                        record("speed-expands-$mod",radii[0]>2.3 && radii[1]>radii[0]+.2 && radii[1]-radii[0]<1.0,"radii=$radii")
                     }
                     MagicManager.projectiles.forEach { it.alive=false }
                 }

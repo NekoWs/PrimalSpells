@@ -141,6 +141,9 @@ SCENES = {
 for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
+# 这两场包含真实爆炸/锯齿飞散，使用已有解体门禁（至少4帧），不能要求瞬间消失。
+SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
+SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}
 SCENES["explosion"]["decay"] = "collapse"
 SCENES["wand_casting_wide"] = {**SCENES["wand_casting_first_person"], "title": "宽视野90度 / 宝石位置校准 / 副手镜像"}

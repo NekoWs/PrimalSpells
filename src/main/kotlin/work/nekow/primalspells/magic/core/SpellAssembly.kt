@@ -7,7 +7,7 @@ import kotlin.math.pow
 object SpellAssembly {
     private val generators = setOf("bounce_duplicate", "explosion_projectile", "quantum_entanglement", "double_cast")
     private val motion = setOf("speed_boost", "gradual_accelerate", "gradual_decelerate", "gravity", "homing",
-        "bounce", "bounce_duplicate", "random_path", "reciprocate", "sine_wave", "self_orbit", "sphere_orbit")
+        "bounce", "bounce_duplicate", "random_path", "reciprocate", "sine_wave", "self_orbit")
 
     /** 注入独立effect并保存id计数，供视觉和后代继承使用。 */
     fun apply(shot: Projectile, modifiers: List<Modifier>) {

@@ -108,7 +108,7 @@ object SpellExpansionScenes {
             }, camera = { ctx, _ -> Pose(0.5, ctx.floorBlockY(0, 0) + 3.5, -10.0, 0f, 10f) },
             tick = { ctx, t ->
                 val y = ctx.floorBlockY(0, 0) + 1.0
-                if (t == 8) cast(ctx, listOf("chain_bolt"), -3.0, y, -5.0)
+                if (t == 8) cast(ctx, listOf("chain_bolt"), -3.0, y, -2.0)
                 if (t == 65) {
                     val stack = ItemStack(ModItems.WAND.get())
                     val w = WandManager[WandManager.createWand(stack)]
@@ -116,12 +116,12 @@ object SpellExpansionScenes {
                     w.load(); w.status.mana = 1000.0; w.charge = 0.0
                     shieldWand = w; targets.first().setItemInHand(InteractionHand.MAIN_HAND, stack)
                 }
-                if (t == 75) cast(ctx, listOf("freeze_charge", "chain_bolt"), -3.0, y, -5.0)
+                if (t == 75) cast(ctx, listOf("freeze_charge", "chain_bolt"), -3.0, y, -2.0)
                 if (t == 110) MagicManager.projectiles.forEach { it.alive = false }
             }, checksAt = { ctx, t -> when (t) {
                 38 -> {
                     val values = numbers(ctx)
-                    listOf(Check(name, t, "five-distinct-decaying-hits", values.sorted() == listOf("-4", "-2.8", "-2.0", "-1.4", "-1.0").sorted(), "damage=$values"))
+                    listOf(Check(name, t, "four-distinct-decaying-hits", values.sorted() == listOf("-4", "-2.8", "-2.0", "-1.4").sorted(), "damage=$values"))
                 }
                 98 -> listOf(Check(name, t, "shield-charged-and-no-freeze", shieldWand!!.status.mana < 1000.0 && !FrozenStatus.isFrozen(targets.first()),
                     "mana=${shieldWand.status.mana} frozen=${FrozenStatus.isFrozen(targets.first())}"))

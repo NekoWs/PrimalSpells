@@ -35,7 +35,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  │  ├─ DelayedCastProjectile.kt DroneSwarm.kt
 │  │  └─ immobile/              静止/定点类投射物
 │  │     ├─ SmallExplosion.kt LargeExplosion.kt GravityFieldProjectile.kt BlackHoleProjectile.kt
-│  ├─ modifier/                 修饰器实现（27 个）
+│  ├─ modifier/                 修饰器实现（26 个）
 │  └─ effect/                   特效（挂在投射物上的可组合行为）
 │     ├─ BaseEffect.kt          特效基类：六钩子 + phase + 同类叠加辅助（stackScale/isStackPrimary）
 │     ├─ geometry/              空间与运动：Position, Velocity, Move, Bounce, Tracking, ConstantAcceleration
@@ -327,3 +327,7 @@ WandUseAnimationMixin.java与ItemInHandRendererAccessor.java放src/main/java/wor
 client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪光状态；network/WandCastPayload.kt为成功施法模型通知，通过ClientPayloadSink转发，公共侧不引用客户端。现有tools/wands/generate_models.py生成主体、待机模块及宝石亮态，原资源路径保留，无旧→新迁移。
 
 第63轮结构记录：删除`magic/modifier/ClusterBomb.kt`；新增`magic/effect/visual/LaserTrace.kt`（投射物视觉）。`EffectPhase.GUIDANCE`只计算位移，不独自判碰撞，随后仍走`Move`。
+
+第64轮结构记录：新增`magic/projectile/Chainsaw.kt`、`magic/effect/visual/{ChainsawFx,DelayedCastFx}.kt`、`client/capture/SpellTimingScenes.kt`。新增链锯卡资源与生成器图标，并移除SphereOrbit及资源，总计43卡。延迟施法从Trajectory路由到DelayedCastFx，通用共鸣不再添加飞散装饰。
+
+第64轮最终结构：删除`magic/modifier/SphereOrbit.kt`，新增`client/capture/CrystalLifecycleScene.kt`；当前17投射物+26修正共43卡。

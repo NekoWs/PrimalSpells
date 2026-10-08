@@ -21,7 +21,7 @@
 | ↳ [issues/resolved.md](issues/resolved.md) | **已解决记录**（按轮次，含历史崩溃与 PD 已闭环条目） | 想知道「当初为什么这么改」 |
 | ↳ [issues/pd-api-requests.md](issues/pd-api-requests.md) | 要提给 ParticleDrawing 的 **API 需求**（未决）+ 能力边界 | 接粒子特效、升级前置模组 |
 | [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
-| [design/minecraft-visuals.md](design/minecraft-visuals.md) | MC实色粒子与44张像素法术卡规范 | 修改视觉或贴图 |
+| [design/minecraft-visuals.md](design/minecraft-visuals.md) | MC实色粒子与43张像素法术卡规范 | 修改视觉或贴图 |
 | [design/wand-casting.md](design/wand-casting.md) | 持杖法阵、角点锁印、冷却导槽、低模法杖与退场 | 修改持杖/施法表现 |
 | [design/spell-quality.md](design/spell-quality.md) | 第54轮当前质感、修饰配方继承、跨投射物反应与高配档 | 修改特效或法术联动 |
 | [design/animation-continuity.md](design/animation-continuity.md) | 动画起落/引导/视野与近场镜头冲击，含前置阻塞 | 修改动画与镜头反馈 |
@@ -73,7 +73,7 @@ PrimalSpells/
 | **Modifier**（原 `Revise`） | 修饰器：施法时把自身携带的 effect 注入到本次施法的投射物上，或改动参数（伤害/速度/弹跳…） | `magic/core/Modifier.kt`、`magic/modifier/` |
 | **Effect** | 挂在投射物上的可组合行为：几何（`Move`/`Velocity`…）、时机与结算（`Hurt`/`Explosion`/`Trigger`…）、表现（`Trajectory`） | `magic/effect/` |
 | **MagicStatus** | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 | `magic/core/MagicStatus.kt` |
-| **EffectPhase** | 效果执行阶段（SETUP/MODIFIER/MOTION/OVERRIDE/VISUAL），决定效果谁先跑 | `magic/core/EffectPhase.kt` |
+| **EffectPhase** | 效果执行阶段（SETUP/MODIFIER/GUIDANCE/MOTION/OVERRIDE/VISUAL），决定效果谁先跑 | `magic/core/EffectPhase.kt` |
 | **Wand** | 法杖运行时对象：牌堆（`drawPile`/`hand`/`discardPile`）、法力与冷却、NBT 序列化 | `wand/Wand.kt` |
 | **牌堆 / 抽牌** | 施法时按 `cast` 预算从 `drawPile` 抽牌进 `hand`，结算后进 `discardPile`；抽牌堆空时回洗并附加 `recharge` | `wand/Wand.kt` |
 | **TriggerSpell** | 触发法术：会额外抽牌组成 `payload`，命中时触发 payload 内法术 | `magic/core/TriggerSpell.kt` |

@@ -130,7 +130,7 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 
 触发法术在 `Wand.castHand` → `loadPayload()` 阶段**额外抽牌**（预算 = `triggerCast`，这张法术自身也按 `cast` 计入预算），把抽到的法术克隆后填进 `payload`；抽到触发法术时会**递归**填充它自己的 payload，于是形成 `触发A( 触发B( 火球 ) )` 这样的链。
 
-命中时由 `Trigger.onHit`（死亡时由 `DelayedTrigger.onDie`）把 payload 里的投射物就地施放，并把 payload 内的修饰器效果注入这些投射物；**释放后立即清空 payload**（一次性）——payload 持有的是同一批实例，重复释放会让效果被反复注入、叠加。
+命中时由 `Trigger.onHit`（寿命到期当刻由 `DelayedTrigger.onExpire`）把 payload 里的投射物就地施放，并把 payload 内的修饰器效果注入这些投射物；**释放后立即清空 payload**（一次性）——payload 持有的是同一批实例，重复释放会让效果被反复注入、叠加。
 
 ### 2.7 `EffectPhase`：效果执行顺序（`magic/core/EffectPhase.kt`）
 
@@ -140,11 +140,12 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 |---|---|---|---|
 | `SETUP` | 最先 | 最先（空实现） | `Position`、`Velocity` —— 写入出生点与初速 |
 | `MODIFIER`（默认） | SETUP 之后 | 位置积分**之前** | 修饰器注入的效果（改速度/伤害/爆炸参数），以及 `Hurt`、`Trigger`、`Explosion` 等 |
+| `GUIDANCE` | 修正之后 | 积分之前 | `SelfOrbit`、`QuantumEntanglement.OrbitEffect` —— 计算轨道目标速度，由Move扫掠 |
 | `MOTION` | — | 中间 | `Move` —— 每 tick **唯一**推进 `status.pos` |
-| `OVERRIDE` | — | 积分**之后** | `SelfOrbit`、`SphereOrbit`、`QuantumEntanglement.OrbitEffect` —— 绝对定位，不再被积分位移叠加 |
+| `OVERRIDE` | — | 积分**之后** | `ChainArc` —— 命中后停飞，逐跳定位导电锚 |
 | `VISUAL` | — | 最后 | `Trajectory`、`AreaFieldEffect`、束源/斥力场 —— 读本 tick 的最终位置 |
 
-一句话规则：**改速度留在默认阶段，写位置用 `OVERRIDE`，读最终位置用 `VISUAL`。**
+一句话规则：**普通改速用默认阶段，轨道导向用 `GUIDANCE` 并交给Move扫掠，停飞后的锚定位用 `OVERRIDE`，读最终位置用 `VISUAL`。**
 
 ## 3. 一次施法的完整流程
 
@@ -198,15 +199,18 @@ for p in projectiles:
     if !p.alive: p.die(); remove; continue
     p.tick()              → effects 按 EffectPhase.tickOrder 稳定排序后 onTick()
                              ├─ MODIFIER：修饰器注入的效果（改速度/伤害）
+                             ├─ GUIDANCE：周身环绕/量子复制体的目标速度
                              ├─ MOTION  ：Move 阻尼 → 子步进碰撞 → 命中回调 → status.pos 推进
-                             ├─ OVERRIDE：轨道类绝对定位（SelfOrbit / SphereOrbit / 量子纠缠复制体）
+                             ├─ OVERRIDE：连锁电弧命中后更新导电锚
                              └─ VISUAL  ：Trajectory 读最终位置发粒子
     status.age++
-    if status.age >= maxAge: alive = false
+    if status.age >= maxAge && alive: expire(); alive = false
 projectiles.addAll(pendingAdd); pendingAdd.clear()
 ```
 
-死亡路径：`alive = false` → 下一 tick 的循环开头 `die()` → effects `onDie()`（`Explosion` 的 `onDeath = true`、`DelayedTrigger` 释放 payload、`TeleportProjectile` 传送施法者、`Trajectory` 停发射器并移除头部粒子）。
+自然到期先执行 `expire()` → effects `onExpire()`，延迟载体释放payload，休眠水晶触发真实爆炸；随后进入普通死亡清理。提前碰撞死亡或强制清除不会调用onExpire。
+
+死亡路径：`alive = false` → 下一 tick 的循环开头 `die()` → effects `onDie()`（`Explosion` 的 `onDeath = true`、`TeleportProjectile` 传送施法者、`Trajectory` 停发射器并移除头部粒子）。
 
 `ServerStoppingEvent` 时 `MagicManager.projectiles.clear()`（投射物不跨存档存活）；`WandManager` 同时落盘法杖。
 
@@ -274,7 +278,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 8. 关键不变量与陷阱（改代码前必读）
 
-1. **执行顺序由 `EffectPhase` 决定，不再看插入顺序**。`onActive` 按 `SETUP → MODIFIER → …` 升序，`onTick` 按 `MODIFIER → MOTION → OVERRIDE → VISUAL` 升序；同阶段内保持注入顺序。想改速度就留在默认阶段，**想写 `status.pos` 必须用 `OVERRIDE`**，否则会被 `Move` 的积分叠加（这就是过去轨道漂移的根因）。
+1. **执行顺序由 `EffectPhase` 决定，不再看插入顺序**。`onActive` 按 `SETUP → MODIFIER → …` 升序，`onTick` 按 `MODIFIER → GUIDANCE → MOTION → OVERRIDE → VISUAL` 升序；同阶段内保持注入顺序。普通改速留在默认阶段；需要碰撞的轨道在GUIDANCE写目标速度，由Move推进并扫掠。停止自由飞行的导电锚等才在OVERRIDE写最终坐标，不能让轨道覆盖位置而绕开命中。
 2. **`Magic.clone()` 是「从注册表新建实例」**，不继承任何运行期状态（当前速度、被修饰器改过的伤害/爆炸参数都不继承）。`id` 未注册直接抛异常——所以**法术 id 不能随便改**。
 3. **`Modifier.effects()` 返回的是浅拷贝**：多枚子弹各自拿一份克隆，但克隆内部的引用字段仍可能指向同一对象，别用可变字段存跨实例状态。
 4. **修饰器效果只在 `castHand` 时注入一次**：`Modifier` 自身不进 `MagicManager.projectiles`，不参与 tick。
@@ -466,3 +470,13 @@ WandCastingFx.origin是汇聚点与持杖弹体出生点的共同来源；普通
 寿命计数达到maxAge的当刻，MagicManager先转发一次`onExpire`，再标记死亡；下一刻的`onDie`只做清理。DelayedTrigger仅从onExpire消费一次payload，提前碰撞/强制清理不冒充到期触发。实体命中不扣bounces，只有方块反弹扣次数；BounceExplosion仅响应成功方块弹跳。
 
 法杖时间统一完整刻，回蓝为每刻；存档迁移与余数取消见[design/wand-tiers.md](design/wand-tiers.md)。穿刺扫掠每个子步使用不变起点，实体命中回调更新status.pos不得改变后续子步的积分基准。
+
+## 第64轮：链锯结算与电弧导电窗口
+
+`Magic.resetsCastDelay`默认false；只有成功支付法力并实际施放的投射物参与。Wand按投射物牌序结算，链锯清零此前的delay，后续投射物仍追加delay；出现有效清零时不再由法杖delay下限重新顶回去。无链锯的原有max(法杖delay,卡牌delay)语义保留。链锯-3刻recharge与同次施放的卡牌、末尾回洗相加，最终钳制至0；不会跨施放保留负余数。触发荷载中的链锯不清除载体那次施放的delay。
+
+ChainBolt基础maxAge=4，实际初速0.75格/刻（字段0.46875×全局1.6倍率），无阻尼，单跳半径=命中时实际速度×4=3格。首击建立锚并重置age=0，从当刻开始按修正后的maxAge计导电窗口；首击当刻不再二次跳跃，随后每刻最多一跳，默认含首击共4个敌人。寿命修正继续增加窗口、速度修正继续扩大范围。未命中前也只有4刻飞行；墙体截断、已命中过的UUID去重、每跳伤害×0.7。
+
+DelayedCastFx的锁印由原生PD批量trackAll跟随最终位置，不再提前向外飞散。MagicManager寿命到期调用onExpire时，视觉释放与DelayedTrigger荷载出生发生在同一服务端刻、同一最终位置；普通死亡只收尾，不冒充一次成功施放。
+
+第64轮追加：SphereOrbit彻底移除（旧NBT未知id保留原空槽，不移位）；SelfOrbit半径改`2+速度×0.5`、最大6。CrystalReaction在onExpire调用幂等detonate，预警时间取min(剩余寿命,引爆倒计时+1)，只在最后40刻闪白，半周期ceil(剩余刻/8)并限制1～5；onDie只做碎裂清理，不重复结算爆炸。

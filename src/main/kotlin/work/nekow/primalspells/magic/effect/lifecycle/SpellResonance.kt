@@ -23,7 +23,7 @@ class SpellResonance : BaseEffect() {
         val manager = ParticleManager.of(level)
         val center = pos()
         val count = projectile.modifiers.values.sum()
-        if (projectile.id !in setOf("laser", "plasma_beam", "chain_bolt") && status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
+        if (projectile.id !in setOf("laser", "plasma_beam", "chain_bolt", "delayed_cast", "chainsaw") && status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
             PixelVfx.burst(manager, center, tint(), 8 + count * 3, 0.045, 4, 0.0)
         }
         // 护盾卡也能包裹发射出去的法术：真实反射敌方魔法弹，归属改为当前施法者。

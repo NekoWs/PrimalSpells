@@ -21,6 +21,8 @@ abstract class Magic {
     var delay: Int = 0
     /** 增加充能时间 **/
     var recharge: Int = 0
+    /** 本张投射物结算时归零本次施放延迟；后续投射物仍可追加延迟。 */
+    open val resetsCastDelay: Boolean = false
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()
 
@@ -113,7 +115,7 @@ abstract class Magic {
     /**
      * 每 tick：按 [EffectPhase.tickOrder] 依次触发 `onTick`。
      *
-     * 顺序契约：玩法效果改速度/伤害 → `Move` 位置积分 → 轨道类绝对定位 → 粒子表现。
+     * 顺序契约：玩法效果改速度/伤害 → 轨道导向 → `Move` 扫掠积分 → 位置覆盖 → 粒子表现。
      */
     fun tick() {
         effects.sortedBy { it.phase.tickOrder }.forEach { it.onTick() }

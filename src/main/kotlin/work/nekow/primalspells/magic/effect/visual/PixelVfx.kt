@@ -109,8 +109,8 @@ object PixelVfx {
         repeat(4) { face ->
             fun waist(i: Int) = center.add(cos(PI / 4 + i * PI / 2) * 0.32, 0.06, sin(PI / 4 + i * PI / 2) * 0.32)
             val a = waist(face); val b = waist(face + 1)
-            facet(manager, group, a, b, top, palette[face])
-            facet(manager, group, b, a, bottom, palette[(face + 2) % 4])
+            facet(manager, group, b, a, top, palette[face])
+            facet(manager, group, a, b, bottom, palette[(face + 2) % 4])
             Draw.line(manager, a, b, 9, ColorSource.of(Color.ofInt(224, 174, 65)), 0.5f,
                 group = group, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
         }

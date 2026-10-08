@@ -736,3 +736,5 @@ PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴
 实时玩家法阵使用实体getter；等离子束端点使用setVariableLive样本，随后由原生Bridge位置插值。不得对持续更新的坐标每刻重启1刻setVariableInterpolated：当前refreshInputs/applyVarEases顺序会阻止新样本收敛。presence退场只启动一次，可以保留有限变量缓动。此举只修当前跟随错误，不宣称未决逐渲染帧变量/尺寸能力已闭环。
 
 爆炸采用PD ParticleBatch的速度/力与逐片sizeCurve；创建按spawnAll公开256成员上限组织，运动更新仍交给PD原生自动拆包。shatter用moveAlongOffset抵消scaleTo的几何内缩并向外移动，片元缩小不改变“爆炸/碎裂的轮廓继续外扩”的语义。已经自由飞行的批次用逐片resize收尾，避免重新挂组缩回场心。
+
+第64轮：CrystalReaction的晶面顶点绕序改朝外，ParticleVisual.spin仍按公开API弧度/局部XYZ使用。PD单面正面朝局部+Z，不能用反向面或加一层反面粒子遮掩绕序错误。白闪使用现有ParticleGroup.recolor的一刻过渡，锁印用ParticleBatch.trackAll/逐片resize；未另写渲染、跟随、颜色插值引擎。

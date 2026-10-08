@@ -77,7 +77,7 @@
 | `projectile/immobile/LargeExplosion.kt` | `large_explosion`（半径 6 / 中心伤害 24 / 蓄力 18 tick） |
 | `projectile/immobile/GravityFieldProjectile.kt` | `gravity_field`（静止光环，200 tick） |
 | `projectile/immobile/BlackHoleProjectile.kt` | `black_hole`（静止引力场） |
-| `modifier/`（27 个，逐个见 §3） | 修饰器实现 |
+| `modifier/`（26 个，逐个见 §3） | 修饰器实现 |
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
@@ -192,8 +192,7 @@
 | `large_explosion` | `LargeExplosion` | 投射物 | `magic/projectile/immobile/LargeExplosion.kt` |
 | `gravity_field` | `GravityFieldProjectile` | 投射物 | `magic/projectile/immobile/GravityFieldProjectile.kt` |
 | `black_hole` | `BlackHoleProjectile` | 投射物 | `magic/projectile/immobile/BlackHoleProjectile.kt` |
-| `self_orbit` | `SelfOrbit` | 修饰器（`OVERRIDE` 定位） | `magic/modifier/SelfOrbit.kt` |
-| `sphere_orbit` | `SphereOrbit` | 修饰器（`OVERRIDE` 定位） | `magic/modifier/SphereOrbit.kt` |
+| `self_orbit` | `SelfOrbit` | 修饰器（`GUIDANCE` 导向、Move扫掠） | `magic/modifier/SelfOrbit.kt` |
 | `teleport` | `TeleportProjectile` | 投射物 | `magic/projectile/TeleportProjectile.kt` |
 | `quantum_entanglement` | `QuantumEntanglement` | 修饰器（生成子弹） | `magic/modifier/QuantumEntanglement.kt` |
 | `energy_shield` | `EnergyShield` | 修饰器（**被动**，`needInventory`）：常驻展开、平时不可见；格挡按「强度 vs 抗性」扣法力，挡不住就出**定向破口**（第 26 轮重做，口径见 [design/combat-pricing.md](design/combat-pricing.md) §3–§4） | `magic/modifier/EnergyShield.kt`、`util/Polyhedra.kt`、`magic/core/ShieldGuard.kt` |
@@ -294,3 +293,7 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 第63轮：移除`modifier/ClusterBomb.kt`及其注册/资源；新增`effect/visual/LaserTrace.kt`，从真实扫掠段生成短激光。`SpellQualityScenes.mechanics`覆盖寿命、刻迁移、量子命中和轨道速度；当前矩阵432组合。
 
 本机OSHI排障：`tools/verify/RepairPerformanceCounters.ps1`（管理员备份/重建/验证脚本）；运行口径见build-and-run的OSHI小节，未解决状态见issues/open.md §3.1。
+
+第64轮新增：`magic/projectile/Chainsaw.kt`为近距攻击投射物，`magic/effect/visual/ChainsawFx.kt`绘制短促锯齿白刃，`magic/effect/visual/DelayedCastFx.kt`替代延迟施法的通用拖尾；`client/capture/SpellTimingScenes.kt`覆盖链锯牌序、连续施放与移动延时载体同刻释放。注册表17投射物+26修正=43卡，配方矩阵442组合。
+
+第64轮同时删除`magic/modifier/SphereOrbit.kt`及球形环绕所有资源、注册和生成器入口；新增`client/capture/CrystalLifecycleScene.kt`记录四向晶面、加速白闪、自然到期爆炸。

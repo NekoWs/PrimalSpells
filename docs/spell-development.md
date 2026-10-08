@@ -399,3 +399,5 @@ class MyPassive : Modifier() {
 工具/法杖之后按移动投射物→静态投射物→修正排列；同类保持MagicManager.registry注册顺序。
 静态投射物以Projectile初始speed==0识别（仍能受力移动的区域场也属于静态施放）；Modifier最后。
 不要用ModItems.MAGICS的HashMap迭代顺序展示法术，否则新增条目会让已有分类散乱。
+
+第64轮新增投射物卡特性`resetsCastDelay`：只供链锯式实际施放的投射物在牌序当前位置清除此前施放延迟，普通Modifier不能用它改变可交换组合规则。触发载体只累加荷载数值，不继承该标记。自然寿命结算用onExpire，像水晶定时爆炸、延迟载体的释放视觉也接该钩子；onDie只承担收尾或明确的死亡结算。

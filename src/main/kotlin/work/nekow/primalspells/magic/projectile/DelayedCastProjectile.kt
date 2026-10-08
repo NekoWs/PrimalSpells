@@ -5,7 +5,7 @@ import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.core.Magic
 import work.nekow.primalspells.magic.core.TriggerSpell
 import work.nekow.primalspells.magic.effect.lifecycle.DelayedTrigger
-import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.magic.effect.visual.DelayedCastFx
 import work.nekow.primalspells.util.Lore
 
 /**
@@ -29,7 +29,7 @@ class DelayedCastProjectile : Projectile(), TriggerSpell {
         maxAge = 20
         speed = 0f; collisionEnabled = false
         hitRadius = 0.0
-        effects += Trajectory(Color.GREEN)
+        effects += DelayedCastFx()
         effects += DelayedTrigger(this)
     }
 

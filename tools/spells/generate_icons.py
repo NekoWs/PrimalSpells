@@ -6,14 +6,14 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'src/main/resources/assets/primalspells/textures/item'
 MAGIC = ROOT / 'src/main/kotlin/work/nekow/primalspells/magic'
-PROJECTILES = ('fireball','drone_bolt','trigger_fireball','delayed_cast','drone_swarm','laser',
+PROJECTILES = ('fireball','drone_bolt','trigger_fireball','delayed_cast','drone_swarm','laser','chainsaw',
                'small_explosion','large_explosion','gravity_field','black_hole','teleport',
                'dormant_crystal','crystal_detonation','chain_bolt','plasma_beam','repulsion_field')
 MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','extended_lifetime',
              'piercing','bounce_explosion','homing','bounce_duplicate','gradual_accelerate',
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
-             'self_orbit','sphere_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge')
+             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge')
 IDS = PROJECTILES + MODIFIERS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
 ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
@@ -65,6 +65,12 @@ def icon(name):
     if name in ('fireball','trigger_fireball'):
         flame()
         if name=='trigger_fireball': plus(24,8,WHITE)
+    elif name=='chainsaw':
+        d.polygon(((8,22),(6,19),(9,15),(12,17),(14,14),(18,18),(14,23)),fill=ORANGE)
+        d.polygon(((13,15),(20,7),(24,7),(25,11),(18,19)),fill='#768997')
+        line(((14,15),(21,8),(23,10),(17,17)),WHITE,2)
+        for x,y in ((16,10),(19,7),(23,6),(25,10),(23,13),(20,16)): box(x,y,YELLOW,1)
+        box(11,19,DARK_BLUE,1)
     elif name=='drone_bolt':
         d.rectangle((8,10,18,22),fill='#707f8c',outline=WHITE,width=2);box(13,16,BLUE,2);arrow((20,16),(25,16),BLUE)
     elif name=='drone_swarm':
@@ -140,7 +146,7 @@ def icon(name):
         line(((16,12),(16,8),(21,8)),ORANGE);plus(23,7,YELLOW)
     elif name=='explosion_remove':
         burst(c=ORANGE);line(((7,25),(25,7)),RED,3);line(((6,24),(24,6)),WHITE,1)
-    elif name in ('self_orbit','sphere_orbit'):orbit(name=='sphere_orbit')
+    elif name=='self_orbit':orbit()
     elif name=='quantum_entanglement':
         line(((10,12),(22,20)),BLUE)
         for x,y in ((10,12),(22,20)):

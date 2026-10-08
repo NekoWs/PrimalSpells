@@ -11,7 +11,7 @@ package work.nekow.primalspells.magic.core
  *
  * 排序规则：
  * - `onActive` 按 [activeOrder] 升序：[SETUP] 先写入出生点与初速，[MODIFIER] 才能在此基础上改数值。
- * - `onTick` 按 [tickOrder] 升序：[MODIFIER] 改速度/伤害 → [MOTION] 位置积分 → [OVERRIDE] 绝对定位 → [VISUAL] 粒子。
+ * - `onTick` 按 [tickOrder] 升序：[MODIFIER] 改速度/伤害 → [GUIDANCE] 轨道导向 → [MOTION] 扫掠积分 → [OVERRIDE] 位置覆盖 → [VISUAL] 粒子。
  */
 enum class EffectPhase(val activeOrder: Int, val tickOrder: Int) {
     /**
@@ -26,17 +26,15 @@ enum class EffectPhase(val activeOrder: Int, val tickOrder: Int) {
      */
     MODIFIER(1, 1),
 
-    /**
-     * 位置积分（`Move`）：每个 tick **唯一**推进 [MagicStatus.pos] 的地方，同时做碰撞检测与命中分派。
-     */
     /** 轨道导向：修正器改速后，Move扫掠前计算目标位移；出生在SETUP/修正之后。 */
     GUIDANCE(3, 2),
 
+    /** 位置积分（`Move`）：扫掠轨迹、检测碰撞与分派命中。 */
     MOTION(2, 3),
 
     /**
-     * 位置覆盖（轨道类效果，如 `SelfOrbit`/`SphereOrbit`）：在 [MOTION] **之后**绝对定位，
-     * 因此不会再被积分位移叠加（这正是过去轨道漂移的根因）。
+     * 位置覆盖（命中后的连锁电弧等）：在 [MOTION] **之后**定位。
+     * 需要轨迹碰撞的环绕效果使用 [GUIDANCE]，不在此阶段直接跳过扫掠。
      */
     OVERRIDE(3, 4),
 

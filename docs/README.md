@@ -21,7 +21,8 @@
 | ↳ [issues/resolved.md](issues/resolved.md) | **已解决记录**（按轮次，含历史崩溃与 PD 已闭环条目） | 想知道「当初为什么这么改」 |
 | ↳ [issues/pd-api-requests.md](issues/pd-api-requests.md) | 要提给 ParticleDrawing 的 **API 需求**（未决）+ 能力边界 | 接粒子特效、升级前置模组 |
 | [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
-| [design/minecraft-visuals.md](design/minecraft-visuals.md) | 当前MC实色粒子与44张像素法术卡规范 | 修改视觉或贴图 |
+| [design/minecraft-visuals.md](design/minecraft-visuals.md) | MC实色粒子与44张像素法术卡规范 | 修改视觉或贴图 |
+| [design/spell-quality.md](design/spell-quality.md) | 第54轮当前质感、修饰配方继承、跨投射物反应与高配档 | 修改特效或法术联动 |
 | [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
 | [design/spell-expansion.md](design/spell-expansion.md) | 第52轮七张法术卡：水晶/电弧/远距/光束/斥力/冰冻，数值与组合验收 | 修改新增法术与组合 |
 | [design/field-effects.md](design/field-effects.md) | 黑洞 / 重力场的造型、生命周期、粒子预算与实机证据 | 修改区域法术视觉 |

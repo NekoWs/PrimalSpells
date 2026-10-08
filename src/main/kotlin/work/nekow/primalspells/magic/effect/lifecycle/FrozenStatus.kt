@@ -60,7 +60,9 @@ object FrozenStatus {
         val state = states.remove(id) ?: return
         immunity[id] = state.level to (state.level.gameTime + 40)
         state.target.getAttribute(Attributes.MOVEMENT_SPEED)?.removeModifier(FREEZE_ID)
-        state.shell.scale(0.05f, 6).destroyAfter(6)
+        state.shell.remove()
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(state.level), state.target.boundingBox.center,
+            Color.ofInt(128, 222, 255), if (shattered) 192 else 64, if (shattered) 0.35 else 0.1, 12)
     }
 
     /** 服务器停止时不留下实体引用或粒子组。 */

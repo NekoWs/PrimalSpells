@@ -36,32 +36,20 @@ class ChainArc : BaseEffect(), DirectDamage {
         val world = level ?: return
         val start = last ?: return
         if (!projectile.alive) return
-        if (caster.level() !== world || jumps >= 3 || status.age >= 60) { projectile.alive = false; return }
+        if (caster.level() !== world || jumps >= 3 + (projectile.modifiers["bounce"] ?: 0) * 2 || status.age >= projectile.maxAge) { projectile.alive = false; return }
         if (cooldown-- > 0) return
         val candidates = world.getEntitiesOfClass(LivingEntity::class.java,
-            net.minecraft.world.phys.AABB.ofSize(start, 10.0, 10.0, 10.0)) {
+            net.minecraft.world.phys.AABB.ofSize(start, 10.0 * projectile.areaScale, 10.0 * projectile.areaScale, 10.0 * projectile.areaScale)) {
             it.isAlive && it !== caster && !caster.isAlliedTo(it) && it.uuid !in visited &&
-                it.boundingBox.center.distanceToSqr(start) <= 25.0
+                it.boundingBox.center.distanceToSqr(start) <= 25.0 * projectile.areaScale * projectile.areaScale
         }.sortedWith(compareBy<LivingEntity> { it.boundingBox.center.distanceToSqr(start) }.thenBy { it.id })
         val target = candidates.firstOrNull {
             world.clip(ClipContext(start, it.boundingBox.center, ClipContext.Block.COLLIDER,
                 ClipContext.Fluid.NONE, caster)).type == net.minecraft.world.phys.HitResult.Type.MISS
         } ?: run { projectile.alive = false; return }
         val end = target.boundingBox.center
-        val manager = ParticleManager.of(world)
-        val group = manager.createGroup(start)
-        // 固定端点折线：形状由本侧给出，一次性闪电寿命/淡出完全由 PD 负责。
-        val points = (0..12).map { i ->
-            val p = start.lerp(end, i / 12.0)
-            if (i == 0 || i == 12) p else p.add(0.0, if (i % 2 == 0) 0.13 else -0.13, 0.0)
-        }
-        Draw.curve(manager, { t ->
-            val step = t * (points.size - 1)
-            val index = step.toInt().coerceAtMost(points.size - 2)
-            points[index].lerp(points[index + 1], step - index)
-        }, 160, ColorSource.of(Color.ofInt(120, 210, 255, 255)), 1.2f, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
-        group.scale(0.05f, 8, work.nekow.particledrawing.core.easing.EasingType.LINEAR).destroyAfter(8)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.arc(ParticleManager.of(world), start, end)
+        SpellInteractions.beam(projectile, start, end, work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
         status.damage *= 0.7
         visited += target.uuid
         jumps++

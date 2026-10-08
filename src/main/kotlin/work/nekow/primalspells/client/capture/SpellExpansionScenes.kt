@@ -134,13 +134,14 @@ object SpellExpansionScenes {
         val name = "expansion_plasma"
         var target: TestDummyEntity? = null
         var shieldWand: Wand? = null
-        return Scene(name, "等离子束：持续命中 / 墙面截断 / 延寿硬上限", 24, 145,
+        return Scene(name, "等离子束：持续命中 / 墙面截断 / 延寿联动", 24, 145,
             prepare = { ctx -> prepare(ctx); target = ctx.spawnDummy(0.0, ctx.floorBlockY(0, 0) + 1.0, 0.0) },
             camera = { ctx, _ -> Pose(6.0, ctx.floorBlockY(0, 0) + 3.8, -7.0, 41f, 10f) },
             tick = { ctx, t ->
                 val floor = ctx.floorBlockY(0, 0)
                 if (t == 8) cast(ctx, listOf("extended_lifetime", "plasma_beam"), 0.0, floor + 1.0, -5.0)
                 if (t == 60) {
+                    MagicManager.projectiles.forEach { it.alive = false }
                     for (x in -1..1) for (y in floor + 1..floor + 4) ctx.level.setBlock(BlockPos(x, y, -2), Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState(), 2)
                     cast(ctx, listOf("plasma_beam"), 0.0, floor + 1.0, -5.0)
                 }
@@ -154,10 +155,10 @@ object SpellExpansionScenes {
                     shieldWand = w; target!!.setItemInHand(InteractionHand.MAIN_HAND, stack)
                 }
                 if (t == 106) cast(ctx, listOf("freeze_charge", "plasma_beam"), 0.0, floor + 1.0, -5.0)
-                if (t == 125) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 114) MagicManager.projectiles.forEach { it.alive = false }
             }, checksAt = { ctx, t -> when (t) {
                 28 -> listOf(Check(name, t, "repeated-beam-damage", numbers(ctx).count { it == "-1.5" } >= 3, "damage=${numbers(ctx)}"))
-                53 -> listOf(Check(name, t, "lifetime-hard-cap", MagicManager.projectiles.none { it.id == "plasma_beam" }, "shots=${MagicManager.projectiles.size}"))
+                53 -> listOf(Check(name, t, "extended-lifetime-keeps-beam-alive", MagicManager.projectiles.any { it.id == "plasma_beam" && it.alive && it.status.age > 40 }, "shots=${MagicManager.projectiles.size}"))
                 85 -> listOf(Check(name, t, "wall-blocks-damage", numbers(ctx).isEmpty(), "damage=${numbers(ctx)}"))
                 118 -> listOf(Check(name, t, "shield-blocks-repeated-beam-and-freeze", shieldWand!!.status.mana <= 990.0 &&
                     numbers(ctx).isEmpty() && !FrozenStatus.isFrozen(target!!),

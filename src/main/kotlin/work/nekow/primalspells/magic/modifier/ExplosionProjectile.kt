@@ -45,19 +45,21 @@ class ExplosionProjectile : Modifier() {
                 val level = caster.level() as? ServerLevel ?: return
 
                 // 当前行进方向
-                val forward = Vector3f(status.velocity).normalize()
+                val forward = if (status.velocity.lengthSquared() > 1e-8f) Vector3f(status.velocity).normalize()
+                    else Vector3f(projectile.launchDirection.x.toFloat(), projectile.launchDirection.y.toFloat(), projectile.launchDirection.z.toFloat())
 
                 // 生成垂直于行进方向的随机方向
                 val perp = genRandomPerpendicular(forward)
 
-                // 克隆基础投射物（不附带修正）
-                val bullet = projectile.clone()
+                // 重建投射物并继承非生成型修饰配方
+                val bullet = projectile.clone().also { work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, it) }
                 bullet.caster = caster
                 bullet.wand = wand
                 bullet.position = Vector3f(status.pos)
-                bullet.velocity = Vector3f(perp).mul(bulletSpeed)
+                bullet.velocity = work.nekow.primalspells.magic.core.SpellAssembly.launch(bullet, perp, bulletSpeed)
 
                 // 设置爆炸效果
+                bullet.effects.removeAll { it is Explosion }
                 bullet.effects += Explosion(onHit = true, onDeath = false)
 
                 bullet.spell()

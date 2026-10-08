@@ -17,9 +17,6 @@ class SmallExplosion : Projectile() {
         speed = 0f
         hitRadius = 0.0
         effects += Explosion(onDeath = true, onHit = false)
-    }
-
-    override fun onSpell() {
         status.explosionRadius = 3.0f
         status.explosionDamage = 12.0
     }

@@ -44,7 +44,7 @@ class QuantumEntanglement : Modifier() {
                 link.members += projectile
 
                 for (i in 0 until 2) {
-                    val clone = projectile.clone()
+                    val clone = projectile.clone().also { work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, it) }
                     clone.caster = caster
                     clone.wand = wand
                     clone.position = Vector3f(projectile.status.pos)

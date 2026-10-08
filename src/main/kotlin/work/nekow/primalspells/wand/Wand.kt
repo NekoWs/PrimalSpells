@@ -196,8 +196,7 @@ class Wand(var id: String) {
             if (p is TriggerSpell) {
                 loadPayload(p)
             }
-            val effects = validRevises.flatMap { it.effects() }
-            p.effects += effects
+            work.nekow.primalspells.magic.core.SpellAssembly.apply(p, validRevises)
             p.caster = caster
             p.wand = this
             p.position = caster.eyePosition.toVector3f().sub(0F, 0.1F, 0F)

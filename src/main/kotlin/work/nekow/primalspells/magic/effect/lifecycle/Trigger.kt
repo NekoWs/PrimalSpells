@@ -32,11 +32,12 @@ class Trigger : BaseEffect() {
 
         shots.forEach { shot ->
             // 每枚子弹拿一份独立克隆的效果实例，避免多枚子弹共享同一个效果对象
-            shot.effects += modifiers.flatMap { it.effects() }
+            work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, shot)
+            work.nekow.primalspells.magic.core.SpellAssembly.apply(shot, modifiers)
             shot.caster = caster
             shot.wand = wand
-            shot.position = result.pos
-            shot.velocity = result.normal
+            shot.position = org.joml.Vector3f(result.pos)
+            shot.velocity = org.joml.Vector3f(result.normal)
             shot.spell()
             MagicManager.add(shot)
         }

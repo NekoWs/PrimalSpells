@@ -5,7 +5,7 @@ import work.nekow.primalspells.magic.effect.geometry.ConstantAcceleration
 import work.nekow.primalspells.magic.effect.lifecycle.CrystalReaction
 import org.joml.Vector3f
 
-/** 可投掷并粘附方块的休眠水晶，寿命三十秒、同一施法者最多二十四颗。 */
+/** 可投掷并粘附方块的休眠水晶，寿命三十秒；数量不做每人截断。 */
 class DormantCrystal : Projectile() {
     override val id = "dormant_crystal"
     override val bodyColor = Color.ofInt(178, 118, 255)

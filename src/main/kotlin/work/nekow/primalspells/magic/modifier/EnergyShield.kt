@@ -783,20 +783,8 @@ class EnergyShield : Modifier() {
         )
     }
 
-    /**
-     * 铺一组玻璃面板：**亮边**（面板轮廓上的点）+ 可选**极淡填充**（面板内部的稀疏点），
-     * 成员挂在**以球心为 pivot** 的组上，[holdTicks] 后开始缩小、[fadeTicks] 内收缩完并由 PD 销毁整组。
-     *
-     * **面板按飘散位移分组**（第 39 轮，open.md §1.9.2）：PD 的组是 arm / 演出的单位，
-     * 一块面板一个组会让一次爆炸打出 32 条 `armed` 日志。位移**相同**的面板于是共用一个组 ——
-     * 格挡玻璃、破口轮廓、爆炸碎裂（整批沿爆点方向）都只占 **1 个组**；
-     * 只有「投射物打穿、每片沿自己法线向外」那种才不得不一片一组（≤7 组）。
-     *
-     * @param driftOf 每块面板的飘散位移（`null` = 原地淡出）
-     * @param fillColor 填充点的颜色（背对爆点那一批用更淡的）
-     * @param follow true = 这一批**跟着持有者移动**（破口轮廓用，见 [spawnBreachOutline]）；
-     *   false（默认）= 画在生成处不动（第 36 轮口径：碎片盖章）
-     */
+    /** 实色晶格保持壳面尺寸；裂纹沿面心延伸，破裂片元独立外飞。
+     * 破口轮廓随持有者移动，格挡残像和碎片留在受击位置。 */
     private fun spawnGlassPanels(
         level: ServerLevel,
         holder: Entity,
@@ -825,41 +813,37 @@ class EnergyShield : Modifier() {
         // 顺序也仍是硬约束：**先建组（含 followEntity）再铺成员**（第 13 轮踩过）。
         val pivot = if (follow) holder.position() else center
         for ((drift, batch) in panelIndices.mapNotNull { shieldPanels.getOrNull(it) }.groupBy(driftOf)) {
-            val group = manager.createGroup(pivot)
-            if (follow) group.followEntity(holder.uuid)
+            val group = if (drift == null) manager.createGroup(pivot) else null
+            if (follow) group?.followEntity(holder.uuid)
             for (panel in batch) {
-                for (offset in panel.ring) {
-                    manager.create()
-                        .position(center.add(offset))
-                        .color(edgeColor)
-                        .scale(edgeScale)
-                        // 实色方点采用全亮；蓝色与亮背景形成色相对比
-                        .additive(false)
-                        .glowing(glow)
-                        .lifetime(PD_IMMORTAL)
-                        .group(group.id)
-                        .offsetFromPivot(offset)
+                val offsets = panel.ring + if (withFill) fillOffsets(panel) else emptyList()
+                val normal = panel.center.normalize()
+                offsets.forEachIndexed { i, offset ->
+                    val edge = i < panel.ring.size
+                    val handle = manager.create().position(center.add(offset))
+                        .color(if (edge) edgeColor else fillColor)
+                        .visual(work.nekow.particledrawing.api.ParticleVisual().style(work.nekow.particledrawing.api.ParticleStyle.SQUARE)
+                            .anisoWorld(if (edge) edgeScale * 0.2f else 0.09375f, if (edge) edgeScale * 0.2f else 0.046875f)
+                            .glowing(glow).spin(i * 0.47))
+                        .lifetime(holdTicks + fadeTicks + if (drift != null) i % 13 else if (follow) -(i % 5) else i % 5)
                         .spawn()
+                    if (drift != null) {
+                        // 保持片元尺寸，沿法线剥落并受重力；不会整块护盾缩到球心。
+                        handle?.setVelocity(drift.scale(0.08).add(normal.scale(0.09 + i % 7 * 0.015))
+                            .add(offset.subtract(panel.center).scale(0.12)).add(0.0, 0.05, 0.0))
+                        handle?.applyForce(Vec3(0.0, -0.012, 0.0), -1)
+                    } else group?.add(handle)
                 }
                 if (withFill) {
-                    for (offset in fillOffsets(panel).filterIndexed { index, _ -> index % 5 == 0 }) {
-                        manager.create()
-                            .position(center.add(offset))
-                            .color(fillColor)
-                            .scale(GLASS_FILL_SCALE)
-                            .additive(false)
-                            .glowing(glow)
-                            .lifetime(PD_IMMORTAL)
-                            .group(group.id)
-                            .offsetFromPivot(offset)
-                            .spawn()
-                    }
+                    work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, center.add(panel.center),
+                        normal, 0.18, edgeColor, 8, 2.4f)
+                    // 晶格裂纹从受击面心向边角扩展，短命白线有明确冲击方向。
+                    for (end in panel.ring.filterIndexed { i, _ -> i % 12 == 0 })
+                        work.nekow.primalspells.magic.effect.visual.PixelVfx.arc(manager, center.add(panel.center),
+                            center.add(end), edgeColor)
                 }
             }
-            if (drift != null) group.move(drift, fadeTicks, EasingType.EASE_OUT)
-            group.delay(holdTicks)
-            // 实色碎片按尺寸收缩并按时销毁，不再使用半透明玻璃填充/alpha 淡出
-            group.scale(0.05f, fadeTicks, EasingType.LINEAR).destroyAfter(fadeTicks)
+            group?.destroyAfter(holdTicks + fadeTicks + 13)
         }
     }
 

@@ -32,14 +32,25 @@ class BlackHoleFx {
     private var lastCenter: Vec3? = null
     private var ringLag = Vec3.ZERO
     private var ageTicks = 0
+    private var activeScale = 1.0
 
-    /** 首次铺暗核、倾斜吸积盘与稀疏边界；之后跟随场心、更新外环惯性并补三颗星尘。 */
-    fun spawn(manager: ParticleManager, center: Vec3) {
-        if (core == null) createStructure(manager, center)
+    /** 首次铺暗核、倾斜吸积盘与稀疏边界；之后跟随场心、更新外环惯性并补九颗星尘。 */
+    fun spawn(manager: ParticleManager, center: Vec3, areaScale: Double = 1.0, energy: Double = 0.0) {
+        activeScale = areaScale
+        if (core == null) {
+            createStructure(manager, center)
+            if (areaScale != 1.0) {
+                core?.scale(areaScale.toFloat(), 1); boundary?.scale(areaScale.toFloat(), 1)
+                photonRim?.scale(areaScale.toFloat(), 1); discs.forEach { it.scale(areaScale.toFloat(), 1) }
+                outerRings.forEachIndexed { i, ring -> ring.setVariableLive("rad", ((2.7 + i * 0.55) * areaScale).toString()) }
+            }
+        }
+        if (energy > 0 && ageTicks % 6 == 0) PixelVfx.ring(manager, center, DISC_NORMAL,
+            0.35 * areaScale, DUST_BRIGHT, 8, (3 + kotlin.math.sqrt(energy) * 0.2).toFloat())
         followCenter(center)
         ageTicks++
         val batch = sucked ?: ParticleBatch(manager).also { sucked = it }
-        repeat(3) {
+        repeat(9) {
             // 黄金角取点使连续发射均匀铺开，造型可复录，不依赖世界随机数。
             val index = emissionIndex++
             val angle = index * GOLDEN_ANGLE
@@ -50,7 +61,7 @@ class BlackHoleFx {
             }
             val tangent = DISC_NORMAL.cross(radial).normalize().scale(0.22)
             batch.add(
-                manager.create().position(center.add(radial.scale(RADIUS)))
+                manager.create().position(center.add(radial.scale(RADIUS * areaScale)))
                     .color(if (index % 3 == 0) DUST_BRIGHT else DUST_COLOR)
                     .scale(if (index % 3 == 0) 0.55f else 0.8f)
                     .style(ParticleStyle.SQUARE).glowing(true).additive(false)
@@ -62,7 +73,7 @@ class BlackHoleFx {
     /** 星尘越靠近暗核越快，位置积分与成员回收仍由 PD 负责，每 tick 一次批量速度包。 */
     fun update(center: Vec3) {
         val batch = sucked ?: return
-        batch.removeIf { _, pos, _ -> pos.distanceTo(center) <= CORE_RADIUS }
+        batch.removeIf { _, pos, _ -> pos.distanceTo(center) <= CORE_RADIUS * activeScale }
         if (batch.isEmpty()) return
         val velocities = ArrayList<Vec3>(batch.size())
         batch.forEach { _, _, pos, vel ->
@@ -105,11 +116,11 @@ class BlackHoleFx {
 
         repeat(2) { layer ->
             val disc = manager.createGroup(center)
-            // 每层三条螺旋，不均匀的亮暗断带比等距同心圆更能读出绕流。
-            repeat(3) { arm ->
+            // 每层六条螺旋，不均匀的亮暗断带比等距同心圆更能读出绕流。
+            repeat(6) { arm ->
                 Draw.curve(manager, { t ->
                     val radius = CORE_RADIUS + 0.18 + t * (1.50 + layer * 0.20)
-                    val angle = arm * PI * 2.0 / 3.0 + t * PI * 1.5 + layer * 0.6
+                    val angle = arm * PI * 2.0 / 6.0 + t * PI * 1.5 + layer * 0.6
                     center.add(discOffset(radius, angle, (layer - 0.5) * 0.15))
                 }, 100,
                     colorFn = ColorSource { t -> if (t < 0.4) DISC_INNER else if (t < 0.75) DUST_COLOR else DISC_OUTER },
@@ -124,7 +135,7 @@ class BlackHoleFx {
         createOuterRings(manager, center)
 
         val edge = manager.createGroup(center)
-        Draw.sphere(manager, center, RADIUS, 64, ColorSource.of(BOUNDARY_COLOR), 0.55f,
+        Draw.sphere(manager, center, RADIUS, 128, ColorSource.of(BOUNDARY_COLOR), 0.55f,
             group = edge, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
 
         boundary = edge

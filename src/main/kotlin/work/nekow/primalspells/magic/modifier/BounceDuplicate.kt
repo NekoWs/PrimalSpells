@@ -16,7 +16,7 @@ import kotlin.random.Random
  * 弹跳复制修正 —— 在投射物每次弹跳时生成一个自身复制体
  *
  * 复制体特性：
- * - 仅包含基础投射物（不附带任何修正效果）
+ * - 继承非生成型修饰配方，每个子弹重建独立效果
  * - 发射方向 = 弹跳方向 + [randomStrength] 倍的随机偏移向量
  * - 速度大小 = 弹跳时投射物的当前速度
  * - 复制体立即施放并加入 MagicManager 管理
@@ -59,8 +59,8 @@ class BounceDuplicate : Modifier() {
                 // 获取服务端世界实例
                 val level = caster.level() as? ServerLevel ?: return
 
-                // 克隆基础投射物 —— 不附带任何修正效果
-                val clone = projectile.clone()
+                // 重建投射物并继承非生成型修饰配方
+                val clone = projectile.clone().also { work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, it) }
 
                 // 设置复制体的施法者和法杖（继承原投射物）
                 clone.caster = caster
@@ -81,7 +81,7 @@ class BounceDuplicate : Modifier() {
 
                 // 复制体速度 = 发射方向 × 原投射物当前速度大小
                 val speedMagnitude = status.velocity.length()
-                val launchVelocity = Vector3f(launchDirection).mul(speedMagnitude)
+                val launchVelocity = work.nekow.primalspells.magic.core.SpellAssembly.launch(clone, launchDirection, speedMagnitude)
 
                 // 设置复制体的初始位置（弹跳碰撞点）和速度
                 clone.position = Vector3f(result.pos)

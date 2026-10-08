@@ -100,7 +100,7 @@ abstract class AreaFieldEffect(
 
         applyProjectileForces(center)
 
-        val aabb = AABB.ofSize(center, radius * 2.0, radius * 2.0, radius * 2.0)
+        val aabb = AABB.ofSize(center, radius * projectile.areaScale * 2.0, radius * projectile.areaScale * 2.0, radius * projectile.areaScale * 2.0)
         val inRange = level.getEntitiesOfClass(LivingEntity::class.java, aabb) { it.isAlive }
 
         // 1) 先处理离开范围的生物：立刻撤销迟缓（不等效果自然到期）
@@ -139,9 +139,9 @@ abstract class AreaFieldEffect(
     private fun applyProjectileForces(center: Vec3) {
         val projectiles = MagicManager.projectiles
         if (projectiles.isEmpty()) return
-        val radiusSq = radius * radius
+        val radiusSq = radius * radius * projectile.areaScale * projectile.areaScale
         for (p in projectiles) {
-            if (p === projectile || !p.alive) continue
+            if (p === projectile || !p.alive || p.caster.level() !== fieldLevel) continue
             val dx = center.x - p.status.pos.x.toDouble()
             val dy = center.y - p.status.pos.y.toDouble()
             val dz = center.z - p.status.pos.z.toDouble()

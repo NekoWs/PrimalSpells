@@ -384,3 +384,11 @@ class MyPassive : Modifier() {
 静止法术与触发荷载的方向读取 `launchDirection`，不要依赖被自身速度乘成零的 status.velocity。
 `Magic.initLore` 已添加描述行，新法术无额外专用数值时不用重写 initLore，避免描述重复。
 七张卡与测试装配见 [design/spell-expansion.md](design/spell-expansion.md)。
+
+
+### 第54轮组合装配
+
+新增投射物应使用基础构造参数，不在onSpell重设已被修饰的伤害/爆炸状态。
+修饰装配统一走SpellAssembly.apply；生成后代走inherit后再spell，禁止共享effect/复制已结算状态。
+场/束范围读areaScale、寿命读maxAge；直接伤害走SpellDamage，爆炸传shot上下文以继承冻结。
+当前跨投射物规则和实机矩阵见 [design/spell-quality.md](design/spell-quality.md)。

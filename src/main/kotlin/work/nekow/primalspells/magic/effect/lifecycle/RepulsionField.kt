@@ -28,7 +28,7 @@ class RepulsionField : BaseEffect() {
             val shell = manager.createGroup(center)
             repeat(3) { plane ->
                 Draw.curve(manager, { t ->
-                    val a = t * PI * 2; val u = 4 * cos(a); val v = 4 * sin(a)
+                    val a = t * PI * 2; val u = 4 * projectile.areaScale * cos(a); val v = 4 * projectile.areaScale * sin(a)
                     center.add(if (plane == 2) 0.0 else u, if (plane == 0) 0.0 else v,
                         if (plane == 0) v else if (plane == 2) u else 0.0)
                 }, 96, ColorSource.of(Color.ofInt(245, 145, 80, 255)), 0.6f, group = shell,
@@ -39,22 +39,28 @@ class RepulsionField : BaseEffect() {
         }
         if (lastCenter != center) group?.setPivot(center)
         lastCenter = center
+        if (status.age % 8 == 0) work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(ParticleManager.of(world),
+            center, Vec3(0.0, 1.0, 0.0), 0.75 * projectile.areaScale, Color.ofInt(245, 145, 80), 10, 5f)
         for (p in MagicManager.projectiles) {
-            if (p === projectile || !p.alive || !p.motionEnabled || p.caster.level() !== world || p.speed == 0f) continue
+            if (p === projectile || !p.alive || !p.motionEnabled || p.caster.level() !== world) continue
             val offset = Vec3(p.status.pos.x.toDouble(), p.status.pos.y.toDouble(), p.status.pos.z.toDouble()).subtract(center)
-            if (offset.lengthSqr() !in 1e-6..16.0) continue
-            val push = offset.normalize().scale(0.12)
+            if (offset.lengthSqr() !in 1e-6..(16.0 * projectile.areaScale * projectile.areaScale)) continue
+            val push = offset.normalize().scale(0.12 * kotlin.math.sqrt(1 + projectile.storedEnergy))
             p.status.velocity.add(push.x.toFloat(), push.y.toFloat(), push.z.toFloat())
             if (p.status.velocity.length() > 4f) p.status.velocity.normalize().mul(4f)
         }
         for (p in world.getEntitiesOfClass(net.minecraft.world.entity.projectile.Projectile::class.java,
-            AABB.ofSize(center, 8.0, 8.0, 8.0)) { it.isAlive }) {
+            AABB.ofSize(center, 8.0 * projectile.areaScale, 8.0 * projectile.areaScale, 8.0 * projectile.areaScale)) { it.isAlive }) {
             val offset = p.position().subtract(center)
-            if (offset.lengthSqr() !in 1e-6..16.0) continue
-            val velocity = p.deltaMovement.add(offset.normalize().scale(0.12))
+            if (offset.lengthSqr() !in 1e-6..(16.0 * projectile.areaScale * projectile.areaScale)) continue
+            val velocity = p.deltaMovement.add(offset.normalize().scale(0.12 * kotlin.math.sqrt(1 + projectile.storedEnergy)))
             p.deltaMovement = if (velocity.length() > 4.0) velocity.normalize().scale(4.0) else velocity
             p.hurtMarked = true
         }
     }
-    override fun onDie() { group?.stopContinuous()?.scale(0.05f, 8)?.destroyAfter(8); group = null }
+    override fun onDie() {
+        group?.remove(); group = null
+        level?.let { world -> work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world),
+            Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), Color.ofInt(245, 145, 80), 128, 0.32, 14) }
+    }
 }

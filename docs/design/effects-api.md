@@ -709,3 +709,10 @@ PD `ParticleGroup.setPivot` 更新已生成固定结构的中心；`expression` 
 光束用表达式读六个实时端点变量；位置与颜色由表达式决定，FADE 因子按 PD 文档叠加其上。
 10tick线性淡出提供清晰余晖；服务端只更新整体端点，不自建逐粒子状态或补间引擎。
 单组预算和验收见 [spell-expansion.md](spell-expansion.md)。本轮所需现有 API 足够，无新增请求。
+
+
+### 第54轮质感组合
+
+PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴在六面棱柱表面（alignTo对齐的是长轴，不能用它对齐法线）；
+裂纹/冲击用固定色阶折线与有限寿命，碎片速度/重力交给PD公开ParticleBatch/Handle。
+效果要求及接入见 [spell-quality.md](spell-quality.md)，不使用alpha渐隐或加法混合。

@@ -9,6 +9,6 @@ class CrystalDetonation : Projectile() {
     override val id = "crystal_detonation"
     init { mana = 5.0; delay = 20; maxAge = 1; speed = 0f }
     override fun onSpell() {
-        CrystalReaction.detonateOwned(caster, Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()))
+        CrystalReaction.detonateOwned(caster, Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), this)
     }
 }

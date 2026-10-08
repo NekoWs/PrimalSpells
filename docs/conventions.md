@@ -293,3 +293,10 @@ magic/modifier  ──→ magic/core, magic/effect
 每次完成更新都必须提交Git；先完成构建与必要验收，再按本节中文提交格式提交，不自动push。
 法术视觉遵循 [design/minecraft-visuals.md](design/minecraft-visuals.md)：MC硬边像素、实色和有限色阶。
 不采用渐变半透明粒子/柔边光点/加色叠亮。风格变更已覆盖第49–52轮旧视觉口径。
+
+
+### 第54轮新增文件落位
+
+配方装配SpellAssembly位于magic/core；SpellResonance/SpellInteractions位于magic/effect/lifecycle；
+公开PD API造型PixelVfx位于magic/effect/visual；实机验收SpellQualityScenes位于client/capture。
+本轮不搬动旧文件，无旧→新路径迁移。

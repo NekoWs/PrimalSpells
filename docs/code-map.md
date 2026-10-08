@@ -257,3 +257,13 @@
 
 第53轮：`tools/spells/generate_icons.py` 覆盖所有44个注册id，重绘全部法术卡；
 `ExplosionFx` 改为批量实色碎片。当前粒子造型和预算规则见 [design/minecraft-visuals.md](design/minecraft-visuals.md)。
+
+
+### 第54轮质感与联动入口
+
+`magic/core/SpellAssembly.kt`：配方装配/后代继承/静止源运动准备。
+`magic/effect/lifecycle/SpellResonance.kt`：共鸣、命中质感与护盾弹反射。
+`magic/effect/lifecycle/SpellInteractions.kt`：同维度晶体、冰火、吞弹和冲击。
+`magic/effect/visual/PixelVfx.kt`：公开PD API的冲击/裂纹/实色晶面几何。
+`client/capture/SpellQualityScenes.kt`：448组合矩阵、有序数值/速度与真实施法联动验收。
+规则以 [design/spell-quality.md](design/spell-quality.md) 为准。

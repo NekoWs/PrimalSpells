@@ -17,9 +17,6 @@ class LargeExplosion : Projectile() {
         speed = 0f
         hitRadius = 0.0
         effects += Explosion(onDeath = true, onHit = false)
-    }
-
-    override fun onSpell() {
         status.explosionRadius = 6.0f
         status.explosionDamage = 24.0
     }

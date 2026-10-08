@@ -53,7 +53,7 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟢 | `EnergyShield` 无常驻粒子，受击实色蓝边与稀疏方屑；第53轮填充采样降为1/5，爆炸按影响范围选片，按飘散位移合并组 | `magic/modifier/EnergyShield.kt` | 稳态0粒子/0包；当前MC视觉以 [design/minecraft-visuals.md](../design/minecraft-visuals.md) 为准，不再追求半透明玻璃 |
+| 🟢 | `EnergyShield` 无常驻粒子，受击实色晶格与裂纹；第54轮完整填充与独立剥落碎片，爆炸按影响范围选片，固定轮廓按飘散位移合并组，碎片独立受力 | `magic/modifier/EnergyShield.kt` | 稳态0粒子/0包；当前MC视觉以 [design/minecraft-visuals.md](../design/minecraft-visuals.md) 为准，不再追求半透明玻璃 |
 | 🟡 | **黑洞范围内的「持续轻抖」强度还没实机调过**（第 20 轮收敛后只剩这一处镜头冲击） | `BlackHole.kt` 的 `RUMBLE_MIN`/`RUMBLE_RANGE`、`client/ScreenShakeClient.kt` 的 `MAX_*_DEG` | 现在 0.05~0.13 振幅（越靠球心略强）+ 角度上限 2.6°/1.8°/1.4°：实机站在黑洞里会不会嫌晃、还是根本感觉不到，需要人上手。调参入口就是这两个常量；玩家侧可用原版「受伤视角晃动」一键关掉 |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 剪枝只剩「场上无投射物直接返回」：第 26 轮的扫掠判定要看**线段**，原来的「到玩家中心距离球」粗筛（按点距离）会漏判，已删除。法术数量上量级时可考虑空间分桶/网格 |

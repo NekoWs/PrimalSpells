@@ -28,17 +28,20 @@ class Explosion(
     val onHit: Boolean = true,
     val onDeath: Boolean = false
 ) : BaseEffect() {
+    private var terminalHit = false
 
     override fun onHitEntity(target: Entity) {
-        if (onHit) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage)
+        if (onHit) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
+        if (onHit && !projectile.alive) terminalHit = true
     }
 
     override fun onHitBlock(pos: Vector3f) {
-        if (onHit) customExplode(caster, pos, status.explosionRadius, status.explosionDamage)
+        if (onHit) customExplode(caster, pos, status.explosionRadius, status.explosionDamage, shot = projectile)
+        if (onHit && !projectile.alive) terminalHit = true
     }
 
     override fun onDie() {
-        if (onDeath) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage)
+        if (onDeath && !terminalHit) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
     }
 
     companion object {
@@ -51,7 +54,7 @@ class Explosion(
          * @param radius 爆炸半径（方块数；<= 0 直接返回）
          * @param damage 中心最大伤害（线性衰减到边缘为 0）
          */
-        fun customExplode(source: Entity, center: Vector3f, radius: Float, damage: Double, level: ServerLevel? = null) {
+        fun customExplode(source: Entity, center: Vector3f, radius: Float, damage: Double, level: ServerLevel? = null, shot: work.nekow.primalspells.magic.projectile.Projectile? = null) {
             val serverLevel = level ?: (source.level() as? ServerLevel) ?: return
             if (radius <= 0f) return
 
@@ -60,6 +63,8 @@ class Explosion(
             val cz = center.z.toDouble()
 
             CrystalReaction.notifyExplosion(serverLevel, Vec3(cx, cy, cz), radius.toDouble())
+
+            SpellInteractions.shock(serverLevel, Vec3(cx, cy, cz), radius.toDouble(), work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
 
             // 1. 播放自定爆炸音效
             serverLevel.playSound(
@@ -75,7 +80,7 @@ class Explosion(
 
             // 3. 实体伤害 + 击退
             if (damage > 0.0) {
-                applyDamageAndKnockback(serverLevel, source, cx, cy, cz, radius, damage)
+                applyDamageAndKnockback(serverLevel, source, cx, cy, cz, radius, damage, shot)
             }
         }
 
@@ -96,7 +101,8 @@ class Explosion(
             source: Entity,
             cx: Double, cy: Double, cz: Double,
             r: Float,
-            damage: Double
+            damage: Double,
+            shot: work.nekow.primalspells.magic.projectile.Projectile?
         ) {
             val center = Vec3(cx, cy, cz)
             val aabb = AABB.ofSize(center, r.toDouble() * 2.0, r.toDouble() * 2.0, r.toDouble() * 2.0)
@@ -129,6 +135,8 @@ class Explosion(
                         entity.invulnerableTime = 0
                         val accepted = entity.hurtServer(level, damageSource, actualDamage.toFloat())
                         if (accepted && frozen) FrozenStatus.shatter(entity)
+                        if (accepted && entity is LivingEntity && shot != null && shot.status.freezeTicks > 0)
+                            FrozenStatus.freeze(entity, shot.status.freezeTicks)
                         entity.invulnerableTime = invul
                     }
                 }

@@ -56,6 +56,7 @@ object MagicManager {
         }
         projectiles.addAll(pendingAdd)
         pendingAdd.clear()
+        work.nekow.primalspells.magic.effect.lifecycle.SpellInteractions.tick(projectiles.toList())
         // 延迟重音（塌缩爆闪、波环落地溅射…）也在这里推进：它们必须在效果死掉之后仍然到点触发
         Deferred.tick()
     }
@@ -110,6 +111,14 @@ object MagicManager {
     @SubscribeEvent
     fun onTick(event: ServerTickEvent.Pre) {
         tick()
+    }
+
+    /** 高配特效档：使用PD公开配置提高容量，避免完整晶面被默认可见粒子预算截断。 */
+    @SubscribeEvent
+    fun onServerStarted(event: net.neoforged.neoforge.event.server.ServerStartedEvent) {
+        val config = work.nekow.particledrawing.config.ParticleDrawingConfig.SERVER
+        config.maxParticlesPerDimension.set(1_000_000)
+        config.maxParticlesPerPlayer.set(100_000)
     }
 
     @SubscribeEvent

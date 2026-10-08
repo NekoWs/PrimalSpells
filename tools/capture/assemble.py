@@ -57,6 +57,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
     # 护盾受击玻璃亮度远高于电弧；在独立电弧窗口内量渲染和渐隐，不混用护盾峰值。
     "expansion_arc": {"length": 150, "title": "电弧衰减 / 去重 / 护盾", "decay": "gradual", "quiet": (0, 8), "fade_window": (8, 64)},
@@ -84,7 +85,7 @@ SCENES = {
     },
     "explosion": {
         "length": 78,
-        "title": "爆炸：触发即爆（实色碎片外飞 + 尘屑收缩）",
+        "title": "爆炸：闪爆 / 喷射碎片 / 三向冲击圈 / 翻涌烟团",
         # 第 29 轮起爆炸改成**青白色能量**（对齐用户给的参考）→ 标准判据用蓝（青满足 b>80 且 b-r>12）
         "metric": "blue",
         # 放弹（t=20）之前必须干净
@@ -390,7 +391,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     span = tend - t50
     if spec.get("decay", "gradual") in ("gradual", "collapse"):
         result["asserts"].append(
-            ("实色颗粒逐步收缩/分批结束" if spec.get("decay") == "collapse" else "退场是渐变而非闪现",
+            ("实色结构解体/颗粒分批结束" if spec.get("decay") == "collapse" else "退场是渐变而非闪现",
              span >= MIN_DECAY_FRAMES, f"覆盖量50%→5% 跨 {span} 帧（要求 ≥{MIN_DECAY_FRAMES}）"),
         )
     elif spec.get("decay", "gradual") == "none":

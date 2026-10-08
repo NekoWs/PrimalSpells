@@ -429,3 +429,13 @@ Hurt/电弧/束源通过 `SpellDamage` 共用护盾和冰冻接入；水晶爆�
 
 粒子接线改为MC实色方粒，尺寸/寿命退场；不再用柔光、加色或alpha渐隐。伤害/范围/移动/抽牌机制保持不变。
 Trajectory 不再引用客户端 ParticleTextures；公共侧仅使用PD方形原语。当前造型见 design/minecraft-visuals.md。
+
+
+## 第54轮配方与反应补充
+
+用户授权拓展旧机制：Wand和触发荷载经SpellAssembly保存修饰配方，后代重建非生成型修饰effect；
+生成型修饰不向后代传播。伤害数值在基础构造后按牌序onActive计算，小/大爆炸不在onSpell重设参数。
+MagicManager在本tick投射物推进与pendingAdd合并后执行同维度SpellInteractions快照，
+反应只标记存活/储能，实际死亡仍走下一轮die，不在列表遍历期间删除对象。
+护盾弹反射同时修改Projectile.caster和每个BaseEffect.caster；无人机非生成型配方通过实体NBT持久化。
+详见 [design/spell-quality.md](design/spell-quality.md)。

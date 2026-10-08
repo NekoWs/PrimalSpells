@@ -1,7 +1,6 @@
 package work.nekow.primalspells.magic.projectile
 
 import net.minecraft.core.BlockPos
-import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.EntitySpawnReason
 import work.nekow.particledrawing.api.Color
@@ -40,7 +39,7 @@ class DroneSwarm : Projectile() {
 
         // 在释放位置周围半径 2 格的圆上均匀分布 5 个实体
         val count = 5
-        val radius = 2.0
+        val radius = 2.0 * areaScale
         for (i in 0 until count) {
             // 计算等角分布的偏移
             val angle = 2.0 * Math.PI * i / count
@@ -61,23 +60,17 @@ class DroneSwarm : Projectile() {
             // 覆盖默认位置为精确坐标，并绑定施法者 UUID 以排除友军伤害
             if (entity != null) {
                 entity.setPos(spawnX, spawnY, spawnZ)
+                entity.spellRecipe = work.nekow.primalspells.magic.core.SpellAssembly.inheritableOrder(this)
+                entity.spellModifiers = work.nekow.primalspells.magic.core.SpellAssembly.inheritable(this)
                 entity.owner = caster.uuid // 记录施法者，攻击时不误伤
             }
         }
 
-        // 生成施法粒子效果
-        for (i in 0..7) {
-            val px = center.x + (level.random.nextDouble() - 0.5) * 2.0
-            val py = center.y + level.random.nextDouble() * 2.0
-            val pz = center.z + (level.random.nextDouble() - 0.5) * 2.0
-            level.sendParticles(
-                ParticleTypes.WARPED_SPORE,
-                px, py, pz,
-                1,
-                0.0, 0.0, 0.0,
-                0.5
-            )
-        }
+        val manager = work.nekow.particledrawing.api.ParticleManager.of(level)
+        val p = net.minecraft.world.phys.Vec3(center.x.toDouble(), center.y.toDouble(), center.z.toDouble())
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, p, net.minecraft.world.phys.Vec3(0.0, 1.0, 0.0), radius * 0.4, Color.CYAN, 12, 3f)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, p, Color.CYAN, 128, 0.15, 16)
+
     }
 
     /** 初始化物品描述 */

@@ -98,7 +98,7 @@ class GravityField : AreaFieldEffect(
             // 初速 0 + 恒定向下加速度：位置由 PD 逐 tick 积分（零逐 tick 包），越落越快才有「重力」的样子
             fallingBatch.add(
                 manager.spawnParticle(
-                    center.add(upper.scale(EFFECT_RADIUS)),
+                    center.add(upper.scale((EFFECT_RADIUS * projectile.areaScale))),
                     FALL_COLOR,
                     FALL_SCALE,
                     FALL_LIFETIME_TICKS,
@@ -133,13 +133,18 @@ class GravityField : AreaFieldEffect(
         // 还没落地的溅射一并作废：场都没了，地面上不该再压出环来
         pendingImpacts.forEach { it.cancel() }
         pendingImpacts.clear()
-        shell?.stopContinuous()?.scale(0.05f, 10, EasingType.LINEAR)?.destroyAfter(10)
+        shell?.remove()
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, center, Color.ofInt(130, 215, 255),
+            1600, 0.18, 10, 0.003, EFFECT_RADIUS * projectile.areaScale)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, center, Vec3(0.0, 1.0, 0.0),
+            0.5 * projectile.areaScale, Color.ofInt(130, 215, 255), 12, 6f)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, center, Color.ofInt(130, 215, 255), 128, 0.26, 14)
         shell = null
         falling?.clear()
         splashes?.clear()
         splashes = null
-        // 固定井环淡出，还在下压的波环立即销毁，避免场结束后继续落地
-        wellRing?.stopContinuous()?.scale(0.05f, 10, EasingType.LINEAR)?.destroyAfter(10)
+        // 固定井环结束时发出落地碎屑，还在下压的波环立即销毁，避免场结束后继续落地
+        wellRing?.remove()
         wellRing = null
         for (ring in rings) ring.remove()
         rings.clear()
@@ -161,13 +166,13 @@ class GravityField : AreaFieldEffect(
             repeat(2) { half ->
                 Draw.curve(manager, { t ->
                     val angle = (0.10 + half * 0.52 + t * 0.34) * PI
-                    center.add(EFFECT_RADIUS * sin(angle) * cos(azimuth),
-                        EFFECT_RADIUS * cos(angle), EFFECT_RADIUS * sin(angle) * sin(azimuth))
+                    center.add((EFFECT_RADIUS * projectile.areaScale) * sin(angle) * cos(azimuth),
+                        (EFFECT_RADIUS * projectile.areaScale) * cos(angle), (EFFECT_RADIUS * projectile.areaScale) * sin(angle) * sin(azimuth))
                 }, 48, ColorSource.of(SHELL_COLOR), SHELL_SCALE, group = group, visual = visual)
             }
         }
-        val crownY = EFFECT_RADIUS * RING_START_HEIGHT_SCALE
-        val crownRadius = sqrt(EFFECT_RADIUS * EFFECT_RADIUS - crownY * crownY)
+        val crownY = (EFFECT_RADIUS * projectile.areaScale) * RING_START_HEIGHT_SCALE
+        val crownRadius = sqrt((EFFECT_RADIUS * projectile.areaScale) * (EFFECT_RADIUS * projectile.areaScale) - crownY * crownY)
         Draw.circle(manager, center.add(0.0, crownY, 0.0), crownRadius, 144,
             colorFn = ColorSource.of(Color.ofInt(108, 180, 242, 255)), scale = 0.65f,
             group = group, visual = visual)
@@ -176,11 +181,11 @@ class GravityField : AreaFieldEffect(
     }
 
     /**
-     * 场底平面：从场心向下逐格探测 [EFFECT_RADIUS] 格，取第一块非空气方块的上表面；
+     * 场底平面：从场心向下逐格探测 [(EFFECT_RADIUS * projectile.areaScale)] 格，取第一块非空气方块的上表面；
      * 一路探空（悬空施法）就退化为球体最底端 —— 保证粒子一定会被回收，不会永远下落。
      */
     private fun detectFloor(level: ServerLevel, center: Vec3): Double {
-        val bottom = center.y - EFFECT_RADIUS
+        val bottom = center.y - (EFFECT_RADIUS * projectile.areaScale)
         var y = Mth.floor(center.y) - 1
         while (y.toDouble() >= bottom) {
             val probe = BlockPos(Mth.floor(center.x), y, Mth.floor(center.z))
@@ -193,8 +198,8 @@ class GravityField : AreaFieldEffect(
     /** 场底井环：地面上一个缓慢自转的水平粒子环，半径随场底高度收缩（球体在该高度的水平截面）。 */
     private fun spawnWellRing(manager: ParticleManager, center: Vec3, floor: Double) {
         val heightAboveFloor = center.y - floor
-        val crossSection = sqrt((EFFECT_RADIUS * EFFECT_RADIUS - heightAboveFloor * heightAboveFloor).coerceAtLeast(0.0))
-        val radius = crossSection.coerceIn(WELL_RING_MIN_RADIUS, EFFECT_RADIUS)
+        val crossSection = sqrt(((EFFECT_RADIUS * projectile.areaScale) * (EFFECT_RADIUS * projectile.areaScale) - heightAboveFloor * heightAboveFloor).coerceAtLeast(0.0))
+        val radius = crossSection.coerceIn(WELL_RING_MIN_RADIUS, (EFFECT_RADIUS * projectile.areaScale))
         val group = manager.createGroup(Vec3(center.x, floor + WELL_RING_LIFT, center.z))
         Draw.circle(
             manager,
@@ -230,9 +235,9 @@ class GravityField : AreaFieldEffect(
         floor: Double,
         fallTicks: Int,
     ): ParticleGroup? {
-        val startY = center.y + EFFECT_RADIUS * RING_START_HEIGHT_SCALE
+        val startY = center.y + (EFFECT_RADIUS * projectile.areaScale) * RING_START_HEIGHT_SCALE
         val radius = sqrt(
-            (EFFECT_RADIUS * EFFECT_RADIUS - (startY - center.y) * (startY - center.y)).coerceAtLeast(0.0)
+            ((EFFECT_RADIUS * projectile.areaScale) * (EFFECT_RADIUS * projectile.areaScale) - (startY - center.y) * (startY - center.y)).coerceAtLeast(0.0)
         ).coerceAtLeast(RING_MIN_RADIUS)
         val fall = startY - (floor + WELL_RING_LIFT)
         if (fall <= 0.0) return null

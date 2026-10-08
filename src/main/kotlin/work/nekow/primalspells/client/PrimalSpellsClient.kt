@@ -63,6 +63,9 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.addListener<ClientTickEvent.Post> {
             if (!builtinsReady) {
                 builtinsReady = true
+                val config = work.nekow.particledrawing.config.ParticleDrawingConfig.CLIENT
+                config.maxRenderParticles.set(200_000)
+                config.particleBatchSize.set(65_536)
                 ParticleManager.registerBuiltinTextures()
                 ParticleTextures.register()
             }

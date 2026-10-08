@@ -1,6 +1,5 @@
 package work.nekow.primalspells.magic.projectile
 
-import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
@@ -52,21 +51,15 @@ class TeleportProjectile : Projectile() {
         val y = pos.y.toDouble()
         val z = pos.z.toDouble()
 
-        // 起点粒子（施法者原位置）
-        level.sendParticles(
-            ParticleTypes.PORTAL,
-            caster.x, caster.y + caster.eyeHeight, caster.z,
-            32, 0.3, 0.3, 0.3, 0.05
-        )
-
+        val manager = work.nekow.particledrawing.api.ParticleManager.of(level)
+        val from = caster.position().add(0.0, caster.eyeHeight.toDouble(), 0.0)
+        val to = net.minecraft.world.phys.Vec3(x, y, z)
+        val color = Color.ofInt(182, 132, 255)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, from, net.minecraft.world.phys.Vec3(0.0, 1.0, 0.0), 0.35, color, 12, 3f)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, from, color, 96, 0.12, 12)
         caster.teleportTo(level, x, y, z, emptySet(), caster.yRot, caster.xRot, true)
-
-        // 终点粒子（传送目标位置）
-        level.sendParticles(
-            ParticleTypes.PORTAL,
-            x, y, z,
-            32, 0.3, 0.3, 0.3, 0.05
-        )
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, to, net.minecraft.world.phys.Vec3(0.0, 1.0, 0.0), 0.35, color, 12, 3f)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, to, color, 128, 0.2, 16)
 
         level.playSound(null, x, y, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f)
     }

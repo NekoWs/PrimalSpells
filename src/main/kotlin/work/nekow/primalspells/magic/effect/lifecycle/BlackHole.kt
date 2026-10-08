@@ -21,7 +21,7 @@ class BlackHole : AreaFieldEffect(
     private var opened = false
 
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
-        visuals.spawn(manager, center)
+        visuals.spawn(manager, center, projectile.areaScale, projectile.storedEnergy)
         if (!opened) {
             opened = true
             ScreenShake.shake(manager.level, center, radius = 24.0, amplitude = 0.45f, ticks = 8)
@@ -35,6 +35,8 @@ class BlackHole : AreaFieldEffect(
 
     override fun clearVisuals(manager: ParticleManager, center: Vec3) {
         visuals.clear()
+        if (projectile.storedEnergy > 0) Explosion.customExplode(caster, org.joml.Vector3f(status.pos),
+            (3.0 * projectile.areaScale).toFloat(), projectile.storedEnergy, manager.level, projectile)
     }
 
     /** 范围内持续低幅镜头呼吸，玩家离开后不续期，客户端三 tick 内自行衰减。 */

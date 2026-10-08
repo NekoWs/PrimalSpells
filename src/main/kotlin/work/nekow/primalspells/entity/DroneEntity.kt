@@ -47,6 +47,17 @@ class DroneEntity(
         }
     private var _owner: UUID? = null
 
+    /** 召唤者的非生成型修饰配方，实体重载后继续用于无人机弹。 */
+    var spellModifiers: Map<String, Int>
+        get() = MagicManager.registry.keys.associateWith { persistentData.getInt("spell_modifier_$it").orElse(0) }.filterValues { it > 0 }
+        set(value) { value.forEach { (id, count) -> persistentData.putInt("spell_modifier_$id", count) } }
+
+    /** NBT保存顺序配方，避免伤害加法和乘法在后代中交换顺序。 */
+    var spellRecipe: List<String>
+        get() = persistentData.getString("spell_recipe").orElse("").split(',').filter { it.isNotEmpty() }
+            .ifEmpty { spellModifiers.flatMap { (id, count) -> List(count) { id } } }
+        set(value) { persistentData.putString("spell_recipe", value.joinToString(",")) }
+
     var attackCooldown = 0
     private var moveAge = 0
     private val rampTicks = 15
@@ -134,6 +145,9 @@ class DroneEntity(
         val center = target.position().add(0.0, target.bbHeight / 2.0, 0.0)
         val dir = center.subtract(eye).normalize()
         bolt.velocity = Vector3f(dir.x.toFloat(), dir.y.toFloat(), dir.z.toFloat())
+        work.nekow.primalspells.magic.core.SpellAssembly.apply(bolt, spellRecipe.map {
+            MagicManager.create(it) as work.nekow.primalspells.magic.core.Modifier
+        })
         bolt.spell()
         MagicManager.add(bolt)
     }

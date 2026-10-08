@@ -283,3 +283,14 @@ python tools/capture/assemble.py          # 合成 + 判定
 执行 `pwsh tools/capture/capture.ps1 -Scene all`，覆盖12条已有真实施法场景。
 本轮没有透明度渐隐：像素覆盖衰减来自尺寸收缩与错峰寿命，报告标签同步调整，最低可见性/零残留门槛保留。
 44张法术卡图标重建及16px预览见 [design/minecraft-visuals.md](design/minecraft-visuals.md)。
+
+
+### 9.7 第54轮质感与法术联动
+
+全量录制新增spell_resonance（320tick），包含448组配方/继承检查与真实晶体、冰火、吞弹、反射、集束验收。
+等离子束延寿判据改为40tick后仍活，墙挡测试前结束前一束，保留独立无伤害断言。
+爆炸即时预算按新喷射/火团/冲击圈检查1200–2200，仍在age=1死亡触发观察伤害。
+设计及结果见 [design/spell-quality.md](design/spell-quality.md)。
+
+最终13场证据为12场全量加spell_resonance定向复验，合并2309帧/零丢帧/81项断言通过；
+视频与帧仍在build/capture/out，来源记录runs.tsv，完整结果与既有OSHI日志限制见spell-quality。

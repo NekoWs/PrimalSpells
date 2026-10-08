@@ -131,7 +131,7 @@ class Trajectory(
             head = manager.create()
                 .position(pos.x, pos.y, pos.z)
                 .color(hotColor(1f))          // 纯白热
-                .visual(runeVisual(HEAD_BLOCKS)) // 0.3125格实色方粒，与尾迹起始宽度一致
+                .visual(runeVisual(HEAD_BLOCKS * (1 + 0.1 * projectile.modifiers.values.sum()) * projectile.areaScale)) // 0.3125格实色方粒，与尾迹起始宽度一致
                 .lifetime(-1)                 // 永存，由 [onDie] 移除
                 .spawn()
         }
@@ -162,7 +162,7 @@ class Trajectory(
             .spacing(TRAIL_SPACING)                                   // 每0.125格一颗
             .life(life)
             .color(hotColor(headHot))          // 固定色阶，alpha始终为1
-            .scale(TRAIL_SCALE_HEAD)                                  // 出生0.3125格
+            .scale(TRAIL_SCALE_HEAD * (1 + 0.1f * projectile.modifiers.values.sum()) * projectile.areaScale.toFloat())                                  // 出生0.3125格
             .glowing(true)
             .additive(false)
             // 尺寸乘数沿寿命线性收缩，世界尺寸从0.3125格降至0.0625格。
@@ -281,6 +281,7 @@ class Trajectory(
     }
 
     private fun hotColor(hot: Float): Color = when {
+        status.freezeTicks > 0 -> Color.ofInt(120, 220, 255)
         hot >= 0.98f -> HOT
         hot >= 0.5f -> color.lerp(HOT, 0.25f).withAlpha(1f)
         else -> color.withAlpha(1f)

@@ -10,7 +10,6 @@ import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.geometry.ConstantAcceleration
 import work.nekow.primalspells.magic.effect.lifecycle.Explosion
 import work.nekow.primalspells.util.HitResult
-import work.nekow.primalspells.util.HitType
 import kotlin.random.Random
 
 /**
@@ -20,7 +19,7 @@ import kotlin.random.Random
  * - 受重力影响（挂载共用的 [ConstantAcceleration]）
  * - 发射速度 = 投射物当前速度 × 0.8
  * - 发射方向 = 投射物方向 + 0.2 倍随机散射
- * - 命中实体/方块时触发爆炸（[Explosion]，爆炸参数为 MagicStatus 默认值——子弹是全新实例，不继承父投射物状态）
+ * - 命中实体/方块时触发爆炸（[Explosion]，爆炸参数为 MagicStatus 默认值——子弹重建非生成型修饰配方）
  */
 class ClusterBomb : Modifier() {
 
@@ -47,16 +46,16 @@ class ClusterBomb : Modifier() {
              * @param result 碰撞结果
              */
             override fun onHit(result: HitResult) {
-                if (!projectile.alive && result.type != HitType.ENTITY) return
 
                 val level = caster.level() as? ServerLevel ?: return
 
-                // 克隆基础投射物（不附带修正）
-                val currentDir = Vector3f(status.velocity).normalize()
-                val currentSpeed = status.velocity.length()
+                // 重建投射物并继承非生成型修饰配方
+                val currentDir = if (status.velocity.lengthSquared() > 1e-8f) Vector3f(status.velocity).normalize()
+                    else Vector3f(projectile.launchDirection.x.toFloat(), projectile.launchDirection.y.toFloat(), projectile.launchDirection.z.toFloat())
+                val currentSpeed = status.velocity.length().coerceAtLeast(0.4f)
 
                 for (i in 0 until bulletCount) {
-                    val bullet = projectile.clone()
+                    val bullet = projectile.clone().also { work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, it) }
 
                     // 随机散射方向
                     val scatter = Vector3f(
@@ -71,19 +70,18 @@ class ClusterBomb : Modifier() {
                         .normalize()
 
                     // 发射速度 = 投射物当前速度 × 比例
-                    val launchVel = Vector3f(launchDir).mul(currentSpeed * speedRatio)
 
                     bullet.caster = caster
                     bullet.wand = wand
                     bullet.position = Vector3f(result.pos)
-                    bullet.velocity = Vector3f(launchVel)
+                    bullet.velocity = work.nekow.primalspells.magic.core.SpellAssembly.launch(bullet, launchDir, currentSpeed * speedRatio)
 
                     // 子弹的物理参数：无阻尼、撞墙即炸（不再穿墙）
                     bullet.dragCoeff = 0.0f
                     bullet.throughBlocks = false
 
-                    // 注意 projectile.clone() 是「从注册表新建实例」，不会继承父投射物的运行期状态，
-                    // 因此爆炸参数是 MagicStatus 的默认值（半径 2 / 伤害 5），需要什么效果就在这里显式装配。
+                    // 数值由子弹基础状态按父配方重放，运动速度通过launch抵消重复倍率。
+                    bullet.effects.removeAll { it is Explosion }
                     bullet.effects += Explosion(onHit = true, onDeath = false)
                     bullet.effects += ConstantAcceleration()
 

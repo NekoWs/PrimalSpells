@@ -96,7 +96,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all()
+    fun all(): List<Scene> = listOf(blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -899,7 +899,7 @@ object CaptureScenes {
         var observedAge = -1
         Scene(
             name = name,
-            title = "爆炸：触发即爆（实色碎片外飞 + 尘屑收缩）",
+            title = "爆炸：闪爆 / 喷射碎片 / 三向冲击圈 / 翻涌烟团",
             warmupTicks = 24,
             lengthTicks = EXPLOSION_TICKS,
             thirdPerson = false,
@@ -954,8 +954,8 @@ object CaptureScenes {
                     EXPLOSION_CAST + 12 -> listOf(
                         Check(
                             name, t, "burst-particles",
-                            burstParticles == 184,
-                            "死亡结算当tick PD 粒子 = $burstParticles（160碎片 + 4闪块 + 20尘屑）",
+                            burstParticles in 1200..2200,
+                            "死亡结算当tick PD 粒子 = $burstParticles（密集喷射、八瓣火团、白热闪爆与三向冲击圈）",
                         ),
                         Check(
                             name, t, "damage-immediate",

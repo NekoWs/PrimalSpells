@@ -1,3 +1,5 @@
+> 第54轮质感/联动/高配容量优先以 [spell-quality.md](spell-quality.md) 为准；本文保留原跟随模型与历史预算。
+
 # 区域法术视觉（2026-10-08，第 49–51 轮）
 
 > 第53轮已改为MC实色硬边方粒；下面早期柔光/alpha渐隐说明仅供历史参考，当前规范见 [minecraft-visuals.md](minecraft-visuals.md)。

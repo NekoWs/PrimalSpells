@@ -16,6 +16,14 @@ import work.nekow.primalspells.magic.core.MagicStatus
 
 abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
+    /** 独立的施法配方；只保存id计数，不保存共享effect实例。 */
+    val modifiers = linkedMapOf<String, Int>()
+    /** 原始抽牌顺序，用于后代重放不可交换的修饰。 */
+    val modifierOrder = arrayListOf<String>()
+    /** 扩散/聚爆同时缩放弹体碰撞、光束宽度和场半径。 */
+    var areaScale: Double = 1.0
+    /** 被其它法术注入的能量，供水晶/黑洞释放。 */
+    var storedEnergy: Double = 0.0
 
     override var cast: Int = 0
 
@@ -54,6 +62,8 @@ abstract class Projectile: Magic() {
         launchDirection = if (velocity.lengthSquared() > 1e-8f)
             net.minecraft.world.phys.Vec3(velocity.x.toDouble(), velocity.y.toDouble(), velocity.z.toDouble()).normalize()
             else caster.lookAngle
+        work.nekow.primalspells.magic.core.SpellAssembly.prepare(this)
+        effects += work.nekow.primalspells.magic.effect.lifecycle.SpellResonance()
         effects += Position(position)
         effects += Velocity(Vector3f(velocity).mul(speed))
         effects += Move(
@@ -76,9 +86,15 @@ abstract class Projectile: Magic() {
         status.hitTargets = 0
     }
 
+    /** 静止/重叠碰撞也有有限单位来向，避免将NaN传给触发荷载和分裂弹。 */
+    private fun currentDirection(): Vector3f = if (status.velocity.lengthSquared() > 1e-8f)
+        Vector3f(status.velocity).normalize() else Vector3f(launchDirection.x.toFloat(), launchDirection.y.toFloat(), launchDirection.z.toFloat())
+
     fun hitEntity(entity: Entity) {
-        val impactNormal = Vector3f(status.pos).sub(entity.position().toVector3f()).normalize()
-        val rebound = Vector3f(status.velocity).normalize().reflect(impactNormal)
+        val offset = Vector3f(status.pos).sub(entity.position().toVector3f())
+        val direction = currentDirection()
+        val impactNormal = if (offset.lengthSquared() > 1e-8f) offset.normalize() else Vector3f(direction).negate()
+        val rebound = direction.reflect(impactNormal)
         val result = HitResult(HitType.ENTITY, Vector3f(status.pos), rebound, entity)
 
         status.hitTargets++
@@ -93,7 +109,7 @@ abstract class Projectile: Magic() {
     }
 
     fun hitBlock(pos: Vector3f, faceNormal: Vector3f) {
-        val rebound = Vector3f(status.velocity).normalize().reflect(faceNormal)
+        val rebound = currentDirection().reflect(faceNormal)
         val castPos = Vector3f(faceNormal).mul(0.01f).add(pos)
         val result = HitResult(HitType.BLOCK, castPos, rebound)
 

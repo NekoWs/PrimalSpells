@@ -1,0 +1,19 @@
+newmtl obsidian
+Kd 1 1 1
+Ka 0 0 0
+map_Kd atlas
+
+newmtl gold
+Kd 1 1 1
+Ka 0 0 0
+map_Kd atlas
+
+newmtl gem
+Kd 1 1 1
+Ka 0.6 0.6 0.6
+map_Kd atlas
+
+newmtl leather
+Kd 1 1 1
+Ka 0 0 0
+map_Kd atlas

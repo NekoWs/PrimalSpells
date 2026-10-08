@@ -12,10 +12,11 @@ import kotlin.math.sin
 
 /** 真玩家持有真实法杖：切换预热、待机、移动跟随、两种冷却与放下清理。 */
 object WandCastingScenes {
-    fun all(): List<Scene> = listOf(casting(), casting(true), casting(true, 90))
+    fun all(): List<Scene> = listOf(casting(), casting(true), casting(true, 90), casting(front = true), WandAimScenes.aiming())
 
-    private fun casting(firstPerson: Boolean = false, fov: Int = 60): Scene {
-        val name = if (fov == 90) "wand_casting_wide" else if (firstPerson) "wand_casting_first_person" else "wand_casting"
+    private fun casting(firstPerson: Boolean = false, fov: Int = 60, front: Boolean = false): Scene {
+        val name = if (front) "wand_casting_front" else if (fov == 90) "wand_casting_wide" else if (firstPerson) "wand_casting_first_person" else "wand_casting"
+        val pitch = if (front) -15f else 30f
         lateinit var first: Wand
         lateinit var second: Wand
         var firstStack = ItemStack.EMPTY
@@ -37,11 +38,11 @@ object WandCastingScenes {
             return stack to wand
         }
         return Scene(name, "持杖三角法阵 / 待机汇聚 / 施放间隔与充能", 24, 220,
-            thirdPerson = !firstPerson, fov = fov, showHands = firstPerson,
+            thirdPerson = !firstPerson, thirdPersonFront = front, fov = fov, showHands = firstPerson,
             prepare = { ctx ->
                 val floor = ctx.floorBlockY(0, 0)
                 ctx.buildStudio(0, 0, floor)
-                ctx.setup(false, 0.5, floor+1.0, 0.5, 0f, 30f)
+                ctx.setup(false, 0.5, floor+1.0, 0.5, 0f, pitch)
                 ctx.player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY)
                 ctx.player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY)
                 WandCastingFx.clear()
@@ -52,7 +53,7 @@ object WandCastingScenes {
                 ctx.player.inventory.setItem(8, secondStack)
             }, camera = { ctx, t ->
                 val x = if (t in 75..130) 0.5 + sin((t-75)*0.04)*1.5 else 0.5
-                Pose(x, ctx.floorBlockY(0, 0)+1.0, 0.5, if (t in 75..130) (t-75)*1.2f else 0f, 30f)
+                Pose(x, ctx.floorBlockY(0, 0)+1.0, 0.5, if (t in 75..130) (t-75)*1.2f else 0f, pitch)
             }, tick = { ctx, t ->
                 if (t == 8) ctx.player.setItemInHand(InteractionHand.MAIN_HAND, firstStack)
                 if (t == 9) {
@@ -72,6 +73,8 @@ object WandCastingScenes {
                 if (t == 95) ctx.player.setItemInHand(InteractionHand.MAIN_HAND, secondStack)
                 if (t == 96) switchBlocked = !second.spell(ctx.player)
                 if (t == 115) switchCast = second.spell(ctx.player)
+                // 正面抬头取景的弹体飞行更久，提前结束弹道尾迹，独立测量持杖退场。
+                if (front && t == 128) MagicManager.projectiles.forEach { it.alive = false }
                 if (t == 140) {
                     ctx.player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY)
                     MagicManager.projectiles.forEach { it.alive = false }
@@ -79,6 +82,7 @@ object WandCastingScenes {
                 if (t == 160) ctx.player.setItemInHand(InteractionHand.OFF_HAND, firstStack)
                 if (t == 161) offhandBlocked = !first.spell(ctx.player)
                 if (t == 178) offhandCast = first.spell(ctx.player)
+                if (front && t == 180) MagicManager.projectiles.forEach { it.alive = false }
                 if (t == 190) {
                     ctx.player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY)
                     MagicManager.projectiles.forEach { it.alive = false }

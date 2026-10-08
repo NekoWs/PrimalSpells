@@ -1,0 +1,11 @@
+{
+  "entries": [{
+    "enum": "net/minecraft/client/model/HumanoidModel$ArmPose",
+    "name": "PRIMALSPELLS_WAND",
+    "constructor": "(ZZLnet/neoforged/neoforge/client/IArmPoseTransformer;)V",
+    "parameters": {
+      "class": "work/nekow/primalspells/client/render/WandArmPose",
+      "field": "POSE"
+    }
+  }]
+}

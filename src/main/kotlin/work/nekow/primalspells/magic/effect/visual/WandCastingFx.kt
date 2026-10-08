@@ -49,12 +49,12 @@ object WandCastingFx {
                 sc=min(1,max(0,(t/600-q)*24))*sqrt(1-dissolve);
                 r=0.26;g=0.78;b=0.86;a=1;
             """)
-            // 每条轨迹由粒子序号、轮次和会话种子取确定性随机数；不是三条固定管线。
-            // 三角形内均匀重心采样，尾部方屑与头部共用同一随机起点，末段加速吸入。
-            group(162, 0.03125f, """
-                jet=floor(i/3);tail=i-jet*3;
+            // 六束长弧光流，每束240个连续采样点；随机落点与控制点按轮次变化。
+            // PD逐帧计算三次Bezier及尾宽，不使用运行时逐tick发射或另建粒子驱动。
+            group(1440, 0.01875f, """
+                jet=floor(i/240);q=(i-jet*240)/239;
                 h=sin(jet*127.1+seed)*43758.5453;h=h-floor(h);
-                period=1000+h*650;phase=max(0,t-650)/period+h;
+                period=1900+h*700;phase=max(0,min(t,retireAt)-650)/period+h;
                 cycle=floor(phase);p=phase-cycle;
                 s1=sin(jet*12.9898+cycle*78.233+seed)*43758.5453;s1=s1-floor(s1);
                 s2=sin(jet*39.346+cycle*11.135+seed)*19341.171;s2=s2-floor(s2);
@@ -62,19 +62,22 @@ object WandCastingFx {
                 theta=PI/2+yaw;
                 sx=fx+1.13*(w1*cos(theta)+w2*cos(theta+2*PI/3)+w3*cos(theta+4*PI/3));
                 sz=fz+1.13*(w1*sin(theta)+w2*sin(theta+2*PI/3)+w3*sin(theta+4*PI/3));
-                u=max(0,p-tail*0.025);pull=pow(u,2.6);
-                end=min(1,max(0,(t-retireAt)/750));pull=pull+(1-pull)*end*end;
-                bend=sin(PI*pull)*(0.1+h*0.18);
-                x=sx+(hx-sx)*pull+cos(theta+s2*2*PI)*bend;
-                y=fy+(hy-fy)*pull+sin(PI*u)*0.3*(1-end);
-                z=sz+(hz-sz)*pull+sin(theta+s2*2*PI)*bend;
-                sweep=sin(PI*u)*0.65*(1-end);
-                x=x+dx*sweep;z=z+dz*sweep;
+                u=max(0,p-q*0.62);pull=pow(u,1.7);
+                end=min(1,max(0,(t-retireAt-h*200)/550));pull=pull+(1-pull)*end*end;
+                bow=0.8+s1*0.6;angle=theta+s2*2*PI;
+                c1x=sx+cos(angle)*bow;c1z=sz+sin(angle)*bow;
+                c2x=hx+cos(angle+1.4)*bow*0.65-dx*0.35;
+                c2z=hz+sin(angle+1.4)*bow*0.65-dz*0.35;
+                v=1-pull;
+                x=v*v*v*sx+3*v*v*pull*c1x+3*v*pull*pull*c2x+pull*pull*pull*hx;
+                y=v*v*v*fy+3*v*v*pull*(fy+0.8)+3*v*pull*pull*(hy+0.35)+pull*pull*pull*hy;
+                z=v*v*v*sz+3*v*v*pull*c1z+3*v*pull*pull*c2z+pull*pull*pull*hz;
                 born=650+(cycle-h)*period;
                 active=min(1,max(0,(retireAt-born)*10));
-                sc=min(1,max(0,(t-650)/150))*active*(1-end)*(0.55+0.85*pull)*(1-tail*0.32)*(1-0.25*busy);
-                sc=sc*min(1,max(0,(0.995-p)*60));
-                r=0.46+0.35*pull;g=0.88+0.12*pull;b=0.94;a=1;
+                sc=min(1,max(0,(t-650)/250))*active*sqrt(1-end)*(1-q*0.75);
+                sc=sc*min(1,max(0,u*80))*min(1,max(0,(1-p)*12))*(0.7+0.3*pull);
+                warm=jet-floor(jet/3)*3;
+                r=0.45+0.38*pull+0.12*min(1,warm);g=0.87+0.13*pull;b=1;a=1;
             """)
             group(60, 0.046875f, """
                 lane=floor(3*i/n);q=3*i/n-lane;theta=PI/2+yaw+lane*2*PI/3;
@@ -243,7 +246,7 @@ object WandCastingFx {
         val player = caster as? ServerPlayer ?: return
         if (selected(player) !== wand) return
         val center = origin(caster, wand)
-        val forward = caster.lookAngle
+        val forward = work.nekow.primalspells.wand.WandAim.direction(caster, center)
         val manager = ParticleManager.of(caster.level())
         val group = manager.createGroup(center)
         repeat(64) { i ->

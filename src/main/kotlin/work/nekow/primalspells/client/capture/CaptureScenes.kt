@@ -55,6 +55,7 @@ class Scene(
     val warmupTicks: Int,
     val lengthTicks: Int,
     val thirdPerson: Boolean = false,
+    val thirdPersonFront: Boolean = false,
     val moveCamera: Boolean = true,
     val fov: Int = 70,
     val showHands: Boolean = false,

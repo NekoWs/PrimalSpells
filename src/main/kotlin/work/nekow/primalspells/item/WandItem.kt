@@ -25,6 +25,12 @@ import work.nekow.primalspells.registry.ModItems
 
 class WandItem(properties: Properties) : Item(properties) {
 
+    /** 数值同步仍是同一根杖，不能触发原版重新装备的上下跳动；换槽/换杖照常。 */
+    override fun shouldCauseReequipAnimation(oldStack: ItemStack, newStack: ItemStack, slotChanged: Boolean): Boolean {
+        val oldId = oldStack.get(ModItems.WAND_ID)
+        return slotChanged || oldId == null || oldStack.item !== newStack.item || oldId != newStack.get(ModItems.WAND_ID)
+    }
+
     companion object {
         /**
          * 「玩家 UUID → 最近一次施法用的法杖」，**只**用来把法杖数值同步给正在施法的玩家

@@ -280,3 +280,7 @@ Wand.spell检查装备预热，castHand使用共同施法点；实机流程在cl
 第57轮：tools/wands/generate_models.py生成全部7个法杖的24元件立体模型；WandCastingFx共用宝石位置、随机内部吸入、双冷却完成退场、切杖退场和成功施法迸发。CaptureScenes.Scene.showHands和CaptureDriver的RenderGuiEvent.Pre取消用于第一视角实机模型验收。
 
 client/render/WandHandPose.kt：原版70°手持投影与世界FOV的宝石位置补偿，由PrimalSpellsClient的RegisterClientExtensionsEvent注册到7个法杖物品。
+
+第58轮：wand/WandAim.kt取准星射线的最近可见实体/方块并校准宝石发射方向；item/WandItem.kt按WAND_ID避免同步引发重新装备。client/render/WandArmPose.kt和META-INF/enumextensions.json提供第三人称握持姿势。tools/wands/generate_models.py改为原创OBJ网格生成器，wand_atlas.png材质来源见docs/design/wand-materials.md；client/capture/WandAimScenes.kt验证近远主副手命中及墙体遮挡。
+
+第58轮录制：CaptureScenes.Scene.thirdPersonFront与CaptureDriver的相机选择支持wand_casting_front正面握持证据。

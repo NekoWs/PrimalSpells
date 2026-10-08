@@ -1,6 +1,3 @@
 {
-  "parent": "primalspells:item/wand",
-  "textures": {
-    "metal": "minecraft:block/copper_block"
-  }
+  "parent": "primalspells:item/wand"
 }

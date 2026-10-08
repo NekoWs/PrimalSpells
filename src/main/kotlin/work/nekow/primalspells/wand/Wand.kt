@@ -205,7 +205,7 @@ class Wand(var id: String) {
             p.caster = caster
             p.wand = this
             p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toVector3f()
-            p.velocity = caster.lookAngle.toVector3f().normalize()
+            p.velocity = WandAim.direction(caster, net.minecraft.world.phys.Vec3(p.position)).toVector3f()
             p.spell()
             if (!castVisualPlayed) {
                 work.nekow.primalspells.magic.effect.visual.WandCastingFx.cast(caster, this)

@@ -315,7 +315,8 @@ object CaptureDriver {
         sceneLog.appendLine("showHands\t${next.showHands}")
         if (mc.gui.hud.isHidden() == next.showHands) mc.gui.hud.toggle()
         mc.options.fov().set(next.fov)
-        mc.options.cameraType = if (next.thirdPerson) CameraType.THIRD_PERSON_BACK else CameraType.FIRST_PERSON
+        mc.options.cameraType = if (next.thirdPersonFront) CameraType.THIRD_PERSON_FRONT
+            else if (next.thirdPerson) CameraType.THIRD_PERSON_BACK else CameraType.FIRST_PERSON
         log("=== scene ${next.name} start (warmup=${next.warmupTicks}, length=${next.lengthTicks}) ===")
         server.execute {
             inServer(next.name, "prepare") { next.prepare(ctx(server)) }

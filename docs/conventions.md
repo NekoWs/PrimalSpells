@@ -313,3 +313,7 @@ magic/modifier  ──→ magic/core, magic/effect
 法杖原版JSON方块模型源生成器位于tools/wands/generate_models.py；7个等级模型仍在assets/primalspells/models/item。没有新位图或自制客户端粒子/模型渲染器，原持杖接线与录制类原位扩展。
 
 第一人称FOV显示校准WandHandPose位于client/render，由PrimalSpellsClient注册IClientItemExtensions；公共侧不得依赖它。
+
+### 第58轮新增文件落位
+
+准星目标选择WandAim位于wand；真实瞄准碰撞录制WandAimScenes位于client/capture。第三人称枚举参数WandArmPose位于client/render，META-INF/enumextensions.json由mods.toml声明；公共侧不引用这些客户端类。法杖OBJ、MTL及显示模型仍在assets/primalspells/models/item，原创图集在textures/item，来源与提示词在docs/design/wand-materials.md。没有文件迁移或新渲染引擎。

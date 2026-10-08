@@ -57,6 +57,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "wand_aim": {"metric": "wand", "length": 160, "title": "近远准星命中 / 副手 / 遮挡 / 稳定握持", "decay": "gradual", "quiet": (0, 8), "fade_window": (129, 159)},
     "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角持杖 / 汇聚点与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
     "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 汇聚待机 / 双冷却 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
     "spell_stability": {"length": 180, "title": "双场穿墙 / 即时追踪 / 晶体预算", "decay": "gradual", "quiet": (0, 8)},
@@ -140,6 +141,7 @@ for _scene, _spec in SCENES.items():
         _spec["decay"] = "collapse"
 SCENES["explosion"]["decay"] = "collapse"
 SCENES["wand_casting_wide"] = {**SCENES["wand_casting_first_person"], "title": "宽视野90度 / 宝石位置校准 / 副手镜像"}
+SCENES["wand_casting_front"] = {**SCENES["wand_casting_first_person"], "title": "第三人称正面握柄 / 左右手姿势 / 弧光汇聚"}
 
 #: 「特效像素」判据：**偏冷的亮**像素（蓝 ≥ 红）。黑底摄影棚里只有粒子满足：
 #: 木桩是棕色（红 > 蓝）、地面是灰黑（不够亮）、火球拖尾是橙色（红 > 蓝）。
@@ -344,15 +346,16 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         f"实际 {sorted(sizes)}，要求 {expected_size}（隐藏窗口不能退化成 1×1）",
     ))
 
-    blue_cover = [int(blue_mask(f).sum()) for f in frames]
-    red_cover = [int(red_mask(f).sum()) for f in frames]
-    warm_cover = [int(warm_mask(f).sum()) for f in frames]
-    orange_cover = [int(orange_mask(f).sum()) for f in frames]
-    dark_cover = [int(dark_mask(f).sum()) for f in frames]
+    # 只读取本场判据使用的色域，避免每个新增持杖取景都重复解码五遍整段录制。
+    metric = spec.get("metric", "blue")
+    blue_cover = [int(blue_mask(f).sum()) for f in frames] if metric not in ("wand", "warm", "orange") else []
+    red_cover = [int(red_mask(f).sum()) for f in frames] if "breach" in spec or "breach_fade" in spec else []
+    warm_cover = [int(warm_mask(f).sum()) for f in frames] if metric == "warm" else []
+    orange_cover = [int(orange_mask(f).sum()) for f in frames] if metric == "orange" else []
+    dark_cover = [int(dark_mask(f).sum()) for f in frames] if "dark_core" in spec else []
     # 标准判据（空场起飞 / 真的渲染 / 退场 / 静止窗口）用哪一个像素判据：默认蓝（冷色粒子），
     # 爆炸场景声明 `metric: warm`（饱和暖色）；火球拖尾声明 `metric: orange`（加法混合的橙黄火花，
     # 见 `orange_mask` 的标定说明）。粉色破口判据始终独立于它。
-    metric = spec.get("metric", "blue")
     cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"warm": warm_cover, "orange": orange_cover}.get(metric, blue_cover)
     result["cover"] = cover
     result["blue_cover"] = blue_cover
@@ -381,6 +384,9 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         ("场景内断言全过", all(ok for _, ok in checks) and bool(checks),
          f"{sum(1 for _, ok in checks if ok)}/{len(checks)}"),
     )
+    if spec.get("metric") == "wand":
+        missing = [line for line in log_lines if "Missing texture" in line and "primalspells:item/wand" in line]
+        result["asserts"].append(("法杖材质完整", not missing, f"缺失材质警告={len(missing)}"))
     result["asserts"].append(("空场起飞", max(cover[:2]) <= empty, f"前 2 帧特效像素 {cover[:2]}（阈值 ≤{empty}）"))
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))

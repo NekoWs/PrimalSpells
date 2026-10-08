@@ -51,7 +51,15 @@ class ModItems {
                     }
                     output.accept(SPELL_POUCH)
                     output.accept(TEST_DUMMY)
-                    MAGICS.values.forEach { output.accept(it) }
+                    // 同类沿注册顺序排列，避免HashMap导致每种法术散落在不同位置。
+                    MagicManager.registry.entries.sortedBy { (_, factory) ->
+                        val magic = factory()
+                        when {
+                            magic is work.nekow.primalspells.magic.core.Modifier -> 2
+                            magic is work.nekow.primalspells.magic.projectile.Projectile && magic.speed == 0f -> 1
+                            else -> 0
+                        }
+                    }.forEach { (id, _) -> MAGICS[id]?.let { output.accept(it) } }
                 }
                 .build()
         }

@@ -1,6 +1,7 @@
 package work.nekow.primalspells.magic.effect.visual
 
 import net.minecraft.world.phys.Vec3
+import work.nekow.particledrawing.api.Anchor
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ColorSource
 import work.nekow.particledrawing.api.Draw
@@ -32,9 +33,8 @@ class BlackHoleFx {
         activeScale = areaScale
         if (core == null) {
             createStructure(manager, center)
-            if (areaScale != 1.0) {
-                core?.scale(areaScale.toFloat(), 1); boundary?.scale(areaScale.toFloat(), 1)
-            }
+            core?.scaleTo(0f, 0)?.scaleTo(areaScale.toFloat(), 3, EasingType.EASE_OUT)
+            boundary?.scaleTo(0f, 0)?.scaleTo(areaScale.toFloat(), 4, EasingType.EASE_OUT)
         }
         followCenter(center)
         val batch = sucked ?: ParticleBatch(manager).also { sucked = it }
@@ -88,20 +88,20 @@ class BlackHoleFx {
         Draw.sphere(manager, center, CORE_RADIUS, 160, ColorSource.of(CORE_COLOR), 1.4f,
             group = dark, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
 
-        core = dark
+        core = dark.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD))
 
         val edge = manager.createGroup(center)
         Draw.sphere(manager, center, RADIUS, 128, ColorSource.of(BOUNDARY_COLOR), 0.55f,
             group = edge, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
 
-        boundary = edge
+        boundary = edge.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD))
     }
 
     /** 暗核和稀疏边界紧跟最终位置；环形装饰已移除。 */
     private fun followCenter(center: Vec3) {
         if (lastCenter != center) {
-            core?.setPivot(center)
-            boundary?.setPivot(center)
+            core?.updateAnchor(lastCenter ?: center, center)
+            boundary?.updateAnchor(lastCenter ?: center, center)
         }
         lastCenter = center
     }

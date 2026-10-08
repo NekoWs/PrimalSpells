@@ -80,7 +80,7 @@ object WandAimScenes {
                 copy.set(ModItems.WAND_SELECTED_SLOT, 1)
                 results["same-wand-sync-no-reequip"] = !(stack.item as WandItem).shouldCauseReequipAnimation(stack,copy,false)
                 results["slot-switch-still-equips"] = (stack.item as WandItem).shouldCauseReequipAnimation(stack,copy,true)
-            }, camera = { ctx, _ -> Pose(.5,ctx.floorBlockY(0,0)+1.0,.5,0f,0f) },
+            }, camera = { ctx, t -> Pose(.5,ctx.floorBlockY(0,0)+1.0,.5,0f,if (t >= 127) 70f else 0f) },
             tick = { ctx,t ->
                 when(t) {
                     8 -> ctx.player.setItemInHand(InteractionHand.MAIN_HAND,stack)

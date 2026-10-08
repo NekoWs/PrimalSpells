@@ -26,7 +26,7 @@ object SpellQualityScenes {
         wand.innate += ids.map { MagicManager.create(it)!! }; wand.load(); wand.status.mana = 1000.0
         check(wand.spell(source))
     }
-    /** 短时双场受力穿墙（长时PD包缺陷另记台账）、即时追踪与高速穿刺的真实运行回归。 */
+    /** 长时双场受力穿墙与超过512成员的PD批量载荷、即时追踪与高速穿刺的真实运行回归。 */
     private fun stability(): Scene {
         val name = "spell_stability"
         var holes = listOf<Projectile>()
@@ -34,6 +34,7 @@ object SpellQualityScenes {
         var target: TestDummyEntity? = null
         var firstTurn = false
         var crystalBudget = 0
+        var largeBatchOk = false
         return Scene(name, "双黑洞互吸穿墙 / 即时追踪 / 晶面预算", 24, 180,
             prepare = { ctx ->
                 val floor = ctx.floorBlockY(0, 0)
@@ -54,7 +55,18 @@ object SpellQualityScenes {
                     holes = MagicManager.projectiles.filter { it.id == "black_hole" }
                     holes.forEach { it.status.velocity.z = 0.25f }
                 }
-                if (t == 45) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 129) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 92) {
+                    val manager = ParticleManager.of(ctx.level)
+                    val batch = work.nekow.particledrawing.api.ParticleBatch(manager)
+                    // spawnAll声明上限256；用公开ensureSize建立完整集合，运动更新仍一次交给PD自动拆包。
+                    batch.ensureSize(1024) { i -> manager.create()
+                        .position(Vec3(-5.0 + (i % 32) * 0.025, floor+3.0, (i / 32) * 0.025))
+                        .color(work.nekow.particledrawing.api.Color.ofInt(100, 205, 255)).scale(0.25f)
+                        .lifetime(4).sizeCurve(*work.nekow.primalspells.magic.effect.visual.PixelVfx.lifeKeys(4)).spawn() }
+                    batch.setVelocityAll(List(1024) { Vec3(0.0, 0.02, 0.0) })
+                    largeBatchOk = batch.size() == 1024
+                }
                 if (t == 125) {
                     target = ctx.spawnDummy(2.0, floor+2.0, -2.0)
                     val p = MagicManager.create("fireball") as Projectile
@@ -82,6 +94,8 @@ object SpellQualityScenes {
                 }
             }, checksAt = { ctx, t -> when(t) {
                 40 -> listOf(Check(name, t, "two-holes-survive-attraction-through-wall", holes.size == 2 && holes.all { it.alive && !it.collisionEnabled && it.status.pos.z > 5f && it.status.pos.x.isFinite() && it.status.velocity.length().isFinite() }, "holes=${holes.map { Triple(it.alive, it.status.pos, it.status.velocity) }}"))
+                96 -> listOf(Check(name, t, "pd-1024-velocity-members-no-disconnect", largeBatchOk, "all1024=$largeBatchOk"))
+                128 -> listOf(Check(name, t, "two-holes-long-running-finite", holes.size == 2 && holes.all { it.alive && it.status.pos.x.isFinite() && it.status.velocity.length().isFinite() }, "holes=${holes.map { it.status.pos }}"))
                 126 -> listOf(Check(name, t, "homing-first-tick-and-faster-launch", firstTurn, "firstTurn=$firstTurn"), Check(name, t, "piercing-integrates-through-solid-wall", probe != null && probe!!.status.pos.z > 3.4f, "position=${probe?.status?.pos}"))
                 140 -> listOf(Check(name, t, "bounded-solid-crystal-budget", crystalBudget in 300..1000, "particles=$crystalBudget"))
                 179 -> listOf(Check(name, t, "clean-projectiles", MagicManager.projectiles.isEmpty(), "shots=${MagicManager.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))

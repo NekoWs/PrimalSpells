@@ -52,15 +52,17 @@ class CrystalReaction : BaseEffect() {
             .add(0.0, if (stuck) 0.45 else 0.0, 0.0)
         if (group == null) {
             group = work.nekow.primalspells.magic.effect.visual.PixelVfx.crystal(ParticleManager.of(world), center, status.freezeTicks > 0)
+            group?.scaleTo(projectile.areaScale.toFloat(), 3, work.nekow.particledrawing.core.easing.EasingType.EASE_OUT)
+            visualScale = projectile.areaScale
             if (countdown >= 0) group?.recolor(Color.ofInt(255, 185, 82), 1)
         }
         if (visualScale != projectile.areaScale) {
-            group?.scale((projectile.areaScale / visualScale).toFloat(), 1)
+            group?.scaleTo(projectile.areaScale.toFloat(), 2)
             visualScale = projectile.areaScale
         }
         if (status.age % 12 == 0) work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(
             ParticleManager.of(world), center.add(0.0, 0.85, 0.0), Color.ofInt(210, 245, 210), 8, 0.02, 5, -0.002)
-        if (lastCenter != center) group?.setPivot(center)
+        if (lastCenter != center) group?.updateAnchor(lastCenter ?: center, center)
         lastCenter = center
         if (countdown >= 0 && countdown-- == 0) {
             detonated = true

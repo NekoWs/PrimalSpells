@@ -6,6 +6,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.HumanoidArm
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
+import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.wand.Wand
 import java.util.UUID
@@ -15,7 +16,7 @@ import kotlin.math.sin
 /** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
     const val EQUIP_TICKS = 8
-    const val EXIT_TICKS = 8
+    const val EXIT_TICKS = 12
     private const val GEM_FORWARD = 0.85
     private const val GEM_UP = 0.25
     private const val GEM_SIDE = 0.38
@@ -30,9 +31,7 @@ object WandCastingFx {
         var expires = Long.MAX_VALUE
         var lastDelay = -1.0
         var lastRecharge = -1.0
-        var lastEyeHeight = -1.0
-        var lastBusy = ""
-        var lastSide = 0.0
+        private var lastPosition = player.position()
         private var delayFx: ParticleGroup? = null
         private var rechargeFx: ParticleGroup? = null
         val ready: Boolean get() = level.gameTime - started >= EQUIP_TICKS
@@ -41,66 +40,58 @@ object WandCastingFx {
         init {
             group(72, 0.09375f, """
                 lane=floor(3*i/n);q=3*i/n-lane;
-                theta=PI/2+yaw+lane*2*PI/3;
+                theta=PI/2+lane*2*PI/3;
                 ax=cos(theta)*1.2;az=sin(theta)*1.2;
                 bx=cos(theta+2*PI/3)*1.2;bz=sin(theta+2*PI/3)*1.2;
                 scatter=sin(i*91.71)*0.5+0.5;
-                dissolve=min(1,max(0,(t-retireAt-scatter*50)/300));
-                x=fx+ax+(bx-ax)*q;y=fy+sin(t*0.004+i*0.55)*0.018+dissolve*dissolve*(0.08+scatter*0.08);
+                dissolve=fade;
+                x=fx+ax+(bx-ax)*q;y=fy+dissolve*dissolve*0.08;
                 z=fz+az+(bz-az)*q;
-                sc=min(1,max(0,(t/260-q)*24))*sqrt(1-dissolve*dissolve*(3-2*dissolve));
-                r=0.26;g=0.78;b=0.86;a=1;
+                sc=min(1,max(0,(t/260-q)*24))*sqrt(remaining);
+                glint=pow(max(0,cos(2*PI*q-t*0.0018-lane*2*PI/3)),12);
+                r=0.20+glint*0.30;g=0.65+glint*0.30;b=0.78+glint*0.22;a=1;
             """)
-            // 两枚块状菱形符印持续陪伴宝石；呼吸只改变尺寸，不周期关闭可见性。
-            group(16, 0.046875f, """
-                lane=floor(i/8);q=(i-lane*8)/8;
-                edge=floor(q*4);u=q*4-edge;
-                ax=cos(edge*PI/2);ay=sin(edge*PI/2);
-                bx=cos((edge+1)*PI/2);by=sin((edge+1)*PI/2);
-                turn=t*0.00055+lane*PI;
-                rx=side/max(0.001,abs(side))*(0.14+lane*0.075+0.012*sin(turn));ry=-0.075+(lane*2-1)*0.035+sin(turn)*0.02;
-                vx=rx+(ax+(bx-ax)*u)*0.05;
-                vy=ry+(ay+(by-ay)*u)*0.05;
-                x=hx+cos(yaw)*vx+ux*vy;
-                y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
-                sc=min(1,max(0,(t-260)/100))*(0.9+0.1*sin(t*0.003+lane*PI))*sqrt(remaining);
-                r=0.38+lane*0.16;g=0.92;b=1;a=1;
-            """)
-            // 白色束印快速展开卸能，再沿进度回位；靠近杖首，避免横跨第一人称上半屏。
-
-
-            group(1, 0.0625f, """
-                x=hx;y=hy;z=hz;
-                sc=min(1,max(0,(t-260)/100))*sqrt(remaining);
-                r=0.72;g=1;b=0.95;a=1;
+            // 角点锁印沿地面缓慢呼吸；杖首idle由原生模型模块承担，避免眼锚误充手锚。
+            group(24, 0.09375f, """
+                lane=floor(i/8);node=i-lane*8;angle=node*PI/4;
+                theta=PI/2+lane*2*PI/3;
+                rad=0.15+0.015*sin(t*0.0016+lane*2*PI/3);
+                x=fx+cos(theta)*1.2+cos(angle)*rad;
+                y=fy+0.025;z=fz+sin(theta)*1.2+sin(angle)*rad;
+                entry=min(1,max(0,(t-180)/160));entry=entry*entry*(3-2*entry);
+                sc=entry*(0.86+0.10*sin(t*0.0016+lane*2*PI/3))*sqrt(remaining);
+                r=0.38;g=0.92;b=1;a=1;
             """)
             update()
         }
 
-        private fun newDelayFx(): ParticleGroup = group(8, 0.046875f, """
-                lane=floor(i/4);node=i-lane*4;
-                done=min(1,max(0,(t-delayEnd)/200));done=done*done*(3-2*done);
-                appear=min(1,max(0,(t-delayStart)/100));appear=appear*appear*(3-2*appear);
-                vx=side/max(0.001,abs(side))*(0.13+lane*0.08+0.04*(1-dp)*(1-dp)+(node-floor(node/2)*2)*0.025);
-                vy=-0.03+(floor(node/2)*2-1)*0.075;
-                x=hx+cos(yaw)*vx+ux*vy;y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
-                sc=delayOn*appear*(1-done)*sqrt(remaining);
-                r=0.92;g=0.96;b=1;a=1;
+        /** 白色内边束印逐段回收：法杖正在恢复下一次释放能力。 */
+        private fun newDelayFx(): ParticleGroup = group(72, 0.09375f, """
+                lane=floor(3*i/n);q=3*i/n-lane;
+                theta=PI/2+lane*2*PI/3;
+                ax=cos(theta)*1.07;az=sin(theta)*1.07;
+                bx=cos(theta+2*PI/3)*1.07;bz=sin(theta+2*PI/3)*1.07;
+                done=min(1,max(0,(t-delayEnd)/150));done=done*done*(3-2*done);
+                appear=min(1,max(0,(t-delayStart)/75));appear=appear*appear*(3-2*appear);
+                lit=min(1,max(0,(1-dp-q)*24+1));lit=lit*lit*(3-2*lit);
+                x=fx+ax+(bx-ax)*q;y=fy+0.03;z=fz+az+(bz-az)*q;
+                sc=delayOn*appear*(0.28+0.72*lit)*(1-done)*sqrt(remaining);
+                r=0.88;g=0.96;b=1;a=1;
             """)
 
-        private fun newRechargeFx(): ParticleGroup = group(36, 0.09375f, """
-                lane=floor(i/12);node=i-lane*12;row=floor(node/3);col=node-row*3-1;
-                theta=PI/2+yaw+lane*2*PI/3;
-                done=min(1,max(0,(t-rechargeEnd-row*15)/200));done=done*done*(3-2*done);
-                appear=min(1,max(0,(t-rechargeStart)/100));appear=appear*appear*(3-2*appear);
-                rad=1.08+done*0.08;
-                x=fx+cos(theta)*rad-sin(theta)*col*0.105;
-                z=fz+sin(theta)*rad+cos(theta)*col*0.105;
-                y=fy+0.075+row*0.125+done*done*0.22;
-                shape=1-abs(row-1.5)*0.18-abs(col)*0.12;
-                sc=rechargeOn*appear*shape*(1-done)*sqrt(remaining);
-                lit=min(1,max(0,rp*4-row));lit=lit*lit*(3-2*lit);
-                r=0.16+lit*0.12;g=0.32+lit*0.34;b=0.72+lit*0.28;a=1;
+        /** 蓝色外边导槽由三顶点充满；充满后并回主法阵，表示牌堆已完成回充。 */
+        private fun newRechargeFx(): ParticleGroup = group(72, 0.09375f, """
+                lane=floor(3*i/n);q=3*i/n-lane;
+                theta=PI/2+lane*2*PI/3;
+                done=min(1,max(0,(t-rechargeEnd)/175));done=done*done*(3-2*done);
+                appear=min(1,max(0,(t-rechargeStart)/75));appear=appear*appear*(3-2*appear);
+                rad=1.32-done*0.12;
+                ax=cos(theta)*rad;az=sin(theta)*rad;
+                bx=cos(theta+2*PI/3)*rad;bz=sin(theta+2*PI/3)*rad;
+                x=fx+ax+(bx-ax)*q;y=fy+0.015;z=fz+az+(bz-az)*q;
+                lit=min(1,max(0,(rp-q)*24+1));lit=lit*lit*(3-2*lit);
+                sc=rechargeOn*appear*(0.45+lit*0.55)*(1-done)*sqrt(remaining);
+                r=0.12+lit*0.16;g=0.30+lit*0.38;b=0.72+lit*0.28;a=1;
             """)
 
         private fun group(count: Int, size: Float, code: String): ParticleGroup {
@@ -111,24 +102,17 @@ object WandCastingFx {
                     .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size, size).glowing(true).additive(false))
                     .lifetime(-1).spawn())
             }
-            group.defineEntity("holder", player.uuid)
-                .setVariable("clockOffset", elapsed)
+            group.setVariable("clockOffset", elapsed)
                 .setVariable("seed", (player.uuid.hashCode() and 65535).toDouble())
-                .setVariable("eh", player.eyeHeight.toDouble()).setVariable("side", handOffset(player, wand))
                 .setVariable("delayStart", -1.0e12).setVariable("rechargeStart", -1.0e12)
                 .setVariable("delayDuration", 1.0).setVariable("rechargeDuration", 1.0)
-                .setVariable("busy", 0.0).setVariable("delayOn", 0.0).setVariable("rechargeOn", 0.0)
-                .setVariable("retireAt", 1.0e12).setVariable("delayEnd", 1.0e12).setVariable("rechargeEnd", 1.0e12)
+                .setVariable("delayOn", 0.0).setVariable("rechargeOn", 0.0)
+                .setVariable("presence", 1.0).setVariable("footX", player.x)
+                .setVariable("footY", player.y).setVariable("footZ", player.z).setVariable("delayEnd", 1.0e12).setVariable("rechargeEnd", 1.0e12)
             group.expression("""
                 now=t+clockOffset;
-                fx=get_entity_x(holder);fy=get_entity_y(holder)+0.06;fz=get_entity_z(holder);
-                yaw=get_entity_yaw(holder)*PI/180;
-                dx=get_entity_dirx(holder);dy=get_entity_diry(holder);dz=get_entity_dirz(holder);
-                ux=sin(yaw)*dy;uy=sqrt(max(0,1-dy*dy));uz=-cos(yaw)*dy;
-                hx=fx+dx*$GEM_FORWARD+cos(yaw)*side+ux*$GEM_UP;
-                hy=fy-0.06+eh+dy*$GEM_FORWARD+uy*$GEM_UP;
-                hz=fz+dz*$GEM_FORWARD+sin(yaw)*side+uz*$GEM_UP;
-                fade=min(1,max(0,(now-retireAt)/350));remaining=1-fade*fade*(3-2*fade);
+                fx=footX;fy=footY+0.06;fz=footZ;
+                remaining=presence;fade=1-presence;
                 dp=min(1,max(0,(now-delayStart)/delayDuration));
                 rp=min(1,max(0,(now-rechargeStart)/rechargeDuration));
                 ${code.replace(Regex("\\bt\\b"), "now")}
@@ -137,9 +121,20 @@ object WandCastingFx {
             return group
         }
 
-        private fun variable(name: String, value: Double) = groups.forEach { it.setVariableLive(name, value.toString()) }
+        /** 位置样本缓动交给PD；退场中的法阵也继续跟随玩家。 */
+        fun followPosition() {
+            val current = player.position()
+            if (current == lastPosition) return
+            groups.forEach {
+                it.setVariableInterpolated("footX", current.x.toString(), 1)
+                    .setVariableInterpolated("footY", current.y.toString(), 1)
+                    .setVariableInterpolated("footZ", current.z.toString(), 1)
+            }
+            lastPosition = current
+        }
 
         fun update() {
+            followPosition()
             val delay = wand.status.delay.coerceAtLeast(0.0)
             val recharge = wand.status.recharge.coerceAtLeast(0.0)
             // 每轮状态有独立PD会话；重复施法时旧提示正常收尾，新提示从零展开。
@@ -163,18 +158,12 @@ object WandCastingFx {
             lastDelay = delay
             lastRecharge = recharge
             groups.removeAll { it.size() == 0 }
-            val busy = if (delay > 0 || recharge > 0) "1" else "0"
-            if (lastBusy != busy) { groups.forEach { it.setVariableLive("busy", busy) }; lastBusy = busy }
-            val eyeHeight = player.eyeHeight.toDouble()
-            val side = handOffset(player, wand)
-            if (lastSide != side) { variable("side", side); lastSide = side }
-            if (eyeHeight != lastEyeHeight) { variable("eh", eyeHeight); lastEyeHeight = eyeHeight }
+
         }
 
         fun retire() {
-            variable("retireAt", elapsed)
             expires = level.gameTime + EXIT_TICKS
-            groups.forEach { it.destroyAfter(EXIT_TICKS) }
+            groups.forEach { it.setVariableInterpolated("presence", "0", 7, EasingType.EASE_IN_OUT).destroyAfter(EXIT_TICKS) }
             retiring += this
         }
 
@@ -212,7 +201,7 @@ object WandCastingFx {
     fun tick(server: MinecraftServer) {
         retiring.removeAll {
             val invalid = !it.player.isAlive || it.player.level() !== it.level || server.playerList.getPlayer(it.player.uuid) !== it.player
-            if (invalid) it.remove()
+            if (invalid) it.remove() else it.followPosition()
             invalid || it.level.gameTime >= it.expires
         }
         val held = hashSetOf<UUID>()
@@ -240,7 +229,7 @@ object WandCastingFx {
         return state(player, wand).ready
     }
 
-    /** 模型宝石位于视线右上方，施法和符印共用同一相机正交基；副手/左惯用手镜像。 */
+    /** 模型宝石位于视线右上方，施法和迸发共用同一相机正交基；副手/左惯用手镜像。 */
     fun origin(caster: Entity, wand: Wand): Vec3 {
         val player = caster as? ServerPlayer
         if (player == null || selected(player) !== wand) return caster.eyePosition.add(0.0, -0.1, 0.0)

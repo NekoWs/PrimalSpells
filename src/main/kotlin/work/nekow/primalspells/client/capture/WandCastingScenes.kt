@@ -1,5 +1,7 @@
 package work.nekow.primalspells.client.capture
 
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.Blocks
 import net.minecraft.client.Minecraft
 import work.nekow.primalspells.client.render.WandModelProperty
 import net.minecraft.world.InteractionHand
@@ -60,6 +62,11 @@ object WandCastingScenes {
             thirdPerson = !firstPerson, thirdPersonFront = front, fov = fov, showHands = firstPerson,
             prepare = { ctx ->
                 val floor = ctx.floorBlockY(0, 0)
+                // 清除前一条稳定性场景的穿墙夹具，保证法杖展示不被无关石墙遮挡。
+                for (x in -4..4) for (y in floor+1..floor+6) {
+                    val pos = BlockPos(x, y, 3)
+                    if (ctx.level.getBlockState(pos).`is`(Blocks.STONE)) ctx.level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2)
+                }
                 ctx.buildStudio(0, 0, floor)
                 ctx.setup(false, 0.5, floor+1.0, 0.5, 0f, pitch)
                 ctx.player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY)
@@ -72,7 +79,7 @@ object WandCastingScenes {
                 ctx.player.inventory.setItem(8, secondStack)
             }, camera = { ctx, t ->
                 val x = if (t in 75..130) 0.5 + sin((t-75)*0.04)*1.5 else 0.5
-                Pose(x, ctx.floorBlockY(0, 0)+1.0, 0.5, if (t in 75..130) (t-75)*1.2f else 0f, pitch)
+                Pose(x, ctx.floorBlockY(0, 0)+1.0, 0.5, if (t in 75..130) (t-75)*1.2f else 0f, if (firstPerson && t >= 182) 70f else pitch)
             }, tick = { ctx, t ->
                 if (t in listOf(20,25,30,40,180)) sampleModel(t)
                 if (t == 8) ctx.player.setItemInHand(InteractionHand.MAIN_HAND, firstStack)
@@ -120,7 +127,7 @@ object WandCastingScenes {
                 80 -> listOf(Check(name, t, "repeated-cast-does-not-restart-equip", repeatCast && WandCastingFx.ready(ctx.player, first), "cast=$repeatCast"))
                 120 -> listOf(Check(name, t, "switch-wand-restarts-equip-only-once", switchBlocked && switchCast && WandCastingFx.ready(ctx.player, second), "blocked=$switchBlocked cast=$switchCast"))
                 144 -> listOf(Check(name, t, "put-away-keeps-finite-exit-animation", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
-                150 -> listOf(Check(name, t, "put-away-cleans-after-exit", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                154 -> listOf(Check(name, t, "put-away-cleans-after-exit", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 192 -> listOf(Check(name, t, "offhand-exit-still-visible", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 208 -> listOf(Check(name, t, "offhand-exit-cleaned", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 180 -> listOf(Check(name, t, "offhand-has-equip-and-casting", offhandBlocked && offhandCast, "blocked=$offhandBlocked cast=$offhandCast"))

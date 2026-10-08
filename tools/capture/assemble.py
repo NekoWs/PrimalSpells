@@ -59,7 +59,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 SCENES = {
     "wand_aim": {"metric": "wand", "length": 160, "title": "近远准星命中 / 副手 / 遮挡 / 稳定握持", "decay": "gradual", "quiet": (0, 8), "fade_window": (129, 159)},
     "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角低模持杖 / 常驻符印与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
-    "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 块状符印 / 充能柱 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
+    "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 角点锁印 / 双层冷却导槽 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
     "spell_stability": {"length": 180, "title": "双场穿墙 / 即时追踪 / 晶体预算", "decay": "gradual", "quiet": (0, 8)},
     "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
@@ -178,7 +178,7 @@ def wand_mask(path: Path) -> "np.ndarray":
     # 宝石为饱和蓝、银架的蓝红差仅24；只计青色符印/法阵，白色冷却另有独立门禁。
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    return (g > 150) & (b > 160) & (g > b * 0.87) & ((b - r) > 40)
+    return (g > 150) & (b > 160) & (g > b * 0.80) & ((b - r) > 40)
 
 
 def blue_mask(path: Path) -> "np.ndarray":
@@ -397,16 +397,15 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
 
     if scene in ("wand_casting_first_person", "wand_casting_wide"):
-        # 上半屏符印的独立掩码，排除脚下常驻三角形；跨多个旧弧流周期检查不能断档。
+        # 杖首由原生模型idle承担：未施法窗口不再出现错位的眼锚悬浮符印。
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
-        def glyph_pixels(tick):
+        idle_pixels = []
+        for tick in range(22, 28):
             a = np.asarray(Image.open(tick_frames[tick]).convert("RGB"), dtype=np.int16)[20:440, 640:1220]
             r, g, b = a[..., 0], a[..., 1], a[..., 2]
-            # 两枚符印的离散青色，排除宝石、白色焦点/迸发及低G的脚下法阵。
-            return int(((r <= 150) & (g >= 225) & (b >= 245)).sum())
-        idle_pixels = [glyph_pixels(t) for t in range(25, 95)]
-        result["asserts"].append(("宝石idle持续可见无周期断档", min(idle_pixels) >= 120,
-            f"tick25–94上方符印最少{min(idle_pixels)}像素，要求每帧≥120"))
+            idle_pixels.append(int(((r <= 150) & (g >= 225) & (b >= 245)).sum()))
+        result["asserts"].append(("杖首无错位悬浮符印", max(idle_pixels) <= 8,
+            f"未施法窗口青色悬浮片元{idle_pixels}；模型idle另由实机属性断言验证"))
 
     # 多系统场景可指定独立时间窗；保留同样的最低像素数与渐隐跨度门槛。
     fade_cover, fade_peak, fade_idx, fade_empty = cover, peak, peak_idx, empty
@@ -466,14 +465,14 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
 
         def cooldown_pixels(tick, charge=False, entry=False):
-            roi = (slice(490, 660), slice(400, 880)) if charge else (slice(220, 460), slice(400, 900))
+            roi = (slice(460, 700), slice(320, 960))
             a = np.asarray(Image.open(ticks[tick]).convert("RGB"), dtype=np.int16)[roi]
             r, g, b = a[..., 0], a[..., 1], a[..., 2]
-            mask = ((r <= 110) & (g >= (65 if entry else 135)) & (g <= 190) & (b >= (160 if entry else 225))) if charge else (
+            mask = ((r <= 110) & (g >= (65 if entry else 135)) & (g <= 190) & (b >= (160 if entry else 225)) & ((b-g) > 78)) if charge else (
                 (r >= 220) & (g >= 230) & (b >= 245) & ((b-r) > 12))
             return int(mask.sum())
 
-        for label, charge in [("施法恢复白色束印", False), ("回洗聚能蓝色导晶", True)]:
+        for label, charge in [("施法恢复白色内边", False), ("回洗聚能蓝色外边", True)]:
             entry = [cooldown_pixels(t, charge, entry=True) for t in range(29, 32)]
             first = max(entry)
             seq = [cooldown_pixels(t, charge) for t in (range(65, 73) if charge else range(45, 52))]
@@ -481,7 +480,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
                 f"施法后前三tick覆盖{entry}像素，150ms内展开且不能等待半程"))
             result["asserts"].append((label + "短促收尾后归零",
                 max(seq) > 30 and sum(v > 10 for v in seq) >= 2 and seq[-1] <= max(seq) * .05,
-                f"独立颜色覆盖{seq}，至少2帧可见且末尾≤5%；200–245ms收尾"))
+                f"独立颜色覆盖{seq}，至少2帧可见且末尾≤5%；150–175ms收尾"))
 
     # 护盾专属：静止窗口必须干净、受击窗口必须有多次「亮起→消失」
     if "quiet" in spec:

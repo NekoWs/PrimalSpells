@@ -6,6 +6,8 @@ import work.nekow.particledrawing.api.Anchor
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.CurveKey
 import work.nekow.particledrawing.api.EmitterHandle
+import work.nekow.particledrawing.api.ParticleCurve
+import work.nekow.particledrawing.api.ParticleLifeCurve
 import work.nekow.particledrawing.api.ParticleBatch
 import work.nekow.particledrawing.api.ParticleHandle
 import work.nekow.particledrawing.api.ParticleManager
@@ -15,15 +17,15 @@ import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.util.pdParticles
-import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** 实色方粒拖尾；track 头部与延后一tick的里程发射器分工，PD负责插值、尺寸曲线和寿命。 */
+/** 实色方粒拖尾；头部与里程发射器共用相邻运动样本，PD负责插值、尺寸曲线和寿命。 */
 class Trajectory(
     val color: Color,
     val intensity: Float = 1f,
@@ -35,31 +37,31 @@ class Trajectory(
 
     private var prevPos: Vec3? = null
 
-    private var prevPrevPos: Vec3? = null
-
     private var head: ParticleHandle? = null
 
     private var emitter: EmitterHandle? = null
 
-    private var emitterSpeed: Double = 0.0
+    private var emitterLife = 0
+    private var flightEnded = false
 
     override fun onActive() {
+        flightEnded = false
         seed = System.identityHashCode(this)
         prevPos = null
-        prevPrevPos = null
         head = null
     }
 
     override fun onTick() {
         val level = caster.level() as? ServerLevel ?: return
         val manager = wand.pdParticles(level)
+        if (projectile.id == "chain_bolt" && !projectile.motionEnabled) {
+            finishFlight(manager)
+            return
+        }
         val pos = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
         val velocity = Vec3(status.velocity.x.toDouble(), status.velocity.y.toDouble(), status.velocity.z.toDouble())
-        // 三个位置：pos = 本 tick 权威位置；anchorPos = 本 tick 动作前的位置（头部 track 的插值区间起点）；
-        // lagAnchor = 再前一 tick 的位置（尾迹发射器的锚点，见 [prevPrevPos]）
+        // track与发射器都采用上一→当前样本；小符文使用同一段的起点。
         val anchorPos = prevPos ?: pos
-        val lagAnchor = prevPrevPos ?: anchorPos
-        prevPrevPos = anchorPos
         prevPos = pos
 
         val speed = velocity.length()
@@ -77,32 +79,24 @@ class Trajectory(
 
         // ① 头部实色方粒：单颗、永存、`track` —— 丝滑前进的"本体"
         ensureHead(manager, pos)
-        // ② 尾迹：发射器（锚点比头部晚一 tick ⇒ 永不越到前面）
-        ensureEmitter(manager, lagAnchor, velocity, speed, strength)
+        // ② 尾迹：前置发射器与头部使用同相位的相邻样本插值。
+        ensureEmitter(manager, pos, velocity, speed, strength)
         // ③ 贴着弹体、快速向附近散开又很快消失的细小符文（只做质感，不做长度）
         emitMotes(manager, anchorPos, dir, side, up, strength)
     }
 
     override fun onDie() {
-        emitter?.stop()
-        emitter = null
-        emitterSpeed = 0.0
         val level = caster.level() as? ServerLevel ?: return
         val manager = wand.pdParticles(level)
+        finishFlight(manager)
+        if (projectile.id == "chain_bolt" && !projectile.motionEnabled) return
         val pos = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
-        head?.let { marker ->
-            val remnant = manager.createGroup(pos)
-            remnant.add(marker)
-            PixelVfx.retire(remnant, 3)
-        }
-        head = null
         val velocity = Vec3(status.velocity.x.toDouble(), status.velocity.y.toDouble(), status.velocity.z.toDouble())
         val speed = velocity.length()
         val dir = if (speed > MIN_SPEED) velocity.scale(1.0 / speed) else Vec3(0.0, 1.0, 0.0)
         val side = perpendicular(dir)
         val up = dir.cross(side).normalize()
         prevPos = null
-        prevPrevPos = null
         if (speed < MIN_SPEED) {
             emitFieldAfterglow(manager, pos, side, up)
             return
@@ -125,6 +119,18 @@ class Trajectory(
         launch(manager, specs, velocities, FALLING)
     }
 
+    private fun finishFlight(manager: ParticleManager) {
+        if (flightEnded) return
+        flightEnded = true
+        emitter?.stop(); emitter = null
+        head?.let { marker ->
+            val remnant = manager.createGroup(marker.position() ?: Vec3.ZERO)
+            remnant.add(marker)
+            PixelVfx.retire(remnant, 2)
+        }
+        head = null
+    }
+
     // =====================================================================================
     // ① 尾迹发射器
     // =====================================================================================
@@ -144,7 +150,7 @@ class Trajectory(
 
     private fun ensureEmitter(
         manager: ParticleManager,
-        lagAnchor: Vec3,
+        pos: Vec3,
         velocity: Vec3,
         speed: Double,
         strength: Float,
@@ -154,15 +160,22 @@ class Trajectory(
         // 末段约 15% 寿命是淡出区（设计要求"末尾完全消失"），实测"可见/名义 ≈ 0.85"（第 48 轮）。
         val life = (length / speed / TRAIL_VISIBLE_FRACTION).roundToInt()
             .coerceIn(TRAIL_LIFE_MIN, TRAIL_LIFE_MAX)
-        val anchor = Anchor.Movable(lagAnchor, velocity)
+        val anchor = Anchor.Movable(pos, velocity)
         val current = emitter
-        if (current != null && abs(speed - emitterSpeed) <= emitterSpeed * SPEED_REBUILD_RATIO) {
+        if (current != null) {
+            if (life != emitterLife) {
+                current.life(life).lifeCurve(ParticleLifeCurve.of(ParticleCurve.scale(
+                    CurveKey.at(0, 0f), CurveKey.at(0.75, 1f, EasingType.EASE_OUT),
+                    CurveKey.at(life * 0.65, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
+                    CurveKey.at(life, 0f, EasingType.EASE_IN_OUT))))
+                emitterLife = life
+            }
             current.updateAnchor(anchor) // 每 tick 挪锚点（PD 侧只在变化时发包）
             return
         }
-        current?.stop()
         val headHot = (TRAIL_HOT_HEAD_BASE + (1f - TRAIL_HOT_HEAD_BASE) * strength).coerceIn(0f, 1f)
         emitter = manager.emitter(anchor)
+            .jitter(0.035)
             .spacing(TRAIL_SPACING)                                   // 每0.125格一颗
             .life(life)
             .color(hotColor(headHot))          // 固定色阶，alpha始终为1
@@ -181,7 +194,7 @@ class Trajectory(
             // 实色颗粒按寿命缩小；不添加透明度曲线。
             .maxAlive(TRAIL_MAX_ALIVE)
             .spawn()
-        emitterSpeed = speed
+        emitterLife = life
     }
 
     // =====================================================================================
@@ -342,7 +355,6 @@ class Trajectory(
         const val TRAIL_LIFE_MIN = 4
         const val TRAIL_LIFE_MAX = 40
 
-        const val SPEED_REBUILD_RATIO = 0.20
 
         const val TRAIL_SCALE_HEAD = 1.5625f
         const val TRAIL_SCALE_TAIL = 0.3125f

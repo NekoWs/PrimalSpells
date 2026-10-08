@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.Mth
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
+import work.nekow.particledrawing.api.Anchor
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ColorSource
 import work.nekow.particledrawing.api.Draw
@@ -78,10 +79,11 @@ class GravityField : AreaFieldEffect(
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
         val random = manager.level.random
         val moved = lastCenter?.let { it.distanceToSqr(center) > 1.0e-10 } ?: false
+        val previousFloor = floorY
         val floor = if (moved || floorY == null) detectFloor(manager.level, center).also { floorY = it } else floorY!!
         if (moved) {
-            shell?.setPivot(center)
-            wellRing?.setPivot(Vec3(center.x, floor + WELL_RING_LIFT, center.z))
+            shell?.updateAnchor(lastCenter ?: center, center)
+            wellRing?.updateAnchor(Vec3((lastCenter ?: center).x, (previousFloor ?: floor) + WELL_RING_LIFT, (lastCenter ?: center).z), Vec3(center.x, floor + WELL_RING_LIFT, center.z))
         }
         lastCenter = center
 
@@ -178,6 +180,7 @@ class GravityField : AreaFieldEffect(
             colorFn = ColorSource.of(Color.ofInt(108, 180, 242, 255)), scale = 0.65f,
             group = group, visual = visual)
         group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+        group.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 4, EasingType.EASE_OUT)
         shell = group
     }
 
@@ -220,6 +223,7 @@ class GravityField : AreaFieldEffect(
                 visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
         }
         group.spin(Vec3(0.0, 1.0, 0.0), WELL_RING_SPIN_RADIANS_PER_TICK)
+        group.anchor(Anchor.Movable(Vec3(center.x, floor + WELL_RING_LIFT, center.z), Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 3, EasingType.EASE_OUT)
         wellRing = group
     }
 

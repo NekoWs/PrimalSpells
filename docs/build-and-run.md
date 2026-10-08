@@ -23,23 +23,23 @@ JDK 由 `foojay-resolver-convention` 插件按 toolchain 自动下载；本机�
 ## 2. 依赖
 
 ```groovy
-// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.14-ALPHA）
+// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.15-ALPHA）
 compileOnly  files("lib/particledrawing-${particledrawing_version}.jar")   // 编译期接口
 localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // 开发环境运行时（不传递给下游）
 ```
 
-- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.14-ALPHA,)`）、`ordering="AFTER"`。
+- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.15-ALPHA,)`）、`ordering="AFTER"`。
 - jar 以**本地文件**形式签入 `lib/`，不走 Maven；文件名与版本区间都由 `gradle.properties` 驱动（`particledrawing_version` / `particledrawing_version_range`），`build.gradle` 与 `mods.toml` 不再硬编码。
 - 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：`ParticleManager`（`create`/`trackAll`/`setVelocityAll`/`applyForceAll`）、
   `ParticleHandle`（`setVelocity`/`track`/`position`/`applyForce`/`attachTo`/`attachToLocal`/`remove`）、`Color`；
   另有 `ParticleBatch`（**程序化粒子集的推荐入口**：`add`/`trackAll`/`setVelocityAll`/`applyForceAll`/`forEach`/`removeIf`/`ensureSize`/`evictDead`）、`ParticleGroup`（编排式动画）、`EffectCallbacks`、`EffectVarStore`。
 - ✅ **构建口径（同名换 jar 的坑，已解决）**：2026-09-30 当天曾在**同一版本号字符串**下替换过 `lib/` 里的 jar，
   旧构建缺 `position`/`applyForce`/`attachTo`/`trackAll` 而 `versionRange` 拦不住。
-  现在 PD 每加一批 API 就提版本（当前 **1.0.14-ALPHA**），本模组的下限同步为 `[1.0.14-ALPHA,)`，
+  现在 PD 每加一批 API 就提版本（当前 **1.0.15-ALPHA**），本模组的下限同步为 `[1.0.15-ALPHA,)`，
   旧构建在加载期就会被拒绝，**不需要再靠日期约定**。
 - ⚠️ **预发布版本的版本区间（踩过一次的坑）**：FML 用 Maven 版本语义比较，`1.0.11-ALPHA` 排序**低于** `1.0.11`，
   所以下限写 `[1.0.11,)` 会报 `Mod primalspells requires particledrawing 1.0.11 or above / Currently, particledrawing is 1.0.11-ALPHA`。
-  下限必须带上预发布标识（当前即 `[1.0.14-ALPHA,)`；规则在 1.0.8-ALPHA 那次实测过：带标识的下限接受该预发布版与之后的版本，拒绝对应更低的版本；比较大小写不敏感）。
+  下限必须带上预发布标识（当前即 `[1.0.15-ALPHA,)`；规则在 1.0.8-ALPHA 那次实测过：带标识的下限接受该预发布版与之后的版本，拒绝对应更低的版本；比较大小写不敏感）。
 - **升级依赖的三步**（都只改 `gradle.properties` + 放 jar）：
   1. 新 jar（含 `-sources.jar` 更好）放进 `lib/`；
   2. 改 `gradle.properties` 的 `particledrawing_version`（= jar 文件名里的版本段）与 `particledrawing_version_range`（下限 = 该版本，预发布要带标识）；
@@ -47,13 +47,12 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 - ⚠️ **若第 3 步失败**：不要在本模组绕过或自研替代实现 —— 按
   [conventions.md](conventions.md) 第 9 节的政策停下，并把 API 修改需求登记到
   [issues/pd-api-requests.md](issues/pd-api-requests.md)（政策全文见 [design/effects-api.md](design/effects-api.md) 第 0 节）。
-- 当前锁定版本为 **1.0.14-ALPHA**（一次实现四个历史需求：增量追加按「从现在起」读、旋转可叠加、
-  `scale`/`pulse` 连到轴心的距离一起缩放、`move` 不再改 arm 基准轴心 —— 详见
-  [issues/resolved.md](issues/resolved.md) 附录 B 与第 20 轮）。升级时**务必重审本侧「自己补偿时钟」的写法**：
-  第 17~19 轮为绕开旧语义自己算过游标，新版语义下会重复计时（第 20 轮踩过）。
+- 当前锁定版本为 **1.0.15-ALPHA**：新增当前倍率接续的scaleTo/scaleBy、零尺寸不绘制、移动组锚点相邻样本插值、空间变量缓动、发射器jitter及寿命/曲线热更新；大批次运动/销毁载荷由PD自动拆包。
+- 本地前置源码项目位于 `D:/Backup/IDEA Projects/ParticleDrawing`。本轮执行 `gradlew.bat build sourcesJar --console=plain`，复制build/libs中的主JAR与sources JAR；另外执行 `gradlew.bat test --rerun-tasks --console=plain`，测试成功。
+- 增量动画仍按“从现在起”追加，不能自行再补播放游标。发射器`.sizeCurve`是**追加乘数曲线**；重复热更新应使用`.lifeCurve(ParticleLifeCurve.of(ParticleCurve.scale(...)))`覆盖，避免累积到8条通道上限。
 - 上一版本为 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
-- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.14-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
+- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.15-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
   源码 jar **不接进构建**（只作对照用）：Gradle 的 file 依赖没有 sources 变体，2026-10-04 试过
   `compileOnly` + `idea.module.scopes` 想让 IDEA 悬停看到 KDoc，**实测没生效**，已撤回 —— 别再试这条。
 
@@ -346,3 +345,17 @@ wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thi
 镜头纯曲线验证：按§7使用K2JVMCompiler编译`client/CameraImpulse.kt`与`tools/verify/CameraImpulseCheck.kt`，运行`CameraImpulseCheckKt`。
 当前实机原始证据`build/capture/final61b.log`、`final61c.log`、`final61d.log`、`summary61b.tsv`、`summary61c.tsv`、`summary61d.tsv`、`runs61.tsv`及`out/`；不能关闭OSHI日志异常门禁。
 连续性设计、真实边界与结果见[animation-continuity.md](design/animation-continuity.md)。
+
+
+### 第62轮：前置源码编译与连续性复验
+
+先在`D:/Backup/IDEA Projects/ParticleDrawing`运行`gradlew.bat build sourcesJar --console=plain`；将build/libs的1.0.15-ALPHA主JAR、sources JAR复制到本项目lib，仅保留当前版本。
+改gradle.properties的版本与带ALPHA的版本下限后，运行`gradlew.bat build --no-build-cache --console=plain`。
+前置自身测试使用`gradlew.bat test --rerun-tasks --console=plain`，322项通过。
+runCapture仍须隐藏后台启动与300秒超时护栏。全量覆盖19场，稳定性场景t128检查两洞运行120tick，t92建立1024成员并执行一次setVelocityAll，t96检查保持连接。
+ParticleManager.spawnAll公开上限256与运动载荷上限是不同口径；1024成员测试用ParticleBatch.ensureSize建立集合，速度仍一次交给PD自动拆包。
+法杖第一人称最后俯视地面阵列，用实际视野检查退场；火球摄影棚清除前场遗留墙，禁止把墙体遮挡当成生命周期收尾。
+
+
+第62轮最终来源为round62c的14场与round62f的5场补录；runs62.tsv记录来源，summary62.tsv汇总3529帧/零丢帧/170项断言。不得把中间接线失败/视觉失败的62a–e当成最终证据。
+前置组尺寸/变量仍20Hz求值的源码限制单独登记，新API接线通过不等于严格高刷保证已经完成。

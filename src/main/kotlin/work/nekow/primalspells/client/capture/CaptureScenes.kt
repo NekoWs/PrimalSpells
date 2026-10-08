@@ -632,6 +632,10 @@ object CaptureScenes {
             camera = { ctx, t -> trailCam(ctx, t) },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
+                // 清掉前序场景留下的内部墙，固定死亡tick不应被旧摄影棚提前拦截。
+                for (x in CX-TRAIL_STUDIO_HALF..CX+TRAIL_STUDIO_HALF) for (z in CZ-TRAIL_STUDIO_HALF..CZ+TRAIL_STUDIO_HALF)
+                    for (y in floorY+1..floorY+TRAIL_STUDIO_HEIGHT)
+                        ctx.level.setBlock(net.minecraft.core.BlockPos(x,y,z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2)
                 ctx.buildStudio(CX, CZ, floorY, half = TRAIL_STUDIO_HALF, wallHeight = TRAIL_STUDIO_HEIGHT)
                 ctx.setup(
                     spectator = true,
@@ -734,7 +738,7 @@ object CaptureScenes {
     private const val TRAIL_CAST_OFFSET = 9.0
 
     /** 影棚半宽（格）：**要够大**，否则回望机位的侧向偏移会把镜头塞进墙里（整屏黑） */
-    private const val TRAIL_STUDIO_HALF = 12
+    private const val TRAIL_STUDIO_HALF = 20
 
     /**
      * 影棚墙高（格）：**必须够高**（第 43 轮踩）。

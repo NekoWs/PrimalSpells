@@ -35,9 +35,10 @@ class RepulsionField : BaseEffect() {
                     visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
             }
             shell.spin(Vec3(0.2, 1.0, 0.1).normalize(), 0.025).pulse(1.04f, 10)
+            shell.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 3, work.nekow.particledrawing.core.easing.EasingType.EASE_OUT)
             group = shell
         }
-        if (lastCenter != center) group?.setPivot(center)
+        if (lastCenter != center) group?.updateAnchor(lastCenter ?: center, center)
         lastCenter = center
         if (status.age % 8 == 0) work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(ParticleManager.of(world),
             center, Vec3(0.0, 1.0, 0.0), 0.75 * projectile.areaScale, Color.ofInt(245, 145, 80), 10, 5f)

@@ -33,18 +33,17 @@ object ExplosionFx {
         batch.setVelocityAll(velocities)
         batch.applyForceAll(velocities.map { it.scale(-0.025).add(0.0, -0.017, 0.0) }, 22)
 
-        // 降级：PD多段组缩放不继承当前倍率，暂停整体膨胀入场；前置修复后恢复。
-        // 分瓣运动交接到冲击圈，保持完整尺寸再收尾。
+        // 零尺寸闪爆快速展开；后续收束捕获当前倍率，提前中断也不重置姿态。
         val flash = Draw.sphere(manager, center, r * 0.18, 144, ColorSource.of(white), 1.8f,
             visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-        flash.delay(3).scale(0f, 4, EasingType.EASE_IN_OUT).destroyAfter(6)
+        flash.scaleTo(0f, 0).scaleTo(1.5f, 2, EasingType.EASE_OUT).delay(3).scaleTo(0f, 4, EasingType.EASE_IN_OUT).destroyAfter(6)
         repeat(8) { lobe ->
             val d = ParticleShapes.fibonacciSphere(8)[lobe]
             val group = Draw.sphere(manager, center.add(d.scale(r * 0.18)), r * 0.15, 72,
                 ColorSource.of(flame[lobe % 3]), 1.0f,
                 visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-            group.move(d.scale(r * 0.5), 6, EasingType.EASE_OUT)
-                .delay(4 + lobe % 3).scale(0f, 5, EasingType.EASE_IN_OUT).destroyAfter(7)
+            group.scaleTo(0f, 0).scaleTo(1f, 2, EasingType.EASE_OUT).move(d.scale(r * 0.5), 6, EasingType.EASE_OUT)
+                .delay(4 + lobe % 3).scaleTo(0f, 5, EasingType.EASE_IN_OUT).destroyAfter(7)
         }
         for (n in listOf(Vec3(0.0, 1.0, 0.0), Vec3(1.0, 0.15, 0.0), Vec3(0.0, 0.3, 1.0)))
             PixelVfx.ring(manager, center, n, r * 0.25, cyan, 11, 5f)

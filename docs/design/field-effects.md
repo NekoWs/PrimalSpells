@@ -106,3 +106,11 @@ PD 1.0.14 已提供所需能力：`ParticleStyle.SOFT_DOT/LINE`、`ParticleVisua
 PD批量速度包上限问题仍未解决，见issues/pd-api-requests.md；本轮没有绕过该API。
 
 第61轮取消范围内镜头呼吸，只保留黑洞形成的近场轻冲击；暗核/边界500ms收束，剩余星尘600ms收束。固定组零尺寸入场与移动轴心插值仍受PD阻塞。当前规则和证据见[动画连贯性](animation-continuity.md)。
+
+
+## 第62轮：新版前置的连续位姿
+
+1.0.15-ALPHA下，黑洞暗核/星点与重力场边界/地面井环使用Movable轴心和previous/current样本，Orient.WORLD保持造型朝向，井环同时保留上一地面高度。
+主体由0尺寸2–4tick展开，停止时scaleTo从当前倍率收束。旧的Fixed即时位置替换与禁用零尺寸入场说明仅为第61轮历史状态。
+黑洞仍没有固定环；星尘批量速度更新交给PD自动拆包，不截断成员、不在本侧手动分拆运动包。
+实机spell_stability验证两洞互吸携带共同前向速度运行120tick，坐标/速度有限、穿墙、不掉线；1024成员真实setVelocityAll通过。

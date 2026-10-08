@@ -3,13 +3,13 @@
 > 第53轮已改为MC实色硬边方粒；下面早期柔光/alpha渐隐说明仅供历史参考，当前规范见 [minecraft-visuals.md](minecraft-visuals.md)。
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
-> **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第61轮新的组缩放接续与移动锚点插值缺口见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
+> **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第62轮已接入组缩放接续与移动锚点插值；未决需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
-（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.14-ALPHA`）。
+（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.15-ALPHA`）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
-**当前锁定版本：`1.0.14-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
+**当前锁定版本：`1.0.15-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
 `-sources.jar` 为准，不看旧版本记忆）。
 
 **触发条件**（满足任一即进入本政策）：
@@ -234,7 +234,7 @@ HUD/tooltip、无人机、资源与语言键等与 PD API 无关的工作。
 > 状态：**播放器侧 API 轮子已实现**（`particledrawing` 仓库，§5 全部落地并通过 `gradlew build` + 单测）。
 > 魔法模组端（`primalspells`）动画/特效接线**后续再做**。
 > 涉及仓库：
-> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.14-ALPHA）
+> - 播放器：`D:\Backup\IDEA Projects\ParticleDrawing`（`particledrawing`，当前锁定 1.0.15-ALPHA）
 > - 魔法模组：`D:\Backup\IDEA Projects\PrimalSpells`（`primalspells`，MC 26.2 / NeoForge 26.2.0.59 / Java 25）
 
 ---
@@ -717,4 +717,16 @@ PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴
 裂纹/冲击用固定色阶折线与有限寿命，碎片速度/重力交给PD公开ParticleBatch/Handle。
 效果要求及接入见 [spell-quality.md](spell-quality.md)，不使用alpha渐隐或加法混合。
 
-第61轮动画连贯性：单片尺寸曲线继续接入；组ScaleBy接续和Fixed轴心插值已发现前置能力缺口并停止接入。当前范围、降级与恢复条件见[animation-continuity.md](animation-continuity.md)及未决需求最后两条。
+第61轮停止旧的组ScaleBy/Fixed轴心接入；第62轮用1.0.15-ALPHA恢复当前倍率和移动样本接线。严格高刷组尺寸/变量求值仍有新缺口，见[animation-continuity.md](animation-continuity.md)与pd-api-requests。
+
+
+## 第62轮：1.0.15-ALPHA接线
+
+- `scaleTo(0,0).scaleTo(target,2–4ticks)`用于区域场、晶体、冰壳和爆炸火团快速入场；退场统一`scaleTo(0,ticks)`捕获当前倍率，保留销毁余量。
+- 移动结构首次`anchor(Anchor.Movable(center,Vec3.ZERO))`，之后`updateAnchor(previous,current)`；黑洞、重力边界/井环、水晶、斥力场不再热改Fixed轴心。井环保留上一帧地面高度。
+- 等离子束空间端点使用`setVariableInterpolated(name,value,1)`；尾迹发射器用当前位置，与头部track同相位，不再自行延后一tick。
+- 尾迹声明`.jitter(0.035)`；寿命改变时用`.life(...).lifeCurve(...)`覆盖整套曲线，已有片元走完自己的曲线，不重建发射器。
+- 运行时位置/寿命/缩放求值与拆包全部由PD实现，本侧仅提供样本和动画参数。
+
+
+源码限制：组编排tick仍20Hz，尺寸直接syncScale；变量快照先于VarEase更新。保留原生通路和销毁余量，不把20fps捕获PASS当成144Hz连续保证；第62轮新请求见pd-api-requests。

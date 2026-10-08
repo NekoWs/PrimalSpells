@@ -31,6 +31,7 @@ object FrozenStatus {
         Draw.sphere(ParticleManager.of(level), center, target.bbWidth.toDouble() * 0.7 + 0.15, 64,
             ColorSource.of(Color.ofInt(140, 226, 255, 255)), 0.6f, group = group,
             visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+        group.scaleTo(0f, 0).scaleTo(1f, 2, work.nekow.particledrawing.core.easing.EasingType.EASE_OUT)
         val duration = ticks.coerceIn(1, 30)
         target.getAttribute(Attributes.MOVEMENT_SPEED)?.let {
             it.removeModifier(FREEZE_ID)

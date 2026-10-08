@@ -392,3 +392,10 @@ class MyPassive : Modifier() {
 修饰装配统一走SpellAssembly.apply；生成后代走inherit后再spell，禁止共享effect/复制已结算状态。
 场/束范围读areaScale、寿命读maxAge；直接伤害走SpellDamage，爆炸传shot上下文以继承冻结。
 当前跨投射物规则和实机矩阵见 [design/spell-quality.md](design/spell-quality.md)。
+
+
+## 创造标签排序（第62轮）
+
+工具/法杖之后按移动投射物→静态投射物→修正排列；同类保持MagicManager.registry注册顺序。
+静态投射物以Projectile初始speed==0识别（仍能受力移动的区域场也属于静态施放）；Modifier最后。
+不要用ModItems.MAGICS的HashMap迭代顺序展示法术，否则新增条目会让已有分类散乱。

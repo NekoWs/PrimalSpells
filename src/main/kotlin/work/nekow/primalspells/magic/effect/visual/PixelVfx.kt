@@ -15,9 +15,9 @@ object PixelVfx {
             CurveKey.at(max(end * 0.35, end - 5), 1), CurveKey.at(end, 0, EasingType.EASE_IN_OUT))
     }
 
-    /** 完整尺寸组有限收束至零后销毁；PD多倍率接续缺陷另记需求，不能用于零尺寸入场。 */
+    /** 从当前合成倍率有限收束至零；出生、膨胀或脉冲中断仍由PD接续。 */
     fun retire(group: ParticleGroup?, ticks: Int = 6) {
-        group?.scale(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
+        group?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
     }
 
     /** 已有批次交给PD组播放有限收束，本侧不再逐tick驱动；用于场结束的剩余片元。 */
@@ -64,7 +64,7 @@ object PixelVfx {
         group.scale(growth, 5, EasingType.EASE_OUT).destroyAfter(life + 5)
     }
 
-    /** 多层闪电主干与分叉，按离散色阶/寿命闪烁；无缩小整条电弧的动作。 */
+    /** 连续导向目标的折线电流；白热前锋顺线推进，旧线在原位收尾。 */
     fun arc(manager: ParticleManager, from: Vec3, to: Vec3, color: Color = Color.ofInt(100, 205, 255)) {
         val dir = to.subtract(from)
         val u = dir.normalize().cross(Vec3(0.0, 1.0, 0.0)).let {
@@ -78,10 +78,14 @@ object PixelVfx {
         val specs = ArrayList<ParticleSpawnSpec>()
         for (i in 0 until points.lastIndex) repeat(8) { j ->
             val p = points[i].lerp(points[i + 1], j / 8.0)
+            val arrival = 0.05 + (i * 8 + j) / 143.0 * 4.5
+            // 每片沿固定折线先后展开，寿命曲线不接管位置；白热前锋跟随出现时间推进。
             specs += ParticleSpawnSpec().position(p).color(if (j % 3 == 0) Color.ofInt(224, 250, 255) else color)
-                .visual(ParticleVisual().anisoWorld(0.09375f, 0.09375f).glowing(true)).lifetime(5 + i % 6).sizeCurve(*lifeKeys(5 + i % 6))
-            if (i % 4 == 0) specs += ParticleSpawnSpec().position(p.add(u.scale(j * 0.04)))
-                .color(color).visual(ParticleVisual().anisoWorld(0.046875f, 0.046875f).glowing(true)).lifetime(3 + j % 5).sizeCurve(*lifeKeys(3 + j % 5))
+                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.09375f, 0.09375f)
+                    .glowing(true).additive(false)).lifetime(12).sizeCurve(
+                    CurveKey.at(0, 0), CurveKey.at(arrival, 0),
+                    CurveKey.at(arrival + 0.9, 1, EasingType.EASE_OUT), CurveKey.at(arrival + 1.5, 1),
+                    CurveKey.at(arrival + 5.4, 0, EasingType.EASE_IN_OUT))
         }
         manager.spawnAll(specs)
         burst(manager, to, color, 24, 0.12, 8, 0.0)
@@ -102,6 +106,7 @@ object PixelVfx {
             Draw.line(manager, a, b, 9, ColorSource.of(Color.ofInt(224, 174, 65)), 0.5f,
                 group = group, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
         }
+        group.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 3, EasingType.EASE_OUT)
         return group
     }
 

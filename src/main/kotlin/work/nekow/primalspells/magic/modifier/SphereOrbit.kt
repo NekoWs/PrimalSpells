@@ -10,22 +10,15 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/**
- * 球形环绕修正 —— 每个投射物以随机倾斜的圆环轨道环绕施法者，多个投射物汇聚即形成球面环绕。
- *
- * 轨道半径 = min(当前速度 × 1.0, 5.0)，下限 1.0；环绕角速度 = 当前速度 × 0.16，范围 [0.04, 0.4]。
- *
- * 与 [SelfOrbit] 同理，注入的效果声明为 [EffectPhase.OVERRIDE]：在 `Move` 积分之后绝对定位，
- * 因此轨道不会被积分位移叠加而漂移。
+/** 环绕半径=2+驱动速度×2（最多12格）；角速度=驱动速度×0.6/半径。
+ * 在GUIDANCE阶段给出位移，实体/地形命中仍完全由Move扫掠处理。
  */
 class SphereOrbit : Modifier() {
 
     override val id = "sphere_orbit"
 
-    private val radiusFactor = 1.0f
-    private val radiusCap = 5.0f
-    private val angularSpeedFactor = 0.16f
-    private val minAngularSpeed = 0.04f
+    private val radiusFactor = 2.0f
+    private val radiusCap = 12.0f
     private val maxAngularSpeed = 0.4f
 
     init {
@@ -33,16 +26,20 @@ class SphereOrbit : Modifier() {
         delay = 0
 
         effects += object : BaseEffect() {
-            override val phase = EffectPhase.OVERRIDE
+            override val phase = EffectPhase.GUIDANCE
 
             /** 轨道相位（弧度） */
             private var orbitPhase = 0f
+            private var driveSpeed = 0f
+            private var previousTravel = 0f
 
             /** 随机轨道平面的两个正交基向量 */
             private var basisU = Vector3f()
             private var basisV = Vector3f()
 
             override fun onActive() {
+                driveSpeed = status.velocity.length()
+                previousTravel = driveSpeed
                 val dx = status.pos.x - caster.x.toFloat()
                 val dy = status.pos.y - (caster.y + caster.eyeHeight).toFloat()
                 val dz = status.pos.z - caster.z.toFloat()
@@ -60,9 +57,11 @@ class SphereOrbit : Modifier() {
                 val cy = (center.y + center.eyeHeight).toFloat()
                 val cz = center.z.toFloat()
 
-                val currentSpeed = status.velocity.length()
-                val radius = (currentSpeed * radiusFactor).coerceIn(1.0f, radiusCap)
-                val angularSpeed = (currentSpeed * angularSpeedFactor).coerceIn(minAngularSpeed, maxAngularSpeed)
+                // 与上一段实际命令比较，只继承阻尼/加减速倍率，不把较短的弦长当成速度衰减。
+                if (previousTravel > 1e-6f) driveSpeed *= status.velocity.length() / previousTravel
+                val currentSpeed = driveSpeed
+                val radius = (2.0f + currentSpeed * radiusFactor).coerceIn(2.0f, radiusCap)
+                val angularSpeed = (currentSpeed * 0.6f / radius).coerceIn(0.0f, maxAngularSpeed)
 
                 orbitPhase += angularSpeed
                 val cosVal = cos(orbitPhase)
@@ -72,12 +71,11 @@ class SphereOrbit : Modifier() {
                 val py = cy + radius * (basisU.y * cosVal + basisV.y * sinVal)
                 val pz = cz + radius * (basisU.z * cosVal + basisV.z * sinVal)
 
-                status.pos.set(px, py, pz)
-                status.velocity.set(
-                    angularSpeed * (-basisU.x * sinVal + basisV.x * cosVal) * radius,
-                    angularSpeed * (-basisU.y * sinVal + basisV.y * cosVal) * radius,
-                    angularSpeed * (-basisU.z * sinVal + basisV.z * cosVal) * radius
-                )
+                val delta = Vector3f(px, py, pz).sub(status.pos)
+                if (delta.length() > currentSpeed && currentSpeed > 0f) delta.normalize().mul(currentSpeed)
+                status.velocity.set(delta)
+                previousTravel = delta.length()
+
             }
 
             private fun randomUnitVector(): Vector3f {

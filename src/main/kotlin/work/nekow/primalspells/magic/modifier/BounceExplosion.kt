@@ -22,8 +22,10 @@ class BounceExplosion : Modifier() {
         mana = 5.0
         delay = 0
 
+        effects += work.nekow.primalspells.magic.effect.geometry.Bounce()
+
         // 添加爆炸效果：在弹跳碰撞时触发
-        effects += Explosion(onHit = true, onDeath = false)
+        effects += Explosion(onHit = true, onDeath = false, bounceOnly = true)
 
         // 添加弹跳音效（与爆炸效果相互独立）
         effects += object : BaseEffect() {

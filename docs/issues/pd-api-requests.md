@@ -60,3 +60,5 @@
 
 > 需求落地后：把本条**整段搬进** [resolved.md](resolved.md) 附录 B（连同当时的原文），
 > 本文件只留标题式的一行指针都不要留 —— 保持"打开这个文件看到的全是未决项"。
+
+- 第63轮补充：持续运动时每刻重启1刻setVariableInterpolated确实导致法阵/移动光束位置不收敛。本轮停止该接入点，玩家位置改用已有实体getter、束端点改用已有setVariableLive+原生位置桥；没有自写粒子更新/插值。仍需修正重定向时当前值捕获与refreshInputs/applyVarEases顺序，并实现逐渲染帧求值。

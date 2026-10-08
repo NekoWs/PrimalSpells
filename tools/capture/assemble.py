@@ -89,9 +89,9 @@ SCENES = {
     },
     "explosion": {
         "length": 78,
-        "title": "爆炸：闪爆 / 喷射碎片 / 三向冲击圈 / 翻涌烟团",
+        "title": "爆炸：随机火舌 / 径向破裂 / 余烬 / 烟团",
         # 第 29 轮起爆炸改成**青白色能量**（对齐用户给的参考）→ 标准判据用蓝（青满足 b>80 且 b-r>12）
-        "metric": "blue",
+        "metric": "warm",
         # 放弹（t=20）之前必须干净
         "quiet": (2, 16),
         # 暖色判据下的退场是**阈值悬崖**（球体 alpha 淡出 6 tick，但像素判据只看到跨阈值那一帧）——
@@ -141,6 +141,7 @@ SCENES = {
 for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
+SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}
 SCENES["explosion"]["decay"] = "collapse"
 SCENES["wand_casting_wide"] = {**SCENES["wand_casting_first_person"], "title": "宽视野90度 / 宝石位置校准 / 副手镜像"}
 SCENES["wand_casting_front"] = {**SCENES["wand_casting_first_person"], "title": "第三人称正面握柄 / 左右手姿势 / 块状符印"}

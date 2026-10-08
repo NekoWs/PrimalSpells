@@ -143,6 +143,7 @@ abstract class Projectile: Magic() {
 
     override fun initLore() {
         super.initLore()
+        lore += LoreEntry(Lore.MAX_AGE, arrayOf(maxAge.toString()))
         if (status.damage > 0) lore += LoreEntry(Lore.DAMAGE, arrayOf(Lore.formatDouble(status.damage)))
     }
 

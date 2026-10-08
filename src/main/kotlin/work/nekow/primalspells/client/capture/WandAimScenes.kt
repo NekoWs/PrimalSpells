@@ -73,7 +73,7 @@ object WandAimScenes {
                 stack = ItemStack(ModItems.WAND.get())
                 wand = WandManager[WandManager.createWand(stack)]
                 wand.magics += MagicManager.create("fireball")
-                wand.delaySeconds = .1; wand.rechargeSeconds = .1; wand.load(); wand.status.mana = wand.mana
+                wand.delayTickCount = 2.0; wand.rechargeTickCount = 2.0; wand.load(); wand.status.mana = wand.mana
                 ctx.player.inventory.setItem(7,stack)
                 dummy = ctx.spawnDummy(.5,floor+1.0,3.5)
                 val copy = stack.copy()

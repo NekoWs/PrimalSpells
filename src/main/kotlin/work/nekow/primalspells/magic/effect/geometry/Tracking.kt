@@ -96,12 +96,12 @@ class Tracking(
                 && !(excludeMinecarts && entity is AbstractMinecart)
                 && !(excludeBoats && entity is AbstractBoat)
         }.forEach { entity ->
-            val dx = entity.x - status.pos.x
-            val dy = entity.y - status.pos.y
-            val dz = entity.z - status.pos.z
+            val dx = entity.boundingBox.center.x - status.pos.x
+            val dy = entity.boundingBox.center.y - status.pos.y
+            val dz = entity.boundingBox.center.z - status.pos.z
             // entity.x 是 Double、status.pos.x 是 Float → 表达式本身已是 Double，无需再 toDouble()
             val distSq = dx * dx + dy * dy + dz * dz
-            if (distSq < nearestDistSq) {
+            if (distSq <= adjustedRange * adjustedRange && distSq < nearestDistSq) {
                 nearestDistSq = distSq
                 nearestEntity = entity
             }
@@ -127,9 +127,9 @@ class Tracking(
 
             // 计算从投射物指向目标实体的方向向量（单位向量）
             val direction = Vector3f(
-                (target.x - status.pos.x).toFloat(),
-                (target.y - status.pos.y).toFloat(),
-                (target.z - status.pos.z).toFloat()
+                (target.boundingBox.center.x - status.pos.x).toFloat(),
+                (target.boundingBox.center.y - status.pos.y).toFloat(),
+                (target.boundingBox.center.z - status.pos.z).toFloat()
             )
             if (direction.lengthSquared() < 1e-8f) return@let
             direction.normalize()

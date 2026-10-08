@@ -26,14 +26,16 @@ class Wand(var id: String) {
     /** 法力上限 */
     var mana: Double = 3000.0
 
-    /** **施放延迟**（秒）：每发之间的最小间隔，与卡牌自己累加的 delay 取大值，见 [spell] */
-    var delaySeconds: Double = 0.0
+    /** **施放延迟**（刻）：每发之间的最小间隔，与卡牌自己累加的 delay 取大值，见 [spell] */
+    var delayTickCount: Double = 0.0
+        set(value) { field = kotlin.math.ceil(value.coerceAtLeast(0.0)) }
 
-    /** **充能时间**（秒）：抽牌堆抽空之后的重装时间，见 [reloadIfNeeded] */
-    var rechargeSeconds: Double = 0.0
+    /** **充能时间**（刻）：抽牌堆抽空之后的重装时间，见 [reloadIfNeeded] */
+    var rechargeTickCount: Double = 0.0
+        set(value) { field = kotlin.math.ceil(value.coerceAtLeast(0.0)) }
 
-    /** 每秒充能（回蓝） */
-    var charge: Double = 1000.0
+    /** 每刻充能（回蓝）。 */
+    var charge: Double = 50.0
 
     /** 每回施放几个法术（创建时按等级权重掷出，1 的权重最高） */
     var cast = 1
@@ -68,10 +70,7 @@ class Wand(var id: String) {
 
     data class Status(
         var mana: Double = 0.0,
-        /**
-         * 施法冷却（**小数 tick**）：卡牌贡献整数 tick，法杖自己的 [delayMs]/[rechargeMs] 折成小数，
-         * 两者取大/累加。每 tick 递减 1.0，`≤ 0` 表示可以施法；**负的零头会被保留**用于余数累加（见 [spell]）。
-         */
+        /** 冷却按完整刻计数，到零就绪，不保留负余数。 */
         var delay: Double = 0.0,
         var recharge: Double = 0.0,
         var lastDelay: Double = 0.0,
@@ -81,11 +80,11 @@ class Wand(var id: String) {
     )
     var status: Status = Status()
 
-    /** 本杖的**施放延迟**（tick，含小数）：[delaySeconds] × 20 */
-    fun delayTicks(): Double = delaySeconds * TICKS_PER_SECOND
+    /** 本杖施放延迟（完整刻）。 */
+    fun delayTicks(): Double = kotlin.math.ceil(delayTickCount.coerceAtLeast(0.0))
 
-    /** 本杖的**充能时间**（tick，含小数）：[rechargeSeconds] × 20 */
-    fun rechargeTicks(): Double = rechargeSeconds * TICKS_PER_SECOND
+    /** 本杖充能时间（完整刻）。 */
+    fun rechargeTicks(): Double = kotlin.math.ceil(rechargeTickCount.coerceAtLeast(0.0))
 
     /**
      * 按掷出的数值初始化一根**新**法杖（等级 + 变体 + 抽牌），见 [WandTier]。
@@ -95,9 +94,9 @@ class Wand(var id: String) {
      */
     fun applyStats(stats: WandStats) {
         mana = stats.maxMana
-        charge = stats.manaPerSecond
-        delaySeconds = stats.delaySeconds
-        rechargeSeconds = stats.rechargeSeconds
+        charge = stats.manaPerTick
+        delayTickCount = stats.delayTickCount
+        rechargeTickCount = stats.rechargeTickCount
         size = stats.size
         cast = stats.cast
     }
@@ -154,18 +153,13 @@ class Wand(var id: String) {
             status.failedReason.add("Recharge ${fmt(status.recharge)}/${fmt(rechargeTicks())}")
             return false
         }
-        // 余数累加（第 26 轮加等级表时引入）：冷却**不归零**，而是保留「已经过去的零头」。
-        // 计数器是小数 tick，一次 240 ms 的间隔（4.8 tick）会走成 5/5/5/5/4 tick 交替、长期平均正好 4.8
-        // ——单次间隔仍是整数 tick（客户端每 tick 只能施法一次，这是硬底线），但**平均节奏精确到毫秒**。
-        val delayResidual = min(0.0, status.delay)
-        val rechargeResidual = min(0.0, status.recharge)
         status.delay = 0.0
         status.recharge = 0.0
         draw(cast)
         castHand(caster, hand)
-        // 法杖自己的 delay 是**最小间隔**（与卡牌累加出来的值取大），再叠上余数
-        status.delay = max(status.delay, delayTicks()) + delayResidual
-        status.recharge += rechargeResidual
+        // 法杖自己的delay是完整刻最小间隔，与卡牌累加值取大。
+        status.delay = max(status.delay, delayTicks()).coerceAtLeast(0.0)
+        status.recharge = status.recharge.coerceAtLeast(0.0)
         status.lastDelay = status.delay
         status.lastRecharge = status.recharge
         work.nekow.primalspells.magic.effect.visual.WandCastingFx.cooldownsChanged(caster, this)
@@ -367,6 +361,8 @@ class Wand(var id: String) {
      */
     fun tick(caster: Entity? = null, level: ServerLevel? = null) {
         if (caster != null) {
+            // 显式被动驱动也是持有证据：盔甲架等实体不一定触发物品inventoryTick。
+            WandManager.markHeld(WandID(id), caster.uuid, caster.level().gameTime)
             val pm = status.particleManager
             if (pm?.level != caster.level()) {
                 status.particleManager = ParticleManager.of(caster.level())
@@ -383,10 +379,10 @@ class Wand(var id: String) {
             }
             return
         }
-        // 小数 tick：>0 才递减，因此 ≤0 的负余数会一直留到下一次施法（见 [spell] 的余数累加）
-        if (status.delay > 0.0) status.delay -= 1.0
-        if (status.recharge > 0.0) status.recharge -= 1.0
-        if (status.mana < mana) status.mana = min(mana, status.mana + charge / 20)
+        // 完整刻倒计时到零，避免延迟和充能出现负余数。
+        status.delay = (status.delay - 1.0).coerceAtLeast(0.0)
+        status.recharge = (status.recharge - 1.0).coerceAtLeast(0.0)
+        if (status.mana < mana) status.mana = min(mana, status.mana + charge)
 
         // 被动「未被持有」通知：闲置分支跑在 ServerTickEvent.Pre（实体 tick 之前），
         // 因此「本 tick 被持有」时 lastPassiveTick 恰为 gameTime - 1；大于 1 说明持有者已离开。
@@ -414,9 +410,9 @@ class Wand(var id: String) {
         val tag = CompoundTag()
         tag.putString("id", id)
         tag.putDouble("mana", mana)
-        tag.putDouble("delay_sec", delaySeconds)
-        tag.putDouble("recharge_sec", rechargeSeconds)
-        tag.putDouble("charge", charge)
+        tag.putInt("delay_ticks", delayTicks().toInt())
+        tag.putInt("recharge_ticks", rechargeTicks().toInt())
+        tag.putDouble("charge_tick", charge)
         tag.putInt("cast", cast)
         tag.putInt("size", size)
         tag.putDouble("status_mana", status.mana)
@@ -524,11 +520,11 @@ class Wand(var id: String) {
     }
 
     companion object {
-        /** 服务端固定 20 tick/s：秒 ↔ tick 的**唯一**换算点（第 28 轮口径从毫秒改成秒）。 */
+        /** 服务端固定20刻/秒；仅供旧存档边界换算。 */
         const val TICKS_PER_SECOND = 20.0
 
-        /** 冷却诊断字符串用的格式化（一位小数，够看清余数） */
-        private fun fmt(v: Double): String = "%.1f".format(v)
+        /** 冷却诊断字符串使用完整刻 */
+        private fun fmt(v: Double): String = v.toInt().toString()
 
         /**
          * 从 NBT 反序列化重建法杖对象。
@@ -542,22 +538,19 @@ class Wand(var id: String) {
         fun fromTag(tag: CompoundTag): Wand {
             val wand = Wand(tag.getStringOr("id", ""))
             wand.mana = tag.getDoubleOr("mana", 0.0)
-            // 单位沿革：`delay`(整数 tick，第 27 轮前) → `delay_ms`(第 27 轮) → `delay_sec`(第 28 轮)。
-            // 两级都往下迁移；`getDoubleOr` 接受任意数值型 NBT，所以旧的 int tick 也能直接读。
-            wand.delaySeconds = tag.getDoubleOr(
-                "delay_sec",
-                tag.getDoubleOr("delay_ms", tag.getIntOr("delay", 0) * 1000.0) / 1000.0,
-            )
-            wand.rechargeSeconds = tag.getDoubleOr(
-                "recharge_sec",
-                tag.getDoubleOr("recharge_ms", tag.getIntOr("recharge", 0) * 1000.0) / 1000.0,
-            )
-            wand.charge = tag.getDoubleOr("charge", 0.0)
+            // 新存档刻优先；旧秒/毫秒只在读档边界换算，旧delay整数本来就是刻。
+            fun readTicks(name: String): Double = kotlin.math.ceil(tag.getDoubleOr(name + "_ticks",
+                if (tag.contains(name + "_sec")) tag.getDoubleOr(name + "_sec", 0.0) * 20
+                else if (tag.contains(name + "_ms")) tag.getDoubleOr(name + "_ms", 0.0) / 50
+                else tag.getDoubleOr(name, 0.0)).coerceAtLeast(0.0))
+            wand.delayTickCount = readTicks("delay")
+            wand.rechargeTickCount = readTicks("recharge")
+            wand.charge = tag.getDoubleOr("charge_tick", tag.getDoubleOr("charge", 0.0) / 20.0)
             wand.cast = tag.getIntOr("cast", 1)
             wand.size = tag.getIntOr("size", 9)
             wand.status.mana = tag.getDoubleOr("status_mana", 0.0)
-            wand.status.delay = tag.getDoubleOr("status_delay", 0.0)
-            wand.status.recharge = tag.getDoubleOr("status_recharge", 0.0)
+            wand.status.delay = kotlin.math.ceil(tag.getDoubleOr("status_delay", 0.0).coerceAtLeast(0.0))
+            wand.status.recharge = kotlin.math.ceil(tag.getDoubleOr("status_recharge", 0.0).coerceAtLeast(0.0))
             tag.getListOrEmpty("innate").forEach {
                 MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.innate += m }
             }

@@ -20,12 +20,18 @@ object PixelVfx {
         group?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
     }
 
-    /** 已有批次交给PD组播放有限收束，本侧不再逐tick驱动；用于场结束的剩余片元。 */
+    /** 飞散碎片只收片元尺寸，保留原速度与位置，不把整批拉回场心。 */
     fun retireBatch(manager: ParticleManager, batch: ParticleBatch?, center: Vec3, ticks: Int = 6) {
         if (batch == null || batch.isEmpty()) return
-        val group = manager.createGroup(center)
-        batch.handles().forEach { group.add(it) }
-        retire(group, ticks)
+        val handles = batch.handles().toList()
+        handles.forEach { it.resize(0f, ticks, EasingType.EASE_IN_OUT) }
+        work.nekow.primalspells.util.Deferred.after(manager.level, ticks + 2) { handles.forEach { it.remove() } }
+    }
+
+    /** 破裂时径向外移和片元熄灭同时进行；抵消scale的几何内缩，轮廓只向外打开。 */
+    fun shatter(group: ParticleGroup?, ticks: Int = 5, radiusScale: Float = 1f) {
+        group?.moveAlongOffset(radiusScale * 2f, ticks, EasingType.EASE_IN_OUT)
+            ?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
     }
 
     /** 碎屑保持运动，单片起落并错峰结束；不把几何整体缩向轴心。 */
@@ -33,14 +39,16 @@ object PixelVfx {
               speed: Double = 0.25, life: Int = 16, gravity: Double = 0.015, spread: Double = 0.12) {
         val specs = ArrayList<ParticleSpawnSpec>()
         val velocities = ArrayList<Vec3>()
-        ParticleShapes.fibonacciSphere(count).forEachIndexed { i, d ->
+        val turn = manager.level.random.nextDouble() * PI * 2
+        ParticleShapes.fibonacciSphere(count).forEachIndexed { i, direction ->
+            val d = Vec3(direction.x * cos(turn) - direction.z * sin(turn), direction.y, direction.x * sin(turn) + direction.z * cos(turn))
             specs += ParticleSpawnSpec().position(center.add(d.scale(spread)))
                 .color(if (i % 7 == 0) Color.ofInt(240, 250, 255) else color)
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(
                     if (i % 5 == 0) 0.1875f else 0.0625f, if (i % 5 == 0) 0.0625f else 0.0625f)
                     .glowing(true).spin(i * 0.37))
                 .lifetime(life + i % 13).sizeCurve(*lifeKeys(life + i % 13))
-            velocities += d.scale(speed * (0.55 + i % 9 / 12.0)).add(0.0, 0.06, 0.0)
+            velocities += d.scale(speed * (0.55 + manager.level.random.nextDouble() * 0.8)).add(0.0, 0.06, 0.0)
         }
         val batch = ParticleBatch(manager).also { it.addAll(manager.spawnAll(specs)) }
         batch.setVelocityAll(velocities)

@@ -28,7 +28,7 @@ class TeleportProjectile : Projectile() {
         mana = 4.0
         delay = 0
         recharge = 0
-        maxAge = 100
+        maxAge = 60
         speed = 1.0f
         hitRadius = 0.2
         effects += Trajectory(Color.of(0.6f, 0.3f, 1f))

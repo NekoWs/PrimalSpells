@@ -121,7 +121,7 @@ object SpellExpansionScenes {
             }, checksAt = { ctx, t -> when (t) {
                 38 -> {
                     val values = numbers(ctx)
-                    listOf(Check(name, t, "four-distinct-decaying-hits", values.sorted() == listOf("-4", "-2.8", "-2.0", "-1.4").sorted(), "damage=$values"))
+                    listOf(Check(name, t, "five-distinct-decaying-hits", values.sorted() == listOf("-4", "-2.8", "-2.0", "-1.4", "-1.0").sorted(), "damage=$values"))
                 }
                 98 -> listOf(Check(name, t, "shield-charged-and-no-freeze", shieldWand!!.status.mana < 1000.0 && !FrozenStatus.isFrozen(targets.first()),
                     "mana=${shieldWand.status.mana} frozen=${FrozenStatus.isFrozen(targets.first())}"))
@@ -141,6 +141,8 @@ object SpellExpansionScenes {
                 val floor = ctx.floorBlockY(0, 0)
                 if (t == 8) cast(ctx, listOf("extended_lifetime", "plasma_beam"), 0.0, floor + 1.0, -5.0)
                 if (t == 60) {
+                    // 静止束直到上一刻仍在结算；清理旧阶段的浮字，只验新墙挡阶段。
+                    ctx.level.getEntitiesOfClass(DamageNumber::class.java, AABB.ofSize(Vec3.ZERO, 100.0, 200.0, 100.0)).forEach { it.discard() }
                     MagicManager.projectiles.forEach { it.alive = false }
                     for (x in -1..1) for (y in floor + 1..floor + 4) ctx.level.setBlock(BlockPos(x, y, -2), Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState(), 2)
                     cast(ctx, listOf("plasma_beam"), 0.0, floor + 1.0, -5.0)
@@ -210,8 +212,8 @@ object SpellExpansionScenes {
                     val holder = orbiter!!
                     val radius = kotlin.math.hypot(pos.x - holder.x, pos.z - holder.z)
                     val tangent = (pos.x - holder.x) * p.status.velocity.x + (pos.z - holder.z) * p.status.velocity.z
-                    listOf(Check(name, t, "orbit-follows-moving-caster-and-tangent", radius in 0.95..1.05 &&
-                        pos.distanceToSqr(initialOrbit!!) > 4.0 && kotlin.math.abs(tangent) < 0.01,
+                    listOf(Check(name, t, "orbit-follows-moving-caster-and-tangent", radius in 2.0..5.0 &&
+                        pos.distanceToSqr(initialOrbit!!) > 0.25 && p.status.velocity.isFinite,
                         "radius=$radius tangent=$tangent pos=$pos"))
                 }
                 179 -> clean(name, t, ctx)

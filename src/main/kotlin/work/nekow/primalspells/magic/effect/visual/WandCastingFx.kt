@@ -31,7 +31,6 @@ object WandCastingFx {
         var expires = Long.MAX_VALUE
         var lastDelay = -1.0
         var lastRecharge = -1.0
-        private var lastPosition = player.position()
         private var delayFx: ParticleGroup? = null
         private var rechargeFx: ParticleGroup? = null
         val ready: Boolean get() = level.gameTime - started >= EQUIP_TICKS
@@ -40,7 +39,7 @@ object WandCastingFx {
         init {
             group(72, 0.09375f, """
                 lane=floor(3*i/n);q=3*i/n-lane;
-                theta=PI/2+lane*2*PI/3;
+                theta=PI/2+lane*2*PI/3+t*0.00015;
                 ax=cos(theta)*1.2;az=sin(theta)*1.2;
                 bx=cos(theta+2*PI/3)*1.2;bz=sin(theta+2*PI/3)*1.2;
                 scatter=sin(i*91.71)*0.5+0.5;
@@ -54,7 +53,7 @@ object WandCastingFx {
             // 角点锁印沿地面缓慢呼吸；杖首idle由原生模型模块承担，避免眼锚误充手锚。
             group(24, 0.09375f, """
                 lane=floor(i/8);node=i-lane*8;angle=node*PI/4;
-                theta=PI/2+lane*2*PI/3;
+                theta=PI/2+lane*2*PI/3+t*0.00015;
                 rad=0.15+0.015*sin(t*0.0016+lane*2*PI/3);
                 x=fx+cos(theta)*1.2+cos(angle)*rad;
                 y=fy+0.025;z=fz+sin(theta)*1.2+sin(angle)*rad;
@@ -68,7 +67,7 @@ object WandCastingFx {
         /** 白色内边束印逐段回收：法杖正在恢复下一次释放能力。 */
         private fun newDelayFx(): ParticleGroup = group(72, 0.09375f, """
                 lane=floor(3*i/n);q=3*i/n-lane;
-                theta=PI/2+lane*2*PI/3;
+                theta=PI/2+lane*2*PI/3+t*0.00015;
                 ax=cos(theta)*1.07;az=sin(theta)*1.07;
                 bx=cos(theta+2*PI/3)*1.07;bz=sin(theta+2*PI/3)*1.07;
                 done=min(1,max(0,(t-delayEnd)/150));done=done*done*(3-2*done);
@@ -82,7 +81,7 @@ object WandCastingFx {
         /** 蓝色外边导槽由三顶点充满；充满后并回主法阵，表示牌堆已完成回充。 */
         private fun newRechargeFx(): ParticleGroup = group(72, 0.09375f, """
                 lane=floor(3*i/n);q=3*i/n-lane;
-                theta=PI/2+lane*2*PI/3;
+                theta=PI/2+lane*2*PI/3+t*0.00015;
                 done=min(1,max(0,(t-rechargeEnd)/175));done=done*done*(3-2*done);
                 appear=min(1,max(0,(t-rechargeStart)/75));appear=appear*appear*(3-2*appear);
                 rad=1.32-done*0.12;
@@ -107,11 +106,10 @@ object WandCastingFx {
                 .setVariable("delayStart", -1.0e12).setVariable("rechargeStart", -1.0e12)
                 .setVariable("delayDuration", 1.0).setVariable("rechargeDuration", 1.0)
                 .setVariable("delayOn", 0.0).setVariable("rechargeOn", 0.0)
-                .setVariable("presence", 1.0).setVariable("footX", player.x)
-                .setVariable("footY", player.y).setVariable("footZ", player.z).setVariable("delayEnd", 1.0e12).setVariable("rechargeEnd", 1.0e12)
-            group.expression("""
+                .setVariable("presence", 1.0).setVariable("delayEnd", 1.0e12).setVariable("rechargeEnd", 1.0e12)
+            group.defineEntity("holder", player.uuid).expression("""
                 now=t+clockOffset;
-                fx=footX;fy=footY+0.06;fz=footZ;
+                fx=get_entity_x(holder);fy=get_entity_y(holder)+0.06;fz=get_entity_z(holder);
                 remaining=presence;fade=1-presence;
                 dp=min(1,max(0,(now-delayStart)/delayDuration));
                 rp=min(1,max(0,(now-rechargeStart)/rechargeDuration));
@@ -121,17 +119,8 @@ object WandCastingFx {
             return group
         }
 
-        /** 位置样本缓动交给PD；退场中的法阵也继续跟随玩家。 */
-        fun followPosition() {
-            val current = player.position()
-            if (current == lastPosition) return
-            groups.forEach {
-                it.setVariableInterpolated("footX", current.x.toString(), 1)
-                    .setVariableInterpolated("footY", current.y.toString(), 1)
-                    .setVariableInterpolated("footZ", current.z.toString(), 1)
-            }
-            lastPosition = current
-        }
+        /** PD实体getter直接采样位置，原生粒子桥负责位置插值。 */
+        fun followPosition() { }
 
         fun update() {
             followPosition()

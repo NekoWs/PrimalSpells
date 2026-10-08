@@ -26,17 +26,18 @@ import work.nekow.primalspells.magic.effect.BaseEffect
  */
 class Explosion(
     val onHit: Boolean = true,
-    val onDeath: Boolean = false
+    val onDeath: Boolean = false,
+    val bounceOnly: Boolean = false
 ) : BaseEffect() {
     private var terminalHit = false
 
     override fun onHitEntity(target: Entity) {
-        if (onHit) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
+        if (onHit && !bounceOnly) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
         if (onHit && !projectile.alive) terminalHit = true
     }
 
     override fun onHitBlock(pos: Vector3f) {
-        if (onHit) customExplode(caster, pos, status.explosionRadius, status.explosionDamage, shot = projectile)
+        if (onHit && (!bounceOnly || projectile.alive)) customExplode(caster, pos, status.explosionRadius, status.explosionDamage, shot = projectile)
         if (onHit && !projectile.alive) terminalHit = true
     }
 
@@ -76,7 +77,7 @@ class Explosion(
             )
 
             // 2. 爆发表现（原版爆炸粒子已删除；第 32 轮起没有蓄力，触发即爆）
-            ExplosionFx.burst(ParticleManager.of(serverLevel), Vec3(cx, cy, cz), radius)
+            ExplosionFx.burst(ParticleManager.of(serverLevel), Vec3(cx, cy, cz), radius, shot?.id ?: "explosion")
 
             // 3. 实体伤害 + 击退
             if (damage > 0.0) {

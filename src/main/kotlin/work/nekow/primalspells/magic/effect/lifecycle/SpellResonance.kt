@@ -23,7 +23,7 @@ class SpellResonance : BaseEffect() {
         val manager = ParticleManager.of(level)
         val center = pos()
         val count = projectile.modifiers.values.sum()
-        if (status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
+        if (projectile.id !in setOf("laser", "plasma_beam", "chain_bolt") && status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
             PixelVfx.burst(manager, center, tint(), 8 + count * 3, 0.045, 4, 0.0)
         }
         // 护盾卡也能包裹发射出去的法术：真实反射敌方魔法弹，归属改为当前施法者。
@@ -59,8 +59,7 @@ class SpellResonance : BaseEffect() {
         if (result.entity != null && projectile.effects.none { it is Hurt || it is DirectDamage || it is Explosion }
             && ("damage_boost" in projectile.modifiers || status.freezeTicks > 0))
             SpellDamage.hit(level, result.entity, projectile, status.damage.coerceAtLeast(1.0))
-        PixelVfx.ring(ParticleManager.of(level), p, projectile.launchDirection, 0.2, tint(), 10, 4f)
-        PixelVfx.burst(ParticleManager.of(level), p, tint(), 48 + projectile.modifiers.values.sum() * 12, 0.22, 12)
+        PixelVfx.burst(ParticleManager.of(level), p, tint(), if (projectile.id == "laser") 16 else 48 + projectile.modifiers.values.sum() * 12, if (projectile.id == "laser") 0.1 else 0.22, if (projectile.id == "laser") 5 else 12)
     }
     private fun tint(): Color = when {
         status.freezeTicks > 0 -> Color.ofInt(128, 222, 255)

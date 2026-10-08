@@ -9,7 +9,7 @@ import work.nekow.primalspells.magic.effect.visual.Trajectory
 import work.nekow.primalspells.util.Lore
 
 /**
- * 延迟施法，死亡时以施法朝向释放 payload 中的法术。
+ * 延迟施法，寿命耗尽的当刻以施法朝向释放 payload 中的法术。
  */
 class DelayedCastProjectile : Projectile(), TriggerSpell {
 

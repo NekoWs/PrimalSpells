@@ -8,7 +8,7 @@ class PlasmaBeamProjectile : Projectile() {
     override val id = "plasma_beam"
     override val bodyColor = Color.ofInt(76, 216, 255)
     init {
-        mana = 30.0; delay = 40; maxAge = 40; speed = 0.12f; dragCoeff = 0f
+        mana = 30.0; delay = 40; maxAge = 40; speed = 0f; dragCoeff = 0f
         status.damage = 1.5
         effects += PlasmaBeam()
     }

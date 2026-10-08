@@ -83,12 +83,12 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 
 `Modifier : Magic`，唯一的额外 API 是 `effects(): List<BaseEffect>`——返回**克隆后**的 effect 列表。
 
-`magic/modifier/` 下 28 个实现分两类：
+`magic/modifier/` 下 27 个实现分两类：
 
 1. **纯注入**：在 `init` 里 `effects += SomeEffect(...)`（如 `Homing` → `Tracking`、`MoreBounce` → `Bounce(8)`）；
 2. **匿名效果**：在 `init` 里 `effects += object : BaseEffect() { override fun onActive() { … } }`，直接改 `status`/`projectile` 的字段（如 `Diffusion` 放大爆炸半径、`Piercing` 改 `maxHitTargets`）。
 
-另有 4 个会**生成新投射物**（`ClusterBomb`、`ExplosionProjectile`、`BounceDuplicate`、`QuantumEntanglement`）——它们语义上更接近「法术」而非「修饰器」，但通过继承 `Modifier` 借用了手牌结算流程（结构债见 [issues/open.md](issues/open.md) 1.2）。
+另有 3 个会**生成新投射物**（`ExplosionProjectile`、`BounceDuplicate`、`QuantumEntanglement`）——它们语义上更接近「法术」而非「修饰器」，但通过继承 `Modifier` 借用了手牌结算流程（结构债见 [issues/open.md](issues/open.md) 1.2）。
 
 ### 2.4 `BaseEffect` 与 14 个实现（`magic/effect/`）
 
@@ -458,3 +458,11 @@ WandCastingFx.origin是汇聚点与持杖弹体出生点的共同来源；普通
 ## 第57轮：宝石出生点与有限退场
 
 持杖玩家出生点改到视线前方0.85格、视线上方0.25格、手侧0.38格；模型、汇聚与发射共用位置口径。施法迸发只在成功释放第一枚投射物后触发，不改牌堆/伤害/冷却语义。持杖会话切换从立即销毁改为16tick有限退场；死亡、跨维度、登出和停止仍立即取消，包括尚在退场的会话。
+
+## 第63轮运行时契约补充
+
+轨道类`SelfOrbit/SphereOrbit/QuantumEntanglement`改为`GUIDANCE`：SETUP→MODIFIER→GUIDANCE→Move扫掠→OVERRIDE→VISUAL。轨道不能在Move之后瞬移覆盖坐标，否则复制体沿实际轨道没有命中判定。GUIDANCE出生排序在数值修正之后，量子复制体分别从±2.2格偏移出生；复制体保留独立effects和联动死亡。
+
+寿命计数达到maxAge的当刻，MagicManager先转发一次`onExpire`，再标记死亡；下一刻的`onDie`只做清理。DelayedTrigger仅从onExpire消费一次payload，提前碰撞/强制清理不冒充到期触发。实体命中不扣bounces，只有方块反弹扣次数；BounceExplosion仅响应成功方块弹跳。
+
+法杖时间统一完整刻，回蓝为每刻；存档迁移与余数取消见[design/wand-tiers.md](design/wand-tiers.md)。穿刺扫掠每个子步使用不变起点，实体命中回调更新status.pos不得改变后续子步的积分基准。

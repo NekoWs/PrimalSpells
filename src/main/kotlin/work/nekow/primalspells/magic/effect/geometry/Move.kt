@@ -46,7 +46,8 @@ class Move(
         val scale = 1 / (1 + dragCoeff * speed)
         val movement = Vector3f(status.velocity).mul(scale)
         status.velocity = Vector3f(movement)
-        val newPos = Vector3f(movement).add(status.pos)
+        val startPos = Vector3f(status.pos)
+        val newPos = Vector3f(movement).add(startPos)
 
         if (!projectile.collisionEnabled || (throughBlocks && hitRadius <= 0.0)) {
             status.pos = newPos
@@ -77,10 +78,10 @@ class Move(
                     emptyList()
                 }
 
-                var prevPos = Vector3f(status.pos)
+                var prevPos = Vector3f(startPos)
                 for (i in 1..steps) {
                     val t = min(i * stepSize, distance)
-                    val checkPos = Vector3f(stepVec).mul(t).add(status.pos)
+                    val checkPos = Vector3f(stepVec).mul(t).add(startPos)
 
                     if (checkEntities) {
                         val px = checkPos.x.toDouble()

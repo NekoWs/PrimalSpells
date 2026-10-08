@@ -125,6 +125,9 @@ abstract class Magic {
         onDie()
     }
 
+    /** 寿命耗尽的当刻通知，不与提前碰撞死亡混淆。 */
+    fun expire() { effects.forEach { it.onExpire() } }
+
     open fun onSpell() { }
     open fun onDie() { }
 

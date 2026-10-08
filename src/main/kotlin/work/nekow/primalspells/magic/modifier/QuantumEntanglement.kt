@@ -24,7 +24,7 @@ class QuantumEntanglement : Modifier() {
     override val id = "quantum_entanglement"
 
     /** 环绕半径 */
-    private val orbitRadius = 1.0f
+    private val orbitRadius = 2.2f
 
     /** 环绕角速度（弧度/tick） */
     private val angularSpeed = 0.3f
@@ -97,13 +97,14 @@ class QuantumEntanglement : Modifier() {
         private val verticalFactor: Float,
         private val link: EntanglementLink,
     ) : BaseEffect() {
-        /** 绝对定位：必须在 `Move` 积分之后写位置，否则会被积分位移叠加（见 EffectPhase.OVERRIDE）。 */
-        override val phase = EffectPhase.OVERRIDE
+        /** 给Move真实轨道位移，复制体沿轨道扫掠并正常命中。 */
+        override val phase = EffectPhase.GUIDANCE
 
         private var orbitPhase = 0f
 
         override fun onActive() {
             orbitPhase = phaseOffset
+            status.pos.add(radius * cos(orbitPhase), 0f, radius * sin(orbitPhase))
         }
 
         override fun onTick() {
@@ -123,9 +124,7 @@ class QuantumEntanglement : Modifier() {
             val dy = radius * verticalFactor * sin(orbitPhase * 2f)
             val dz = radius * sin(orbitPhase)
 
-            status.pos.set(cx + dx, cy + dy, cz + dz)
-            // 复制体靠绝对定位移动，速度只影响拖尾方向：置零让它退化为原地氛围粒子
-            status.velocity.set(0f, 0f, 0f)
+            status.velocity.set(cx + dx, cy + dy, cz + dz).sub(status.pos)
         }
     }
 }

@@ -84,7 +84,7 @@ class CrystalReaction : BaseEffect() {
     }
 
     override fun onDie() {
-        work.nekow.primalspells.magic.effect.visual.PixelVfx.retire(group, 5)
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.shatter(group, 5, projectile.areaScale.toFloat())
         level?.let { world -> work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world),
             Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()),
             if (status.freezeTicks > 0) Color.ofInt(119, 213, 240) else Color.ofInt(114, 216, 185), 144, 0.25, 16) }

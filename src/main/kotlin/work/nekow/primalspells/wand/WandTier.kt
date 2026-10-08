@@ -25,8 +25,8 @@ private val CAST_HIGH = listOf(1 to 40, 2 to 20, 3 to 15, 4 to 10, 5 to 8, 6 to 
  *
  * | 概念 | `Wand` 字段 | 含义 |
  * |---|---|---|
- * | **施放延迟** | [delayMs] → `Wand.delayMs` | 每发之间的**最小间隔**（与卡牌累加出来的值取大）——“手速上限” |
- * | **充能时间** | [rechargeMs] → `Wand.rechargeMs` | **抽牌堆抽空之后的重装时间**——“一梭子打完要喘多久” |
+ * | **施放延迟** | [delayTickCount] → `Wand.delayTickCount` | 每发之间的**最小间隔**（与卡牌累加出来的值取大）——“手速上限” |
+ * | **充能时间** | [rechargeTickCount] → `Wand.rechargeTickCount` | **抽牌堆抽空之后的重装时间**——“一梭子打完要喘多久” |
  *
  * 两者都随等级下降，但**不是同一个数**：充能时间约为施放延迟的 3 倍。
  * 低等级杖槽位少、抽空得频繁，再加上重装慢 —— 早期手感是"打几发就得喘一口"。
@@ -38,14 +38,13 @@ private val CAST_HIGH = listOf(1 to 40, 2 to 20, 3 to 15, 4 to 10, 5 to 8, 6 to 
  * - 顶级（[DEBUG]）：`3000 / 1000 / 0` —— 只作调试，不在六级曲线里
  *
  * 六级都落在「约 2.7–3.1 秒回满」附近：等级涨的是**池子深度**与**节奏**，不是"回蓝快多少"。
- * 时间值都用**毫秒**表达：内部按 `ms / 50` 折成小数 tick，配合冷却计数器的负余数累加
- * （见 `Wand.spell`），长期平均节奏能精确到毫秒；单次间隔仍是整数 tick（客户端每 tick 只能施法一次）。
+ * 时间值使用完整刻，变体乘法后向上对齐；不再交替间隔补余数。
  *
  * @param itemName 物品注册名（`item.primalspells.<itemName>` 就是显示名）
  * @param maxMana 法力上限
- * @param manaPerSecond 每秒充能（回蓝）
- * @param delayMs **施放延迟**：每发之间的最小间隔（毫秒）
- * @param rechargeMs **充能时间**：抽牌堆抽空后的重装时间（毫秒）
+ * @param manaPerTick 每刻充能（回蓝）
+ * @param delayTickCount **施放延迟**：每发之间的最小间隔（刻）
+ * @param rechargeTickCount **充能时间**：抽牌堆抽空后的重装时间（刻）
  * @param size 法术槽位数
  * @param castRolls 施放数的加权掷点表（`施放数 to 权重`）：施放 > 1 会让某些法术链难以使用
  *   （例如无法回绕），所以 **1 的权重最高**，高等级才允许掷出大数字
@@ -54,9 +53,9 @@ enum class WandTier(
     val level: Int,
     val itemName: String,
     val maxMana: Double,
-    val manaPerSecond: Double,
-    val delaySeconds: Double,
-    val rechargeSeconds: Double,
+    val manaPerTick: Double,
+    val delayTickCount: Double,
+    val rechargeTickCount: Double,
     val size: Int,
     private val castRolls: List<Pair<Int, Int>>,
 ) {
@@ -67,22 +66,22 @@ enum class WandTier(
      * **整体强度由法杖限制**。还原 Noita 的强度系统」—— 即法杖负责节奏与总闸（施放延迟 / 充能时间 /
      * 法力 / 回蓝），法术只负责"单发打多少、耗多少蓝"。节奏紧的法术卡不会把法杖的延迟顶上去。
      */
-    T1(1, "wand_t1", 80.0, 30.0, 0.50, 1.00, 6, CAST_LOW),
+    T1(1, "wand_t1", 80.0, 1.5, 10.0, 20.0, 6, CAST_LOW),
 
     /** 见习杖 */
-    T2(2, "wand_t2", 120.0, 45.0, 0.46, 0.90, 8, CAST_LOW),
+    T2(2, "wand_t2", 120.0, 2.25, 10.0, 18.0, 8, CAST_LOW),
 
     /** 学徒杖：用户口径的"初期"（约 100 法力 / <80 充能 / ≥10 tick 延迟）就落在这里 */
-    T3(3, "wand_t3", 180.0, 60.0, 0.42, 0.80, 10, CAST_LOW),
+    T3(3, "wand_t3", 180.0, 3.0, 9.0, 16.0, 10, CAST_LOW),
 
     /** 法师杖 */
-    T4(4, "wand_t4", 240.0, 80.0, 0.38, 0.70, 12, CAST_HIGH),
+    T4(4, "wand_t4", 240.0, 4.0, 8.0, 14.0, 12, CAST_HIGH),
 
     /** 大师杖：用户口径的"中后期"（300 / 100 / ~5 tick） */
-    T5(5, "wand_t5", 300.0, 100.0, 0.34, 0.60, 14, CAST_HIGH),
+    T5(5, "wand_t5", 300.0, 5.0, 7.0, 12.0, 14, CAST_HIGH),
 
     /** 大法师杖 */
-    T6(6, "wand_t6", 450.0, 140.0, 0.30, 0.50, 16, CAST_HIGH),
+    T6(6, "wand_t6", 450.0, 7.0, 6.0, 10.0, 16, CAST_HIGH),
 
     /**
      * **调试杖**（`item.primalspells.wand`）：3000 / 1000 / 0 / 0 / 18 槽全抽 1。
@@ -90,7 +89,7 @@ enum class WandTier(
      * 刻意留在六级曲线之外：它是开发期用来隔离变量的（法力管够、零延迟），
      * 录制场景与测试指令都依赖它。正常玩法里拿不到（只有创造模式物品栏与 `/primalspells wand debug`）。
      */
-    DEBUG(0, "wand", 3000.0, 1000.0, 0.0, 0.0, 18, listOf(1 to 1));
+    DEBUG(0, "wand", 3000.0, 50.0, 0.0, 0.0, 18, listOf(1 to 1));
 
     /** 显示名（物品名）：`item.primalspells.<itemName>` */
     val displayKey: String get() = "item.primalspells.$itemName"
@@ -152,9 +151,9 @@ data class WandStats(
     val tier: WandTier,
     val variant: WandVariant,
     val maxMana: Double,
-    val manaPerSecond: Double,
-    val delaySeconds: Double,
-    val rechargeSeconds: Double,
+    val manaPerTick: Double,
+    val delayTickCount: Double,
+    val rechargeTickCount: Double,
     val size: Int,
     val cast: Int,
 ) {
@@ -164,9 +163,9 @@ data class WandStats(
             tier = tier,
             variant = variant,
             maxMana = tier.maxMana * variant.manaMul,
-            manaPerSecond = tier.manaPerSecond / variant.chargeDiv,
-            delaySeconds = tier.delaySeconds * variant.delayMul,
-            rechargeSeconds = tier.rechargeSeconds * variant.delayMul,
+            manaPerTick = tier.manaPerTick / variant.chargeDiv,
+            delayTickCount = kotlin.math.ceil(tier.delayTickCount * variant.delayMul),
+            rechargeTickCount = kotlin.math.ceil(tier.rechargeTickCount * variant.delayMul),
             size = tier.size,
             cast = tier.rollCast(random),
         )

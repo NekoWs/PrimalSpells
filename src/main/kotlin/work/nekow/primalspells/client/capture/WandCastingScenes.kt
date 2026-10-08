@@ -54,7 +54,7 @@ object WandCastingScenes {
             val stack = ItemStack(ModItems.WAND.get())
             val wand = WandManager[WandManager.createWand(stack)]
             wand.magics += MagicManager.create("fireball")
-            wand.delaySeconds = 0.8; wand.rechargeSeconds = 1.8
+            wand.delayTickCount = 16.0; wand.rechargeTickCount = 36.0
             wand.load(); wand.status.mana = wand.mana
             return stack to wand
         }

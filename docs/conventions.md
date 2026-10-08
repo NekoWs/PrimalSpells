@@ -35,14 +35,14 @@ src/main/kotlin/work/nekow/primalspells/
 │  │  ├─ DelayedCastProjectile.kt DroneSwarm.kt
 │  │  └─ immobile/              静止/定点类投射物
 │  │     ├─ SmallExplosion.kt LargeExplosion.kt GravityFieldProjectile.kt BlackHoleProjectile.kt
-│  ├─ modifier/                 修饰器实现（28 个）
+│  ├─ modifier/                 修饰器实现（27 个）
 │  └─ effect/                   特效（挂在投射物上的可组合行为）
 │     ├─ BaseEffect.kt          特效基类：六钩子 + phase + 同类叠加辅助（stackScale/isStackPrimary）
 │     ├─ geometry/              空间与运动：Position, Velocity, Move, Bounce, Tracking, ConstantAcceleration
 │     ├─ lifecycle/             时机与结算：Trigger, DelayedTrigger, Hurt, Explosion（+ ExplosionFx 表现层）, AreaFieldEffect, BlackHole, GravityField
 │     └─ visual/                粒子表现：Trajectory（头部本体标记 + 拖尾）、BlackHoleFx（暗核/吸积盘/星尘）
 ├─ wand/                        法杖运行时状态
-│  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（小数 tick + 余数累加）、NBT 序列化（槽位保序）
+│  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（完整刻冷却与每刻回蓝）、NBT 序列化（槽位保序）
 │  ├─ WandTier.kt               法杖等级表（六级 + 调试杖：法力/充能速度/施放延迟/充能时间/槽位/施放数）+ 蓄能型变体 + 创建时掷点，见 design/wand-tiers.md
 │  ├─ WandManager.kt            法杖实例表（wandId → Wand）、每 tick 维护、世界存档读写
 │  └─ WandSavedData.kt          SavedData：法杖 NBT 的持久化容器
@@ -325,3 +325,5 @@ WandUseAnimationMixin.java与ItemInHandRendererAccessor.java放src/main/java/wor
 ### 第60轮新增落位
 
 client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪光状态；network/WandCastPayload.kt为成功施法模型通知，通过ClientPayloadSink转发，公共侧不引用客户端。现有tools/wands/generate_models.py生成主体、待机模块及宝石亮态，原资源路径保留，无旧→新迁移。
+
+第63轮结构记录：删除`magic/modifier/ClusterBomb.kt`；新增`magic/effect/visual/LaserTrace.kt`（投射物视觉）。`EffectPhase.GUIDANCE`只计算位移，不独自判碰撞，随后仍走`Move`。

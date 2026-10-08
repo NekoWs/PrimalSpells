@@ -534,7 +534,7 @@ class EnergyShield : Modifier() {
     /**
      * 这一发投射物的**强度** = 它实际能打出的东西（不是把 `MagicStatus` 的字段盲加）。
      *
-     * - 直接伤害：只计实现 `DirectDamage` 的效果声明的强度。像 `cluster_bomb` 那种碎片是
+     * - 直接伤害：只计实现 `DirectDamage` 的效果声明的强度。像 `bounce_duplicate` 那种碎片是
      *   `clone()` 出来的（保留宿主法术的 `status.damage`）但效果被换成 `Explosion + 加速度`，
      *   不判真实伤害效果就会给它们记一笔根本没打出来的伤害；
      * - 爆炸项：**带 `Explosion` 效果**时才计 `爆炸伤害 × 半径`。`MagicStatus` 的爆炸参数
@@ -880,7 +880,7 @@ class EnergyShield : Modifier() {
         lore(Lore.BOUNCE_COST, Lore.formatDouble(baseBounceCost))
         lore(Lore.EXTRA_COST, Lore.formatDouble(extraCostPerPoint))
         // 破口时长现在是「随超出抗性的程度」在 1 秒 ~ 3 秒之间（第 40 轮）
-        lore(Lore.BREACH, "${baseBreachTicks / 20}~${maxBreachTicks / 20}")
+        lore(Lore.BREACH, "${baseBreachTicks}~${maxBreachTicks}")
     }
 
     companion object {

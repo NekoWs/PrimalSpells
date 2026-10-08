@@ -52,7 +52,7 @@ object MagicManager {
             }
             it.tick()
             it.status.age++
-            if (it.status.age >= it.maxAge) it.alive = false
+            if (it.status.age >= it.maxAge && it.alive) { it.expire(); it.alive = false }
         }
         projectiles.addAll(pendingAdd)
         pendingAdd.clear()
@@ -87,7 +87,6 @@ object MagicManager {
         register { Diffusion() }
         register { Implosion() }
         register { Volatile() }
-        register { ClusterBomb() }
         register { ExplosionRemove() }
         register { ExplosionProjectile() }
         register { SmallExplosion() }

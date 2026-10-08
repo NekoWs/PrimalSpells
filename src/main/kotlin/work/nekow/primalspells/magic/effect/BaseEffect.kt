@@ -10,11 +10,11 @@ import work.nekow.primalspells.wand.Wand
 import kotlin.math.sqrt
 
 /**
- * 效果基类：六钩子 + 执行阶段 + 同类叠加辅助。
+ * 效果基类：生命周期钩子 + 执行阶段 + 同类叠加辅助。
  *
  * 生命周期（由 [work.nekow.primalspells.magic.core.Magic] 统一转发）：
  * - `onActive` 施法瞬间一次；`onTick` 每 tick；`onHitEntity`/`onHitBlock`/`onHit` 命中时；
- * - `onDie` 投射物死亡时。
+ * - `onExpire` 寿命耗尽当刻；`onDie` 死亡后的清理。
  *
  * 执行顺序由 [phase] 决定，不再依赖 `effects` 的插入顺序 —— 详见 [EffectPhase]。
  * `caster`/`wand`/`status`/`projectile` 由 [work.nekow.primalspells.magic.core.Magic.spell] 与
@@ -54,6 +54,8 @@ open class BaseEffect : Cloneable {
     open fun onHitEntity(target: Entity) { }
     open fun onHitBlock(pos: Vector3f) { }
     open fun onHit(result: HitResult) { }
+    open fun onExpire() { }
+
     open fun onDie() { }
 
     public override fun clone(): BaseEffect = super.clone() as BaseEffect

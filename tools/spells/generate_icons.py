@@ -12,7 +12,7 @@ PROJECTILES = ('fireball','drone_bolt','trigger_fireball','delayed_cast','drone_
 MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','extended_lifetime',
              'piercing','bounce_explosion','homing','bounce_duplicate','gradual_accelerate',
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
-             'diffusion','implosion','volatile','cluster_bomb','explosion_remove','explosion_projectile',
+             'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
              'self_orbit','sphere_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge')
 IDS = PROJECTILES + MODIFIERS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
@@ -110,7 +110,11 @@ def icon(name):
         if name=='bounce_explosion':burst(9,8,4,ORANGE)
         if name=='bounce_duplicate':box(7,9,YELLOW,2);box(25,22,YELLOW,2)
     elif name=='double_cast':
-        arrow((7,11),(25,11),BLUE);arrow((7,21),(25,21),YELLOW)
+        for x,y in ((6,10),(12,7)):
+            d.rectangle((x,y,x+11,y+15),fill='#332746',outline=PURPLE,width=1)
+            d.rectangle((x+2,y+2,x+9,y+13),fill='#dcecf0')
+            arrow((x+4,y+9),(x+8,y+5),DARK_BLUE,1)
+        arrow((20,23),(26,17),YELLOW,2)
     elif name in ('speed_boost','gradual_accelerate','gradual_decelerate'):
         sizes=(5,5,5) if name=='speed_boost' else ((2,4,6) if name=='gradual_accelerate' else (6,4,2))
         for x,r in zip((8,15,22),sizes):line(((x-3,16-r),(x+2,16),(x-3,16+r)),BLUE)
@@ -134,9 +138,6 @@ def icon(name):
     elif name=='volatile':
         d.ellipse((8,12,24,27),fill='#52626e',outline=WHITE,width=1)
         line(((16,12),(16,8),(21,8)),ORANGE);plus(23,7,YELLOW)
-    elif name=='cluster_bomb':
-        for x,y in ((10,10),(23,12),(16,23)):
-            d.ellipse((x-4,y-4,x+4,y+4),fill='#67727d',outline=ORANGE);box(x-1,y-1,YELLOW,1)
     elif name=='explosion_remove':
         burst(c=ORANGE);line(((7,25),(25,7)),RED,3);line(((6,24),(24,6)),WHITE,1)
     elif name in ('self_orbit','sphere_orbit'):orbit(name=='sphere_orbit')

@@ -88,8 +88,8 @@ object WandCommand {
         source.sendSuccess(
             {
                 Component.literal(
-                    "已获得 $name：法力 ${Lore.formatDouble(wand.mana)} / 回蓝 ${Lore.formatDouble(wand.charge)}每秒" +
-                        " / 施放延迟 ${Lore.formatDouble(wand.delaySeconds)} s / 充能时间 ${Lore.formatDouble(wand.rechargeSeconds)} s" +
+                    "已获得 $name：法力 ${Lore.formatDouble(wand.mana)} / 回蓝 ${Lore.formatDouble(wand.charge)}每刻" +
+                        " / 施放延迟 ${Lore.formatDouble(wand.delayTickCount)} 刻 / 充能时间 ${Lore.formatDouble(wand.rechargeTickCount)} 刻" +
                         " / ${wand.size} 槽 / 施放数 ${wand.cast}"
                 )
             },

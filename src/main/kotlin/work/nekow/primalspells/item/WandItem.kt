@@ -101,8 +101,8 @@ class WandItem(properties: Properties) : Item(properties) {
                 wand.status.lastDelay,
                 wand.status.lastRecharge,
                 wand.charge,
-                wand.delaySeconds,
-                wand.rechargeSeconds,
+                wand.delayTickCount,
+                wand.rechargeTickCount,
                 wand.size
             ))
         }

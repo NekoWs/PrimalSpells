@@ -18,7 +18,7 @@ import work.nekow.primalspells.wand.Wand
 /** 第54轮：真实法杖发射、生命周期和跨投射物反应的实机回归。 */
 object SpellQualityScenes {
     /** 注册联动验收场景。 */
-    fun all(): List<Scene> = listOf(resonance(), stability())
+    fun all(): List<Scene> = listOf(resonance(), stability(), mechanics())
     private fun cast(ctx: CaptureDriver.SceneCtx, ids: List<String>, x: Double, y: Double, z: Double,
         yaw: Float = 0f, pitch: Float = 0f, source: Entity = ctx.player) {
         source.setPos(x, y, z); source.setYRot(yaw); source.setXRot(pitch); source.setOldPosAndRot()
@@ -102,6 +102,144 @@ object SpellQualityScenes {
                 else -> emptyList()
             } })
     }
+    /** 第63轮：寿命触发、轨道扫掠、量子实体命中与时间存档迁移。 */
+    private fun mechanics(): Scene {
+        val name = "spell_mechanics"
+        val checks = ArrayList<Check>()
+        var delayed: Projectile? = null
+        var payloadCount = 0
+        var exactExpiry = false
+        var copies = listOf<Projectile>()
+        var separated = false
+        var quantumTarget: TestDummyEntity? = null
+        var copyHit = false
+        var copyDamage = false
+        var movingBeam: Projectile? = null
+        return Scene(name, "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", 24, 220,
+            prepare = { ctx ->
+                val floor = ctx.floorBlockY(0,0)
+                for (x in -12..12) for (z in -12..12) for (y in floor+1..floor+8)
+                    ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
+                ctx.buildStudio(0,0,floor);ctx.setup(true,0.5,floor+5.0,-14.0,0f,12f)
+                ctx.level.getEntitiesOfClass(TestDummyEntity::class.java,AABB.ofSize(Vec3.ZERO,100.0,200.0,100.0)).forEach { it.discard() }
+                checks.clear();payloadCount=0;exactExpiry=false;copies=emptyList();separated=false
+            }, camera = { ctx,_ -> Pose(0.5,ctx.floorBlockY(0,0)+5.0,-14.0,0f,12f) },
+            tick = { ctx,t ->
+                val floor = ctx.floorBlockY(0,0)
+                fun probe(id: String, mods: List<String> = emptyList(), pos: Vector3f = Vector3f(0f,floor+3f,0f)): Projectile {
+                    val p = MagicManager.create(id) as Projectile
+                    SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
+                    p.caster=ctx.player;p.wand=Wand("probe-$t-$id");p.position=pos;p.velocity=Vector3f(0f,0f,1f);p.dragCoeff=0f
+                    p.spell();return p
+                }
+                fun record(label: String, ok: Boolean, detail: String) { checks += Check(name,t,label,ok,detail) }
+                if (t == 8) {
+                    for ((unit,value,expected) in listOf(Triple("ticks",7.0,7.0),Triple("sec",.34,7.0),Triple("ms",340.0,7.0),Triple("",7.0,7.0))) {
+                        val tag=net.minecraft.nbt.CompoundTag();tag.putString("id","migration-$unit")
+                        tag.putDouble(if(unit.isEmpty()) "delay" else "delay_$unit",value)
+                        tag.putDouble("charge",100.0);tag.putDouble("status_delay",-.2)
+                        val w=Wand.fromTag(tag);val saved=w.saveTag();val again=Wand.fromTag(saved)
+                        record("time-migration-$unit",w.delayTicks()==expected && again.delayTicks()==expected && w.status.delay==0.0 && w.charge==5.0 && again.charge==5.0 && saved.contains("delay_ticks") && !saved.contains("delay_sec"),"delay=${w.delayTicks()} charge=${w.charge}")
+                    }
+                    record("cluster-unregistered",MagicManager.create("cluster_bomb")==null,"removed from registry")
+                    record("teleport-60-ticks",(MagicManager.create("teleport") as Projectile).maxAge==60,"age=60")
+                    record("plasma-default-static",(MagicManager.create("plasma_beam") as Projectile).speed==0f,"speed=0")
+                    val decelerate=probe("fireball",listOf("gradual_decelerate"))
+                    decelerate.collisionEnabled=false
+                    val start=decelerate.status.velocity.length()
+                    repeat(41) { decelerate.status.age=it;decelerate.tick() }
+                    record("deceleration-2-to-0.3",kotlin.math.abs(start-1.6f)<.001 && kotlin.math.abs(decelerate.status.velocity.length()-.24f)<.001,"start=$start end=${decelerate.status.velocity.length()}")
+                    decelerate.die()
+                    val target=ctx.spawnDummy(3.0,floor+2.0,0.0)
+                    val center=target.boundingBox.center
+                    val tracking=probe("fireball",listOf("homing"),Vector3f(0f,center.y.toFloat(),0f));tracking.tick()
+                    record("homing-body-center",tracking.status.velocity.x>0 && kotlin.math.abs(tracking.status.velocity.y)<.001,"velocity=${tracking.status.velocity}")
+                    tracking.die();target.discard()
+                    val hitTarget=ctx.spawnDummy(7.0,floor+1.0,0.0)
+                    for (mod in listOf("bounce","bounce_duplicate","bounce_explosion")) {
+                        val p=probe("fireball",listOf("piercing","bounce",mod))
+                        val before=p.status.bounces;val particles=ParticleManager.of(ctx.level).getEngine().particleCount()
+                        p.hitEntity(hitTarget)
+                        record("entity-not-bounce-$mod",p.alive && p.status.bounces==before && ParticleManager.of(ctx.level).getEngine().particleCount()-particles<300,"alive=${p.alive} bounces=$before -> ${p.status.bounces} impactParticles=${ParticleManager.of(ctx.level).getEngine().particleCount()-particles}")
+                        p.hitBlock(Vector3f(p.status.pos),Vector3f(0f,0f,-1f))
+                        record("block-counts-bounce-$mod",p.status.bounces==before-1,"bounces=${p.status.bounces}")
+                        p.alive=false;p.die()
+                    }
+                    hitTarget.discard()
+                    fun arcCount(mods: List<String>, gap: Double, count: Int): Int {
+                        ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,AABB.ofSize(Vec3.ZERO,100.0,200.0,100.0)).forEach { it.discard() }
+                        val targets=(0 until count).map { ctx.spawnDummy(-10.0+it*gap,floor+1.0,5.0) }
+                        val p=probe("chain_bolt",mods,targets.first().boundingBox.center.toVector3f())
+                        if ("extended_lifetime" !in mods) p.maxAge=12
+                        p.hitEntity(targets.first())
+                        while(p.alive && p.status.age<p.maxAge) { p.tick();p.status.age++ }
+                        val result=ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,AABB.ofSize(Vec3.ZERO,100.0,200.0,100.0)).size
+                        p.alive=false;p.die();targets.forEach { it.discard() };return result
+                    }
+                    val short=arcCount(emptyList(),2.8,8);val long=arcCount(listOf("extended_lifetime"),2.8,8)
+                    record("arc-lifetime-search-budget",short==3 && long==8,"short=$short extended=$long")
+                    val near=arcCount(emptyList(),8.0,2);val far=arcCount(listOf("speed_boost"),8.0,2)
+                    record("arc-speed-search-radius",near==1 && far==2,"normal=$near fast=$far")
+                    for(mod in listOf("self_orbit","sphere_orbit")) {
+                        val radii=(0..1).map { fast ->
+                            val p=probe("fireball",listOf(mod)+if(fast==1)listOf("speed_boost")else emptyList())
+                            p.collisionEnabled=false
+                            repeat(80) { p.tick();p.status.age++ }
+                            val radius=Vec3(p.status.pos).distanceTo(ctx.player.eyePosition)
+                            p.alive=false;p.die();radius
+                        }
+                        record("speed-expands-$mod",radii[0]>2.5 && radii[1]>radii[0]+.5,"radii=$radii")
+                    }
+                    MagicManager.projectiles.forEach { it.alive=false }
+                }
+                if(t==12) {
+                    val p=probe("delayed_cast",pos=Vector3f(-4f,floor+3f,0f))
+                    val payload=MagicManager.create("fireball") as Projectile
+                    payload.effects += object:work.nekow.primalspells.magic.effect.BaseEffect() {
+                        override fun onActive() { payloadCount++;exactExpiry=p.status.age==p.maxAge }
+                    }
+                    (p as TriggerSpell).payload += payload;delayed=p;MagicManager.add(p)
+                }
+                if(t==45) {
+                    cast(ctx,listOf("quantum_entanglement","fireball"),0.0,floor+2.0,-4.0)
+                }
+                if(t==49) {
+                    val leader=MagicManager.projectiles.firstOrNull { "quantum_entanglement" in it.modifiers }
+                    copies=MagicManager.projectiles.filter { it.id=="fireball" && "quantum_entanglement" !in it.modifiers && it.alive && it.wand===leader?.wand }
+                    separated=copies.size==2 && leader!=null && copies.all { it.status.pos.distance(leader.status.pos)>1.5f && it.status.velocity.length()>0f }
+                }
+                if(t==54 && copies.isNotEmpty()) {
+                    val copy=copies.first();val pos=copy.status.pos
+                    quantumTarget=ctx.spawnDummy(pos.x.toDouble(),pos.y.toDouble()-.9,pos.z.toDouble())
+                }
+                if(t==59) {
+                    copyHit=copies.any { it.status.hitTargets>0 }
+                    val target=quantumTarget
+                    copyDamage=target!=null && ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,target.boundingBox.inflate(4.0)).isNotEmpty()
+                    quantumTarget?.discard();MagicManager.projectiles.forEach { it.alive=false }
+                }
+                if(t==75 || t==83) { val p=probe("laser",pos=Vector3f(-3f,floor+3f,-1f));MagicManager.add(p) }
+                if(t==95) { movingBeam=probe("plasma_beam");MagicManager.add(movingBeam!!) }
+                if(t in 100..113) movingBeam?.status?.velocity?.set(.25f,0f,0f)
+                if(t==116) MagicManager.projectiles.forEach { it.alive=false }
+                if(t==140) {
+                    val w=Wand("tick-cadence");w.delayTickCount=7.0;w.rechargeTickCount=0.0
+                    w.innate+=MagicManager.create("laser")!!;w.load();w.status.mana=w.mana
+                    val intervals=ArrayList<Int>();var last=0
+                    for(step in 0..35) { if(w.spell(ctx.player)) { if(step>0)intervals+=step-last;last=step };w.tick() }
+                    record("integer-repeat-cadence",intervals.isNotEmpty() && intervals.all { it==7 },"intervals=$intervals")
+                }
+                if(t==160) MagicManager.projectiles.forEach { it.alive=false }
+            },checksAt={ctx,t -> when(t) {
+                10 -> checks.toList()
+                25 -> listOf(Check(name,t,"delay-no-early-hit-trigger",payloadCount==0,"count=$payloadCount age=${delayed?.status?.age}"))
+                36 -> listOf(Check(name,t,"delay-expires-exactly-once",payloadCount==1 && exactExpiry && (delayed as TriggerSpell).payload.isEmpty(),"count=$payloadCount exact=$exactExpiry age=${delayed?.status?.age}"))
+                60 -> listOf(Check(name,t,"quantum-separated-moving-bodies",separated,"copies=${copies.size}"),Check(name,t,"quantum-copies-collide-and-damage",copyHit && copyDamage,"hit=$copyHit damage=$copyDamage"))
+                142 -> listOf(checks.last())
+                219 -> listOf(Check(name,t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"shots=${MagicManager.projectiles.size}"),Check(name,t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                else -> emptyList()
+            }})
+    }
     private fun resonance(): Scene {
         val name = "spell_resonance"
         var crystal: Projectile? = null
@@ -140,7 +278,7 @@ object SpellQualityScenes {
                     val p = MagicManager.create(id) as Projectile
                     SpellAssembly.apply(p, listOf(MagicManager.create(mod) as Modifier))
                     SpellAssembly.prepare(p)
-                    if ((id in listOf("small_explosion", "large_explosion", "drone_swarm", "crystal_detonation")) && mod in listOf("cluster_bomb", "explosion_projectile", "bounce_duplicate")) matrixOk = matrixOk && p.maxAge >= 40
+                    if ((id in listOf("small_explosion", "large_explosion", "drone_swarm", "crystal_detonation")) && mod in listOf("explosion_projectile", "bounce_duplicate")) matrixOk = matrixOk && p.maxAge >= 40
                     val child = p.clone(); SpellAssembly.inherit(p, child)
                     matrixOk = matrixOk && p.modifiers[mod] == 1 && child.modifiers == SpellAssembly.inheritable(p) && child.modifierOrder == SpellAssembly.inheritableOrder(p) && p.status !== child.status && p.effects.none { it in child.effects }
                     matrix++
@@ -197,8 +335,8 @@ object SpellQualityScenes {
                     ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DroneEntity::class.java, AABB.ofSize(Vec3.ZERO, 100.0, 200.0, 100.0)).forEach { it.discard() }
                     MagicManager.projectiles.forEach { it.alive = false }
                 }
-                if (t == 175) cast(ctx, listOf("damage_boost", "freeze_charge", "speed_boost", "cluster_bomb", "fireball"), -4.0, floor+3.0, -3.0)
-                if (t in 176..182 && !clusterHit) MagicManager.projectiles.firstOrNull { it.id == "fireball" && "cluster_bomb" in it.modifiers }?.let { p ->
+                if (t == 175) cast(ctx, listOf("damage_boost", "freeze_charge", "speed_boost", "fireball"), -4.0, floor+3.0, -3.0)
+                if (t in 176..182 && !clusterHit) MagicManager.projectiles.firstOrNull { it.id == "fireball" && "bounce_duplicate" in it.modifiers }?.let { p ->
                     p.hitBlock(Vector3f(p.status.pos), Vector3f(0f, 0f, -1f)); clusterHit = true
                 }
             }, checksAt = { ctx, t -> when (t) {
@@ -212,8 +350,8 @@ object SpellQualityScenes {
                 140 -> listOf(Check(name, t, "black-hole-stores-consumed-shot", hole != null && hole!!.storedEnergy > 0 && MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "energy=${hole?.storedEnergy}"))
                 155 -> listOf(Check(name, t, "shield-projectile-reflects-and-changes-owner", MagicManager.projectiles.any { it.id == "fireball" && it.caster === ctx.player && it.status.velocity.z < 0 }, "shots=${MagicManager.projectiles.map { it.id to it.status.velocity }}"))
                 185 -> {
-                    val children = MagicManager.projectiles.filter { it.id == "fireball" && it.alive && "cluster_bomb" !in it.modifiers }
-                    listOf(Check(name, t, "terminal-block-hit-creates-inheriting-cluster", children.size == 3 && children.all { it.modifiers["damage_boost"] == 1 && it.status.freezeTicks > 0 && it.status.damage == 6.0 && it.status.velocity.isFinite && it.status.velocity.length() in (0.45f * Projectile.LAUNCH_SPEED_SCALE)..(0.9f * Projectile.LAUNCH_SPEED_SCALE) }, "hit=$clusterHit all=${MagicManager.projectiles.map { it.id to it.modifiers }} children=${children.map { it.modifiers to it.status.damage }}"))
+                    val children = MagicManager.projectiles.filter { it.id == "fireball" && it.alive && "bounce_duplicate" !in it.modifiers }
+                    listOf(Check(name, t, "block-rebound-creates-inheriting-copy", children.size == 1 && children.all { it.modifiers["damage_boost"] == 1 && it.status.freezeTicks > 0 && it.status.damage == 6.0 && it.status.velocity.isFinite && it.status.velocity.length() in (0.1f)..(4.0f) }, "hit=$clusterHit all=${MagicManager.projectiles.map { it.id to it.modifiers }} children=${children.map { it.modifiers to it.status.damage }}"))
                 }
                 212 -> listOf(Check(name, t, "teleport-hit-carries-damage-and-freeze", FrozenStatus.isFrozen(teleportTarget!!) && enemy!!.position().distanceToSqr(teleportTarget!!.position()) < 4.0, "frozen=${FrozenStatus.isFrozen(teleportTarget!!)} caster=${enemy!!.position()}"))
                 248 -> {

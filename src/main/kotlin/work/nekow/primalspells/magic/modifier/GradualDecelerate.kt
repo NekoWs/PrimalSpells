@@ -5,7 +5,7 @@ import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.util.Lore
 
 /**
- * 逐渐减速修正 —— 施法瞬间把投射物速度乘到 5 倍，随后在 40 tick 内平滑降到 0.25 倍（÷√N）。
+ * 逐渐减速修正 —— 施法瞬间把投射物速度乘到 2 倍，随后在 40 tick 内平滑降到 0.22 倍（÷√N）。
  *
  * **顺序无关**（见 [Modifier] 类注释的约定）：全程只做**乘法** ——
  * 施法时 `v *= maxMul`，之后每 tick 乘「本 tick 倍率 ÷ 上一 tick 倍率」。
@@ -18,8 +18,8 @@ class GradualDecelerate : Modifier() {
     override val id = "gradual_decelerate"
 
     private val rampTicks = 40
-    private val maxMul = 5.0f
-    private val minMul = 0.25f
+    private val maxMul = 2.0f
+    private val minMul = 0.3f
 
     init {
         mana = 4.0

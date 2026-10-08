@@ -331,6 +331,7 @@ object CaptureScenes {
                 wand = w
                 shield = card
                 guardDummy.setItemInHand(InteractionHand.MAIN_HAND, stack)
+                w.tick(guardDummy, ctx.level) // 首次装备即建立持有证据，避免正逢回收刻的竞态。
                 // 攻击者：+X 方向 5.5 格，yaw=90 → 朝 -X 正对护盾持有者
                 attacker = ctx.spawnDummy(CX + 5.5, floorY + 1.0, CZ + 0.5, yaw = 90f)
                 // **普通火球**（强度 5）：预算 6 之下"单发挡得住（5 ≤ 6）、同一窗口第二发超预算（10 > 6）"才成立 ——
@@ -964,7 +965,7 @@ object CaptureScenes {
                         Check(
                             name, t, "burst-particles",
                             burstParticles in 1200..2200,
-                            "死亡结算当tick PD 粒子 = $burstParticles（密集喷射、八瓣火团、白热闪爆与三向冲击圈）",
+                            "死亡结算当tick PD 粒子 = $burstParticles（密集喷射、随机火舌、白热碎裂前锋和飞散余烬）",
                         ),
                         Check(
                             name, t, "damage-immediate",

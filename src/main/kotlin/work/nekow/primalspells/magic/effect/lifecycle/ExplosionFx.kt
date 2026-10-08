@@ -7,64 +7,90 @@ import work.nekow.primalspells.magic.effect.visual.PixelVfx
 import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.util.ScreenShake
+import kotlin.math.*
 
-/** 闪爆、压缩火团、冲击环、放射火星与翻涌尘团；固定实色，不把爆炸做成匀速撒球。 */
+/** 非对称火舌向外撕裂、火星弹道和翻卷烟尘；每次爆炸独立取样，绝不整体收球。 */
 object ExplosionFx {
-    /** 同一次结算立即出现闪爆，后续烟团仅是演出，不延迟伤害。 */
-    fun burst(manager: ParticleManager, center: Vec3, radius: Float) {
+    fun burst(manager: ParticleManager, center: Vec3, radius: Float, sourceId: String = "explosion") {
         if (radius <= 0f) return
         val r = radius.toDouble()
-        val white = Color.ofInt(232, 248, 255)
-        val cyan = Color.ofInt(108, 210, 255)
-        val flame = listOf(Color.ofInt(255, 241, 172), Color.ofInt(255, 182, 57), Color.ofInt(238, 90, 35))
-        val specs = ArrayList<ParticleSpawnSpec>()
-        val velocities = ArrayList<Vec3>()
-        val count = (radius * 80).toInt().coerceAtLeast(160)
-        ParticleShapes.fibonacciSphere(count).forEachIndexed { i, dir ->
-            val spoke = if (i % 7 == 0) 1.8 else 0.6 + (i % 13) / 18.0
-            specs += ParticleSpawnSpec().position(center.add(dir.scale(0.3)))
-                .color(if (i % 5 == 0) cyan else flame[i % 3])
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(
-                    if (i % 7 == 0) 0.375f else 0.125f, 0.0625f).glowing(true).spin(i * 0.71))
-                .lifetime(12 + i % 17).sizeCurve(*PixelVfx.lifeKeys(12 + i % 17))
-            velocities += dir.scale((0.25 + r * 0.07) * spoke).add(0.0, 0.06, 0.0)
+        val random = manager.level.random
+        val crystal = sourceId == "dormant_crystal" || sourceId == "crystal_detonation"
+        val flame = if (crystal) listOf(Color.ofInt(212, 239, 167), Color.ofInt(109, 216, 168), Color.ofInt(236, 173, 59))
+            else listOf(Color.ofInt(255, 237, 156), Color.ofInt(255, 175, 42), Color.ofInt(236, 79, 24))
+        fun direction(): Vec3 {
+            val y = random.nextDouble() * 2 - 1
+            val angle = random.nextDouble() * PI * 2
+            val w = sqrt(1-y*y)
+            return Vec3(cos(angle)*w, y, sin(angle)*w)
         }
-        val batch = ParticleBatch(manager).also { it.addAll(manager.spawnAll(specs)) }
-        batch.setVelocityAll(velocities)
-        batch.applyForceAll(velocities.map { it.scale(-0.025).add(0.0, -0.017, 0.0) }, 22)
-
-        // 零尺寸闪爆快速展开；后续收束捕获当前倍率，提前中断也不重置姿态。
-        val flash = Draw.sphere(manager, center, r * 0.18, 144, ColorSource.of(white), 1.8f,
-            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-        flash.scaleTo(0f, 0).scaleTo(1.5f, 2, EasingType.EASE_OUT).delay(3).scaleTo(0f, 4, EasingType.EASE_IN_OUT).destroyAfter(6)
-        repeat(8) { lobe ->
-            val d = ParticleShapes.fibonacciSphere(8)[lobe]
-            val group = Draw.sphere(manager, center.add(d.scale(r * 0.18)), r * 0.15, 72,
-                ColorSource.of(flame[lobe % 3]), 1.0f,
-                visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-            group.scaleTo(0f, 0).scaleTo(1f, 2, EasingType.EASE_OUT).move(d.scale(r * 0.5), 6, EasingType.EASE_OUT)
-                .delay(4 + lobe % 3).scaleTo(0f, 5, EasingType.EASE_IN_OUT).destroyAfter(7)
+        // spawnAll的公开创建上限为256；位置/受力更新由PD批次自行分包。
+        fun emit(specs: List<ParticleSpawnSpec>, velocities: List<Vec3>, gravity: Double = 0.0) {
+            val batch = ParticleBatch(manager)
+            specs.chunked(256).forEach { batch.addAll(manager.spawnAll(it)) }
+            batch.setVelocityAll(velocities)
+            if (gravity != 0.0) batch.applyForceAll(List(specs.size) { Vec3(0.0, -gravity, 0.0) }, 24)
         }
-        for (n in listOf(Vec3(0.0, 1.0, 0.0), Vec3(1.0, 0.15, 0.0), Vec3(0.0, 0.3, 1.0)))
-            PixelVfx.ring(manager, center, n, r * 0.25, cyan, 11, 5f)
-        ScreenShake.shake(manager.level, center, radius = r * 2 + 3, amplitude = (r * 0.06).coerceAtMost(0.55).toFloat(), ticks = 8)
-
-        // 分时喷出的烟团向上翻卷，内暗外亮，保持轮廓块面；粒子寿命负责断裂收场。
-        for (beat in listOf(2, 5, 9)) Deferred.after(manager.level, beat) {
-            val puffSpecs = ArrayList<ParticleSpawnSpec>()
-            val puffVelocities = ArrayList<Vec3>()
-            ParticleShapes.fibonacciSphere(12).forEachIndexed { puff, d ->
-                val c = center.add(d.scale(r * (0.35 + beat * 0.035))).add(0.0, beat * 0.04, 0.0)
-                ParticleShapes.fibonacciSphere(32).forEachIndexed { i, local ->
-                    puffSpecs += ParticleSpawnSpec().position(c.add(local.scale(0.22 + r * 0.04)))
-                        .color(if ((i + puff) % 3 == 0) Color.ofInt(172, 178, 186) else Color.ofInt(68, 73, 84))
-                        .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.25f, 0.25f).glowing(false))
-                        .lifetime(12 + i % 12).sizeCurve(*PixelVfx.lifeKeys(12 + i % 12))
-                    puffVelocities += d.scale(0.06).add(local.cross(Vec3(0.0, 1.0, 0.0)).scale(0.018)).add(0.0, 0.045, 0.0)
-                }
+        val sparks = ArrayList<ParticleSpawnSpec>()
+        val sparkVelocity = ArrayList<Vec3>()
+        repeat((radius * 80).toInt().coerceIn(160, 640)) {
+            val d = direction()
+            val life = 12 + random.nextInt(17)
+            val fast = random.nextDouble() < 0.18
+            sparks += ParticleSpawnSpec().position(center.add(d.scale(0.2)))
+                .color(flame[random.nextInt(flame.size)])
+                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if (fast) 0.375f else 0.125f, 0.09375f)
+                    .glowing(true).additive(false).spin(random.nextDouble()*PI))
+                .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
+            sparkVelocity += d.scale((0.18+r*0.05)*(0.6+random.nextDouble()*1.3)).add(0.0, 0.06, 0.0)
+        }
+        emit(sparks, sparkVelocity, 0.017)
+        // 白热冲击前锋自身碎裂向外飞，逐片熄灭；没有整壳倒缩、也没有蓝色装饰圈。
+        val flash = ArrayList<ParticleSpawnSpec>()
+        val flashVelocity = ArrayList<Vec3>()
+        repeat(144) {
+            val d = direction()
+            flash += ParticleSpawnSpec().position(center.add(d.scale(r*0.08)))
+                .color(Color.ofInt(255, 251, 215)).visual(ParticleVisual().style(ParticleStyle.SQUARE)
+                    .anisoWorld(0.25f, 0.1875f).glowing(true).additive(false))
+                .lifetime(5).sizeCurve(CurveKey.at(0,0),CurveKey.at(0.5,1,EasingType.EASE_OUT),
+                    CurveKey.at(1.5,1),CurveKey.at(5,0,EasingType.EASE_IN))
+            flashVelocity += d.scale(0.22+r*0.06)
+        }
+        emit(flash, flashVelocity)
+        // 小爆炸是短促喷流，大爆炸是多瓣厚重火舌；每瓣方向、密度、寿命、速度都独立。
+        repeat(if (r >= 5) 8 + random.nextInt(3) else 5 + random.nextInt(3)) {
+            val axis = direction()
+            val specs = ArrayList<ParticleSpawnSpec>()
+            val velocities = ArrayList<Vec3>()
+            val power = 0.16+r*0.035+random.nextDouble()*0.12
+            repeat(72) {
+                val local = direction()
+                val life = 8 + random.nextInt(11)
+                specs += ParticleSpawnSpec().position(center.add(axis.scale(r*0.10)).add(local.scale(r*0.08)))
+                    .color(flame[random.nextInt(flame.size)])
+                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.3125f, 0.25f)
+                        .glowing(true).additive(false).spin(random.nextDouble()*PI))
+                    .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
+                velocities += axis.scale(power).add(local.scale(0.05+random.nextDouble()*0.13)).add(0.0,0.03,0.0)
             }
-            val smoke = ParticleBatch(manager).also { it.addAll(manager.spawnAll(puffSpecs)) }
-            smoke.setVelocityAll(puffVelocities)
+            emit(specs, velocities, 0.006)
+        }
+        ScreenShake.shake(manager.level, center, radius = r*2+3,
+            amplitude = (r*0.06).coerceAtMost(0.55).toFloat(), ticks = 8)
+        for (beat in listOf(2,5,9)) Deferred.after(manager.level,beat) {
+            val smoke = ArrayList<ParticleSpawnSpec>()
+            val velocities = ArrayList<Vec3>()
+            repeat(192) {
+                val d = direction()
+                val life = 12+random.nextInt(12)
+                smoke += ParticleSpawnSpec().position(center.add(d.scale(r*(0.16+random.nextDouble()*0.22))))
+                    .color(if (random.nextBoolean()) Color.ofInt(147,134,116) else Color.ofInt(66,60,57))
+                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.3125f,0.3125f).additive(false).glowing(false))
+                    .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
+                velocities += d.scale(0.07+random.nextDouble()*0.06).add(0.0,0.055,0.0)
+            }
+            emit(smoke,velocities)
         }
     }
 }

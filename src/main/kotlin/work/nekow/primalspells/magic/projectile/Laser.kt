@@ -2,7 +2,7 @@ package work.nekow.primalspells.magic.projectile
 
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.effect.lifecycle.Hurt
-import work.nekow.primalspells.magic.effect.visual.Trajectory
+import work.nekow.primalspells.magic.effect.visual.LaserTrace
 
 class Laser: Projectile() {
     override val id = "laser"
@@ -16,7 +16,7 @@ class Laser: Projectile() {
         maxAge = 1
         status.damage = 0.5
         hitRadius = 0.1
-        effects += Trajectory(Color.of(0.5f, 0.8f, 1f))
+        effects += LaserTrace()
         effects += Hurt()
     }
 }

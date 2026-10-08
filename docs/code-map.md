@@ -60,9 +60,9 @@
 | 文件 | 内容 |
 |---|---|
 | `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例）、被动钩子 `onInventoryTick`/`onPassiveIdle`/`onUnloaded`（取下时清理）、运行期状态钩子 `saveRuntimeState`/`loadRuntimeState` |
-| `core/EffectPhase.kt` | 效果执行阶段：`SETUP` / `MODIFIER` / `MOTION` / `OVERRIDE` / `VISUAL` |
+| `core/EffectPhase.kt` | 效果执行阶段：`SETUP` / `MODIFIER` / `GUIDANCE` / `MOTION` / `OVERRIDE` / `VISUAL` |
 | `core/MagicStatus.kt` | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 |
-| `core/MagicManager.kt` | 44 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
+| `core/MagicManager.kt` | 43 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
 | `core/Modifier.kt` | 修饰器基类，`effects()` 返回克隆后的效果 |
 | `core/TriggerSpell.kt` | 触发法术接口（`triggerCast` + `payload`） |
 | `projectile/Projectile.kt` | 投射物基类：装配 4 个内建效果、命中/弹跳分派、`maxAge`/`maxHitTargets` 等字段 |
@@ -77,7 +77,7 @@
 | `projectile/immobile/LargeExplosion.kt` | `large_explosion`（半径 6 / 中心伤害 24 / 蓄力 18 tick） |
 | `projectile/immobile/GravityFieldProjectile.kt` | `gravity_field`（静止光环，200 tick） |
 | `projectile/immobile/BlackHoleProjectile.kt` | `black_hole`（静止引力场） |
-| `modifier/`（28 个，逐个见 §3） | 修饰器实现 |
+| `modifier/`（27 个，逐个见 §3） | 修饰器实现 |
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
@@ -157,7 +157,7 @@
 ## 3. 法术 id ↔ 类 ↔ 资源对照
 
 > 资源三件套：`assets/primalspells/items/<id>.json`、`models/item/<id>.json`、`textures/item/<id>.png`；语言键 `item.primalspells.<id>` 与 `lore.primalspells.<id>.desc`。
-> 注册顺序与 `magic/core/MagicManager.kt` 的 `init` 一致（共 44 项：16 投射物 + 28 修饰器）。调试法术 `speed_getter` 已随死代码清理移除。
+> 注册顺序与 `magic/core/MagicManager.kt` 的 `init` 一致（共 43 项：16 投射物 + 27 修饰器）。调试法术 `speed_getter` 已随死代码清理移除。
 
 | id | 类 | 类型 | 文件 |
 |---|---|---|---|
@@ -186,7 +186,6 @@
 | `diffusion` | `Diffusion` | 修饰器 | `magic/modifier/Diffusion.kt` |
 | `implosion` | `Implosion` | 修饰器 | `magic/modifier/Implosion.kt` |
 | `volatile` | `Volatile` | 修饰器 | `magic/modifier/Volatile.kt` |
-| `cluster_bomb` | `ClusterBomb` | 修饰器（生成子弹） | `magic/modifier/ClusterBomb.kt` |
 | `explosion_remove` | `ExplosionRemove` | 修饰器 | `magic/modifier/ExplosionRemove.kt` |
 | `explosion_projectile` | `ExplosionProjectile` | 修饰器（生成子弹） | `magic/modifier/ExplosionProjectile.kt` |
 | `small_explosion` | `SmallExplosion` | 投射物 | `magic/projectile/immobile/SmallExplosion.kt` |
@@ -291,3 +290,5 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 第60轮：client/render/WandModelProperty.kt选择原生物品模块待机/晶体亮态；network/WandCastPayload.kt由WandCastingFx.cast发给追踪玩家，ClientPayloadSink.wandCast在客户端入口安装处理器。Wand.spell结算后调用WandCastingFx.cooldownsChanged立即刷新真实进度，不改变牌堆顺序。
 
 第61轮镜头反馈：`client/ScreenShakeClient.kt`消费有限冲击，`client/CameraImpulse.kt`提供可离线验证的纯时间曲线；视觉生命周期口径见[动画连贯性](design/animation-continuity.md)。
+
+第63轮：移除`modifier/ClusterBomb.kt`及其注册/资源；新增`effect/visual/LaserTrace.kt`，从真实扫掠段生成短激光。`SpellQualityScenes.mechanics`覆盖寿命、刻迁移、量子命中和轨道速度；当前矩阵432组合。

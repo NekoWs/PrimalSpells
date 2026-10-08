@@ -29,16 +29,19 @@ enum class EffectPhase(val activeOrder: Int, val tickOrder: Int) {
     /**
      * 位置积分（`Move`）：每个 tick **唯一**推进 [MagicStatus.pos] 的地方，同时做碰撞检测与命中分派。
      */
-    MOTION(2, 2),
+    /** 轨道导向：修正器改速后，Move扫掠前计算目标位移；出生在SETUP/修正之后。 */
+    GUIDANCE(3, 2),
+
+    MOTION(2, 3),
 
     /**
      * 位置覆盖（轨道类效果，如 `SelfOrbit`/`SphereOrbit`）：在 [MOTION] **之后**绝对定位，
      * 因此不会再被积分位移叠加（这正是过去轨道漂移的根因）。
      */
-    OVERRIDE(3, 3),
+    OVERRIDE(3, 4),
 
     /**
      * 表现与粒子（`ProjectileBody`/`Trajectory`）：最后执行，读到的永远是本 tick 的最终位置与速度。
      */
-    VISUAL(4, 4),
+    VISUAL(4, 5),
 }

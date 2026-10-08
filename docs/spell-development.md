@@ -373,3 +373,14 @@ class MyPassive : Modifier() {
 10. **`lore.primalspells.<id>.desc` 缺失会在游戏里显示原始 key**：新增法术时中英两份都要补。
 11. **服务端/客户端**：法术逻辑全部在服务端；effect 里不要写客户端代码，`caster.level()` 用 `as? ServerLevel` 判空。
 12. **不要把调试内容混进正式注册表**：调试法术 `SpeedGetter`（`speed_getter`，会在屏幕上打印速度）已在死代码清理中移除；需要临时调试就用本地代码 + 不注册的实例。
+
+
+## 第 52 轮接入补充
+
+新增短命射线/连锁直接伤害时，声明 `lifecycle/DirectDamage.damageStrength`，通过
+`SpellDamage.hit` 接入护盾和冰冻；不要复制 Hurt 的伤害代码，也不要把无伤害束源的碰撞半径改大来接盾。
+束源可以 `hitRadius=0`，命中时以实际线段临时提供 status.pos/velocity 并在 finally 恢复。
+需要粘附/命中后停止积分时设 `motionEnabled=false`；Move 的子步与同一检查点候选循环都会立即停止。
+静止法术与触发荷载的方向读取 `launchDirection`，不要依赖被自身速度乘成零的 status.velocity。
+`Magic.initLore` 已添加描述行，新法术无额外专用数值时不用重写 initLore，避免描述重复。
+七张卡与测试装配见 [design/spell-expansion.md](design/spell-expansion.md)。

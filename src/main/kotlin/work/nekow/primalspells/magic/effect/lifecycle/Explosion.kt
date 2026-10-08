@@ -51,13 +51,15 @@ class Explosion(
          * @param radius 爆炸半径（方块数；<= 0 直接返回）
          * @param damage 中心最大伤害（线性衰减到边缘为 0）
          */
-        fun customExplode(source: Entity, center: Vector3f, radius: Float, damage: Double) {
-            val serverLevel = source.level() as? ServerLevel ?: return
+        fun customExplode(source: Entity, center: Vector3f, radius: Float, damage: Double, level: ServerLevel? = null) {
+            val serverLevel = level ?: (source.level() as? ServerLevel) ?: return
             if (radius <= 0f) return
 
             val cx = center.x.toDouble()
             val cy = center.y.toDouble()
             val cz = center.z.toDouble()
+
+            CrystalReaction.notifyExplosion(serverLevel, Vec3(cx, cy, cz), radius.toDouble())
 
             // 1. 播放自定爆炸音效
             serverLevel.playSound(
@@ -108,7 +110,8 @@ class Explosion(
 
                 // 距离衰减伤害
                 val falloff = (1.0 - dist / r).coerceAtLeast(0.0)
-                val actualDamage = damage * falloff
+                val frozen = entity is LivingEntity && damage * falloff >= 4.0 && FrozenStatus.isFrozen(entity)
+                val actualDamage = damage * falloff + if (frozen) 2.0 else 0.0
 
                 // 能量护盾：壳外侧的爆炸可以替持有者吃掉这一份（伤害与击退一起免掉 ——
                 // 抵扣必须在施加伤害之前做，见 ShieldGuard 的 KDoc）
@@ -124,7 +127,8 @@ class Explosion(
                     if (damageSource != null) {
                         val invul = entity.invulnerableTime
                         entity.invulnerableTime = 0
-                        entity.hurtServer(level, damageSource, actualDamage.toFloat())
+                        val accepted = entity.hurtServer(level, damageSource, actualDamage.toFloat())
+                        if (accepted && frozen) FrozenStatus.shatter(entity)
                         entity.invulnerableTime = invul
                     }
                 }

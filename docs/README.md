@@ -22,6 +22,8 @@
 | ↳ [issues/pd-api-requests.md](issues/pd-api-requests.md) | 要提给 ParticleDrawing 的 **API 需求**（未决）+ 能力边界 | 接粒子特效、升级前置模组 |
 | [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
 | [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
+| [design/spell-expansion.md](design/spell-expansion.md) | 第52轮七张法术卡：水晶/电弧/远距/光束/斥力/冰冻，数值与组合验收 | 修改新增法术与组合 |
+| [design/field-effects.md](design/field-effects.md) | 黑洞 / 重力场的造型、生命周期、粒子预算与实机证据 | 修改区域法术视觉 |
 | [design/combat-pricing.md](design/combat-pricing.md) | **战斗数值口径**：攻击法术的伤害/施法间隔（对齐原版 DPS）、护盾的强度与抗性 | 改伤害、`delay`/`recharge`、护盾数值之前 |
 | [design/wand-tiers.md](design/wand-tiers.md) | **法杖数值口径**：六级等级曲线（法力/充能速度/施放延迟/充能时间/槽位/施放数）、蓄能型变体、毫秒与余数累加、Alt 面板的展示路径 | 改法杖数值、加掉落/合成、调施法节奏之前 |
 

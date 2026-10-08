@@ -23,7 +23,7 @@ import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.lifecycle.Explosion
-import work.nekow.primalspells.magic.effect.lifecycle.Hurt
+import work.nekow.primalspells.magic.effect.lifecycle.DirectDamage
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.Lore
 import work.nekow.primalspells.util.PD_IMMORTAL
@@ -312,7 +312,7 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * **命中兜底**：投射物在同一 tick 内就穿过壳面并贴到持有者身上时，由 `Hurt` 在结算伤害前问这一句。
+     * **命中兜底**：投射物在同一 tick 内就穿过壳面并贴到持有者身上时，由 `SpellDamage` 在结算伤害前问这一句。
      *
      * 为什么需要它：投射物的「移动 + 命中结算 + 到寿死亡」全在 `MagicManager.tick`（`ServerTickEvent.Pre`）里做完，
      * 而护盾的被动扫场跑在**同一 tick 更晚**的实体 tick 里。于是高速法术（`laser` 单 tick 位移 5 格、`maxAge = 1`）
@@ -339,7 +339,9 @@ class EnergyShield : Modifier() {
      * @return true = 这一发被格挡（已扣 MP、已反射、已出玻璃板）；false = 不归护盾管，或挡不住（已开破口）
      */
     private fun tryBlock(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: Projectile): Boolean {
-        if (p.hitRadius <= 0.0) return false          // 不碰撞实体的法术（爆炸点等）走爆炸那条路
+        // 光束的束源不碰撞实体，但射线命中仍声明 DirectDamage，并传入真实命中线段。
+        // 无直接伤害的爆炸点等仍走爆炸入口。
+        if (p.hitRadius <= 0.0 && p.effects.none { it is DirectDamage }) return false
         // 本引擎的 `velocity` 就是「每 tick 位移」（`Move` 用它做位置积分），所以上一 tick 的位置
         // 恰好是 `pos - velocity`。用它拼出这一 tick 的位移线段 —— 不做扫掠就会漏掉单 tick
         // 位移超过壳厚度的法术（laser 5 格/tick）。
@@ -532,15 +534,15 @@ class EnergyShield : Modifier() {
     /**
      * 这一发投射物的**强度** = 它实际能打出的东西（不是把 `MagicStatus` 的字段盲加）。
      *
-     * - 直接伤害：**带 `Hurt` 效果**时才计 `status.damage`。像 `cluster_bomb` 那种碎片是
+     * - 直接伤害：只计实现 `DirectDamage` 的效果声明的强度。像 `cluster_bomb` 那种碎片是
      *   `clone()` 出来的（保留宿主法术的 `status.damage`）但效果被换成 `Explosion + 加速度`，
-     *   不判 `Hurt` 就会给它们记一笔根本没打出来的伤害；
+     *   不判真实伤害效果就会给它们记一笔根本没打出来的伤害；
      * - 爆炸项：**带 `Explosion` 效果**时才计 `爆炸伤害 × 半径`。`MagicStatus` 的爆炸参数
      *   每个投射物身上都有默认值，盲加会给每一发火球凭空记 +10。
      */
     private fun strengthOf(p: Projectile): Double {
         var strength = 0.0
-        if (p.effects.any { it is Hurt }) strength += p.status.damage.coerceAtLeast(0.0)
+        strength += p.effects.filterIsInstance<DirectDamage>().sumOf { it.damageStrength.coerceAtLeast(0.0) }
         if (p.effects.any { it is Explosion }) {
             strength += p.status.explosionDamage.coerceAtLeast(0.0) *
                 p.status.explosionRadius.coerceAtLeast(0f)

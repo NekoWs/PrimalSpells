@@ -62,7 +62,7 @@
 | `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例）、被动钩子 `onInventoryTick`/`onPassiveIdle`/`onUnloaded`（取下时清理）、运行期状态钩子 `saveRuntimeState`/`loadRuntimeState` |
 | `core/EffectPhase.kt` | 效果执行阶段：`SETUP` / `MODIFIER` / `MOTION` / `OVERRIDE` / `VISUAL` |
 | `core/MagicStatus.kt` | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 |
-| `core/MagicManager.kt` | 36 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
+| `core/MagicManager.kt` | 44 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
 | `core/Modifier.kt` | 修饰器基类，`effects()` 返回克隆后的效果 |
 | `core/TriggerSpell.kt` | 触发法术接口（`triggerCast` + `payload`） |
 | `projectile/Projectile.kt` | 投射物基类：装配 4 个内建效果、命中/弹跳分派、`maxAge`/`maxHitTargets` 等字段 |
@@ -77,10 +77,11 @@
 | `projectile/immobile/LargeExplosion.kt` | `large_explosion`（半径 6 / 中心伤害 24 / 蓄力 18 tick） |
 | `projectile/immobile/GravityFieldProjectile.kt` | `gravity_field`（静止光环，200 tick） |
 | `projectile/immobile/BlackHoleProjectile.kt` | `black_hole`（静止引力场） |
-| `modifier/`（26 个，逐个见 §3） | 修饰器实现 |
+| `modifier/`（28 个，逐个见 §3） | 修饰器实现 |
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
+| `effect/visual/BlackHoleFx.kt` | 黑洞独立表现层：小粒子暗核、倾斜双层螺旋吸积盘、边界星点、批量吸入星尘、原组塌缩退场；设计与预算见 [design/field-effects.md](design/field-effects.md) |
 | `effect/visual/Trajectory.kt` | 粒子表现（particledrawing）：**头部一颗 `track` 白热菱形（本体标记，逐渲染帧丝滑）+ 按里程发射的符文尾迹**（`ParticleEmitter`；长度/密度/出生尺寸/尺寸与透明度曲线**全是参数**）；细碎符文、静止场 ambient、死亡补撒走 `spawnAll` 批量 + 寿命曲线。**原 `ProjectileBody`（柔光点）已删除**（同一位置两套时钟会看成闪烁）。见 `Trajectory` 类注释、[design/effects-api.md](design/effects-api.md) §0.1、[issues/resolved.md](issues/resolved.md) 第 48 轮 |
 
 ### 法杖、物品、实体
@@ -156,7 +157,7 @@
 ## 3. 法术 id ↔ 类 ↔ 资源对照
 
 > 资源三件套：`assets/primalspells/items/<id>.json`、`models/item/<id>.json`、`textures/item/<id>.png`；语言键 `item.primalspells.<id>` 与 `lore.primalspells.<id>.desc`。
-> 注册顺序与 `magic/core/MagicManager.kt` 的 `init` 一致（共 36 项：10 投射物 + 26 修饰器）。调试法术 `speed_getter` 已随死代码清理移除。
+> 注册顺序与 `magic/core/MagicManager.kt` 的 `init` 一致（共 44 项：16 投射物 + 28 修饰器）。调试法术 `speed_getter` 已随死代码清理移除。
 
 | id | 类 | 类型 | 文件 |
 |---|---|---|---|
@@ -236,3 +237,19 @@
 | `assets/primalspells/textures/particle/*.png` | **粒子贴图**（PD `registerTexture` 用；当前只有 `rune_spark.png`，见第 45 轮） |
 | `assets/primalspells/lang/zh_cn.json`、`en_us.json` | 语言文件（两侧键集合一致） |
 | `data/primalspells/damage_type/projectile.json` | 伤害类型数据（与 `registry/ModDamageTypes.kt` 对应） |
+
+
+## 第52轮新增内容导航
+
+| 文件 | 职责 |
+|---|---|
+| `magic/projectile/{DormantCrystal,ChainBolt,PlasmaBeamProjectile}.kt` | 休眠水晶、连锁电弧、等离子束 |
+| `magic/projectile/immobile/{CrystalDetonation,RepulsionFieldProjectile}.kt` | 水晶引爆、斥力场 |
+| `magic/modifier/{LongDistanceCast,FreezeCharge}.kt` | 远距施放、冰冻附魔 |
+| `magic/effect/lifecycle/{CrystalReaction,ChainArc,PlasmaBeam,RepulsionField}.kt` | 新内容生命周期与PD接线 |
+| `magic/effect/lifecycle/{DirectDamage,SpellDamage,FrozenStatus}.kt` | 直接伤害强度契约、护盾/冰冻结算、有限控制状态 |
+| `client/capture/SpellExpansionScenes.kt` | 五条真实施法场景与组合断言 |
+| `tools/spells/generate_icons.py` | 七张新增法术卡的像素图标生成器 |
+
+新增id：`dormant_crystal`、`crystal_detonation`、`chain_bolt`、`long_distance_cast`、`plasma_beam`、
+`repulsion_field`、`freeze_charge`。数值、时序与组合约定见 [design/spell-expansion.md](design/spell-expansion.md)。

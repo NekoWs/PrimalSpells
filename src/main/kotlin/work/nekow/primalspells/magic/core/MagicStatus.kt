@@ -12,6 +12,8 @@ data class MagicStatus(
     var pos: Vector3f = Vector3f(),
     var velocity: Vector3f = Vector3f(),
     var damage: Double = 0.0,
+    /** 直接伤害被接受后附加的冻结时长；0 为关闭。 */
+    var freezeTicks: Int = 0,
     var age: Int = 0,
     var bounces: Int = 0,
     var hitTargets: Int = 0,

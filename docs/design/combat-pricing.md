@@ -129,10 +129,10 @@ R = 基础抗性 4 + 每张护盾卡 × 2                  （多张卡只由第
 > `EnergyShield.SKELETONS_HELD`（要扛几个小白）与 `SKELETON_DPS`（锚本身）。
 
 - **强度 = 这一发实际能打出的东西**（不是把 `MagicStatus` 的字段盲加）：
-  - 直接伤害：投射物**带 `Hurt` 效果**时计 `status.damage`。
+  - 直接伤害：投射物实现 `DirectDamage` 的效果声明单次伤害强度（普通弹的 Hurt 读取 `status.damage`）。
     ⚠️ 陷阱 1：`cluster_bomb` 等碎片是 `clone()` 出来的（保留宿主法术的 `status.damage`），
-    但效果被换成 `Explosion + ConstantAcceleration`，**不带 `Hurt`** ——
-    不判 `Hurt` 就会给它们记一笔根本没打出来的伤害。
+    但效果被换成 `Explosion + ConstantAcceleration`，**不声明直接伤害** ——
+    不判真实伤害效果就会给它们记一笔根本没打出来的伤害。
   - 爆炸项：投射物**带 `Explosion` 效果**时计 `explosionDamage × explosionRadius`。
     ⚠️ 陷阱 2：爆炸参数在 `MagicStatus` 上有默认值（5/2 → 6/2），**每枚投射物身上都有**，
     但只有真正挂了 `Explosion` 的才会引爆——盲加会给每一发火球凭空记 +10 强度。
@@ -155,7 +155,7 @@ R = 基础抗性 4 + 每张护盾卡 × 2                  （多张卡只由第
   （半径 = `SHELL_RADIUS`，与表现面、与「壳内侧」都是同一个面）求交，**且线段起点在壳外**"。
   同一条规则有**两个入口**（这是第 26 轮踩出来的关键）：
   1. **tick 末尾扫场**（`onInventoryTick`）：常规弹速的法术在壳面上被弹开、出玻璃板；
-  2. **命中兜底**（`Hurt` → `ShieldGuard.absorbProjectile`）：投射物的「移动 + 命中结算 + 到寿死亡」
+  2. **命中兜底**（`SpellDamage` → `ShieldGuard.absorbProjectile`）：投射物的「移动 + 命中结算 + 到寿死亡」
      全在 `MagicManager.tick`（`ServerTickEvent.Pre`）里做完，而被动扫场跑在**同一 tick 更晚**的实体 tick 里 ——
      `laser`（5 格/tick、`maxAge = 1`）会在这中间打完整套流程并消失，**扫场根本看不到它**
      （第 26 轮实测：只靠扫场时法杖法力一点没掉）。兜底在真正造成伤害之前再问一次护盾；
@@ -283,3 +283,11 @@ R = 基础抗性 4 + 每张护盾卡 × 2                  （多张卡只由第
   爆炸类（强度 60+）任何等级的杖都挡不住，一律走破口（时长吃满 3 秒，见 §4.97）。
 - 仍未做：法杖的**自然生成**（战利品掉落/合成）—— 现状是创造模式物品栏 + `/primalspells wand <等级>`，
   见 [../issues/open.md](../issues/open.md) 1.2。
+
+
+## 第52轮新法术定价与直接伤害契约
+
+新卡数值表、持续攻击限额和控制免疫见 [spell-expansion.md](spell-expansion.md)。
+能量盾不再只按 Hurt 类识别直接伤害，而是累加 `DirectDamage.damageStrength`；
+Hurt、ChainArc、PlasmaBeam 声明各自单次强度，不将未使用的 status.damage 盲加。
+冰冻需实际接受直接伤害后才施加，盾挡住即不冻结；碎冰加成2仅触发一次，爆炸成功抵扣时不碎冰。

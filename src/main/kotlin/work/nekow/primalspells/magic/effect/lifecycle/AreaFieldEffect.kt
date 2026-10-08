@@ -9,6 +9,7 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.pdParticles
@@ -36,6 +37,9 @@ abstract class AreaFieldEffect(
     private val slownessAmplifier: Int = 0,
     private val pullPerTick: Double = 0.0,
 ) : BaseEffect() {
+
+    // 区域场读取最终位置，且不改自身速度；必须在 Move 与轨道 OVERRIDE 之后结算。
+    final override val phase = EffectPhase.VISUAL
 
     /** 本效果当前施加过迟缓的生物（用于「离开即解除」）。 */
     private val affected = HashSet<LivingEntity>()

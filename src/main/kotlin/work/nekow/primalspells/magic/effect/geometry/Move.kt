@@ -40,7 +40,7 @@ class Move(
     override val phase = EffectPhase.MOTION
 
     override fun onTick() {
-        if (!projectile.alive) return
+        if (!projectile.alive || !projectile.motionEnabled) return
 
         val speed = status.velocity.length()
         val scale = 1 / (1 + dragCoeff * speed)
@@ -81,14 +81,16 @@ class Move(
                         val px = checkPos.x.toDouble()
                         val py = checkPos.y.toDouble()
                         val pz = checkPos.z.toDouble()
-                        candidates.forEach { entity ->
+                        for (entity in candidates) {
+                            // 同一检查点内也可能有重叠实体；首次命中停止后不能继续回调其它目标。
+                            if (!projectile.alive || !projectile.motionEnabled) break
                             // 等价于「以检查点为中心、半边长 = hitRadius 的立方体与实体碰撞箱相交」
                             if (entity.boundingBox.inflate(hitRadius).contains(px, py, pz)) {
                                 status.pos = checkPos
                                 projectile.hitEntity(entity)
                             }
                         }
-                        if (!projectile.alive) return
+                        if (!projectile.alive || !projectile.motionEnabled) return
                     }
 
                     val blockPos = BlockPos(

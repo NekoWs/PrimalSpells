@@ -30,7 +30,7 @@ import work.nekow.primalspells.util.Lore
  * CompoundTag + [TagValueInput] 重新加载（transformation 每 tick 更新，
  * 客户端经 entityData 同步 + interpolation_duration 平滑插值）。
  */
-class DamageNumber(level: Level, pos: Vec3, amount: Double) :
+class DamageNumber(level: Level, pos: Vec3, val amount: Double) :
     Display.TextDisplay(EntityTypes.TEXT_DISPLAY, level) {
 
     private var life = 0

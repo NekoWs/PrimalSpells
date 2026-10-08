@@ -5,6 +5,7 @@ import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleHandle
 import work.nekow.particledrawing.api.ParticleManager
+import work.nekow.particledrawing.api.ParticleVisual
 import work.nekow.primalspells.wand.Wand
 
 /** PD 粒子寿命：`-1` = 永存（由调用方在明确时机销毁，如 `ParticleBatch.clear()`）。 */
@@ -35,6 +36,7 @@ fun Wand.pdParticles(level: ServerLevel): ParticleManager {
  * @param acceleration  恒定加速度（blocks/tick²）。非 null 时多下发一次施力包；之后**两端逐 tick
  *                      自行积分**（速度累加、位置跟上），同样**零逐 tick 包** ——
  *                      「一直受同一个力」的粒子（重力场的下坠）用这个，别自己每 tick 重算速度
+ * @param visual        可选的贴图、朝向与混合规格，在生成时一次下发。
  * @return 句柄；被维度粒子上限拒绝时为 `null`（调用方按「下一 tick 再补」处理，不要空转）
  */
 fun ParticleManager.spawnParticle(
@@ -44,8 +46,11 @@ fun ParticleManager.spawnParticle(
     lifetimeTicks: Int = PD_IMMORTAL,
     velocity: Vec3? = null,
     acceleration: Vec3? = null,
+    visual: ParticleVisual? = null,
 ): ParticleHandle? {
-    val handle = create().position(pos).color(color).scale(scale).lifetime(lifetimeTicks).spawn() ?: return null
+    val builder = create().position(pos).color(color).scale(scale).lifetime(lifetimeTicks)
+    if (visual != null) builder.visual(visual).glowing(visual.glowing).lightLevel(visual.lightLevel)
+    val handle = builder.spawn() ?: return null
     if (velocity != null) handle.setVelocity(velocity)
     // 力与速度**叠加**（PD 明确语义：施力不覆盖已有速度），所以「初速 + 恒定加速度」可以同时给
     if (acceleration != null) handle.applyForce(acceleration, FORCE_FOREVER)

@@ -53,14 +53,22 @@
 
 | 严重度 | 问题 | 位置 | 说明 / 建议 |
 |---|---|---|---|
-| 🟢 | 黑洞粒子带宽（第 16 轮）：球壳 **144** 颗（`ParticleBatch`，成员固定）+ 被吸入粒子（每 tick 3 颗，本模组重算速度 + 一次 `setVelocityAll`） | `magic/effect/lifecycle/BlackHole.kt` | 稳态 **0 包/tick**；进场 1 包/粒子、退场 2 包/粒子（各一次性：逐粒子缓动 `move` / 重新生成 + 向心初速），被吸入粒子 1 包/tick、峰值约 100 |
-| 🟢 | 重力场粒子带宽（第 16 轮）：范围球壳 **120** 颗（`ParticleGroup`：`Draw.sphere` + 慢速自转，**0 包/tick**）+ 下坠粒子（生成时一次施力）+ 波环/井环（组，一次性） | `magic/effect/lifecycle/GravityField.kt` | 下坠粒子 **0 包/tick**（恒定力由两端逐 tick 积分）；波环每 22 tick 建一个组；回收只读 PD 权威位置。球壳 alpha/数量就是「看得出球形范围」的旋钮 |
 | 🟢 | `EnergyShield` 粒子量（第 26 轮重做后**没有常驻粒子**；第 39 轮起爆炸按影响范围铺满）：受击时**单片**玻璃板 ≈ 36 亮边 + 36 填充；投射物打穿「一块 + 相邻一圈」（约 6–7 片）碎裂 ≈ 450 颗；**整罩大爆**（32 片全被波及）≈ 2100 颗碎裂 + 约 1050 颗粉色轮廓 —— 但只占 **3 个 PD 组**（第 39 轮按飘散位移合并） | `magic/modifier/EnergyShield.kt` | 稳态 **0 粒子 / 0 包**（这正是「太挡视野」的解法）。玻璃是**磨砂**而非真玻璃：程序化粒子的贴图写死为纯白方块，真玻璃要等 PD 开放贴图/UV（需求已登记） |
 | 🟡 | **黑洞范围内的「持续轻抖」强度还没实机调过**（第 20 轮收敛后只剩这一处镜头冲击） | `BlackHole.kt` 的 `RUMBLE_MIN`/`RUMBLE_RANGE`、`client/ScreenShakeClient.kt` 的 `MAX_*_DEG` | 现在 0.05~0.13 振幅（越靠球心略强）+ 角度上限 2.6°/1.8°/1.4°：实机站在黑洞里会不会嫌晃、还是根本感觉不到，需要人上手。调参入口就是这两个常量；玩家侧可用原版「受伤视角晃动」一键关掉 |
-| 🟢 | **重力场退场没有动画**：`clearVisuals` 直接把球壳/波环/井环销毁（存活 200 tick，但退场是一帧内消失） | `magic/effect/lifecycle/GravityField.kt` | 与黑洞（整壳塌缩）/护盾（逐块淡出）不一致；第 17 轮的录制把它拍了下来（`build/capture/out/gravity_field`）。是否补退场动画待定；判定脚本已按「设计上就是立即消失」记录该口径。第 20 轮已保证「退场后地面不会再冒环/溅粒子」（未落地的溅射会撤销、已溅出的粒子随批次清掉） |
 | 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
 | 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 剪枝只剩「场上无投射物直接返回」：第 26 轮的扫掠判定要看**线段**，原来的「到玩家中心距离球」粗筛（按点距离）会漏判，已删除。法术数量上量级时可考虑空间分桶/网格 |
 | 🟡 | 三个**当前无使用者**的扩展点：`Magic.onPassiveIdle`、`Magic.saveRuntimeState`/`loadRuntimeState`（+ `Wand.magicStates`）、`Magic.onUnloaded` 的既有用例 | `magic/core/Magic.kt`、`wand/Wand.kt` | 第 26 轮护盾重做后它们都没有使用者了（护盾不再有常驻球壳、也不再需要跨存档进度）。机制本身是通用钩子、文档齐全，**保留**待将来「有进度的法术 / 放下后收尾」；清理与否待定 |
 
 > 自转/淡出这类**组级编排**都用 `ParticleGroup`（客户端求值、零逐 tick 包），与 `ParticleBatch` 的分工见
 > [design/effects-api.md §0.2](../design/effects-api.md)。
+
+## 3. 本机验证环境
+
+### 🟡 3.1 OSHI 性能计数器异常导致录制总体报告失败（2026-10-08）
+
+- 现象：本机启动 MC 时记录 `Unable to locate English counter names in registry Perflib 009`，
+  OSHI 查询进程 userTime / virtualSize / residentSetSize 时又有空指针；特效场景断言均过，总体仍失败。
+- 复现：`pwsh tools/capture/capture.ps1 -Scene black_hole,gravity_field`；本轮修改前的基线也出现相同日志。
+- 影响：无法宣称录制流水线整体通过；第49轮两场及第52轮五场均1280×720、零丢帧，末尾PD粒子数为零，视觉判据通过。
+- 涉及：Windows Perflib/OSHI，`run/capture/logs/latest.log`、`tools/capture/assemble.py` 的日志门禁。
+- 下一步：检查该主机性能计数器环境或上游 OSHI 兼容性，再重跑；未过滤异常或关闭日志门禁。

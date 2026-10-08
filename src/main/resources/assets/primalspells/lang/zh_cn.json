@@ -106,5 +106,19 @@
   "item.primalspells.wand_t5": "大师杖",
   "item.primalspells.wand_t6": "大法师杖",
   "wand.primalspells.variant.charged": "%s·蓄能",
-  "tooltip.primalspells.size": "槽位：%s"
+  "tooltip.primalspells.size": "槽位：%s",
+  "item.primalspells.dormant_crystal": "休眠水晶",
+  "lore.primalspells.dormant_crystal.desc": "投出粘附方块的水晶，爆炸可将其激活。存活30秒，每位施法者最多24颗。",
+  "item.primalspells.crystal_detonation": "水晶引爆",
+  "lore.primalspells.crystal_detonation.desc": "激活施法点16格内属于你的休眠水晶，短暂预警后引爆。",
+  "item.primalspells.chain_bolt": "连锁电弧",
+  "lore.primalspells.chain_bolt.desc": "首击后最多跳向3个新目标，每跳伤害乘0.7；跳跃距离5格，无法穿墙。",
+  "item.primalspells.long_distance_cast": "远距施放",
+  "lore.primalspells.long_distance_cast.desc": "将本次法术出生点前移6格，遇墙截断；叠加最多12格。",
+  "item.primalspells.plasma_beam": "等离子束",
+  "lore.primalspells.plasma_beam.desc": "束源发出6格光束，遇墙截断；每5刻伤害1.5，最多4个目标。持续最多2秒。",
+  "item.primalspells.repulsion_field": "斥力场",
+  "lore.primalspells.repulsion_field.desc": "展开半径4格的斥力场，推开魔法与原版投射物（包括自己的），持续6秒。",
+  "item.primalspells.freeze_charge": "冰冻附魔",
+  "lore.primalspells.freeze_charge.desc": "直接伤害乘0.75，命中后冻结1.5秒，解冻后免疫2秒。4点以上重击额外造成2点碎冰伤害。"
 }

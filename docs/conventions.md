@@ -35,12 +35,12 @@ src/main/kotlin/work/nekow/primalspells/
 │  │  ├─ DelayedCastProjectile.kt DroneSwarm.kt
 │  │  └─ immobile/              静止/定点类投射物
 │  │     ├─ SmallExplosion.kt LargeExplosion.kt GravityFieldProjectile.kt BlackHoleProjectile.kt
-│  ├─ modifier/                 修饰器实现（26 个）
+│  ├─ modifier/                 修饰器实现（28 个）
 │  └─ effect/                   特效（挂在投射物上的可组合行为）
 │     ├─ BaseEffect.kt          特效基类：六钩子 + phase + 同类叠加辅助（stackScale/isStackPrimary）
 │     ├─ geometry/              空间与运动：Position, Velocity, Move, Bounce, Tracking, ConstantAcceleration
 │     ├─ lifecycle/             时机与结算：Trigger, DelayedTrigger, Hurt, Explosion（+ ExplosionFx 表现层）, AreaFieldEffect, BlackHole, GravityField
-│     └─ visual/                粒子表现：Trajectory（头部本体标记 + 拖尾）
+│     └─ visual/                粒子表现：Trajectory（头部本体标记 + 拖尾）、BlackHoleFx（暗核/吸积盘/星尘）
 ├─ wand/                        法杖运行时状态
 │  ├─ Wand.kt                   牌堆（drawPile/hand/discardPile）、施法、法力与冷却（小数 tick + 余数累加）、NBT 序列化（槽位保序）
 │  ├─ WandTier.kt               法杖等级表（六级 + 调试杖：法力/充能速度/施放延迟/充能时间/槽位/施放数）+ 蓄能型变体 + 创建时掷点，见 design/wand-tiers.md
@@ -183,6 +183,7 @@ magic/modifier  ──→ magic/core, magic/effect
 | `magic/Projectile.kt` | `magic/projectile/Projectile.kt` | 与子类同包 |
 | `magic/revise/` | `magic/modifier/` | 27 个修饰器；`ReciprocateRevise`→`Reciprocate`、`SineWaveRevise`→`SineWave` |
 | `magic/effect/*`（单层平铺） | `magic/effect/{geometry,lifecycle,visual}/` | `BaseEffect.kt` 留在 `effect/` 根 |
+| `magic/effect/lifecycle/BlackHole.kt` 内视觉实现 | `magic/effect/visual/BlackHoleFx.kt` | 第 49 轮：表现与引力结算分离 |
 | `ModDamageTypes.kt`（包根） | `registry/ModDamageTypes.kt` | 注册类统一归口 |
 | `item/ModItems.kt`, `item/ModMenus.kt` | `registry/` | 同上 |
 | `block/ModBlocks.kt` | `registry/ModBlocks.kt` | 同上 |
@@ -275,3 +276,13 @@ magic/modifier  ──→ magic/core, magic/effect
 新增：法术小包
 构建：升级前置模组版本
 ```
+
+
+### 第52轮新增落位
+
+可飞水晶/电弧/束源放在 `magic/projectile/`，水晶引爆和斥力场放在 `projectile/immobile/`；
+远距施放与冰冻附魔放在 `magic/modifier/`。玩法时机、直接伤害接入与短命冰冻状态归
+`magic/effect/lifecycle/`；接线未新增客户端粒子引擎。五条实机场景独立放在
+`client/capture/SpellExpansionScenes.kt`，图标生成器放在 `tools/spells/`。
+旧→新：`Hurt` 内的直接伤害/护盾兜底 → `lifecycle/SpellDamage`（Hurt、电弧、束源共用），
+护盾仅识别 Hurt → 识别 `lifecycle/DirectDamage` 的单次伤害强度。详见 design/spell-expansion.md。

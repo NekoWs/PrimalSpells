@@ -15,6 +15,12 @@ import work.nekow.primalspells.magic.projectile.immobile.BlackHoleProjectile
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.projectile.TeleportProjectile
 import work.nekow.primalspells.magic.modifier.*
+import work.nekow.primalspells.magic.projectile.DormantCrystal
+import work.nekow.primalspells.magic.projectile.ChainBolt
+import work.nekow.primalspells.magic.projectile.PlasmaBeamProjectile
+import work.nekow.primalspells.magic.projectile.immobile.CrystalDetonation
+import work.nekow.primalspells.magic.projectile.immobile.RepulsionFieldProjectile
+import work.nekow.primalspells.magic.effect.lifecycle.FrozenStatus
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.Deferred
 
@@ -35,6 +41,7 @@ object MagicManager {
     }
 
     fun tick() {
+        FrozenStatus.tick()
         val iter = projectiles.iterator()
         while (iter.hasNext()) {
             val it = iter.next()
@@ -91,6 +98,13 @@ object MagicManager {
         register { TeleportProjectile() }
         register { QuantumEntanglement() }
         register { EnergyShield() }
+        register { DormantCrystal() }
+        register { CrystalDetonation() }
+        register { ChainBolt() }
+        register { LongDistanceCast() }
+        register { PlasmaBeamProjectile() }
+        register { RepulsionFieldProjectile() }
+        register { FreezeCharge() }
     }
 
     @SubscribeEvent
@@ -100,6 +114,7 @@ object MagicManager {
 
     @SubscribeEvent
     fun onServerStopping(event: ServerStoppingEvent) {
+        FrozenStatus.clear()
         projectiles.clear()
         Deferred.clear()
     }

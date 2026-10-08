@@ -227,6 +227,11 @@ object CaptureDriver {
     /** 一次性画面配置：把我们不想要的一切关掉，让输出里只剩特效本身。 */
     private fun configureClient(mc: Minecraft) {
         hideWindow(mc)
+        // 隐藏窗口在部分 Windows 驱动上返回 0×0，Window 会兜底成 1×1。
+        // 录制走离屏目标，明确保持请求的分辨率，不能把缩成一像素的帧当成证据。
+        mc.window.setWidth(1280)
+        mc.window.setHeight(720)
+        mc.framebufferSizeChanged()
         mc.options.pauseOnLostFocus = false
         mc.options.bobView().set(false)
         mc.options.fovEffectScale().set(0.0)

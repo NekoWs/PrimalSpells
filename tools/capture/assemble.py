@@ -42,6 +42,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Windows 默认 GBK 不能打印损坏日志中的替代字符；报告文件始终是 UTF-8。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 try:
     import numpy as np
     from PIL import Image, ImageDraw
@@ -53,14 +57,26 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
+    # 护盾受击玻璃亮度远高于电弧；在独立电弧窗口内量渲染和渐隐，不混用护盾峰值。
+    "expansion_arc": {"length": 150, "title": "电弧衰减 / 去重 / 护盾", "decay": "gradual", "quiet": (0, 8), "fade_window": (8, 64)},
+    "expansion_combinations": {"length": 180, "title": "多重施放 / 触发水晶 / 环绕光束", "decay": "gradual", "quiet": (0, 8)},
+    "expansion_plasma": {"length": 145, "title": "持续光束 / 遮挡 / 寿命", "decay": "gradual", "quiet": (0, 8)},
+    "expansion_utilities": {"length": 220, "title": "冰冻 / 远距 / 斥力", "decay": "gradual", "quiet": (0, 8)},
     # decay: gradual = 该效果**设计上**有退场动画（必须逐帧衰减）；instant = 设计上就是立刻消失；
     #        none    = 这一场有**两套互不相干的视觉系统**（玻璃板 + 爆炸烟）或收场不是蓝色像素，
     #                  全局峰值不可靠，退场交给场景专属判据（必须在 spec 里另有对应断言）
     "black_hole": {
-        "length": 108, "title": "黑洞：进场长出 → 稳态 → 向心塌缩", "decay": "gradual",
+        "length": 108, "title": "黑洞：暗核 / 双层吸积盘 → 旋转塌缩", "decay": "gradual",
+    },
+    "black_hole_moving": {
+        "length": 108, "title": "黑洞：移动跟随 / 急停回圆 / 反向拉伸", "decay": "gradual",
+    },
+    "gravity_field_moving": {
+        "length": 130, "title": "重力场：移动球壳与地面井环跟随", "decay": "gradual",
     },
     "gravity_field": {
-        "length": 130, "title": "重力场：球形范围 + 下坠粒子 + 落地波环",
+        "length": 130, "title": "重力场：球面经线 / 下压刻度波 / 地面双井环",
         # 第 47 轮由 instant 改 gradual：静止场（重力场/黑洞）现在有**共用的退场余晖**
         # （`Trajectory.emitFieldAfterglow`，寿命 6~24 tick 错开），本体一死是**逐颗淡出**、不再是一刀切断。
         # 原先的 instant 记的是"那时确实没有退场动画"；设计变了，口径跟着改（黑洞那边本来就是 gradual）。
@@ -300,6 +316,16 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         result["asserts"].append(("有帧产出", False, "frames/ 为空 —— 录制没跑起来或被删了"))
         return result
 
+    expected_size = (1280, 720)
+    sizes = set()
+    for frame in frames:
+        with Image.open(frame) as im:
+            sizes.add(im.size)
+    result["asserts"].append((
+        "录制分辨率正确", sizes == {expected_size},
+        f"实际 {sorted(sizes)}，要求 {expected_size}（隐藏窗口不能退化成 1×1）",
+    ))
+
     blue_cover = [int(blue_mask(f).sum()) for f in frames]
     red_cover = [int(red_mask(f).sum()) for f in frames]
     warm_cover = [int(warm_mask(f).sum()) for f in frames]
@@ -341,9 +367,20 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
 
+    # 多系统场景可指定独立时间窗；保留同样的最低像素数与渐隐跨度门槛。
+    fade_cover, fade_peak, fade_idx, fade_empty = cover, peak, peak_idx, empty
+    if "fade_window" in spec:
+        lo, hi = spec["fade_window"]
+        rows = read_tsv(sdir / "frames.tsv")
+        fade_cover = [cover[int(row[0])] for row in rows if lo <= int(row[1]) < hi]
+        fade_peak = max(fade_cover, default=0)
+        fade_idx = fade_cover.index(fade_peak) if fade_cover else 0
+        fade_empty = max(1, int(fade_peak * EMPTY_RATIO))
+        result["asserts"].append(("独立效果确实渲染", fade_peak >= total_px * MIN_PEAK_RATIO,
+            f"游戏 tick {lo}-{hi} 峰值 {fade_peak} 像素（排除其它视觉系统）"))
     # 退场渐变：从峰值衰减到 50% 与 <5% 的位置差
-    t50 = next((i for i in range(peak_idx, len(cover)) if cover[i] <= peak * 0.5), len(cover) - 1)
-    tend = next((i for i in range(t50, len(cover)) if cover[i] <= empty), len(cover) - 1)
+    t50 = next((i for i in range(fade_idx, len(fade_cover)) if fade_cover[i] <= fade_peak * 0.5), len(fade_cover) - 1)
+    tend = next((i for i in range(t50, len(fade_cover)) if fade_cover[i] <= fade_empty), len(fade_cover) - 1)
     span = tend - t50
     if spec.get("decay", "gradual") == "gradual":
         result["asserts"].append(
@@ -416,6 +453,23 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
              visible >= spec.get("min_fade_frames", 3) and seg and seg[-1] == 0,
              f"尾段 {lo}-{hi} 有 {visible} 帧仍可见、末帧 {seg[-1] if seg else '-'}"),
         )
+    if scene == "black_hole_moving":
+        # 固定镜头下检查明亮内盘确实离开出生点、反向后抵达另一侧。
+        # 用 frames.tsv 的游戏 tick 定位，避免丢帧导致时间窗偏移；低亮外环和历史星尘不参与。
+        rows = [row.split("\t") for row in (sdir / "frames.tsv").read_text(encoding="utf-8").splitlines() if row.strip()]
+        centers = []
+        for tick in (18, 41, 66):
+            row = min(rows, key=lambda row: abs(int(row[1]) - tick))
+            with Image.open(sdir / "frames" / f"{int(row[0]):05d}.png") as im:
+                rgb = np.asarray(im.convert("RGB"), dtype=np.int16)
+            _, xs = np.where((rgb[:, :, 2] > 180) & (rgb[:, :, 2] - rgb[:, :, 0] > 12))
+            centers.append(float(np.median(xs)) if len(xs) else float("nan"))
+        start, first_stop, reversed_stop = centers
+        result["asserts"].append((
+            "明亮内盘随本体往返移动", start - first_stop > 60 and reversed_stop - start > 60,
+            f"t=18/41/66 横向中心 {centers}，两侧离开出生点均须 >60px",
+        ))
+
     # 视频/动图/拼图
     ok_mp4, err_mp4 = build_video(sdir / "frames", sdir / f"{scene}.mp4", fps)
     ok_gif, err_gif = build_gif(sdir / "frames", sdir / f"{scene}.gif", fps, 640)

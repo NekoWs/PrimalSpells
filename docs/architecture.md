@@ -83,7 +83,7 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 
 `Modifier : Magic`，唯一的额外 API 是 `effects(): List<BaseEffect>`——返回**克隆后**的 effect 列表。
 
-`magic/modifier/` 下 26 个实现分两类：
+`magic/modifier/` 下 28 个实现分两类：
 
 1. **纯注入**：在 `init` 里 `effects += SomeEffect(...)`（如 `Homing` → `Tracking`、`MoreBounce` → `Bounce(8)`）；
 2. **匿名效果**：在 `init` 里 `effects += object : BaseEffect() { override fun onActive() { … } }`，直接改 `status`/`projectile` 的字段（如 `Diffusion` 放大爆炸半径、`Piercing` 改 `maxHitTargets`）。
@@ -107,8 +107,8 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 | | `Hurt` | 命中实体造成伤害（临时清零 `invulnerableTime`；伤害类型缺失时跳过而不是崩服） |
 | | `Explosion` | 自定义爆炸：音效 + 粒子 + 距离衰减伤害与击退（**不破坏方块**，见 §8.1） |
 | | `AreaFieldEffect` | 区域场基类：**每 tick** 结算 —— 范围内刷新迟缓 + 按半径拉拽 + **对半径内投射物施力（黑洞口把法术吸进去、重力场往下压）**；实体离开范围立即撤销迟缓。视觉由子类用 PD 粒子实现（`spawnVisuals`/`updateVisuals`/`clearVisuals` 三个钩子） |
-| | `BlackHole` | 半径 5 引力场：迟缓 I + 把生物与**魔法投射物**拉向中心；PD 粒子每 tick 1 个（紫色、随机切向初速、**本模组积分位置**、吸力随距离增强 + 阻尼，抵达中心 0.1 格才销毁） |
-| | `GravityField` | 半径 5 重力场：迟缓 IV + 给**魔法投射物**向下的力；PD 粒子两层 —— 半径 5 的半透明球壳标识范围（96 个永存），以及上半球表面生成、竖直下落、碰到下半球表面即销毁的下落粒子 |
+| | `BlackHole` | 半径 5 引力场：迟缓 I + 拉拽生物和投射物；视觉委托 `BlackHoleFx`（小粒子暗核、倾斜双层吸积盘、星尘吸入、原组塌缩淡出）。星尘位置由 PD 积分 |
+| | `GravityField` | 半径 5 重力场：迟缓 IV + 压低投射物；球面经线、顶部发源环、加速下压刻度波、落体细线与地面双井环，结束时固定结构淡出 |
 | `visual/` | `Trajectory` | 头部一颗 `track` 白热菱形（本体标记）+ 发射器尾迹（按里程发射、寿命曲线驱动） |
 | | `Trajectory` | 在投射物后方喷拖尾粒子（发射点反向偏移）；速度≈0 时退化为原地氛围粒子 |
 
@@ -139,10 +139,10 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 | 阶段 | onActive 位置 | onTick 位置 | 谁在用 |
 |---|---|---|---|
 | `SETUP` | 最先 | 最先（空实现） | `Position`、`Velocity` —— 写入出生点与初速 |
-| `MODIFIER`（默认） | SETUP 之后 | 位置积分**之前** | 修饰器注入的效果（改速度/伤害/爆炸参数），以及 `Trajectory`、`Hurt`、`Trigger`、`Explosion` 等 |
+| `MODIFIER`（默认） | SETUP 之后 | 位置积分**之前** | 修饰器注入的效果（改速度/伤害/爆炸参数），以及 `Hurt`、`Trigger`、`Explosion` 等 |
 | `MOTION` | — | 中间 | `Move` —— 每 tick **唯一**推进 `status.pos` |
 | `OVERRIDE` | — | 积分**之后** | `SelfOrbit`、`SphereOrbit`、`QuantumEntanglement.OrbitEffect` —— 绝对定位，不再被积分位移叠加 |
-| `VISUAL` | — | 最后 | `Trajectory` —— 读本 tick 的最终位置发粒子 |
+| `VISUAL` | — | 最后 | `Trajectory`、`AreaFieldEffect`、束源/斥力场 —— 读本 tick 的最终位置 |
 
 一句话规则：**改速度留在默认阶段，写位置用 `OVERRIDE`，读最终位置用 `VISUAL`。**
 
@@ -306,6 +306,11 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 9. 与 ParticleDrawing 的接口现状
 
+> **第 49 轮区域视觉更新**：黑洞视觉已拆到 `magic/effect/visual/BlackHoleFx.kt`，
+> 固定结构改用 PD 组，退场直接追加缩放/淡出；旧的球壳重建、反弹与 Deferred 三拍已删除。
+> 重力场改为经线/刻度波/双井环，固定结构淡出。当前模型、预算和验证见
+> [design/field-effects.md](design/field-effects.md)；下方注明轮次的旧接线记录保留供迁移追溯。
+
 - 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.14-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 集合类粒子（黑洞球壳、被吸入粒子、下落粒子）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
@@ -403,3 +408,18 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
 - ⚠️ **遇到 ParticleDrawing 的 API 缺陷或能力缺失时的处理政策（硬性）见 [conventions.md](conventions.md) §9 与 [design/effects-api.md](design/effects-api.md) §0**：
   不得在本模组自行另写一套替代实现，应停止尝试并列出 API 修改需求。
+
+
+### 第 51 轮：区域场跟随最终定位
+
+`AreaFieldEffect.phase = VISUAL`，范围结算与表现统一读取 Move/OVERRIDE 之后的场心。
+黑洞暗核/内盘、重力场球壳/井环移动时更新 PD 组轴心；黑洞外环用 PD 表达式仿作惯性椭圆，
+停止后恢复。已发射的世界空间粒子保持历史轨迹。造型与预算见 [design/field-effects.md](design/field-effects.md)。
+
+
+### 第52轮新增内容的核心接缝
+
+`Projectile` 保存 `launchDirection`，Velocity 乘速使用副本；`motionEnabled=false` 停止 Move（含命中后子步）与恒定加速度。
+短命冻结状态由 MagicManager 驱动和停服清理；不会持久化。直接伤害效果声明 `DirectDamage`，
+Hurt/电弧/束源通过 `SpellDamage` 共用护盾和冰冻接入；水晶爆炸通知只排队、不递归结算。
+内容规则和新增包文件见 [design/spell-expansion.md](design/spell-expansion.md)。

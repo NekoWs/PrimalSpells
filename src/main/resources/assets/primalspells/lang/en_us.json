@@ -106,5 +106,19 @@
   "item.primalspells.wand_t5": "Master Wand",
   "item.primalspells.wand_t6": "Archmage Wand",
   "wand.primalspells.variant.charged": "Charged %s",
-  "tooltip.primalspells.size": "Slots: %s"
+  "tooltip.primalspells.size": "Slots: %s",
+  "item.primalspells.dormant_crystal": "Dormant Crystal",
+  "lore.primalspells.dormant_crystal.desc": "Throws a crystal that sticks to blocks. Explosions arm it. Lasts 30s; maximum 24 per caster.",
+  "item.primalspells.crystal_detonation": "Crystal Detonation",
+  "lore.primalspells.crystal_detonation.desc": "Arms your dormant crystals within 16 blocks of the cast point, with a brief warning.",
+  "item.primalspells.chain_bolt": "Chain Bolt",
+  "lore.primalspells.chain_bolt.desc": "Chains to up to 3 new targets within 5 blocks; each jump deals 70% damage. Walls block jumps.",
+  "item.primalspells.long_distance_cast": "Long-Distance Cast",
+  "lore.primalspells.long_distance_cast.desc": "Moves the cast origin forward 6 blocks, stopping at walls. Stacking is capped at 12 blocks.",
+  "item.primalspells.plasma_beam": "Plasma Beam",
+  "lore.primalspells.plasma_beam.desc": "Emits a 6-block beam blocked by walls. Deals 1.5 damage every 5 ticks to up to 4 targets; lasts at most 2s.",
+  "item.primalspells.repulsion_field": "Repulsion Field",
+  "lore.primalspells.repulsion_field.desc": "A 4-block field pushes magic and vanilla projectiles, including your own, for 6 seconds.",
+  "item.primalspells.freeze_charge": "Freeze Charge",
+  "lore.primalspells.freeze_charge.desc": "Direct damage x0.75. Freezes on hit for 1.5s, followed by 2s immunity. Hits of 4+ damage shatter ice for +2 damage."
 }

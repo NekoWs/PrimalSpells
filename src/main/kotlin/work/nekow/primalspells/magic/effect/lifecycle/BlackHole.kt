@@ -2,381 +2,63 @@ package work.nekow.primalspells.magic.effect.lifecycle
 
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
-import work.nekow.particledrawing.api.Color
-import work.nekow.particledrawing.api.ParticleBatch
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.particledrawing.core.easing.EasingType
+import work.nekow.primalspells.magic.effect.visual.BlackHoleFx
 import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.util.Deferred
-import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.ScreenShake
-import work.nekow.primalspells.util.spawnParticle
 
 /**
- * 黑洞 —— 半径 5 的引力场：
- * - **生物**：迟缓 I，并按 `0.12 / (距离 + 0.5)` 每 tick 拉向中心；
- * - **魔法投射物**：每 tick 沿指向中心的方向加速（吸力同样随距离衰减）—— 把飞进来的法术吸进去；
- * - **粒子**（ParticleDrawing）分两层：
- *   1. **范围球壳**：半径 [EFFECT_RADIUS] 的球面，[SHELL_PARTICLES] 个**永存**粒子，
- *      标识黑洞的**大小/作用范围**，并带**进场 / 退场动画**（见下）；
- *   2. **被吸入的粒子**：每 tick 在球壳上生成 [PARTICLES_PER_TICK] 个（第一颗亮、其余暗紫），
- *      初速度取**随机切向**（绕中心旋转），随后被吸向中心，抵达中心（[CONSUME_RADIUS] 内）即销毁。
- *
- * ## 球体的进入 / 退出动画：**整壳的每颗粒子都参与**
- *
- * 第 15 轮的做法是「球壳淡入 + 另外撒一圈向心粒子」，实机反馈是「外面的大球不动、
- * 里面另有一个小球在缩」—— 动画与球壳脱节。第 16 轮改成**球壳本身**做径向运动：
- *
- * - **进场**：整壳粒子先在球心附近（[ENTER_START_RADIUS_SCALE] 倍半径）生成，随即逐粒子下发
- *   `ParticleHandle.move(自己的球面位置, [ENTER_TICKS], EASE_OUT)` —— **PD 在客户端逐帧缓动**，
- *   服务端只发一次指令。观感是「这颗球**从中心长出来**」；
- * - **退场分三拍**（第 18 轮按实机反馈重做：原来是一段匀速直线收缩「慢慢缩回去」）：
- *   1. **整壳砸进去**（[EXIT_TICKS] = 8 tick）：整壳粒子按原位置/原颜色重新生成，初速 0、
- *      每颗粒子各给**向心加速度** `a = 2d/(T(T+1))`（PD 两端按 `v += a; pos += v` 积分，
- *      `d(n) = a·n(n+1)/2` → 第 T tick 正好抵达中心、寿命同刻到点）。观感：几乎不动地悬一下，
- *      最后 2~3 tick 猛砸进中心；
- *   2. **反弹出一个小球**（[REBOUND_TICKS]）：在中心生成一颗**小得多**的球（半径约 0.3），
- *      给**向外的初速 + 向内的加速度** —— 它先弹开、在约 0.95 格处停住、再被吸回去；
- *   3. **收成一点**：小球回到中心时一次性收尾（[FINAL_PARTICLES] 颗微光 + 镜头冲击）。
- *      曾经这里是一记 40 颗的白色爆闪，实机反馈「看起来有点廉价」—— 爆闪换成「再吸回去」，
- *      力量感来自**塌缩本身**而不是炸一下。
- *
- *   为什么每拍都「重新生成」而不是给旧粒子设速度：球壳粒子是永存的，而 `ParticleHandle` 没有改寿命的入口 ——
- *   不重新生成就会在抵达中心后继续飞出去，变成永远留在世界里的粒子。
- *   三拍之间的衔接（此刻本效果已经死了）由 `util/Deferred` 排到点触发。
- *
- * 两条路径都是**一次性**的：进场 1 包/粒子（缓动移动）、退场 2 包/粒子（销毁 + 重新生成 + 初速），
- * 稳态 **0 包/tick**。（第 15 轮的组级 `fadeIn`/`spin` 随之去掉：组要额外维护程序与生命周期，
- * 而自转在这种球壳上几乎看不出来；见 `docs/issues/resolved.md` 第 16 轮。）
- *
- * ## 吸力：越近越强 + 阻尼（阻尼系数是「能否落到中心」的唯一开关）
- *
- * 加速度随距离增强（`0.12/(距离+0.5)`），并且每 tick 顺带乘一点阻尼（[DAMPING_PER_TICK]）让切向速度衰减。
- * 阻尼太弱时粒子会形成**偏心率很大的椭圆轨道**：半径降到某个值后来回振荡，永远进不了中心。
- * 实测（500 个随机样本数值复算）：`0.995` → 抵达中心 **0/500**（在 r≈2.2~5.0 之间绕到寿命结束）；
- * 现用的 **[DAMPING_PER_TICK] = 0.9** → **100%** 抵达中心，平均 **34 tick**。
- * 参数取值过程见 `docs/issues/resolved.md` 第 11 轮。
- *
- * ## 运动：速度每 tick 由本模组重算，位置积分归 PD
- *
- * 吸力**随距离变化**，PD 的 `applyForce` 那种「一次下发的恒定加速度」表达不了 —— 每 tick 都得重算每颗粒子
- * 该有的速度。但**位置不再由本模组积分**：`ParticleBatch.setVelocityAll(velocities)` 一次包覆盖全组
- * （**1 包/tick，与粒子数无关**），之后由 PD 逐 tick 做 `pos += vel`（服务端权威；暂停时客户端不再外推）。
- *
- * 好处：位置与速度都读 PD 的权威值（`forEach` / `removeIf`），**本模组不持有任何跨 tick 的粒子状态**。
- * 渲染/同步/寿命/可见性依旧由 ParticleDrawing 负责。
+ * 半径五格的黑洞：生物迟缓 I，生物与魔法投射物按 0.12/(距离+0.5) 拉向中心。
+ * 服务端结算由 AreaFieldEffect 驱动，暗核、吸积盘与星尘表现委托 BlackHoleFx。
+ * 范围内保持低幅镜头呼吸；视觉退场由 PD 组自行播放，不再重建三拍球壳。
  */
 class BlackHole : AreaFieldEffect(
     radius = EFFECT_RADIUS,
     slownessAmplifier = 0,
     pullPerTick = PULL_PER_TICK,
 ) {
-    /**
-     * 范围球壳：成员固定的 `ParticleBatch`（进场时一次性铺满、永存）。
-     *
-     * 用 `ParticleBatch` 而不是 `ParticleGroup`：本轮进/退场都是**逐粒子径向**动画，
-     * 而组级编排只能整组统一变换（且 `ParticleGroup.scale` 目前不缩「到轴心的距离」，
-     * 见 `docs/issues/pd-api-requests.md`）—— 逐粒子的径向运动会与组的客户端指令互相覆盖。
-     * 代价：球壳是**固定成员集**，不再有 `ensureSize` 的缺量补齐（个别生成被上限拒绝时留空缺）。
-     */
-    private var shell: ParticleBatch? = null
+    private val visuals = BlackHoleFx()
+    private var opened = false
 
-    /** 被吸入的粒子：成员、速度、位置全部由 PD 维护，本模组只每 tick 重算一次速度。 */
-    private var sucked: ParticleBatch? = null
-
-    /** 球壳取点（单位方向，Fibonacci 均匀分布）：结果确定，算一次即可。 */
-    private val shellOffsets: List<Vec3> by lazy { ParticleShapes.fibonacciSphere(SHELL_PARTICLES) }
-
-    /** 反弹小球的取点（均匀球面，算一次即可）。 */
-    private val reboundOffsets: List<Vec3> by lazy { ParticleShapes.fibonacciSphere(REBOUND_PARTICLES) }
-
-    /**
-     * 球壳每颗粒子的颜色：`fibonacciSphere` 由 +y 往 −y 排，所以下标 i 直接对应「从顶到底」的渐变参数；
-     * 每隔 [SPARKLE_EVERY] 颗掺一个亮紫星点。
-     */
-    private val shellColors: List<Color> by lazy {
-        List(SHELL_PARTICLES) { i ->
-            val base = SHELL_RIM.lerp(SHELL_CORE, ((i + 0.5) / SHELL_PARTICLES).toFloat())
-            if (i % SPARKLE_EVERY == 0) base.lerp(SHELL_SPARK, 0.7f) else base
-        }
-    }
-
-    /** 首 tick 铺球壳（含进场动画），之后每 tick 只补被吸入的粒子。 */
     override fun spawnVisuals(manager: ParticleManager, center: Vec3) {
-        if (shell == null) spawnShell(manager, center)
-        spawnSucked(manager, center)
-    }
-
-    /**
-     * 铺球壳 + 进场动画：每颗粒子在球心附近生成，随即被下一条指令「缓动」送到自己的球面位置。
-     *
-     * 缓动由 PD 在客户端求值（服务端只发一次指令），所以整个过程 **0 逐 tick 包**；
-     * `EASE_OUT` = 起步快、收尾慢，看起来是「炸开之后稳稳停在球面上」。
-     */
-    private fun spawnShell(manager: ParticleManager, center: Vec3) {
-        val batch = ParticleBatch(manager)
-        for (i in 0 until SHELL_PARTICLES) {
-            val dir = shellOffsets[i]
-            val start = center.add(dir.scale(EFFECT_RADIUS * ENTER_START_RADIUS_SCALE))
-            val target = center.add(dir.scale(EFFECT_RADIUS))
-            val handle = manager.spawnParticle(start, shellColors[i], SHELL_SCALE)
-            handle?.move(target, ENTER_TICKS, EasingType.EASE_OUT)
-            batch.add(handle)
-        }
-        shell = batch
-        // 开场一记镜头冲击：进场的缓动是 EASE_OUT（起步最快），这一下正好压在最猛的那一刻
-        ScreenShake.shake(manager.level, center, radius = OPEN_SHAKE_RADIUS, amplitude = 0.45f, ticks = 8)
-    }
-
-    /** 每 tick 在球壳上生成被吸入的粒子（第一颗亮、其余暗紫），初速沿随机切向。 */
-    private fun spawnSucked(manager: ParticleManager, center: Vec3) {
-        val random = manager.level.random
-        val batch = sucked ?: ParticleBatch(manager).also { sucked = it }
-        repeat(PARTICLES_PER_TICK) { index ->
-            val radial = ParticleShapes.randomUnitVector(random)
-            val pos = center.add(radial.scale(EFFECT_RADIUS))
-            // 初速度取随机切向（绕中心转）：一次速度包，之后每 tick 由 updateVisuals 重算
-            val tangent = ParticleShapes.randomTangent(radial, random).scale(TANGENTIAL_SPEED)
-            val spark = index == 0
-            batch.add(
-                manager.spawnParticle(
-                    pos,
-                    if (spark) SPARK_COLOR else SUCTION_COLOR,
-                    if (spark) SPARK_SCALE else SUCTION_SCALE,
-                    LIFETIME_TICKS,
-                    tangent,
-                )
-            )
+        visuals.spawn(manager, center)
+        if (!opened) {
+            opened = true
+            ScreenShake.shake(manager.level, center, radius = 24.0, amplitude = 0.45f, ticks = 8)
         }
     }
 
-    /**
-     * 每 tick 重算每颗粒子的速度并**一次包**下发；位置由 PD 积分，抵达中心的粒子销毁。
-     *
-     * 顺序：`forEach` 读 PD 的权威 pos/vel 算出本 tick 速度 → `setVelocityAll` 一包下发 →
-     * 再按位置回收（读 PD 权威位置，读不产包）。全程本模组不留跨 tick 状态。
-     */
     override fun updateVisuals(manager: ParticleManager, center: Vec3) {
+        visuals.update(center)
         rumbleInside(manager, center)
-        val batch = sucked ?: return
-        if (batch.isEmpty()) return
-
-        // 速度迭代：v ← v·阻尼 + 向心加速度（随距离增强）。位置由 PD 做 pos += v，与这里一一对应
-        val velocities = ArrayList<Vec3>(batch.size())
-        batch.forEach { _, _, pos, vel ->
-            val toCenter = center.subtract(pos)
-            velocities += vel.scale(DAMPING_PER_TICK)
-                .add(toCenter.normalize().scale(PULL_PER_TICK / (toCenter.length() + 0.5)))
-        }
-        batch.setVelocityAll(velocities)
-
-        // 抵达中心即销毁（读 PD 的权威位置）
-        batch.removeIf { _, pos, _ -> pos.distanceTo(center) <= CONSUME_RADIUS }
     }
 
-    /**
-     * **站在范围里就一直极轻微地抖**（第 20 轮按实机反馈加的）：以前是「进/退场各撞一下」，
-     * 退场那两下太抢戏；现在改成持续的、几乎察觉不到的低幅抖动 —— 力量感交给「你被一个场包着」这件事本身，
-     * 而不是几记重锤。
-     *
-     * 口径：
-     * - 只在**玩家**位于球壳半径内时发（每 tick 一条 8 字节包、只发给该玩家，见 `ScreenShake.shake`），
-     *   离开范围立刻停（下一条 shake 不再续期，客户端 3 tick 内衰减到 0）；
-     * - 越靠近中心略强：`RUMBLE_MIN + RUMBLE_RANGE × (1 − 距离/半径)`（振幅量级 0.05~0.13，
-     *   换算到视角只有零点几度，属于「画面在轻微呼吸」而不是「镜头在晃」）；
-     * - `ticks = 3` 持续续期，所以表现为**连续**的低幅抖动，而不是一顿一顿的脉冲。
-     */
+    override fun clearVisuals(manager: ParticleManager, center: Vec3) {
+        visuals.clear()
+    }
+
+    /** 范围内持续低幅镜头呼吸，玩家离开后不续期，客户端三 tick 内自行衰减。 */
     private fun rumbleInside(manager: ParticleManager, center: Vec3) {
         val level = manager.level
         for (player in level.players()) {
             val dist = player.position().distanceTo(center)
             if (dist > EFFECT_RADIUS) continue
             val depth = (1.0 - dist / EFFECT_RADIUS).coerceIn(0.0, 1.0)
-            ScreenShake.shake(
-                level,
-                player.position(),
-                radius = 1.0,
-                amplitude = (RUMBLE_MIN + RUMBLE_RANGE * depth).toFloat(),
-                ticks = RUMBLE_TICKS,
-            )
+            ScreenShake.shake(level, player.position(), radius = 1.0,
+                amplitude = (RUMBLE_MIN + RUMBLE_RANGE * depth).toFloat(), ticks = 3)
         }
     }
 
-    /**
-     * 效果结束：球壳（若已铺出）**整壳向中心塌缩**，被吸入的粒子立即销毁。
-     *
-     * 塌缩做法：先 `clear()` 掉原球壳，再在**同一批位置**上用相同的颜色/尺寸重新生成一遍，
-     * 初速指向中心、大小 = `距离 / [EXIT_TICKS]`、寿命 = [EXIT_TICKS] —— 常量速度 + 自带寿命，
-     * 位置由 PD 逐 tick 积分，所以**效果死掉之后动画照样放完**（本模组不需要再回来 tick），
-     * 且粒子在抵达中心的那一刻全部过期，不会留在世界里。
-     */
-    override fun clearVisuals(manager: ParticleManager, center: Vec3) {
-        if (shell != null) {
-            shell?.clear()
-            val level = manager.level
-            val t = EXIT_TICKS.toDouble()
-            for (i in 0 until SHELL_PARTICLES) {
-                val pos = center.add(shellOffsets[i].scale(EFFECT_RADIUS))
-                val toCenter = center.subtract(pos)
-                // a = 2d / (T(T+1))：离散积分 d(n) = a·n(n+1)/2 下第 T tick 恰好抵达中心
-                val accel = toCenter.normalize().scale(2.0 * toCenter.length() / (t * (t + 1.0)))
-                manager.spawnParticle(pos, shellColors[i], SHELL_SCALE, EXIT_TICKS, acceleration = accel)
-            }
-            // 第二拍：整壳刚砸到中心，就地反弹出一颗小球（Deferred 的到期判定带一 tick 余量，故 -1）
-            Deferred.after(level, EXIT_TICKS - 1) { spawnReboundBall(manager, center) }
-            // 退场全程不再给镜头冲击：实机反馈「最后两下抖动」太抢戏，改成「人在范围内就一直很轻微地抖」
-        }
-        shell = null
-        sucked?.clear()
-        sucked = null
-    }
-
-    /**
-     * 第二拍：**反弹小球** —— 整壳砸进中心之后，一颗小得多的球从中心弹出来、停一下、再被吸回去。
-     *
-     * 一颗粒子的位置曲线是 `d(n) = d₀ + v₀·n − a·n(n+1)/2`（初速向外、加速度向内，两者都是**一次性**下发、
-     * 由 PD 两端逐 tick 积分）：`v₀/a ≈ 5` → 第 4~5 tick 弹到最远约 0.95 格、短暂停住，
-     * 第 [REBOUND_TICKS] tick 回到中心、寿命同刻到点。选这组数字就是为了让它「停一下再被吸走」，
-     * 而不是一路弹飞或者弹不出来。
-     */
-    private fun spawnReboundBall(manager: ParticleManager, center: Vec3) {
-        val level = manager.level
-        for (dir in reboundOffsets) {
-            manager.spawnParticle(
-                center.add(dir.scale(REBOUND_START_RADIUS)),
-                REBOUND_COLOR,
-                REBOUND_SCALE,
-                REBOUND_TICKS,
-                velocity = dir.scale(REBOUND_SPEED),
-                acceleration = dir.scale(-REBOUND_ACCEL),
-            )
-        }
-        // 第三拍：小球被吸回中心、收成一点（Deferred 同样带一 tick 余量）
-        Deferred.after(level, REBOUND_TICKS - 1) { spawnFinalSnap(manager, center) }
-    }
-
-    /**
-     * 第三拍的收尾：**一撮很小的微光**（不是爆炸）。
-     *
-     * 实机反馈原来那记 40 颗白色爆闪「看起来有点廉价」—— 力量感应该来自塌缩过程本身；
-     * 这里只留 14 颗、尺寸更小、寿命极短，颜色也避开纯白（偏紫），作用是给「收成一点」一个落点，
-     * 而不是再炸一朵花出来。
-     */
-    private fun spawnFinalSnap(manager: ParticleManager, center: Vec3) {
-        val random = manager.level.random
-        repeat(FINAL_PARTICLES) {
-            val dir = ParticleShapes.randomUnitVector(random)
-            manager.spawnParticle(
-                center.add(dir.scale(FINAL_START_RADIUS)),
-                FINAL_COLOR,
-                FINAL_SCALE,
-                FINAL_LIFETIME,
-                dir.scale(FINAL_SPEED),
-            )
-        }
-    }
-
-    /** 投射物：每 tick 沿指向中心的方向加速（吸力随距离衰减）。 */
+    /** 每 tick 对范围内投射物施加原有引力；与视觉盘的半径、转速无关。 */
     override fun applyProjectileForce(projectile: Projectile, dirToCenter: Vector3f, dist: Double) {
         val strength = (PULL_PER_TICK / (dist + 0.5)).toFloat()
         projectile.status.velocity.add(Vector3f(dirToCenter).mul(strength))
     }
 
     private companion object {
-        /** 生效半径：同时是范围球壳与粒子生成半径 */
         const val EFFECT_RADIUS = 5.0
-
-        /** 范围球壳：均匀（Fibonacci）球面取点，粒子越多球体越「实」 */
-        const val SHELL_PARTICLES = 144
-        const val SHELL_SCALE = 0.5f
-
-        /** 球壳上缘（偏紫）/ 下缘（近黑）/ 星点 */
-        val SHELL_RIM: Color = Color.ofInt(126, 74, 214, 120)
-        val SHELL_CORE: Color = Color.ofInt(26, 18, 46, 165)
-        val SHELL_SPARK: Color = Color.ofInt(214, 176, 255, 190)
-
-        /** 每隔几颗掺一个星点 */
-        const val SPARKLE_EVERY = 5
-
-        // ---- 球壳进场 / 退场动画 ----
-
-        /** 进场的起点半径（球壳半径的倍数）：整壳从这么小的球长到满半径 */
-        const val ENTER_START_RADIUS_SCALE = 0.18
-
-        /** 进场时长（tick）：逐粒子 `move` + `EASE_OUT`，约 0.7 秒 */
-        const val ENTER_TICKS = 14
-
-        /**
-         * 第一拍（整壳砸进中心）的时长：**不是速度** —— 速度由 `a = 2d/(T(T+1))` 推出。
-         * 调大 = 悬停更久、砸得更狠；调小 = 更干脆。第 18 轮从 14 收到 8（实机反馈「还是慢了一点」）。
-         */
-        const val EXIT_TICKS = 8
-
-        // ---- 重音（镜头冲击 + 爆闪） ----
-
-        /** 开场冲击的生效半径（方块）：比效果半径大一圈，站在外面也看得见 */
-        const val OPEN_SHAKE_RADIUS = 24.0
-
-        // ---- 范围内持续轻抖（第 20 轮：取代原来的进/退场「重锤」） ----
-
-        /** 球壳边缘处的振幅（0.05 ≈ 视角零点几度，几乎察觉不到） */
-        const val RUMBLE_MIN = 0.05
-
-        /** 从边缘到球心振幅的增量（球心处 0.05 + 0.08 = 0.13） */
-        const val RUMBLE_RANGE = 0.08
-
-        /** 每次续期的持续 tick 数：每 tick 续一次 = 连续抖动 */
-        const val RUMBLE_TICKS = 3
-
-        // ---- 第二拍：反弹小球 ----
-
-        /** 小球粒子数 / 起始半径 / 尺寸 / 初速（向外）/ 加速度（向内）/ 总时长 */
-        const val REBOUND_PARTICLES = 48
-        const val REBOUND_START_RADIUS = 0.30
-        const val REBOUND_SCALE = 0.45f
-        const val REBOUND_SPEED = 0.325
-        const val REBOUND_ACCEL = 0.065
-        const val REBOUND_TICKS = 10
-
-        /** 小球颜色：比球壳星点更亮更实（它是被压出来的那个「核」） */
-        val REBOUND_COLOR: Color = Color.ofInt(214, 176, 255, 230)
-
-        // ---- 第三拍：收成一点（刻意做小、做短，不做成爆炸） ----
-
-        /** 粒子数 / 起始半径 / 尺寸 / 寿命 / 外扩速度 */
-        const val FINAL_PARTICLES = 14
-        const val FINAL_START_RADIUS = 0.12
-        const val FINAL_SCALE = 0.34f
-        const val FINAL_LIFETIME = 5
-        const val FINAL_SPEED = 0.10
-
-        /** 避开纯白：偏紫的微光（纯白爆闪实机反馈「有点廉价」） */
-        val FINAL_COLOR: Color = Color.ofInt(196, 140, 255, 210)
-
-        // ---- 被吸入的粒子 ----
-
-        /** 每 tick 生成的被吸入粒子数（第一颗是亮紫小点，其余是暗紫大点） */
-        const val PARTICLES_PER_TICK = 3
-
-        /** 初始切向速度（blocks/tick）：决定起始绕转快慢 */
-        const val TANGENTIAL_SPEED = 0.22
-
-        /** 抵达中心判定半径（方块）：进入这个范围就销毁粒子 */
-        const val CONSUME_RADIUS = 0.1
-
-        /** 每次积分的阻尼系数。**这是「能否落到中心」的唯一开关**：0.995 太弱（实测 0/500 到中心，只在 r≈2.2~5.0 绕圈），0.9 → 100% 抵达、平均 34 tick（见类注释） */
-        const val DAMPING_PER_TICK = 0.9
-
-        /** 被吸入粒子的尺寸与寿命上限（0.9 阻尼下平均 34 tick 就抵达中心被销毁，这条寿命只是兜底） */
-        const val SUCTION_SCALE = 0.55f
-        const val SPARK_SCALE = 0.32f
-        const val LIFETIME_TICKS = 60
-
-        /** 暗紫（被吸入的主力）与亮紫（每 tick 的第一颗，给球壳一层「星尘」） */
-        val SUCTION_COLOR: Color = Color.ofInt(158, 64, 255)
-        val SPARK_COLOR: Color = Color.ofInt(226, 196, 255)
-
-        /** 吸力系数（每 tick，对生物与投射物一致，按 1/(距离+0.5) 衰减） */
         const val PULL_PER_TICK = 0.12
+        const val RUMBLE_MIN = 0.05
+        const val RUMBLE_RANGE = 0.08
     }
 }

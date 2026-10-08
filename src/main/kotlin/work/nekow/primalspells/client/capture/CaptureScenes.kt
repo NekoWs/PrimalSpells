@@ -11,6 +11,9 @@ import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.core.client.ClientParticleEngine
 import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.entity.TestDummyEntity
+import work.nekow.primalspells.magic.core.EffectPhase
+import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.effect.lifecycle.AreaFieldEffect
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.modifier.EnergyShield
 import work.nekow.primalspells.magic.projectile.Projectile
@@ -77,7 +80,7 @@ class Scene(
  *
  * | 场景 | 要看什么 | 关键时间点 |
  * |---|---|---|
- * | `black_hole` | 整壳从中心长出 / 整壳向心塌缩 | 进场 14t、t=70 触发死亡、退场 14t |
+ * | `black_hole` | 暗核 / 双层吸积盘 / 旋转塌缩 | 淡入 6–14t、t=70 死亡、淡出 18t |
  * | `gravity_field` | 球形范围可辨 + 下坠粒子 + 地面波环 | 全程 |
  * | `energy_shield` | 固定球体逐块搭起 / 逐块消散、五/六边形可辨 | 构建 16t、t=100 起消散 |
  *
@@ -93,28 +96,22 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(blackHole(), gravityField(), energyShield(), explosion(), fireballTrail())
+    fun all(): List<Scene> = listOf(blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 
-    /**
-     * 黑洞：半径 5 的引力球壳。
-     *
-     * 第 16 轮把「球壳 + 另一圈向心粒子」改成**球壳本身做径向动画**，所以这个场景的重点是
-     * 「进场时整颗球从中心长出来」「退场时整颗球向中心塌缩」两段 —— 相机绕球缓慢公转，
-     * 让球形轮廓在三维上可读（正对时是一个圆，看不出是球）。
-     */
-    private fun blackHole(): Scene = run {
-        val name = "black_hole"
+    /** 黑洞：围绕暗核与倾斜吸积盘公转，录下分层淡入、稳态旋转与原组塌缩退场。 */
+    private fun blackHole(moving: Boolean = false): Scene = run {
+        val name = if (moving) "black_hole_moving" else "black_hole"
         val lengthTicks = 108
         var wand: Wand? = null
         Scene(
             name = name,
-            title = "黑洞：整壳从中心长出(14t) → 稳态 → 整壳向心塌缩(14t)",
+            title = if (moving) "黑洞：移动跟随 / 急停回圆 / 反向拉伸" else "黑洞：暗核 / 双层吸积盘 → 旋转稳态 → 塌缩淡出",
             warmupTicks = 24,
             lengthTicks = lengthTicks,
             fov = 70,
-            camera = { ctx, t -> orbit(ctx, FIELD_CENTER_LIFT, radius = 13.0, lift = 3.0, degPerTick = 4.0, tick = t) },
+            camera = { ctx, t -> orbit(ctx, FIELD_CENTER_LIFT, radius = 13.0, lift = 3.0, degPerTick = 4.0, tick = if (moving) 0 else t) },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
                 ctx.buildStudio(CX, CZ, floorY)
@@ -142,12 +139,14 @@ object CaptureScenes {
                 ctx.log("$name cast -> $ok, projectiles=${MagicManager.projectiles.size}")
             },
             tick = { _, t ->
+                // 新弹先经 MagicManager.pendingAdd 入列，再装录制专用定位效果。
+                if (moving && t == 3) addFieldMotion("black_hole")
                 // t=70 触发正常死亡路径（onDie → 退场动画），而不是删粒子
                 if (t == DEATH_TICK) {
                     MagicManager.projectiles.filter { it.id == "black_hole" }.forEach { it.alive = false }
                 }
             },
-            checksAt = { ctx, t -> projectileChecks(name, t, "black_hole", lengthTicks - 1, ctx) },
+            checksAt = { ctx, t -> projectileChecks(name, t, "black_hole", lengthTicks - 1, ctx) + fieldMotionChecks(name, t, "black_hole", moving) },
         )
     }
 
@@ -159,17 +158,17 @@ object CaptureScenes {
      * 第 16 轮的验收点是「范围还是要一眼看出是球」：这个场景公转稍快、机位稍远，
      * 让球壳轮廓、内部下坠粒子、地面波环三者在同一帧里都能看到。
      */
-    private fun gravityField(): Scene = run {
-        val name = "gravity_field"
+    private fun gravityField(moving: Boolean = false): Scene = run {
+        val name = if (moving) "gravity_field_moving" else "gravity_field"
         val lengthTicks = 130
         var wand: Wand? = null
         Scene(
             name = name,
-            title = "重力场：球形范围 + 下坠粒子 + 落地波环",
+            title = if (moving) "重力场：移动球壳与地面井环跟随" else "重力场：球面经线 / 下压刻度波 / 地面双井环",
             warmupTicks = 24,
             lengthTicks = lengthTicks,
             fov = 70,
-            camera = { ctx, t -> orbit(ctx, FIELD_CENTER_LIFT, radius = 14.0, lift = 3.5, degPerTick = 3.0, tick = t) },
+            camera = { ctx, t -> orbit(ctx, FIELD_CENTER_LIFT, radius = 14.0, lift = 3.5, degPerTick = 3.0, tick = if (moving) 0 else t) },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
                 ctx.buildStudio(CX, CZ, floorY)
@@ -196,12 +195,49 @@ object CaptureScenes {
                 ctx.log("$name cast -> $ok, projectiles=${MagicManager.projectiles.size}")
             },
             tick = { _, t ->
+                // 新弹先经 MagicManager.pendingAdd 入列，再装录制专用定位效果。
+                if (moving && t == 3) addFieldMotion("gravity_field")
                 if (t == DEATH_TICK) {
                     MagicManager.projectiles.filter { it.id == "gravity_field" }.forEach { it.alive = false }
                 }
             },
-            checksAt = { ctx, t -> projectileChecks(name, t, "gravity_field", lengthTicks - 1, ctx) },
+            checksAt = { ctx, t -> projectileChecks(name, t, "gravity_field", lengthTicks - 1, ctx) + fieldMotionChecks(name, t, "gravity_field", moving) },
         )
+    }
+
+    /** 录制专用定位效果：走真实 OVERRIDE 阶段，固定镜头便于看出结构有没有留在出生点。 */
+    private fun addFieldMotion(id: String) {
+        val p = MagicManager.projectiles.single { it.id == id }
+        val origin = Vector3f(p.status.pos)
+        p.effects += object : BaseEffect() {
+            override val phase = EffectPhase.OVERRIDE
+            private var age = 0
+            override fun onTick() {
+                val t = age++
+                val offset = when {
+                    t < 18 -> 0f
+                    t < 33 -> (t - 18) * 0.18f
+                    t < 45 -> 2.7f
+                    t < 60 -> 2.7f - (t - 45) * 0.36f
+                    else -> -2.7f
+                }
+                status.pos.set(origin.x + offset, origin.y, origin.z)
+            }
+        }.also {
+            it.caster = p.caster
+            it.wand = p.wand
+            it.status = p.status
+            it.projectile = p
+        }
+    }
+
+    private fun fieldMotionChecks(name: String, t: Int, id: String, moving: Boolean): List<Check> {
+        if (!moving || t != 25) return emptyList()
+        val effects = MagicManager.projectiles.single { it.id == id }.effects.sortedBy { it.phase.tickOrder }
+        val field = effects.indexOfFirst { it is AreaFieldEffect }
+        val override = effects.indexOfLast { it.phase == EffectPhase.OVERRIDE }
+        return listOf(Check(name, t, "field-after-position-override", field > override && override >= 0,
+            "field=$field override=$override"))
     }
 
     // ---------------------------------------------------------------- 能量盾

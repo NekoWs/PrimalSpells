@@ -14,6 +14,6 @@ class ConstantAcceleration(
     private val acceleration: Vector3f = Vector3f(0f, -0.03f, 0f),
 ) : BaseEffect() {
     override fun onTick() {
-        status.velocity.add(acceleration)
+        if (projectile.motionEnabled) status.velocity.add(acceleration)
     }
 }

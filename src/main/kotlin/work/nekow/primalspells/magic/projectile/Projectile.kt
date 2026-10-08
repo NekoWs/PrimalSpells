@@ -25,6 +25,13 @@ abstract class Projectile: Magic() {
     var maxAge: Int = 0
     var alive: Boolean = true
 
+    /** 粘附类法术关闭 Move 积分；轨道 OVERRIDE 仍可组合。 */
+    var motionEnabled: Boolean = true
+
+    /** 施放时原始方向，静止束源和触发荷载也保留来向。 */
+    var launchDirection: net.minecraft.world.phys.Vec3 = net.minecraft.world.phys.Vec3.ZERO
+        private set
+
     var maxBounces: Int = 0
     var maxHitTargets: Int = 1
     var bounceScaler: Vector3f = Vector3f(0.9f, 0.9f, 0.9f)
@@ -44,8 +51,11 @@ abstract class Projectile: Magic() {
         //   VISUAL —— Trajectory 读本 tick 的最终位置发粒子
         // 修饰器注入的效果默认落在 MODIFIER 阶段：onActive 在 SETUP 之后（能改初速/伤害），
         // onTick 在 MOTION 之前（改的是速度这类输入量）。
+        launchDirection = if (velocity.lengthSquared() > 1e-8f)
+            net.minecraft.world.phys.Vec3(velocity.x.toDouble(), velocity.y.toDouble(), velocity.z.toDouble()).normalize()
+            else caster.lookAngle
         effects += Position(position)
-        effects += Velocity(velocity.mul(speed))
+        effects += Velocity(Vector3f(velocity).mul(speed))
         effects += Move(
             dragCoeff,
             hitRadius = hitRadius,

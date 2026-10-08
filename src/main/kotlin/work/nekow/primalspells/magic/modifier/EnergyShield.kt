@@ -68,13 +68,13 @@ import kotlin.math.sqrt
  *
  * ## 视觉（延续第 23 轮「受击处展开玻璃」，第 26 轮换掉整罩两段演出）
  *
- * - **格挡成功**：受击方向那一块面板展开一块**发光蓝玻璃**（蓝色亮边 + 半透明蓝填充，都是加色全亮，
+ * - **格挡成功**：受击方向那一块面板展开一块**发光蓝玻璃**（实色蓝色亮边 + 稀疏蓝色方屑，魔法光采用全亮，
  *   约 0.35 秒淡出）—— 第 41 轮按实机反馈从"冷白"改成蓝色，为的是在亮场景里也看得见；
  * - **打穿**：破口区那一片**碎裂**（向外飘散 + 淡出），随后是持续整个破口期的**淡红轮廓**；
  * - 旧的「整罩一闪而碎」「护盾恢复闪一下」两段演出随耐久模型一起删除。
  *
  * 玻璃**画在生成处就不再动**（第 36 轮口径：判定跟人、碎片盖章），淡出结束由 PD 自行销毁
- * （`fadeOut(removeAfter = true)`），所以本实例此后不再被 tick（法杖被收起/回收）也不留孤儿粒子。
+ * （`destroyAfter`），所以本实例此后不再被 tick（法杖被收起/回收）也不留孤儿粒子。
  *
  * ## PD 分组（第 39 轮，open.md §1.9.2）
  *
@@ -785,7 +785,7 @@ class EnergyShield : Modifier() {
 
     /**
      * 铺一组玻璃面板：**亮边**（面板轮廓上的点）+ 可选**极淡填充**（面板内部的稀疏点），
-     * 成员挂在**以球心为 pivot** 的组上，[holdTicks] 后开始淡出、[fadeTicks] 内淡完并由 PD 销毁整组。
+     * 成员挂在**以球心为 pivot** 的组上，[holdTicks] 后开始缩小、[fadeTicks] 内收缩完并由 PD 销毁整组。
      *
      * **面板按飘散位移分组**（第 39 轮，open.md §1.9.2）：PD 的组是 arm / 演出的单位，
      * 一块面板一个组会让一次爆炸打出 32 条 `armed` 日志。位移**相同**的面板于是共用一个组 ——
@@ -833,8 +833,8 @@ class EnergyShield : Modifier() {
                         .position(center.add(offset))
                         .color(edgeColor)
                         .scale(edgeScale)
-                        // 第 41 轮：蓝色亮边走**加色 + 全亮**，实机在亮场景里也一眼看得见
-                        .additive(glow)
+                        // 实色方点采用全亮；蓝色与亮背景形成色相对比
+                        .additive(false)
                         .glowing(glow)
                         .lifetime(PD_IMMORTAL)
                         .group(group.id)
@@ -842,12 +842,12 @@ class EnergyShield : Modifier() {
                         .spawn()
                 }
                 if (withFill) {
-                    for (offset in fillOffsets(panel)) {
+                    for (offset in fillOffsets(panel).filterIndexed { index, _ -> index % 5 == 0 }) {
                         manager.create()
                             .position(center.add(offset))
                             .color(fillColor)
                             .scale(GLASS_FILL_SCALE)
-                            .additive(glow)
+                            .additive(false)
                             .glowing(glow)
                             .lifetime(PD_IMMORTAL)
                             .group(group.id)
@@ -858,8 +858,8 @@ class EnergyShield : Modifier() {
             }
             if (drift != null) group.move(drift, fadeTicks, EasingType.EASE_OUT)
             group.delay(holdTicks)
-            // EASE_OUT：透明度先快后慢 —— 长尾才像「碎开后飘散」，EASE_IN 会在最后一帧啪一下消失
-            group.fadeOut(fadeTicks, removeAfter = true, easing = EasingType.EASE_OUT)
+            // 实色碎片按尺寸收缩并按时销毁，不再使用半透明玻璃填充/alpha 淡出
+            group.scale(0.05f, fadeTicks, EasingType.LINEAR).destroyAfter(fadeTicks)
         }
     }
 
@@ -979,31 +979,22 @@ class EnergyShield : Modifier() {
         /** **破口轮廓**：常驻整段破口期，最后这点时间用来淡出（时长由 [breachTicksFor] 决定） */
         private const val BREACH_OUTLINE_FADE_TICKS = 6
 
-        /**
-         * 格挡那块玻璃的亮边（第 41 轮改）：**发光蓝**。
-         *
-         * 实机反馈「护盾的提示太淡了」（原版骷髅连射时几乎看不见挡没挡住）：冷白在亮场景里和雪/水/云一个色，
-         * 于是改成**蓝边 + 加色发光**（`additive` + `glowing`），对比度靠色相而不是靠亮度。
-         * 稀疏粒子感保留（还是 6 点/棱的点阵，没加密）。
-         */
-        private val GLASS_EDGE_COLOR: Color = Color.ofInt(120, 200, 255, 240)
+        /** 实色蓝色点阵亮边，魔法全亮但不使用加法混合。 */
+        private val GLASS_EDGE_COLOR: Color = Color.ofInt(120, 200, 255, 255)
 
         /** 碎裂那一下的亮边：更亮的蓝白（同一色系，只是更冲） */
-        private val GLASS_SHATTER_COLOR: Color = Color.ofInt(190, 230, 255, 245)
+        private val GLASS_SHATTER_COLOR: Color = Color.ofInt(190, 230, 255, 255)
 
         /** 爆炸碎裂里**背对爆点**那一批的亮边：同一块玻璃暗一档（不抢正面的镜） */
-        private val GLASS_SHATTER_BACK_COLOR: Color = Color.ofInt(120, 180, 240, 150)
+        private val GLASS_SHATTER_BACK_COLOR: Color = Color.ofInt(120, 180, 240, 255)
 
         /** 破口轮廓：淡红（提示攻击者「这里能打」），比玻璃暗、比背景亮 */
-        private val BREACH_OUTLINE_COLOR: Color = Color.ofInt(255, 118, 118, 150)
+        private val BREACH_OUTLINE_COLOR: Color = Color.ofInt(255, 118, 118, 255)
 
-        /**
-         * 填充（第 41 轮改）：**半透明蓝**（≈27% 不透明度 + 加色）—— 受击瞬间整块玻璃读起来是"蓝了一下"，
-         * 在亮背景（雪地/水面/天空）里也压得住，而原来的极淡冷白几乎看不见。
-         */
-        private val GLASS_FILL_COLOR: Color = Color.ofInt(60, 140, 255, 70)
+        /** 实色蓝色方屑，采样只保留1/5，避免整片遮住视野。 */
+        private val GLASS_FILL_COLOR: Color = Color.ofInt(60, 140, 255, 255)
 
         /** 背对爆点那一批的填充：比正面更淡 */
-        private val GLASS_BACK_FILL_COLOR: Color = Color.ofInt(50, 120, 230, 36)
+        private val GLASS_BACK_FILL_COLOR: Color = Color.ofInt(50, 120, 230, 255)
     }
 }

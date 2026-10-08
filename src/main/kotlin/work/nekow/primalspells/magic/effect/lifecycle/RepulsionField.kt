@@ -31,10 +31,10 @@ class RepulsionField : BaseEffect() {
                     val a = t * PI * 2; val u = 4 * cos(a); val v = 4 * sin(a)
                     center.add(if (plane == 2) 0.0 else u, if (plane == 0) 0.0 else v,
                         if (plane == 0) v else if (plane == 2) u else 0.0)
-                }, 96, ColorSource.of(Color.ofInt(245, 145, 80, 120)), 0.6f, group = shell,
-                    visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+                }, 96, ColorSource.of(Color.ofInt(245, 145, 80, 255)), 0.6f, group = shell,
+                    visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
             }
-            shell.fadeIn(8).spin(Vec3(0.2, 1.0, 0.1).normalize(), 0.025).pulse(1.04f, 10)
+            shell.spin(Vec3(0.2, 1.0, 0.1).normalize(), 0.025).pulse(1.04f, 10)
             group = shell
         }
         if (lastCenter != center) group?.setPivot(center)
@@ -56,5 +56,5 @@ class RepulsionField : BaseEffect() {
             p.hurtMarked = true
         }
     }
-    override fun onDie() { group?.fadeOut(8, removeAfter = true); group = null }
+    override fun onDie() { group?.stopContinuous()?.scale(0.05f, 8)?.destroyAfter(8); group = null }
 }

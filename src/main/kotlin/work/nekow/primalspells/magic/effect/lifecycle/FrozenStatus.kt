@@ -29,9 +29,8 @@ object FrozenStatus {
         val group = ParticleManager.of(level).createGroup(target.position())
         group.followEntity(target.uuid)
         Draw.sphere(ParticleManager.of(level), center, target.bbWidth.toDouble() * 0.7 + 0.15, 64,
-            ColorSource.of(Color.ofInt(140, 226, 255, 180)), 0.6f, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true))
-        group.fadeIn(3)
+            ColorSource.of(Color.ofInt(140, 226, 255, 255)), 0.6f, group = group,
+            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
         val duration = ticks.coerceIn(1, 30)
         target.getAttribute(Attributes.MOVEMENT_SPEED)?.let {
             it.removeModifier(FREEZE_ID)
@@ -61,8 +60,7 @@ object FrozenStatus {
         val state = states.remove(id) ?: return
         immunity[id] = state.level to (state.level.gameTime + 40)
         state.target.getAttribute(Attributes.MOVEMENT_SPEED)?.removeModifier(FREEZE_ID)
-        if (shattered) state.shell.scale(1.5f, 5)
-        state.shell.fadeOut(6, removeAfter = true)
+        state.shell.scale(0.05f, 6).destroyAfter(6)
     }
 
     /** 服务器停止时不留下实体引用或粒子组。 */

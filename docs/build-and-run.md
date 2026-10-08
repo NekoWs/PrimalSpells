@@ -276,3 +276,10 @@ python tools/capture/assemble.py          # 合成 + 判定
 
 电弧与护盾混合场景用游戏tick8–64的独立电弧窗口量可见性及渐隐，保留全局最低像素门槛，
 避免护盾玻璃峰值掩盖电弧。组合场景使用木桩作为移动施法者，录制相机不会覆盖其位置。
+
+
+### 9.6 第53轮全量MC风格验收
+
+执行 `pwsh tools/capture/capture.ps1 -Scene all`，覆盖12条已有真实施法场景。
+本轮没有透明度渐隐：像素覆盖衰减来自尺寸收缩与错峰寿命，报告标签同步调整，最低可见性/零残留门槛保留。
+44张法术卡图标重建及16px预览见 [design/minecraft-visuals.md](design/minecraft-visuals.md)。

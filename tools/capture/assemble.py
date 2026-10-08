@@ -84,7 +84,7 @@ SCENES = {
     },
     "explosion": {
         "length": 78,
-        "title": "爆炸：触发即爆（粒子云撑到半径 + 外飞 + 烟渐隐）",
+        "title": "爆炸：触发即爆（实色碎片外飞 + 尘屑收缩）",
         # 第 29 轮起爆炸改成**青白色能量**（对齐用户给的参考）→ 标准判据用蓝（青满足 b>80 且 b-r>12）
         "metric": "blue",
         # 放弹（t=20）之前必须干净
@@ -129,6 +129,12 @@ SCENES = {
         # （直接读 `EnergyShield.breachPanelCount`）来卡，像素判据只负责"红色确实渲染出来了"。
     },
 }
+
+# 第53轮改成实色方粒；覆盖量衰减代表尺寸收缩/错峰到寿，不再代表透明度渐隐。
+for _scene, _spec in SCENES.items():
+    if _spec.get("decay", "gradual") == "gradual":
+        _spec["decay"] = "collapse"
+SCENES["explosion"]["decay"] = "collapse"
 
 #: 「特效像素」判据：**偏冷的亮**像素（蓝 ≥ 红）。黑底摄影棚里只有粒子满足：
 #: 木桩是棕色（红 > 蓝）、地面是灰黑（不够亮）、火球拖尾是橙色（红 > 蓝）。
@@ -378,19 +384,20 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         fade_empty = max(1, int(fade_peak * EMPTY_RATIO))
         result["asserts"].append(("独立效果确实渲染", fade_peak >= total_px * MIN_PEAK_RATIO,
             f"游戏 tick {lo}-{hi} 峰值 {fade_peak} 像素（排除其它视觉系统）"))
-    # 退场渐变：从峰值衰减到 50% 与 <5% 的位置差
+    # 尺寸退场：从峰值衰减到 50% 与 <5% 的位置差
     t50 = next((i for i in range(fade_idx, len(fade_cover)) if fade_cover[i] <= fade_peak * 0.5), len(fade_cover) - 1)
     tend = next((i for i in range(t50, len(fade_cover)) if fade_cover[i] <= fade_empty), len(fade_cover) - 1)
     span = tend - t50
-    if spec.get("decay", "gradual") == "gradual":
+    if spec.get("decay", "gradual") in ("gradual", "collapse"):
         result["asserts"].append(
-            ("退场是渐变而非闪现", span >= MIN_DECAY_FRAMES, f"50%→5% 跨 {span} 帧（要求 ≥{MIN_DECAY_FRAMES}）"),
+            ("实色颗粒逐步收缩/分批结束" if spec.get("decay") == "collapse" else "退场是渐变而非闪现",
+             span >= MIN_DECAY_FRAMES, f"覆盖量50%→5% 跨 {span} 帧（要求 ≥{MIN_DECAY_FRAMES}）"),
         )
     elif spec.get("decay", "gradual") == "none":
         # 这一场的退场由专属判据负责（spec 里必须有对应断言，见 `breach_fade`）
         result["asserts"].append(
             ("退场判定交由专属判据", "breach_fade" in spec or "quiet" in spec,
-             "本场的收场不是蓝色像素（见「破口是淡出而不是一帧消失」/「退场无残留」）"),
+             "本场的收场不是蓝色像素（见「破口逐步收缩并收干净」/「退场无残留」）"),
         )
     else:
         # 这类效果的退场**设计上**就是立刻清理（没有退场动画）：只要求别拖泥带水
@@ -449,12 +456,12 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         seg = red_cover[lo:hi]
         visible = sum(1 for v in seg if v > 0)
         result["asserts"].append(
-            ("破口是淡出而不是一帧消失",
+            ("破口逐步收缩并收干净",
              visible >= spec.get("min_fade_frames", 3) and seg and seg[-1] == 0,
              f"尾段 {lo}-{hi} 有 {visible} 帧仍可见、末帧 {seg[-1] if seg else '-'}"),
         )
     if scene == "black_hole_moving":
-        # 固定镜头下检查明亮内盘确实离开出生点、反向后抵达另一侧。
+        # 固定镜头只取DISC_INNER色板，排除外环惯性与DUST_BRIGHT星尘（214/186/255）。
         # 用 frames.tsv 的游戏 tick 定位，避免丢帧导致时间窗偏移；低亮外环和历史星尘不参与。
         rows = [row.split("\t") for row in (sdir / "frames.tsv").read_text(encoding="utf-8").splitlines() if row.strip()]
         centers = []
@@ -462,7 +469,9 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             row = min(rows, key=lambda row: abs(int(row[1]) - tick))
             with Image.open(sdir / "frames" / f"{int(row[0]):05d}.png") as im:
                 rgb = np.asarray(im.convert("RGB"), dtype=np.int16)
-            _, xs = np.where((rgb[:, :, 2] > 180) & (rgb[:, :, 2] - rgb[:, :, 0] > 12))
+            # DISC_INNER=218/188/255；RGB编码取整有1档误差，窄容差仍与星尘色板分离。
+            _, xs = np.where((rgb[:, :, 0] >= 216) & (rgb[:, :, 0] <= 220)
+                & (rgb[:, :, 1] >= 187) & (rgb[:, :, 1] <= 190) & (rgb[:, :, 2] >= 250))
             centers.append(float(np.median(xs)) if len(xs) else float("nan"))
         start, first_stop, reversed_stop = centers
         result["asserts"].append((
@@ -483,7 +492,7 @@ def write_report(results: list[dict], root: Path, log_lines: list[str]) -> bool:
     lines: list[str] = []
     lines.append("=== Primal Spells 实机录制报告 ===")
     lines.append("")
-    lines.append("判定口径：帧数/丢帧 + 场景内断言 + 特效像素覆盖（空场起飞 / 真的渲染 / 收干净 / 退场渐变）")
+    lines.append("判定口径：帧数/丢帧 + 场景内断言 + 特效像素覆盖（空场起飞 / 真的渲染 / 收干净 / 尺寸退场）")
     lines.append("")
     all_ok = True
     for r in results:

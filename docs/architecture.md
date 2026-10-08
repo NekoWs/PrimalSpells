@@ -423,3 +423,9 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 短命冻结状态由 MagicManager 驱动和停服清理；不会持久化。直接伤害效果声明 `DirectDamage`，
 Hurt/电弧/束源通过 `SpellDamage` 共用护盾和冰冻接入；水晶爆炸通知只排队、不递归结算。
 内容规则和新增包文件见 [design/spell-expansion.md](design/spell-expansion.md)。
+
+
+### 第53轮视觉口径
+
+粒子接线改为MC实色方粒，尺寸/寿命退场；不再用柔光、加色或alpha渐隐。伤害/范围/移动/抽牌机制保持不变。
+Trajectory 不再引用客户端 ParticleTextures；公共侧仅使用PD方形原语。当前造型见 design/minecraft-visuals.md。

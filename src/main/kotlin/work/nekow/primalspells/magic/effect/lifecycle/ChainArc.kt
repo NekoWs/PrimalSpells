@@ -59,9 +59,9 @@ class ChainArc : BaseEffect(), DirectDamage {
             val step = t * (points.size - 1)
             val index = step.toInt().coerceAtMost(points.size - 2)
             points[index].lerp(points[index + 1], step - index)
-        }, 160, ColorSource.of(Color.ofInt(120, 210, 255, 230)), 1.2f, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
-        group.fadeOut(8, removeAfter = true)
+        }, 160, ColorSource.of(Color.ofInt(120, 210, 255, 255)), 1.2f, group = group,
+            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
+        group.scale(0.05f, 8, work.nekow.particledrawing.core.easing.EasingType.LINEAR).destroyAfter(8)
         status.damage *= 0.7
         visited += target.uuid
         jumps++

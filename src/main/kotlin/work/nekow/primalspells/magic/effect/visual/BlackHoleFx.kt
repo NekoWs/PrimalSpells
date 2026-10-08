@@ -53,7 +53,7 @@ class BlackHoleFx {
                 manager.create().position(center.add(radial.scale(RADIUS)))
                     .color(if (index % 3 == 0) DUST_BRIGHT else DUST_COLOR)
                     .scale(if (index % 3 == 0) 0.55f else 0.8f)
-                    .style(ParticleStyle.SOFT_DOT).glowing(true).additive(true)
+                    .style(ParticleStyle.SQUARE).glowing(true).additive(false)
                     .lifetime(60).spawn()?.also { it.setVelocity(tangent) },
             )
         }
@@ -72,35 +72,35 @@ class BlackHoleFx {
         batch.setVelocityAll(velocities)
     }
 
-    /** 原位旋转着塌缩并淡出，直接给现有组追加指令；提前死亡也无需重铺或延迟任务。 */
+    /** 保持实色，原位旋转着塌缩并按时销毁，直接给现有组追加指令；提前死亡也无需重铺或延迟任务。 */
     fun clear() {
         sucked?.clear()
         sucked = null
-        boundary?.scale(0.08f, 10, EasingType.EASE_IN)?.fadeOut(12, removeAfter = true)
+        boundary?.scale(0.08f, 10, EasingType.EASE_IN)?.destroyAfter(12)
         boundary = null
-        photonRim?.scale(0.06f, 12, EasingType.EASE_IN)?.fadeOut(16, removeAfter = true)
+        photonRim?.scale(0.06f, 12, EasingType.EASE_IN)?.destroyAfter(16)
         photonRim = null
         for (ring in outerRings) {
             // 表达式接管位置/尺寸，退场收缩也交给同一份 PD 表达式，避免与 scale 指令竞争。
             ring.setVariableLive("endMs", (ageTicks * 50).toString())
-            ring.fadeOut(16, removeAfter = true)
+            ring.destroyAfter(16)
         }
         outerRings.clear()
         for (disc in discs) {
-            disc.scale(0.06f, 12, EasingType.EASE_IN).fadeOut(16, removeAfter = true)
+            disc.scale(0.06f, 12, EasingType.EASE_IN).destroyAfter(16)
         }
         discs.clear()
-        core?.scale(0.05f, 16, EasingType.EASE_IN)?.fadeOut(18, removeAfter = true)
+        core?.scale(0.05f, 16, EasingType.EASE_IN)?.destroyAfter(18)
         core = null
     }
 
     /** 结构层只生成一次：亮度集中在核边和盘内缘，半径五格的边界留给低亮星点。 */
     private fun createStructure(manager: ParticleManager, center: Vec3) {
         val dark = manager.createGroup(center)
-        // 用小柔边粒子密铺球面，保留 MC 的颗粒尺度；球的前后表面自然遮住盘的后半部。
+        // 用实色小方粒子密铺球面，保留 MC 的颗粒尺度；球的前后表面自然遮住盘的后半部。
         Draw.sphere(manager, center, CORE_RADIUS, 160, ColorSource.of(CORE_COLOR), 1.4f,
-            group = dark, visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true))
-        dark.fadeIn(6)
+            group = dark, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+
         core = dark
 
         repeat(2) { layer ->
@@ -112,11 +112,11 @@ class BlackHoleFx {
                     val angle = arm * PI * 2.0 / 3.0 + t * PI * 1.5 + layer * 0.6
                     center.add(discOffset(radius, angle, (layer - 0.5) * 0.15))
                 }, 100,
-                    colorFn = ColorSource { t -> DISC_INNER.lerp(DISC_OUTER, t.toFloat()) },
+                    colorFn = ColorSource { t -> if (t < 0.4) DISC_INNER else if (t < 0.75) DUST_COLOR else DISC_OUTER },
                     scale = if (layer == 0) 1.0f else 0.7f, group = disc,
-                    visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+                    visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
             }
-            disc.fadeIn(10 + layer * 3).spin(DISC_NORMAL, if (layer == 0) 0.065 else 0.035)
+            disc.spin(DISC_NORMAL, if (layer == 0) 0.065 else 0.035)
             discs += disc
         }
 
@@ -125,8 +125,8 @@ class BlackHoleFx {
 
         val edge = manager.createGroup(center)
         Draw.sphere(manager, center, RADIUS, 64, ColorSource.of(BOUNDARY_COLOR), 0.55f,
-            group = edge, visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true))
-        edge.fadeIn(14).spin(DISC_NORMAL, -0.008)
+            group = edge, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+
         boundary = edge
     }
 
@@ -136,10 +136,10 @@ class BlackHoleFx {
      */
     private fun createPhotonRim(manager: ParticleManager, center: Vec3) {
         val group = manager.createGroup(center)
-        val visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true)
+        val visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false)
         Draw.curve(manager, { t -> center.add(discOffset(CORE_RADIUS + 0.13, t * PI * 2.0, 0.0)) }, 128,
             ColorSource.of(DISC_INNER), 0.55f, group = group, visual = visual)
-        group.fadeIn(12)
+
         photonRim = group
     }
 
@@ -149,7 +149,7 @@ class BlackHoleFx {
             val group = manager.createGroup(center)
             Draw.curve(manager, { t -> center.add(discOffset(2.7 + layer * 0.55, t * PI * 2.0, 0.0)) }, 160,
                 ColorSource.of(DISC_OUTER), if (layer == 0) 0.75f else 0.55f, group = group,
-                visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+                visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
             group.setVariable("cx", center.x).setVariable("cy", center.y).setVariable("cz", center.z)
                 .setVariable("lagx", 0.0).setVariable("lagy", 0.0).setVariable("lagz", 0.0)
                 .setVariable("rad", 2.7 + layer * 0.55).setVariable("endMs", 1.0e9)
@@ -166,9 +166,9 @@ class BlackHoleFx {
                 x=cx+(lagx+px+lagx/ll*along*stretch)*shrink;
                 y=cy+(lagy+py+lagy/ll*along*stretch)*shrink;
                 z=cz+(lagz+pz+lagz/ll*along*stretch)*shrink;
-                r=0.55;g=0.32;b=0.9;a=0.48+0.18*sin(ang);sc=shrink;
+                r=0.55;g=0.32;b=0.9;a=1;sc=shrink;
             """.trimIndent())
-            group.fadeIn(14)
+
             outerRings += group
         }
     }
@@ -214,10 +214,10 @@ class BlackHoleFx {
         val DISC_V: Vec3 = DISC_NORMAL.cross(DISC_U).normalize()
         val DUST_DIRECTIONS: List<Vec3> = ParticleShapes.fibonacciSphere(64)
         val CORE_COLOR: Color = Color.ofInt(4, 3, 9, 255)
-        val DISC_INNER: Color = Color.ofInt(218, 188, 255, 230)
-        val DISC_OUTER: Color = Color.ofInt(90, 43, 175, 55)
-        val BOUNDARY_COLOR: Color = Color.ofInt(110, 74, 174, 100)
-        val DUST_COLOR: Color = Color.ofInt(153, 80, 245, 210)
-        val DUST_BRIGHT: Color = Color.ofInt(214, 186, 255, 230)
+        val DISC_INNER: Color = Color.ofInt(218, 188, 255, 255)
+        val DISC_OUTER: Color = Color.ofInt(90, 43, 175, 255)
+        val BOUNDARY_COLOR: Color = Color.ofInt(110, 74, 174, 255)
+        val DUST_COLOR: Color = Color.ofInt(153, 80, 245, 255)
+        val DUST_BRIGHT: Color = Color.ofInt(214, 186, 255, 255)
     }
 }

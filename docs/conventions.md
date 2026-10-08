@@ -286,3 +286,10 @@ magic/modifier  ──→ magic/core, magic/effect
 `client/capture/SpellExpansionScenes.kt`，图标生成器放在 `tools/spells/`。
 旧→新：`Hurt` 内的直接伤害/护盾兜底 → `lifecycle/SpellDamage`（Hurt、电弧、束源共用），
 护盾仅识别 Hurt → 识别 `lifecycle/DirectDamage` 的单次伤害强度。详见 design/spell-expansion.md。
+
+
+### 第53轮用户约定（后续更新适用）
+
+每次完成更新都必须提交Git；先完成构建与必要验收，再按本节中文提交格式提交，不自动push。
+法术视觉遵循 [design/minecraft-visuals.md](design/minecraft-visuals.md)：MC硬边像素、实色和有限色阶。
+不采用渐变半透明粒子/柔边光点/加色叠亮。风格变更已覆盖第49–52轮旧视觉口径。

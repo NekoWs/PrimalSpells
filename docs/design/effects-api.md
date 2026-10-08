@@ -1,5 +1,6 @@
 # 播放器模组特效 API 设计方案（ParticleDrawing × PrimalSpells）
 
+> 第53轮已改为MC实色硬边方粒；下面早期柔光/alpha渐隐说明仅供历史参考，当前规范见 [minecraft-visuals.md](minecraft-visuals.md)。
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。当前卡在「程序化粒子的贴图/UV/各向异性/朝向/加色」这一组能力上，需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。

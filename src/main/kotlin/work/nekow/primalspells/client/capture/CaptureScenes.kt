@@ -884,19 +884,22 @@ object CaptureScenes {
 
 
     /**
-     * **爆炸**：触发即爆 —— 球壳粒子云撑到爆炸半径 + 内部闪电丝 + 向外飞散 + 收干净。
+     * **爆炸**：触发即爆 —— 实色碎片向外飞散 + 灰色尘屑 + 收干净。
      *
      * 用**中灰摄影棚**：爆炸的青白色粒子在灰底上对比清楚，且灰底（r≈g≈b）不参与蓝判据。
      *
-     * 时间线（tick）：`20` 放一颗 `large_explosion`（半径 6）→ **同 tick 立刻结算** → `78` 结束。
-     * 场心放一个木桩：**放弹后立刻**就该出现伤害数字（第 32 轮起没有蓄力）。
+     * 时间线（tick）：`20` 放一颗 `large_explosion`（半径6）→ age=1死亡触发时同tick结算 → `78` 结束。
+     * 场心放一个木桩：死亡触发回调内就该出现伤害数字（第32轮起没有蓄力）。
      */
     private fun explosion(): Scene = run {
         val name = "explosion"
         var holder: TestDummyEntity? = null
+        var burstParticles = -1
+        var immediateDamage = 0
+        var observedAge = -1
         Scene(
             name = name,
-            title = "爆炸：触发即爆（粒子云撑到半径 + 外飞 + 烟渐隐）",
+            title = "爆炸：触发即爆（实色碎片外飞 + 尘屑收缩）",
             warmupTicks = 24,
             lengthTicks = EXPLOSION_TICKS,
             thirdPerson = false,
@@ -929,6 +932,15 @@ object CaptureScenes {
                 bolt.wand = Wand("capture-explosion")
                 bolt.position = Vector3f(CX + 0.5f, floorY + 2.0f, CZ + 0.5f)
                 bolt.velocity = Vector3f(0f, 0f, 0f)
+                // 客户端计数可能领先服务端；在真实死亡回调内采样，确保同一次结算已有伤害与粒子。
+                // Explosion 已在构造器中先注入，观察器位于它之后，不改变任何结算行为。
+                bolt.effects += object : BaseEffect() {
+                    override fun onDie() {
+                        burstParticles = ParticleManager.of(ctx.level).getEngine().particleCount()
+                        immediateDamage = damageNumbers(ctx, holder)
+                        observedAge = status.age
+                    }
+                }
                 bolt.spell()
                 MagicManager.add(bolt)
                 // guard 只是场心的靶子，这里显式用一下，避免"未使用"告警
@@ -938,20 +950,17 @@ object CaptureScenes {
                 holder?.remove(Entity.RemovalReason.DISCARDED)
             },
             checksAt = { ctx, t ->
-                val particles = runCatching {
-                    ParticleManager.of(ctx.level).getEngine().particleCount()
-                }.getOrDefault(-1)
                 when (t) {
-                    EXPLOSION_CAST + 3 -> listOf(
+                    EXPLOSION_CAST + 12 -> listOf(
                         Check(
                             name, t, "burst-particles",
-                            particles >= 200,
-                            "爆后 PD 粒子 = $particles（球壳粒子云 + 外飞）",
+                            burstParticles == 184,
+                            "死亡结算当tick PD 粒子 = $burstParticles（160碎片 + 4闪块 + 20尘屑）",
                         ),
                         Check(
                             name, t, "damage-immediate",
-                            damageNumbers(ctx, holder) > 0,
-                            "放弹后伤害数字 = ${damageNumbers(ctx, holder)}（第 32 轮起无蓄力，应当立刻有）",
+                            immediateDamage > 0 && observedAge == 1,
+                            "死亡结算当tick伤害数字 = $immediateDamage，法术age=$observedAge（要求age=1即有伤害）",
                         ),
                     )
                     EXPLOSION_TICKS - 3 -> listOf(pdParticleCheck(name, t, ctx))

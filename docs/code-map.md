@@ -253,3 +253,7 @@
 
 新增id：`dormant_crystal`、`crystal_detonation`、`chain_bolt`、`long_distance_cast`、`plasma_beam`、
 `repulsion_field`、`freeze_charge`。数值、时序与组合约定见 [design/spell-expansion.md](design/spell-expansion.md)。
+
+
+第53轮：`tools/spells/generate_icons.py` 覆盖所有44个注册id，重绘全部法术卡；
+`ExplosionFx` 改为批量实色碎片。当前粒子造型和预算规则见 [design/minecraft-visuals.md](design/minecraft-visuals.md)。

@@ -4,6 +4,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.*
+import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
@@ -62,10 +63,10 @@ class CrystalReaction : BaseEffect() {
                 val top = center.add(0.0, 0.65, 0.0)
                 val bottom = center.add(0.0, -0.45, 0.0)
                 Draw.curve(manager, { t -> if (t < 0.5) top.lerp(rim, t * 2) else rim.lerp(bottom, (t - 0.5) * 2) },
-                    48, ColorSource.of(Color.ofInt(178, 118, 255, 210)), 0.55f, group = crystal,
-                    visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+                    48, ColorSource.of(Color.ofInt(178, 118, 255, 255)), 0.75f, group = crystal,
+                    visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
             }
-            crystal.fadeIn(4).spin(Vec3(0.0, 1.0, 0.0), 0.025).pulse(1.07f, 12)
+            crystal.spin(Vec3(0.0, 1.0, 0.0), 0.025).pulse(1.07f, 12)
             group = crystal
             if (countdown >= 0) crystal.recolor(Color.ofInt(255, 185, 82, 255), 2)
         }
@@ -79,8 +80,7 @@ class CrystalReaction : BaseEffect() {
     }
 
     override fun onDie() {
-        if (detonated) group?.scale(1.8f, 6)
-        group?.fadeOut(8, removeAfter = true)
+        group?.stopContinuous()?.scale(0.05f, 10, EasingType.LINEAR)?.destroyAfter(10)
         group = null
     }
 

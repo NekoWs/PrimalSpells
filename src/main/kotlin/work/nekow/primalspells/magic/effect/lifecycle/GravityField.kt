@@ -103,8 +103,8 @@ class GravityField : AreaFieldEffect(
                     FALL_SCALE,
                     FALL_LIFETIME_TICKS,
                     acceleration = FALL_ACCELERATION,
-                    visual = ParticleVisual().style(ParticleStyle.LINE).anisoWorld(0.42f, 0.055f)
-                        .alignTo(Vec3.ZERO, Vec3(0.0, -1.0, 0.0)).glowing(true).additive(true),
+                    visual = ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.125f, 0.125f)
+                        .alignTo(Vec3.ZERO, Vec3(0.0, -1.0, 0.0)).glowing(true).additive(false),
                 )
             )
         }
@@ -133,13 +133,13 @@ class GravityField : AreaFieldEffect(
         // 还没落地的溅射一并作废：场都没了，地面上不该再压出环来
         pendingImpacts.forEach { it.cancel() }
         pendingImpacts.clear()
-        shell?.fadeOut(10, removeAfter = true)
+        shell?.stopContinuous()?.scale(0.05f, 10, EasingType.LINEAR)?.destroyAfter(10)
         shell = null
         falling?.clear()
         splashes?.clear()
         splashes = null
         // 固定井环淡出，还在下压的波环立即销毁，避免场结束后继续落地
-        wellRing?.fadeOut(10, removeAfter = true)
+        wellRing?.stopContinuous()?.scale(0.05f, 10, EasingType.LINEAR)?.destroyAfter(10)
         wellRing = null
         for (ring in rings) ring.remove()
         rings.clear()
@@ -155,7 +155,7 @@ class GravityField : AreaFieldEffect(
     /** 四条断开的经线描出球形边界，顶部环为下压波的发源面；固定几何在 PD 本地缓慢自转。 */
     private fun spawnBoundary(manager: ParticleManager, center: Vec3) {
         val group = manager.createGroup(center)
-        val visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true)
+        val visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false)
         repeat(4) { meridian ->
             val azimuth = meridian * PI / 2.0
             repeat(2) { half ->
@@ -169,9 +169,9 @@ class GravityField : AreaFieldEffect(
         val crownY = EFFECT_RADIUS * RING_START_HEIGHT_SCALE
         val crownRadius = sqrt(EFFECT_RADIUS * EFFECT_RADIUS - crownY * crownY)
         Draw.circle(manager, center.add(0.0, crownY, 0.0), crownRadius, 144,
-            colorFn = ColorSource.of(Color.ofInt(108, 180, 242, 150)), scale = 0.65f,
+            colorFn = ColorSource.of(Color.ofInt(108, 180, 242, 255)), scale = 0.65f,
             group = group, visual = visual)
-        group.fadeIn(10).spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
+        group.spin(SHELL_SPIN_AXIS, SHELL_SPIN_RADIANS_PER_TICK)
         shell = group
     }
 
@@ -201,25 +201,25 @@ class GravityField : AreaFieldEffect(
             Vec3(center.x, floor + WELL_RING_LIFT, center.z),
             radius, WELL_RING_PARTICLES,
             colorFn = WELL_RING_COLOR, scale = WELL_RING_SCALE, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true),
+            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false),
         )
         val pivot = Vec3(center.x, floor + WELL_RING_LIFT, center.z)
         Draw.circle(manager, pivot, radius * 0.78, 120,
             colorFn = WELL_RING_COLOR, scale = 0.5f, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
         repeat(24) { index ->
             val radial = Vec3(cos(index * PI / 12.0), 0.0, sin(index * PI / 12.0))
             Draw.line(manager, pivot.add(radial.scale(radius * 0.86)), pivot.add(radial.scale(radius * 0.95)), 4,
                 colorFn = WELL_RING_COLOR, scale = 0.55f, group = group,
-                visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+                visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
         }
-        group.fadeIn(8).spin(Vec3(0.0, 1.0, 0.0), WELL_RING_SPIN_RADIANS_PER_TICK)
+        group.spin(Vec3(0.0, 1.0, 0.0), WELL_RING_SPIN_RADIANS_PER_TICK)
         wellRing = group
     }
 
     /**
      * 重力波环：场顶一个水平环，用 `move` 的 [EasingType.EASE_IN]（慢起快落 = 加速下坠）压到地面，
-     * 同时 `fadeOut` 淡出并在动画结束后由 PD 自行销毁整组。
+     * 实色波面落地时由 PD 销毁整组。
      *
      * 环的起始高度取球心上方 [RING_START_HEIGHT_SCALE]×半径处（该高度的水平截面半径即环半径），
      * 下落距离 = 起点到井环高度。
@@ -240,18 +240,21 @@ class GravityField : AreaFieldEffect(
         Draw.circle(
             manager, Vec3(center.x, startY, center.z), radius, RING_PARTICLES,
             colorFn = RING_COLOR, scale = RING_SCALE, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true),
+            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false),
         )
         // 同一波面带八个向下尖的刻度，远看也能读出施力方向，而不是一圈漂浮的雪。
         repeat(8) { index ->
             val angle = index * PI / 4.0
             val p = Vec3(center.x + cos(angle) * radius, startY, center.z + sin(angle) * radius)
             val side = Vec3(-sin(angle), 0.0, cos(angle)).scale(0.13)
-            Draw.polyline(manager, listOf(p.add(side), p.add(0.0, -0.28, 0.0), p.subtract(side)),
-                thickness = 0.05f, additive = true, glowing = true, colorFn = RING_COLOR, group = group)
+            val tip = p.add(0.0, -0.28, 0.0)
+            for (end in listOf(p.add(side), p.subtract(side))) {
+                Draw.line(manager, end, tip, 4, colorFn = RING_COLOR, scale = 0.5f, group = group,
+                    visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+            }
         }
         group.move(0.0, -fall, 0.0, fallTicks, EasingType.EASE_IN)
-        group.fadeOut(fallTicks, removeAfter = true)
+        group.destroyAfter(fallTicks)
         // 落地那一拍：地面溅起一圈（一次性粒子）+ 镜头被撞一下。
         // 环的下落由 PD 在客户端本地求值，服务端只知道「[fallTicks] 之后落地」，所以这里排进延迟队列。
         pendingImpacts += Deferred.after(manager.level, fallTicks) {
@@ -299,7 +302,7 @@ class GravityField : AreaFieldEffect(
         const val SHELL_SCALE = 0.45f
 
         /** 球面经线颜色：低亮青蓝 */
-        val SHELL_COLOR: Color = Color.ofInt(96, 149, 208, 85)
+        val SHELL_COLOR: Color = Color.ofInt(96, 149, 208, 255)
 
         /** 球壳自转轴与角速度：绕竖直轴慢转（约 10 秒一圈），客户端本地求值 → 0 包/tick */
         val SHELL_SPIN_AXIS: Vec3 = Vec3(0.0, 1.0, 0.0)
@@ -323,7 +326,7 @@ class GravityField : AreaFieldEffect(
         const val FALL_LIFETIME_TICKS = 100
 
         /** 下坠细线颜色：青蓝，区别于原先的白色雪点 */
-        val FALL_COLOR: Color = Color.ofInt(142, 195, 242, 200)
+        val FALL_COLOR: Color = Color.ofInt(142, 195, 242, 255)
 
         // ---- 重力波环 ----
 
@@ -360,12 +363,12 @@ class GravityField : AreaFieldEffect(
         const val IMPACT_UP_SPEED = 0.11
 
         /** 溅射颜色：比波环亮一点，落地那一下才「亮得出来」（不再是接近纯白） */
-        val IMPACT_COLOR: Color = Color.ofInt(198, 224, 246, 200)
+        val IMPACT_COLOR: Color = Color.ofInt(198, 224, 246, 255)
 
         /** 环的颜色（偏亮的天蓝白：与淡灰下坠粒子区分开，才看得出是「一层」在压下来） */
-        val RING_COLOR: ColorSource = ColorSource { t -> RING_TINT.lerp(RING_TINT_BRIGHT, t.toFloat()) }
-        val RING_TINT: Color = Color.ofInt(150, 190, 235, 105)
-        val RING_TINT_BRIGHT: Color = Color.ofInt(205, 230, 255, 145)
+        val RING_COLOR: ColorSource = ColorSource { t -> if (t < 0.5) RING_TINT else RING_TINT_BRIGHT }
+        val RING_TINT: Color = Color.ofInt(150, 190, 235, 255)
+        val RING_TINT_BRIGHT: Color = Color.ofInt(205, 230, 255, 255)
 
         // ---- 地面井环 ----
 
@@ -382,9 +385,9 @@ class GravityField : AreaFieldEffect(
         /** 井环自转角速度（弧度/tick）：约 10 秒一圈 */
         const val WELL_RING_SPIN_RADIANS_PER_TICK = 0.0105
 
-        val WELL_RING_COLOR: ColorSource = ColorSource { t -> WELL_RING_TINT.lerp(WELL_RING_TINT_BRIGHT, t.toFloat()) }
-        val WELL_RING_TINT: Color = Color.ofInt(120, 160, 210, 95)
-        val WELL_RING_TINT_BRIGHT: Color = Color.ofInt(180, 215, 250, 130)
+        val WELL_RING_COLOR: ColorSource = ColorSource { t -> if (t < 0.5) WELL_RING_TINT else WELL_RING_TINT_BRIGHT }
+        val WELL_RING_TINT: Color = Color.ofInt(120, 160, 210, 255)
+        val WELL_RING_TINT_BRIGHT: Color = Color.ofInt(180, 215, 250, 255)
 
         /** 施加给投射物的向下加速度（每 tick，与 `ConstantAcceleration` 默认值一致） */
         const val GRAVITY_PER_TICK = 0.03f

@@ -6,7 +6,6 @@ import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
-import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 
@@ -56,13 +55,18 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
     private fun createBeam(world: ServerLevel, start: Vec3, end: Vec3): ParticleGroup {
         val manager = ParticleManager.of(world)
         val beam = manager.createGroup(start)
-        Draw.curve(manager, { t -> start.lerp(end, t) }, 120, ColorSource.of(Color.ofInt(76, 216, 255, 240)),
-            2.0f, group = beam, visual = ParticleVisual().style(ParticleStyle.SOFT_DOT).glowing(true).additive(true))
+        Draw.curve(manager, { t -> start.lerp(end, t) }, 64, ColorSource.of(Color.ofInt(76, 216, 255, 255)),
+            0.75f, group = beam, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
         for ((name, value) in listOf("sx" to start.x, "sy" to start.y, "sz" to start.z,
             "ex" to end.x, "ey" to end.y, "ez" to end.z)) beam.setVariable(name, value)
-        beam.expression("u=i/max(1,n-1);x=sx+(ex-sx)*u;y=sy+(ey-sy)*u;z=sz+(ez-sz)*u;r=0.3;g=0.85;b=1;a=0.7+0.2*sin(t*0.04+u*16);sc=0.85+0.15*sin(t*0.06+u*20);")
-        beam.fadeIn(3)
+        beam.setVariable("endMs", 1.0e9)
+        // 实色方点拼出像素束；只收缩尺寸，透明度始终为 1。
+        beam.expression("u=i/max(1,n-1);x=floor((sx+(ex-sx)*u)*16)/16;y=floor((sy+(ey-sy)*u)*16)/16;z=floor((sz+(ez-sz)*u)*16)/16;r=0.3;g=0.85;b=1;a=1;sc=max(0.01,1-max(0,t-endMs)/500);")
         return beam
     }
-    override fun onDie() { group?.fadeOut(10, removeAfter = true, easing = EasingType.LINEAR); group = null }
+    override fun onDie() {
+        group?.setVariableLive("endMs", (status.age * 50).toString())
+        group?.destroyAfter(10)
+        group = null
+    }
 }

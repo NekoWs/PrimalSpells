@@ -67,40 +67,38 @@ object PixelVfx {
         burst(manager, to, color, 24, 0.12, 8, 0.0)
     }
 
-    /** 六面长柱加尖顶的实体晶簇，晶面用不同实色，三根晶柱有不同倾角和尺寸。 */
+    /** 单枚青金双尖晶体：四条腰棱、上下尖端和琥珀束带，区别于紫水晶簇。 */
     fun crystal(manager: ParticleManager, center: Vec3, icy: Boolean = false): ParticleGroup {
         val group = manager.createGroup(center)
-        val palette = if (icy) listOf(Color.ofInt(70, 139, 205), Color.ofInt(119, 213, 240), Color.ofInt(220, 249, 255))
-            else listOf(Color.ofInt(80, 43, 137), Color.ofInt(140, 78, 200), Color.ofInt(197, 156, 249), Color.ofInt(233, 212, 255))
-        repeat(3) { shard ->
-            val offset = Vec3((shard - 1) * 0.24, -0.3, if (shard == 1) -0.10 else 0.12)
-            val height = if (shard == 1) 1.25 else 0.78
-            val lean = Vec3((shard - 1) * 0.24, 0.0, if (shard == 1) 0.0 else 0.12)
-            val base = center.add(offset)
-            val shoulder = base.add(lean).add(0.0, height * 0.68, 0.0)
-            val tip = base.add(lean.scale(1.35)).add(0.0, height, 0.0)
-            val radius = if (shard == 1) 0.19 else 0.14
-            repeat(6) { face ->
-                fun radial(i: Int) = Vec3(cos(i * PI / 3) * radius, 0.0, sin(i * PI / 3) * radius)
-                val a = base.add(radial(face)); val b = base.add(radial(face + 1))
-                val c = shoulder.add(radial(face)); val d = shoulder.add(radial(face + 1))
-                val color = palette[face % palette.size]
-                facet(manager, group, a, b, c, color)
-                facet(manager, group, b, d, c, color)
-                facet(manager, group, c, d, tip, palette[(face + 1) % palette.size])
-            }
+        val palette = if (icy) listOf(Color.ofInt(70, 139, 205), Color.ofInt(119, 213, 240), Color.ofInt(220, 249, 255), Color.ofInt(105, 181, 225))
+            else listOf(Color.ofInt(24, 83, 91), Color.ofInt(47, 150, 146), Color.ofInt(114, 216, 185), Color.ofInt(210, 245, 210))
+        val top = center.add(0.0, 0.72, 0.0)
+        val bottom = center.add(0.0, -0.32, 0.0)
+        repeat(4) { face ->
+            fun waist(i: Int) = center.add(cos(PI / 4 + i * PI / 2) * 0.32, 0.06, sin(PI / 4 + i * PI / 2) * 0.32)
+            val a = waist(face); val b = waist(face + 1)
+            facet(manager, group, a, b, top, palette[face])
+            facet(manager, group, b, a, bottom, palette[(face + 2) % 4])
+            Draw.line(manager, a, b, 9, ColorSource.of(Color.ofInt(224, 174, 65)), 0.5f,
+                group = group, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
         }
         return group
     }
 
+    /** 沿横截面按实际面积采样；细长三角形不再按长边长度平方过度铺粒。 */
     private fun facet(manager: ParticleManager, group: ParticleGroup, a: Vec3, b: Vec3, c: Vec3, color: Color) {
         val normal = b.subtract(a).cross(c.subtract(a)).normalize()
-        val steps = max(5, (max(a.distanceTo(c), b.distanceTo(c)) * 26).toInt())
-        val visual = ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.046875f, 0.046875f)
+        val rows = ceil(max(a.distanceTo(c), b.distanceTo(c)) / 0.055).toInt().coerceAtLeast(1)
+        val visual = ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f, 0.0625f)
             .billboard(false).spin(atan2(-normal.y, normal.z), asin(normal.x.coerceIn(-1.0, 1.0)), 0.0).glowing(true)
-        for (i in 0..steps) for (j in 0..steps - i) {
-            val p = a.add(b.subtract(a).scale(i.toDouble() / steps)).add(c.subtract(a).scale(j.toDouble() / steps))
-            group.add(manager.create().position(p).color(color).visual(visual).lifetime(-1).spawn())
+        for (row in 0..rows) {
+            val t = row.toDouble() / rows
+            val left = a.lerp(c, t); val right = b.lerp(c, t)
+            val columns = ceil(left.distanceTo(right) / 0.055).toInt().coerceAtLeast(1)
+            for (column in 0..columns) {
+                val p = left.lerp(right, column.toDouble() / columns)
+                group.add(manager.create().position(p).color(color).visual(visual).lifetime(-1).spawn())
+            }
         }
     }
 }

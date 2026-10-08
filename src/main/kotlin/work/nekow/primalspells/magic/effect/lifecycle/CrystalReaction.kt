@@ -59,7 +59,7 @@ class CrystalReaction : BaseEffect() {
             visualScale = projectile.areaScale
         }
         if (status.age % 12 == 0) work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(
-            ParticleManager.of(world), center.add(0.0, 0.85, 0.0), Color.ofInt(231, 210, 255), 8, 0.02, 5, -0.002)
+            ParticleManager.of(world), center.add(0.0, 0.85, 0.0), Color.ofInt(210, 245, 210), 8, 0.02, 5, -0.002)
         if (lastCenter != center) group?.setPivot(center)
         lastCenter = center
         if (countdown >= 0 && countdown-- == 0) {
@@ -78,14 +78,14 @@ class CrystalReaction : BaseEffect() {
         arm()
         level?.let { world -> work.nekow.primalspells.magic.effect.visual.PixelVfx.arc(ParticleManager.of(world),
             Vec3(incoming.status.pos.x.toDouble(), incoming.status.pos.y.toDouble(), incoming.status.pos.z.toDouble()),
-            Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), Color.ofInt(200, 156, 255)) }
+            Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), Color.ofInt(224, 174, 65)) }
     }
 
     override fun onDie() {
         group?.remove()
         level?.let { world -> work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world),
             Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()),
-            if (status.freezeTicks > 0) Color.ofInt(119, 213, 240) else Color.ofInt(197, 156, 249), 144, 0.25, 16) }
+            if (status.freezeTicks > 0) Color.ofInt(119, 213, 240) else Color.ofInt(114, 216, 185), 144, 0.25, 16) }
         charged.clear()
         group = null
     }

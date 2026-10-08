@@ -17,7 +17,7 @@
 
 ---
 
-**当前未决：2 条。**
+**当前未决：3 条。**
 
 ### [需求] 发射器无「逐粒子位置抖动 / 偏移」
 
@@ -71,3 +71,14 @@
 
 > 需求落地后：把本条**整段搬进** [resolved.md](resolved.md) 附录 B（连同当时的原文），
 > 本文件只留标题式的一行指针都不要留 —— 保持"打开这个文件看到的全是未决项"。
+
+
+### [需求] 批量速度更新超过512成员导致客户端断线
+
+- 状态：未决，2026-10-08第55轮；本侧停止该接入点的修复尝试。
+- 目标模型：移动/互吸黑洞仍保留完整星尘，公开ParticleBatch.setVelocityAll应支持其全部存活成员，保持ID和速度一一对应。
+- 实际证据：run/client/logs/latest.log于13:38:16与13:38:46记录particle_velocity_batch解码失败，条数分别519和514；这是本次双黑洞问题的实际日志；本轮全量实机回归再次复现517条载荷断线，证据保存在build/verify/black-hole-batch-disconnect.log。crash-reports最新文件为旧版本2026-08-10的伤害注册表错误，与这次断线不同。
+- 现有能力：1.0.14-ALPHA的ParticleVelocityBatchPayload.MAX_BATCH=512，decode限制0..512，encode却直接写updates.size；ParticleBatch核心setVelocityAll经aligned把全部成员交给sendVelocities，没有公开API要求调用方限制512成员。
+- 修改需求：在PD发送端自动拆包，每包不超过MAX_BATCH；对速度/位置/力等批量载荷统一审计编码与解码上限，并测试0/512/513/1024成员、过期成员回收后ID与向量顺序、客户端不掉线及双端最终状态一致。
+- 影响：BlackHoleFx.update的星尘吸入批次；移动黑洞远离旧星尘时容易积累9×60tick的存活成员，超过512。
+- 本侧处理：不截断星尘、不逐粒替代批量API、不修改lib前置jar；双黑洞长时视觉验收仍被此前置缺陷阻断。

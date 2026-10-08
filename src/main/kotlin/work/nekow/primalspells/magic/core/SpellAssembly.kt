@@ -36,7 +36,9 @@ object SpellAssembly {
             child.maxAge = child.maxAge.coerceAtLeast(40)
         }
         val boosts = 2.0.pow(child.modifiers["speed_boost"] ?: 0).toFloat()
-        return org.joml.Vector3f(direction).normalize().mul(speed / (child.speed * boosts))
+        val heading = org.joml.Vector3f(direction)
+        if (heading.lengthSquared() < 1e-8f) heading.set(0f, 0f, 1f)
+        return heading.normalize().mul(speed / (child.speed * boosts * Projectile.LAUNCH_SPEED_SCALE))
     }
 
     /** 引爆卡把自己的非生成型配方传给已布置晶体，立即激活独立effect。 */

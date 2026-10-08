@@ -48,6 +48,11 @@ class Move(
         status.velocity = Vector3f(movement)
         val newPos = Vector3f(movement).add(status.pos)
 
+        if (!projectile.collisionEnabled || (throughBlocks && hitRadius <= 0.0)) {
+            status.pos = newPos
+            return
+        }
+
         val checkEntities = hitRadius > 0.0
         val level = caster.level() as? ServerLevel
         if (level != null) {
@@ -93,6 +98,7 @@ class Move(
                         if (!projectile.alive || !projectile.motionEnabled) return
                     }
 
+                    if (throughBlocks) continue
                     val blockPos = BlockPos(
                         floor(checkPos.x).toInt(),
                         floor(checkPos.y).toInt(),

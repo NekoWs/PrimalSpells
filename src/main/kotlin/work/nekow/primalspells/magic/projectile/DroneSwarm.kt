@@ -24,7 +24,7 @@ class DroneSwarm : Projectile() {
         delay = 0
         recharge = 0
         maxAge = 1
-        speed = 0f
+        speed = 0f; collisionEnabled = false
         hitRadius = 0.0
         effects += Trajectory(Color.CYAN)
     }

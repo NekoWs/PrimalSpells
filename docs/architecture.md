@@ -439,3 +439,10 @@ MagicManager在本tick投射物推进与pendingAdd合并后执行同维度SpellI
 反应只标记存活/储能，实际死亡仍走下一轮die，不在列表遍历期间删除对象。
 护盾弹反射同时修改Projectile.caster和每个BaseEffect.caster；无人机非生成型配方通过实体NBT持久化。
 详见 [design/spell-quality.md](design/spell-quality.md)。
+
+
+### 第55轮运动与碰撞补充
+
+Projectile.motionEnabled只控制位置积分；collisionEnabled独立控制接触查询，区域场必须关闭后者，不能关闭前者代替。
+发射初速统一乘1.6；继承当前世界速度的子弹必须使用SpellAssembly.launch，抵消基础速度/速度卡/全局倍率，不能二次放大。
+Tracking从age=0的首tick生效，零距离方向不归一化。throughBlocks仅跳过方块检测，不跳过本tick位置更新。

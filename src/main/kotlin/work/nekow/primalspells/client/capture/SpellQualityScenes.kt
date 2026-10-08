@@ -18,13 +18,75 @@ import work.nekow.primalspells.wand.Wand
 /** 第54轮：真实法杖发射、生命周期和跨投射物反应的实机回归。 */
 object SpellQualityScenes {
     /** 注册联动验收场景。 */
-    fun all(): List<Scene> = listOf(resonance())
+    fun all(): List<Scene> = listOf(resonance(), stability())
     private fun cast(ctx: CaptureDriver.SceneCtx, ids: List<String>, x: Double, y: Double, z: Double,
         yaw: Float = 0f, pitch: Float = 0f, source: Entity = ctx.player) {
         source.setPos(x, y, z); source.setYRot(yaw); source.setXRot(pitch); source.setOldPosAndRot()
         val wand = Wand("quality-${ctx.level.gameTime}-${ids.joinToString()}")
         wand.innate += ids.map { MagicManager.create(it)!! }; wand.load(); wand.status.mana = 1000.0
         check(wand.spell(source))
+    }
+    /** 短时双场受力穿墙（长时PD包缺陷另记台账）、即时追踪与高速穿刺的真实运行回归。 */
+    private fun stability(): Scene {
+        val name = "spell_stability"
+        var holes = listOf<Projectile>()
+        var probe: Projectile? = null
+        var target: TestDummyEntity? = null
+        var firstTurn = false
+        var crystalBudget = 0
+        return Scene(name, "双黑洞互吸穿墙 / 即时追踪 / 晶面预算", 24, 180,
+            prepare = { ctx ->
+                val floor = ctx.floorBlockY(0, 0)
+                for (x in -12..12) for (z in -12..12) for (y in floor+1..floor+8)
+                    ctx.level.setBlock(BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2)
+                ctx.buildStudio(0, 0, floor); ctx.setup(true, 0.5, floor+5.0, -14.0, 0f, 10f)
+                for (x in -4..4) for (y in floor+1..floor+6)
+                    ctx.level.setBlock(BlockPos(x, y, 3), Blocks.STONE.defaultBlockState(), 2)
+                holes = emptyList(); probe = null; firstTurn = false; crystalBudget = 0
+            }, camera = { ctx, _ -> Pose(0.5, ctx.floorBlockY(0, 0)+5.0, -14.0, 0f, 10f) },
+            tick = { ctx, t ->
+                val floor = ctx.floorBlockY(0, 0)
+                if (t == 8) {
+                    cast(ctx, listOf("black_hole"), -1.5, floor+2.0, 0.0)
+                    cast(ctx, listOf("black_hole"), 1.5, floor+2.0, 0.0)
+                }
+                if (t == 10) {
+                    holes = MagicManager.projectiles.filter { it.id == "black_hole" }
+                    holes.forEach { it.status.velocity.z = 0.25f }
+                }
+                if (t == 45) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 125) {
+                    target = ctx.spawnDummy(2.0, floor+2.0, -2.0)
+                    val p = MagicManager.create("fireball") as Projectile
+                    SpellAssembly.apply(p, listOf(MagicManager.create("homing") as Modifier))
+                    p.caster = ctx.player; p.wand = Wand("first-tick-tracking")
+                    p.position = Vector3f(0f, floor+2.0f, -2f); p.velocity = Vector3f(0f, 0f, 1f)
+                    p.spell(); probe = p
+                    val launchSpeed = p.status.velocity.length()
+                    p.tick()
+                    firstTurn = p.status.velocity.x > 0 && launchSpeed > 0.79f && launchSpeed < 0.81f && p.status.age == 0
+                    p.alive = false; p.die()
+                    target!!.discard()
+                    val piercing = MagicManager.create("fireball") as Projectile
+                    piercing.caster = ctx.player; piercing.wand = Wand("wall-pass")
+                    piercing.position = Vector3f(0f, floor+3f, 2.8f); piercing.velocity = Vector3f(0f, 0f, 1f)
+                    piercing.throughBlocks = true; piercing.spell(); piercing.tick(); probe = piercing
+                    piercing.alive = false; piercing.die()
+                }
+                if (t == 130) {
+                    val manager = ParticleManager.of(ctx.level)
+                    val before = manager.getEngine().particleCount()
+                    val crystal = work.nekow.primalspells.magic.effect.visual.PixelVfx.crystal(manager, Vec3(0.0, floor+3.0, 0.0))
+                    crystalBudget = manager.getEngine().particleCount() - before
+                    crystal.destroyAfter(20)
+                }
+            }, checksAt = { ctx, t -> when(t) {
+                40 -> listOf(Check(name, t, "two-holes-survive-attraction-through-wall", holes.size == 2 && holes.all { it.alive && !it.collisionEnabled && it.status.pos.z > 5f && it.status.pos.x.isFinite() && it.status.velocity.length().isFinite() }, "holes=${holes.map { Triple(it.alive, it.status.pos, it.status.velocity) }}"))
+                126 -> listOf(Check(name, t, "homing-first-tick-and-faster-launch", firstTurn, "firstTurn=$firstTurn"), Check(name, t, "piercing-integrates-through-solid-wall", probe != null && probe!!.status.pos.z > 3.4f, "position=${probe?.status?.pos}"))
+                140 -> listOf(Check(name, t, "bounded-solid-crystal-budget", crystalBudget in 300..1000, "particles=$crystalBudget"))
+                179 -> listOf(Check(name, t, "clean-projectiles", MagicManager.projectiles.isEmpty(), "shots=${MagicManager.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                else -> emptyList()
+            } })
     }
     private fun resonance(): Scene {
         val name = "spell_resonance"
@@ -132,7 +194,7 @@ object SpellQualityScenes {
                 155 -> listOf(Check(name, t, "shield-projectile-reflects-and-changes-owner", MagicManager.projectiles.any { it.id == "fireball" && it.caster === ctx.player && it.status.velocity.z < 0 }, "shots=${MagicManager.projectiles.map { it.id to it.status.velocity }}"))
                 185 -> {
                     val children = MagicManager.projectiles.filter { it.id == "fireball" && it.alive && "cluster_bomb" !in it.modifiers }
-                    listOf(Check(name, t, "terminal-block-hit-creates-inheriting-cluster", children.size == 3 && children.all { it.modifiers["damage_boost"] == 1 && it.status.freezeTicks > 0 && it.status.damage == 6.0 && it.status.velocity.isFinite && it.status.velocity.length() in 0.45f..0.9f }, "hit=$clusterHit all=${MagicManager.projectiles.map { it.id to it.modifiers }} children=${children.map { it.modifiers to it.status.damage }}"))
+                    listOf(Check(name, t, "terminal-block-hit-creates-inheriting-cluster", children.size == 3 && children.all { it.modifiers["damage_boost"] == 1 && it.status.freezeTicks > 0 && it.status.damage == 6.0 && it.status.velocity.isFinite && it.status.velocity.length() in (0.45f * Projectile.LAUNCH_SPEED_SCALE)..(0.9f * Projectile.LAUNCH_SPEED_SCALE) }, "hit=$clusterHit all=${MagicManager.projectiles.map { it.id to it.modifiers }} children=${children.map { it.modifiers to it.status.damage }}"))
                 }
                 212 -> listOf(Check(name, t, "teleport-hit-carries-damage-and-freeze", FrozenStatus.isFrozen(teleportTarget!!) && enemy!!.position().distanceToSqr(teleportTarget!!.position()) < 4.0, "frozen=${FrozenStatus.isFrozen(teleportTarget!!)} caster=${enemy!!.position()}"))
                 248 -> {

@@ -13,7 +13,7 @@ import work.nekow.primalspells.util.Lore
  * 默认参数：
  * - 追踪范围：5.0 方块（球形半径）
  * - 追踪强度：0.1（每 tick 向目标方向的加速度）
- * - 生效延迟：20 tick（投射物射出 1 秒后开始追踪）
+ * - 从首个飞行 tick 开始追踪
  * - 自动排除掉落物、矿车、船
  */
 class Homing : Modifier() {
@@ -27,9 +27,6 @@ class Homing : Modifier() {
     /** 默认追踪强度（每 tick 加速度） */
     private val trackingStrength = 0.1f
 
-    /** 追踪生效前的延迟（单位：tick, 20 tick = 1 秒） */
-    private val trackingDelay = 20
-
     init {
         /** 施放该修正消耗的法力值 */
         mana = 4.0
@@ -38,11 +35,10 @@ class Homing : Modifier() {
         delay = 0
 
         // 向修正效果列表中添加 Tracking 追踪效果
-        // 传入追踪范围、强度、生效延迟，自动排除掉落物/矿车/船
+        // 传入追踪范围、强度，自动排除掉落物/矿车/船
         effects += Tracking(
             range = trackingRange,
             strength = trackingStrength,
-            delayTicks = trackingDelay,
             excludeItems = true,
             excludeMinecarts = true,
             excludeBoats = true

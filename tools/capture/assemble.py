@@ -57,6 +57,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "spell_stability": {"length": 180, "title": "双场穿墙 / 即时追踪 / 晶体预算", "decay": "gradual", "quiet": (0, 8)},
     "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
     # 护盾受击玻璃亮度远高于电弧；在独立电弧窗口内量渲染和渐隐，不混用护盾峰值。

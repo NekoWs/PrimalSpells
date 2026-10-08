@@ -36,6 +36,9 @@ abstract class Projectile: Magic() {
     /** 粘附类法术关闭 Move 积分；轨道 OVERRIDE 仍可组合。 */
     var motionEnabled: Boolean = true
 
+    /** 区域场不接触实体或地形，但仍参与受力和位置积分。 */
+    var collisionEnabled: Boolean = true
+
     /** 施放时原始方向，静止束源和触发荷载也保留来向。 */
     var launchDirection: net.minecraft.world.phys.Vec3 = net.minecraft.world.phys.Vec3.ZERO
         private set
@@ -65,7 +68,7 @@ abstract class Projectile: Magic() {
         work.nekow.primalspells.magic.core.SpellAssembly.prepare(this)
         effects += work.nekow.primalspells.magic.effect.lifecycle.SpellResonance()
         effects += Position(position)
-        effects += Velocity(Vector3f(velocity).mul(speed))
+        effects += Velocity(Vector3f(velocity).mul(speed * LAUNCH_SPEED_SCALE))
         effects += Move(
             dragCoeff,
             hitRadius = hitRadius,
@@ -144,4 +147,9 @@ abstract class Projectile: Magic() {
     }
 
     override fun clone(): Projectile = super.clone() as Projectile
+
+    companion object {
+        /** 全部发射入口共用；子弹继承当前速度时须抵消此倍率。 */
+        const val LAUNCH_SPEED_SCALE = 1.6f
+    }
 }

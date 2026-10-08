@@ -20,6 +20,7 @@ class GravityFieldProjectile : Projectile() {
         recharge = 0
         maxAge = 200 // 存活 10 秒
         speed = 0f // 静态
+        collisionEnabled = false
         hitRadius = 0.0 // 无碰撞
         effects += Trajectory(Color.of(0.5f, 0.4f, 1f)) // 粒子效果
         effects += GravityField() // 减速效果

@@ -242,7 +242,7 @@ object SpellExpansionScenes {
                 if (t == 140) {
                     MagicManager.projectiles.forEach { it.alive = false }
                     cast(ctx, listOf("repulsion_field"), 5.0, floor + 1.0, 0.0)
-                    cast(ctx, listOf("fireball"), 7.0, floor + 1.0, 0.0, yaw = 90f)
+                    cast(ctx, listOf("fireball"), 9.0, floor + 1.0, 0.0, yaw = 90f)
                     val a = Arrow(ctx.level, ctx.player, ItemStack(Items.ARROW), null)
                     a.setPos(7.0, floor + 2.6, 2.0); a.setNoGravity(true); a.deltaMovement = Vec3(-0.05, 0.0, 0.0)
                     ctx.level.addFreshEntity(a); arrow = a
@@ -258,7 +258,7 @@ object SpellExpansionScenes {
                 }
                 104 -> listOf(Check(name, t, "far-cast-stops-at-wall", MagicManager.projectiles.any { it.id == "black_hole" && it.status.pos.z in -2.3f..-2.0f }, "positions=${MagicManager.projectiles.filter { it.id == "black_hole" }.map { it.status.pos }}"))
                 134 -> listOf(Check(name, t, "trigger-payload-keeps-launch-direction", MagicManager.projectiles.any { it.id == "black_hole" && it.status.pos.z < -7f }, "positions=${MagicManager.projectiles.filter { it.id == "black_hole" }.map { it.status.pos }}"))
-                147 -> listOf(Check(name, t, "repels-magic-and-vanilla", arrow!!.deltaMovement.x > 0 && MagicManager.projectiles.any { it.id == "fireball" && it.status.velocity.x > 0 }, "arrow=${arrow.deltaMovement} shots=${MagicManager.projectiles.map { it.id to it.status.velocity }}"))
+                155 -> listOf(Check(name, t, "repels-magic-and-vanilla", arrow!!.deltaMovement.x > 0 && MagicManager.projectiles.any { it.id == "fireball" && it.status.velocity.x > 0 }, "arrow=${arrow.deltaMovement} shots=${MagicManager.projectiles.map { it.id to it.status.velocity }}"))
                 219 -> clean(name, t, ctx)
                 else -> emptyList()
             } })

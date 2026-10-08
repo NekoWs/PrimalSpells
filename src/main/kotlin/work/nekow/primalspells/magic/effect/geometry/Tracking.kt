@@ -13,7 +13,7 @@ import org.joml.Vector3f
 import work.nekow.primalspells.magic.effect.BaseEffect
 
 /**
- * 追踪效果 —— 在延迟结束后每 tick 寻找球形范围内最近的实体,
+ * 追踪效果 —— 从首个 tick 起每 tick 寻找球形范围内最近的实体,
  * 并将投射物的速度向该实体方向偏转（加速）。
  *
  * 叠加机制：多个 Tracking 效果叠加时，首个实例以 √N 倍率增强效果；
@@ -21,7 +21,6 @@ import work.nekow.primalspells.magic.effect.BaseEffect
  *
  * @param range            追踪范围（球形半径, 单位：方块）
  * @param strength         追踪强度（每 tick 向目标方向的加速度）
- * @param delayTicks       投射物射出后延迟多少 tick 才开始生效（默认 20 tick = 1 秒）
  * @param excludeItems     是否排除掉落物实体（默认 true）
  * @param excludeMinecarts 是否排除矿车实体（默认 true）
  * @param excludeBoats     是否排除船实体（默认 true）
@@ -29,7 +28,6 @@ import work.nekow.primalspells.magic.effect.BaseEffect
 class Tracking(
     val range: Float,
     val strength: Float,
-    val delayTicks: Int = 20,
     val excludeItems: Boolean = true,
     val excludeMinecarts: Boolean = true,
     val excludeBoats: Boolean = true
@@ -43,7 +41,6 @@ class Tracking(
      *
      * 流程：
      * 1. 检查投射物存活状态, 已死亡则直接返回
-     * 2. 检查延迟计数 —— 若 [MagicStatus.age] < [delayTicks], 暂不执行追踪
      * 3. 获取服务端世界实例（客户端不执行追踪逻辑）
      * 4. 统计投射物上所有 Tracking 实例数量, 仅首个实例执行追踪（其余跳过）
      * 5. 以 √N 倍率计算调整后的追踪范围和强度
@@ -59,8 +56,6 @@ class Tracking(
         // 投射物已死亡, 不执行追踪
         if (!projectile.alive) return
 
-        // 未到达生效延迟, 暂时跳过追踪逻辑
-        if (status.age < delayTicks) return
 
         // 获取服务端世界实例, 客户端直接跳过
         val level = caster.level() as? ServerLevel ?: return
@@ -135,7 +130,9 @@ class Tracking(
                 (target.x - status.pos.x).toFloat(),
                 (target.y - status.pos.y).toFloat(),
                 (target.z - status.pos.z).toFloat()
-            ).normalize()
+            )
+            if (direction.lengthSquared() < 1e-8f) return@let
+            direction.normalize()
 
             // 以调整后的追踪强度叠加方向向量到投射物当前速度上
             status.velocity.add(direction.mul(adjustedStrength))

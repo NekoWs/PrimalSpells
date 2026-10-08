@@ -80,3 +80,10 @@
 - 影响：无法用文档声明的只判定/拼图模式节省装配时间；本轮使用默认视频模式，视频证据不受影响。
 - 涉及：`tools/capture/assemble.py`、`tools/capture/capture.ps1` 的NoVideo开关。
 - 下一步：将开关传入analyse并跳过视频/动图生成与对应断言，保留全部帧、像素、玩法及日志门禁。
+
+
+## 第55轮：移动黑洞的PD批量速度包断线（2026-10-08）
+
+两个黑洞互吸移动后，存活星尘批次超过512，PD发出519/514条速度更新，客户端抛DecoderException断线。
+已核对run/client/logs/latest.log和lib的1.0.14-ALPHA源码；这是前置API缺陷，本模组不得另写替代实现。
+需求与验收边界见[pd-api-requests.md](pd-api-requests.md)最后一项。保持未解决，待PD修复后复验spell_stability。

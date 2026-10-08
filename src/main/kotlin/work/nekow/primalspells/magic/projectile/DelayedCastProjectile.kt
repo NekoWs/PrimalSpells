@@ -27,7 +27,7 @@ class DelayedCastProjectile : Projectile(), TriggerSpell {
         delay = 0
         recharge = 0
         maxAge = 20
-        speed = 0f
+        speed = 0f; collisionEnabled = false
         hitRadius = 0.0
         effects += Trajectory(Color.GREEN)
         effects += DelayedTrigger(this)

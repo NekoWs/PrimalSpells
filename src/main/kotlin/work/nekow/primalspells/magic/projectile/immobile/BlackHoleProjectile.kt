@@ -20,6 +20,7 @@ class BlackHoleProjectile : Projectile() {
         recharge = 0
         maxAge = 200
         speed = 0f
+        collisionEnabled = false
         hitRadius = 0.0
         effects += Trajectory(Color.of(0.3f, 0f, 0.5f))
         effects += BlackHole()

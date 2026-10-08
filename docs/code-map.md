@@ -267,3 +267,7 @@
 `magic/effect/visual/PixelVfx.kt`：公开PD API的冲击/裂纹/实色晶面几何。
 `client/capture/SpellQualityScenes.kt`：448组合矩阵、有序数值/速度与真实施法联动验收。
 规则以 [design/spell-quality.md](design/spell-quality.md) 为准。
+
+
+第55轮：Projectile中的LAUNCH_SPEED_SCALE统一初速，collisionEnabled区分区域场接触与运动；
+Tracking不再有延迟参数。SpellQualityScenes新增spell_stability短时碰撞/追踪/晶体预算回归，PD长时断线仍在issues/open.md。

@@ -8,7 +8,27 @@ import kotlin.math.*
 
 /** 实色像素的冲击、折线和晶面造型；本侧只给几何与初值，积分、旋转、寿命交给PD。 */
 object PixelVfx {
-    /** 固定尺寸碎屑，错峰寿命；不把几何整体缩向轴心。 */
+    /** 实色片元的尺寸起落；不改变位置或透明度，曲线由PD逐帧求值。 */
+    fun lifeKeys(life: Int): Array<CurveKey> {
+        val end = life.coerceAtLeast(2).toDouble()
+        return arrayOf(CurveKey.at(0, 0), CurveKey.at(min(1.5, end * 0.2), 1, EasingType.EASE_OUT),
+            CurveKey.at(max(end * 0.35, end - 5), 1), CurveKey.at(end, 0, EasingType.EASE_IN_OUT))
+    }
+
+    /** 完整尺寸组有限收束至零后销毁；PD多倍率接续缺陷另记需求，不能用于零尺寸入场。 */
+    fun retire(group: ParticleGroup?, ticks: Int = 6) {
+        group?.scale(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
+    }
+
+    /** 已有批次交给PD组播放有限收束，本侧不再逐tick驱动；用于场结束的剩余片元。 */
+    fun retireBatch(manager: ParticleManager, batch: ParticleBatch?, center: Vec3, ticks: Int = 6) {
+        if (batch == null || batch.isEmpty()) return
+        val group = manager.createGroup(center)
+        batch.handles().forEach { group.add(it) }
+        retire(group, ticks)
+    }
+
+    /** 碎屑保持运动，单片起落并错峰结束；不把几何整体缩向轴心。 */
     fun burst(manager: ParticleManager, center: Vec3, color: Color, count: Int = 72,
               speed: Double = 0.25, life: Int = 16, gravity: Double = 0.015, spread: Double = 0.12) {
         val specs = ArrayList<ParticleSpawnSpec>()
@@ -19,7 +39,7 @@ object PixelVfx {
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(
                     if (i % 5 == 0) 0.1875f else 0.0625f, if (i % 5 == 0) 0.0625f else 0.0625f)
                     .glowing(true).spin(i * 0.37))
-                .lifetime(life + i % 13)
+                .lifetime(life + i % 13).sizeCurve(*lifeKeys(life + i % 13))
             velocities += d.scale(speed * (0.55 + i % 9 / 12.0)).add(0.0, 0.06, 0.0)
         }
         val batch = ParticleBatch(manager).also { it.addAll(manager.spawnAll(specs)) }
@@ -39,7 +59,7 @@ object PixelVfx {
             val p = center.add(u.scale(cos(a) * radius)).add(v.scale(sin(a) * radius))
             group.add(manager.create().position(p).color(color).style(ParticleStyle.SQUARE)
                 .visual(ParticleVisual().anisoWorld(0.0625f, 0.0625f).glowing(true))
-                .lifetime(life + i % 5).spawn())
+                .lifetime(life + i % 5).sizeCurve(*lifeKeys(life + i % 5)).spawn())
         }
         group.scale(growth, 5, EasingType.EASE_OUT).destroyAfter(life + 5)
     }
@@ -59,9 +79,9 @@ object PixelVfx {
         for (i in 0 until points.lastIndex) repeat(8) { j ->
             val p = points[i].lerp(points[i + 1], j / 8.0)
             specs += ParticleSpawnSpec().position(p).color(if (j % 3 == 0) Color.ofInt(224, 250, 255) else color)
-                .visual(ParticleVisual().anisoWorld(0.09375f, 0.09375f).glowing(true)).lifetime(5 + i % 6)
+                .visual(ParticleVisual().anisoWorld(0.09375f, 0.09375f).glowing(true)).lifetime(5 + i % 6).sizeCurve(*lifeKeys(5 + i % 6))
             if (i % 4 == 0) specs += ParticleSpawnSpec().position(p.add(u.scale(j * 0.04)))
-                .color(color).visual(ParticleVisual().anisoWorld(0.046875f, 0.046875f).glowing(true)).lifetime(3 + j % 5)
+                .color(color).visual(ParticleVisual().anisoWorld(0.046875f, 0.046875f).glowing(true)).lifetime(3 + j % 5).sizeCurve(*lifeKeys(3 + j % 5))
         }
         manager.spawnAll(specs)
         burst(manager, to, color, 24, 0.12, 8, 0.0)

@@ -826,6 +826,8 @@ class EnergyShield : Modifier() {
                             .anisoWorld(if (edge) edgeScale * 0.2f else 0.09375f, if (edge) edgeScale * 0.2f else 0.046875f)
                             .glowing(glow).spin(i * 0.47))
                         .lifetime(holdTicks + fadeTicks + if (drift != null) i % 13 else if (follow) -(i % 5) else i % 5)
+                        .sizeCurve(*work.nekow.primalspells.magic.effect.visual.PixelVfx.lifeKeys(
+                            holdTicks + fadeTicks + if (drift != null) i % 13 else if (follow) -(i % 5) else i % 5))
                         .spawn()
                     if (drift != null) {
                         // 保持片元尺寸，沿法线剥落并受重力；不会整块护盾缩到球心。

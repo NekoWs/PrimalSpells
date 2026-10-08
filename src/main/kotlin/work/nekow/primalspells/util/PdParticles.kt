@@ -2,6 +2,8 @@ package work.nekow.primalspells.util
 
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
+import work.nekow.particledrawing.api.CurveKey
+import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleHandle
 import work.nekow.particledrawing.api.ParticleManager
@@ -50,6 +52,11 @@ fun ParticleManager.spawnParticle(
 ): ParticleHandle? {
     val builder = create().position(pos).color(color).scale(scale).lifetime(lifetimeTicks)
     if (visual != null) builder.visual(visual).glowing(visual.glowing).lightLevel(visual.lightLevel)
+    if (lifetimeTicks > 1) {
+        val end = lifetimeTicks.toDouble()
+        builder.sizeCurve(CurveKey.at(0, 0), CurveKey.at(kotlin.math.min(1.5, end * 0.2), 1, EasingType.EASE_OUT),
+            CurveKey.at(kotlin.math.max(end * 0.35, end - 5), 1), CurveKey.at(end, 0, EasingType.EASE_IN_OUT))
+    }
     val handle = builder.spawn() ?: return null
     if (velocity != null) handle.setVelocity(velocity)
     // 力与速度**叠加**（PD 明确语义：施力不覆盖已有速度），所以「初速 + 恒定加速度」可以同时给

@@ -34,46 +34,226 @@ Ka 0.25 0.25 0.25
 map_Kd base
 
 newmtl gem_glow1
-Kd 0.380392 0.588235 0.803922
+Kd 0.223529 0.486275 0.752941
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow1_light
-Kd 0.576471 0.752941 0.945098
+Kd 0.470588 0.690196 0.929412
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow1_dark
-Kd 0.349020 0.435294 0.596078
+Kd 0.184314 0.290196 0.494118
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow2
-Kd 0.576471 0.717647 0.866667
+Kd 0.262745 0.509804 0.764706
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow2_light
-Kd 0.709804 0.831373 0.960784
+Kd 0.498039 0.705882 0.933333
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow2_dark
-Kd 0.552941 0.611765 0.725490
+Kd 0.223529 0.325490 0.521569
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow3
-Kd 0.772549 0.847059 0.929412
+Kd 0.301961 0.537255 0.780392
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow3_light
-Kd 0.843137 0.909804 0.980392
+Kd 0.521569 0.721569 0.937255
 Ka 1 1 1
 map_Kd base
 
 newmtl gem_glow3_dark
+Kd 0.266667 0.360784 0.545098
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow4
+Kd 0.341176 0.560784 0.792157
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow4_light
+Kd 0.549020 0.737255 0.941176
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow4_dark
+Kd 0.305882 0.396078 0.572549
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow5
+Kd 0.380392 0.588235 0.803922
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow5_light
+Kd 0.576471 0.752941 0.945098
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow5_dark
+Kd 0.349020 0.435294 0.596078
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow6
+Kd 0.419608 0.615686 0.815686
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow6_light
+Kd 0.603922 0.768627 0.945098
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow6_dark
+Kd 0.388235 0.470588 0.623529
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow7
+Kd 0.458824 0.639216 0.827451
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow7_light
+Kd 0.631373 0.784314 0.949020
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow7_dark
+Kd 0.431373 0.505882 0.647059
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow8
+Kd 0.498039 0.666667 0.839216
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow8_light
+Kd 0.658824 0.800000 0.952941
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow8_dark
+Kd 0.470588 0.541176 0.674510
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow9
+Kd 0.537255 0.694118 0.854902
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow9_light
+Kd 0.682353 0.815686 0.956863
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow9_dark
+Kd 0.513725 0.576471 0.698039
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow10
+Kd 0.576471 0.717647 0.866667
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow10_light
+Kd 0.709804 0.831373 0.960784
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow10_dark
+Kd 0.552941 0.611765 0.725490
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow11
+Kd 0.615686 0.745098 0.878431
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow11_light
+Kd 0.737255 0.847059 0.964706
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow11_dark
+Kd 0.596078 0.647059 0.749020
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow12
+Kd 0.654902 0.768627 0.890196
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow12_light
+Kd 0.764706 0.862745 0.968627
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow12_dark
+Kd 0.635294 0.682353 0.776471
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow13
+Kd 0.694118 0.796078 0.901961
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow13_light
+Kd 0.792157 0.878431 0.972549
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow13_dark
+Kd 0.678431 0.721569 0.800000
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow14
+Kd 0.733333 0.823529 0.913725
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow14_light
+Kd 0.815686 0.894118 0.976471
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow14_dark
+Kd 0.717647 0.756863 0.827451
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow15
+Kd 0.772549 0.847059 0.929412
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow15_light
+Kd 0.843137 0.909804 0.980392
+Ka 1 1 1
+map_Kd base
+
+newmtl gem_glow15_dark
 Kd 0.760784 0.792157 0.850980
 Ka 1 1 1
 map_Kd base

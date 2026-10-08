@@ -26,27 +26,29 @@ object ExplosionFx {
                 .color(if (i % 5 == 0) cyan else flame[i % 3])
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(
                     if (i % 7 == 0) 0.375f else 0.125f, 0.0625f).glowing(true).spin(i * 0.71))
-                .lifetime(12 + i % 17)
+                .lifetime(12 + i % 17).sizeCurve(*PixelVfx.lifeKeys(12 + i % 17))
             velocities += dir.scale((0.25 + r * 0.07) * spoke).add(0.0, 0.06, 0.0)
         }
         val batch = ParticleBatch(manager).also { it.addAll(manager.spawnAll(specs)) }
         batch.setVelocityAll(velocities)
         batch.applyForceAll(velocities.map { it.scale(-0.025).add(0.0, -0.017, 0.0) }, 22)
 
-        // 白热块只停两拍；实体火团不是透明光晕，分瓣喷出后断裂。
+        // 降级：PD多段组缩放不继承当前倍率，暂停整体膨胀入场；前置修复后恢复。
+        // 分瓣运动交接到冲击圈，保持完整尺寸再收尾。
         val flash = Draw.sphere(manager, center, r * 0.18, 144, ColorSource.of(white), 1.8f,
             visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-        flash.scale(1.8f, 2, EasingType.EASE_OUT).destroyAfter(3)
+        flash.delay(3).scale(0f, 4, EasingType.EASE_IN_OUT).destroyAfter(6)
         repeat(8) { lobe ->
             val d = ParticleShapes.fibonacciSphere(8)[lobe]
             val group = Draw.sphere(manager, center.add(d.scale(r * 0.18)), r * 0.15, 72,
                 ColorSource.of(flame[lobe % 3]), 1.0f,
                 visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-            group.move(d.scale(r * 0.5), 6, EasingType.EASE_OUT).scale(1.5f, 4).destroyAfter(5 + lobe % 4)
+            group.move(d.scale(r * 0.5), 6, EasingType.EASE_OUT)
+                .delay(4 + lobe % 3).scale(0f, 5, EasingType.EASE_IN_OUT).destroyAfter(7)
         }
         for (n in listOf(Vec3(0.0, 1.0, 0.0), Vec3(1.0, 0.15, 0.0), Vec3(0.0, 0.3, 1.0)))
             PixelVfx.ring(manager, center, n, r * 0.25, cyan, 11, 5f)
-        ScreenShake.shake(manager.level, center, radius = r * 5 + 16, amplitude = (0.3 + r * 0.09).toFloat(), ticks = 9)
+        ScreenShake.shake(manager.level, center, radius = r * 2 + 3, amplitude = (r * 0.06).coerceAtMost(0.55).toFloat(), ticks = 8)
 
         // 分时喷出的烟团向上翻卷，内暗外亮，保持轮廓块面；粒子寿命负责断裂收场。
         for (beat in listOf(2, 5, 9)) Deferred.after(manager.level, beat) {
@@ -58,7 +60,7 @@ object ExplosionFx {
                     puffSpecs += ParticleSpawnSpec().position(c.add(local.scale(0.22 + r * 0.04)))
                         .color(if ((i + puff) % 3 == 0) Color.ofInt(172, 178, 186) else Color.ofInt(68, 73, 84))
                         .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.25f, 0.25f).glowing(false))
-                        .lifetime(12 + i % 12)
+                        .lifetime(12 + i % 12).sizeCurve(*PixelVfx.lifeKeys(12 + i % 12))
                     puffVelocities += d.scale(0.06).add(local.cross(Vec3(0.0, 1.0, 0.0)).scale(0.018)).add(0.0, 0.045, 0.0)
                 }
             }

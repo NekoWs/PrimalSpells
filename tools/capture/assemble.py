@@ -105,6 +105,8 @@ SCENES = {
         "length": 72,
         "title": "火球拖尾：白热核 + 沿轨迹的符文余痕（跟拍）",
         "metric": "orange",
+        "fade_window": (33, 65),
+        "fade_min_peak_ratio": 0.0004, # 退场碎屑独立于遮挡前弹体，368px最低可读覆盖；主体门槛不变
         "decay": "gradual",
     },
     "energy_shield": {
@@ -173,10 +175,10 @@ CONTACT_PICKS = 12
 
 
 def wand_mask(path: Path) -> "np.ndarray":
-    # 宝石自身为饱和蓝色；只计青色/白色方粒，不能把手持模型当成退场粒子。
+    # 宝石为饱和蓝、银架的蓝红差仅24；只计青色符印/法阵，白色冷却另有独立门禁。
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    return (g > 150) & (b > 160) & (g > b * 0.87) & ((b - r) > 14)
+    return (g > 150) & (b > 160) & (g > b * 0.87) & ((b - r) > 40)
 
 
 def blue_mask(path: Path) -> "np.ndarray":
@@ -415,15 +417,33 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         fade_peak = max(fade_cover, default=0)
         fade_idx = fade_cover.index(fade_peak) if fade_cover else 0
         fade_empty = max(1, int(fade_peak * EMPTY_RATIO))
-        result["asserts"].append(("独立效果确实渲染", fade_peak >= total_px * MIN_PEAK_RATIO,
+        result["asserts"].append(("独立效果确实渲染", fade_peak >= total_px * spec.get("fade_min_peak_ratio", MIN_PEAK_RATIO),
             f"游戏 tick {lo}-{hi} 峰值 {fade_peak} 像素（排除其它视觉系统）"))
+    if scene in ("wand_casting_first_person", "wand_casting_wide"):
+        tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        center = []
+        for t in range(22, 28):
+            # 杖身银色材质也通过通用冷色判据，使用与idle门禁相同的符印色域排除模型。
+            roi = np.asarray(Image.open(tick_frames[t]).convert("RGB"), dtype=np.int16)[240:450, 520:760]
+            r, g, b = roi[..., 0], roi[..., 1], roi[..., 2]
+            center.append(int(((r <= 150) & (g >= 225) & (b >= 245)).sum()))
+        result["asserts"].append(("待机不遮挡准星周围", max(center) <= 8,
+            f"首次施法前中央240×210区域覆盖{center}，要求≤8像素"))
+
     # 尺寸退场：从峰值衰减到 50% 与 <5% 的位置差
     t50 = next((i for i in range(fade_idx, len(fade_cover)) if fade_cover[i] <= fade_peak * 0.5), len(fade_cover) - 1)
     tend = next((i for i in range(t50, len(fade_cover)) if fade_cover[i] <= fade_empty), len(fade_cover) - 1)
     span = tend - t50
     if spec.get("short_exit"):
-        result["asserts"].append(("短促退场有收尾且不拖沓", 1 <= span <= 6,
-            f"覆盖量50%→5% 跨{span}帧，要求1–6帧；本轮缩短视觉时长"))
+        # 小颗粒栅格化在50%附近差几个像素就会移一整帧，观察整段起落并约束最大单帧丢失。
+        begin = next((i for i in range(fade_idx, len(fade_cover)) if fade_cover[i] <= fade_peak * .95), len(fade_cover)-1)
+        extent = tend - begin
+        largest = max((max(0, fade_cover[i]-fade_cover[i+1]) for i in range(fade_idx, len(fade_cover)-1)), default=fade_peak)
+        zero = next((i for i in range(tend, len(fade_cover)) if fade_cover[i] == 0), len(fade_cover)-1)
+        last = fade_cover[zero-1] if zero > 0 else fade_peak
+        result["asserts"].append(("短促退场连续且无末帧硬切",
+            3 <= extent <= 10 and largest <= fade_peak * .35 and last <= fade_peak * .10,
+            f"95%→5%跨{extent}帧，最大单帧丢失{largest/max(1,fade_peak):.1%}，归零前覆盖{last/max(1,fade_peak):.1%}；要求3–10帧/≤35%/≤10%"))
     elif spec.get("decay", "gradual") in ("gradual", "collapse"):
         result["asserts"].append(
             ("实色结构解体/颗粒分批结束" if spec.get("decay") == "collapse" else "退场是渐变而非闪现",
@@ -445,22 +465,23 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         # 固定第三人称机位，脚下范围排除模型和上方火球；独立验证两种冷却完成后的收尾。
         ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
 
-        def cooldown_pixels(tick, charge=False):
+        def cooldown_pixels(tick, charge=False, entry=False):
             roi = (slice(490, 660), slice(400, 880)) if charge else (slice(220, 460), slice(400, 900))
             a = np.asarray(Image.open(ticks[tick]).convert("RGB"), dtype=np.int16)[roi]
             r, g, b = a[..., 0], a[..., 1], a[..., 2]
-            mask = ((r <= 110) & (g >= 135) & (g <= 190) & (b >= 225)) if charge else (
+            mask = ((r <= 110) & (g >= (65 if entry else 135)) & (g <= 190) & (b >= (160 if entry else 225))) if charge else (
                 (r >= 220) & (g >= 230) & (b >= 245) & ((b-r) > 12))
             return int(mask.sum())
 
         for label, charge in [("施法恢复白色束印", False), ("回洗聚能蓝色导晶", True)]:
-            first = cooldown_pixels(29, charge)
+            entry = [cooldown_pixels(t, charge, entry=True) for t in range(29, 32)]
+            first = max(entry)
             seq = [cooldown_pixels(t, charge) for t in (range(65, 73) if charge else range(45, 52))]
-            result["asserts"].append((label + "施法后立即可见", first >= 30,
-                f"施法下一tick覆盖{first}像素，要求≥30，不能等待半程"))
+            result["asserts"].append((label + "施法后连续展开", first >= 30 and entry[-1] >= entry[0],
+                f"施法后前三tick覆盖{entry}像素，150ms内展开且不能等待半程"))
             result["asserts"].append((label + "短促收尾后归零",
                 max(seq) > 30 and sum(v > 10 for v in seq) >= 2 and seq[-1] <= max(seq) * .05,
-                f"独立颜色覆盖{seq}，至少2帧可见且末尾≤5%；160–205ms收尾"))
+                f"独立颜色覆盖{seq}，至少2帧可见且末尾≤5%；200–245ms收尾"))
 
     # 护盾专属：静止窗口必须干净、受击窗口必须有多次「亮起→消失」
     if "quiet" in spec:
@@ -527,8 +548,8 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         bp = max(boundary); bi = boundary.index(bp)
         half = next((i for i in range(bi, len(boundary)) if boundary[i] <= bp * .5), len(boundary)-1)
         clean = next((i for i in range(half, len(boundary)) if boundary[i] <= bp * .05), len(boundary)-1)
-        result["asserts"].append(("黑洞固定边界短促塌缩", bp >= 50 and 1 <= clean-half <= 6 and max(boundary[8:]) == 0,
-            f"死亡后边界覆盖{boundary}，50%→5%跨{clean-half}帧，8tick后严格归零；运动星尘独立"))
+        result["asserts"].append(("黑洞固定边界连续塌缩", bp >= 50 and 2 <= clean-half <= 8 and max(boundary[12:]) == 0,
+            f"死亡后边界覆盖{boundary}，50%→5%跨{clean-half}帧，12tick后严格归零；运动星尘独立"))
 
     if scene == "black_hole_moving":
         # 固定镜头只取BOUNDARY_COLOR色板；固定吸积盘与外环已经移除。

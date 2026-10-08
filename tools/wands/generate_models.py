@@ -22,7 +22,7 @@ def lathe(name,profile,material,sides=8,center=(8,8),rotation=0):
         for j in range(sides):
             a,b=(j+.5)*math.tau/sides+rotation,(j+1.5)*math.tau/sides+rotation
             mat=material
-            if material.startswith('gem') and material in ['gem','gem_glow1','gem_glow2','gem_glow3']: mat=[material,material+'_light',material,material+'_dark'][j%4]
+            if material.startswith('gem') and (material == 'gem' or material.startswith('gem_glow')): mat=[material,material+'_light',material,material+'_dark'][j%4]
             face([(center[0]+r*math.cos(t),y,center[1]+r*math.sin(t)) for y,r,t in [(y0,r0,a),(y0,r0,b),(y1,r1,b),(y1,r1,a)]],mat)
 
 def tube(name,path,radii,material,sides=4):
@@ -71,12 +71,12 @@ for frame in range(32):
         tube('floating_focus_vane',path,[.22,.3,.3,.18],'gold')
     lathe('floating_pommel',[(-4.7+.25*math.sin(phase),0),(-4.1+.25*math.sin(phase),.65),(-3.5+.25*math.sin(phase),0)],'gem',6)
     (OUT/f'wand_motion_{frame:02}.obj').write_text('\n'.join(lines)+'\n',encoding='utf-8')
-for glow in range(4):
+for glow in range(16):
     material='gem' if glow==0 else f'gem_glow{glow}'
     if glow:
         for suffix in ['', '_light','_dark']:
             original=PALETTE['gem'+suffix]
-            PALETTE[material+suffix]=tuple(round(v+(255-v)*glow*.24) for v in original)
+            PALETTE[material+suffix]=tuple(round(v+(255-v)*glow*.048) for v in original)
     lines=['mtllib wand.mtl'];vertex=0
     lathe('faceted_sapphire',[(20,0),(21.4,1.75),(24.9,1.75),(26.8,0)],material,6)
     (OUT/f'wand_crystal_{glow}.obj').write_text('\n'.join(lines)+'\n',encoding='utf-8')
@@ -93,17 +93,17 @@ model={'loader':'neoforge:obj','model':'primalspells:models/item/wand.obj','flip
  'gui':display([15,-35,-30],[0,-3.2,0],.58),'ground':display([0,0,0],[0,3,0],.45),'fixed':display([0,0,0],[0,-3,0],.6)}}
 (OUT/'wand.json').write_text(json.dumps(model,indent=2)+'\n',encoding='utf-8')
 for tier in range(1,7):(OUT/f'wand_t{tier}.json').write_text(json.dumps({'parent':'primalspells:item/wand'},indent=2)+'\n',encoding='utf-8')
-for kind, count in [('motion',32),('crystal',4)]:
+for kind, count in [('motion',32),('crystal',16)]:
     for index in range(count):
         name=f'wand_motion_{index:02}' if kind=='motion' else f'wand_crystal_{index}'
         part={**model,'model':f'primalspells:models/item/{name}.obj'}
         (OUT/f'{name}.json').write_text(json.dumps(part,indent=2)+'\n',encoding='utf-8')
 def baked(name):return {'type':'minecraft:model','model':'primalspells:item/'+name}
 def dispatch(crystal):
-    count=4 if crystal else 32
+    count=16 if crystal else 32
     return {'type':'minecraft:range_dispatch','property':'primalspells:wand_motion','crystal':crystal,'fallback':baked('wand_crystal_0' if crystal else 'wand_motion_00'),'entries':[{'threshold':i,'model':baked(f'wand_crystal_{i}' if crystal else f'wand_motion_{i:02}')} for i in range(count)]}
 item={'model':{'type':'minecraft:composite','models':[baked('wand'),dispatch(False),dispatch(True)]}}
 items=ROOT/'src/main/resources/assets/primalspells/items'
 for name in ['wand']+[f'wand_t{i}' for i in range(1,7)]:
     (items/f'{name}.json').write_text(json.dumps(item,indent=2)+'\n',encoding='utf-8')
-print(f'base {base_vertices//4} faces; 32 idle frames + 4 crystal light states; fixed gem anchor')
+print(f'base {base_vertices//4} faces; 32 idle frames + 16 crystal light states; fixed gem anchor')

@@ -24,6 +24,7 @@
 | [design/minecraft-visuals.md](design/minecraft-visuals.md) | MC实色粒子与44张像素法术卡规范 | 修改视觉或贴图 |
 | [design/wand-casting.md](design/wand-casting.md) | 持杖法阵、悬浮符印、充能柱、低模法杖与退场 | 修改持杖/施法表现 |
 | [design/spell-quality.md](design/spell-quality.md) | 第54轮当前质感、修饰配方继承、跨投射物反应与高配档 | 修改特效或法术联动 |
+| [design/animation-continuity.md](design/animation-continuity.md) | 动画起落/引导/视野与近场镜头冲击，含前置阻塞 | 修改动画与镜头反馈 |
 | [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
 | [design/spell-expansion.md](design/spell-expansion.md) | 第52轮七张法术卡：水晶/电弧/远距/光束/斥力/冰冻，数值与组合验收 | 修改新增法术与组合 |
 | [design/field-effects.md](design/field-effects.md) | 黑洞 / 重力场的造型、生命周期、粒子预算与实机证据 | 修改区域法术视觉 |

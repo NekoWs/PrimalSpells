@@ -84,14 +84,18 @@ class Trajectory(
     }
 
     override fun onDie() {
-        head?.remove()
-        head = null
         emitter?.stop()
         emitter = null
         emitterSpeed = 0.0
         val level = caster.level() as? ServerLevel ?: return
         val manager = wand.pdParticles(level)
         val pos = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
+        head?.let { marker ->
+            val remnant = manager.createGroup(pos)
+            remnant.add(marker)
+            PixelVfx.retire(remnant, 3)
+        }
+        head = null
         val velocity = Vec3(status.velocity.x.toDouble(), status.velocity.y.toDouble(), status.velocity.z.toDouble())
         val speed = velocity.length()
         val dir = if (speed > MIN_SPEED) velocity.scale(1.0 / speed) else Vec3(0.0, 1.0, 0.0)
@@ -115,8 +119,8 @@ class Trajectory(
             val size = MOTE_SIZE_MIN + (MOTE_SIZE_MAX - MOTE_SIZE_MIN) * hash01(seed, i + 461)
             specs += ParticleSpawnSpec().position(pos)
                 .color(hotColor(0.55f + 0.45f * hash01(seed, i + 441).toFloat()))
-                .visual(runeVisual(size * 1.6))
-                .lifetime(lifetime)
+                .visual(runeVisual(size * 2.0))
+                .lifetime(lifetime).sizeCurve(*PixelVfx.lifeKeys(lifetime))
         }
         launch(manager, specs, velocities, FALLING)
     }
@@ -132,7 +136,7 @@ class Trajectory(
                 .position(pos.x, pos.y, pos.z)
                 .color(hotColor(1f))          // 纯白热
                 .visual(runeVisual(HEAD_BLOCKS * (1 + 0.1 * projectile.modifiers.values.sum()) * projectile.areaScale)) // 0.3125格实色方粒，与尾迹起始宽度一致
-                .lifetime(-1)                 // 永存，由 [onDie] 移除
+                .lifetime(-1).sizeCurve(CurveKey.at(0, 0), CurveKey.at(1.5, 1, EasingType.EASE_OUT)) // 由onDie收尾
                 .spawn()
         }
         head?.track(pos.x, pos.y, pos.z)
@@ -169,8 +173,10 @@ class Trajectory(
             // ⚠️ 别在前段加陡降（曾经用过「前 1/3 寿命掉到 55%」）：那会在本体与尾迹之间留一道
             // 尺寸台阶，实机反馈「本体明显比后面的拖尾要大，要之前的连续感」。要连续就线性、从同一尺寸起铺。
             .sizeCurve(
-                CurveKey.at(0, 1f),
-                CurveKey.at(life, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
+                CurveKey.at(0, 0f),
+                CurveKey.at(0.75, 1f, EasingType.EASE_OUT),
+                CurveKey.at(life * 0.65, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
+                CurveKey.at(life, 0f, EasingType.EASE_IN_OUT),
             )
             // 实色颗粒按寿命缩小；不添加透明度曲线。
             .maxAlive(TRAIL_MAX_ALIVE)
@@ -211,7 +217,7 @@ class Trajectory(
             specs += ParticleSpawnSpec().position(along.add(offset))
                 .color(hotColor(hot * strength))
                 .visual(runeVisual(size))
-                .lifetime(life)
+                .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
         }
         launch(manager, specs, velocities, FALLING)
     }
@@ -233,7 +239,7 @@ class Trajectory(
                 .position(pos.add(outward.scale(AFTERGLOW_RADIUS_MIN + (AFTERGLOW_RADIUS_MAX - AFTERGLOW_RADIUS_MIN) * hash01(seed, i + 831))))
                 .color(hotColor(0.6f + 0.4f * hash01(seed, i + 861).toFloat()))
                 .visual(runeVisual(size))
-                .lifetime(lifetime)
+                .lifetime(lifetime).sizeCurve(*PixelVfx.lifeKeys(lifetime))
         }
         launch(manager, specs, velocities, null)
     }
@@ -250,14 +256,14 @@ class Trajectory(
                 .position(pos.add(outward.scale(AMBIENT_RADIUS_MIN + (AMBIENT_RADIUS_MAX - AMBIENT_RADIUS_MIN) * hash01(seed, status.age + i + 291))))
                 .color(hotColor(0.35f * intensity))
                 .visual(runeVisual(AMBIENT_DOT))
-                .lifetime(AMBIENT_LIFETIME)
+                .lifetime(AMBIENT_LIFETIME).sizeCurve(*PixelVfx.lifeKeys(AMBIENT_LIFETIME))
         }
         if (hash01(seed, status.age / AMBIENT_MOTE_PERIOD + 701) < AMBIENT_MOTE_CHANCE) {
             specs += ParticleSpawnSpec()
                 .position(pos.add(spherePoint(status.age, 331).scale(AMBIENT_MOTE_RADIUS)))
                 .color(hotColor(0.9f))
                 .visual(runeVisual(CORE_SIZE))
-                .lifetime(AMBIENT_MOTE_LIFETIME)
+                .lifetime(AMBIENT_MOTE_LIFETIME).sizeCurve(*PixelVfx.lifeKeys(AMBIENT_MOTE_LIFETIME))
         }
         launch(manager, specs, velocities, null)
     }
@@ -365,7 +371,7 @@ class Trajectory(
         const val FORCE_FOREVER = -1
 
         // ---- 死亡补撒（寿命必须错开：同寿 = 同时消失 = 退场成悬崖，见 [onDie]） ----
-        const val DEATH_SPARKS = 22
+        const val DEATH_SPARKS = 40
         const val DEATH_SPEED = 0.16
         const val DEATH_LIFETIME_MIN = 3
         const val DEATH_LIFETIME_MAX = 20

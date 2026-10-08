@@ -17,7 +17,7 @@
 
 ---
 
-**当前未决：3 条。**
+**当前未决：5 条。**
 
 ### [需求] 发射器无「逐粒子位置抖动 / 偏移」
 
@@ -82,3 +82,21 @@
 - 修改需求：在PD发送端自动拆包，每包不超过MAX_BATCH；对速度/位置/力等批量载荷统一审计编码与解码上限，并测试0/512/513/1024成员、过期成员回收后ID与向量顺序、客户端不掉线及双端最终状态一致。
 - 影响：BlackHoleFx.update的星尘吸入批次；移动黑洞远离旧星尘时容易积累9×60tick的存活成员，超过512。
 - 本侧处理：不截断星尘、不逐粒替代批量API、不修改lib前置jar；双黑洞长时视觉验收仍被此前置缺陷阻断。
+
+### [需求] 组缩放继承当前倍率并提供零尺寸入场
+
+- 状态：未决，2026-10-09第61轮；停止多段ScaleBy入场接入。
+- 目标模型：固定结构由零尺寸展开，提前死亡时从当前姿态收尾，追加缩放不重置已有倍率、脉冲或旋转。
+- 实际能力：ParticleGroup.scale声明相对倍率，但ClientAnimationProgramManager.applySlot对每条ScaleBy直接赋值`scaleMul=1+(ratio-1)*k`，没有当前倍率快照；`.scale(.01,0).scale(100,3)`被后一条覆盖而非恢复至1；从1.5倍接退场也先重置到1。sugarFrame还把最终视觉尺寸钳到0.001。
+- 期望API：`group.scaleTo(target,ticks,easing)`与`group.scaleBy(ratio,ticks,easing)`明确区分；执行起点捕获当前合成变换，支持从0展开、任意时刻退场、帧级重定向；尺寸0应允许完全不绘制。Draw形状生成入口支持ParticleLifeCurve，方便实色片元的入场而不缩整个形状。
+- 影响面：黑洞、重力场、水晶、冰壳、斥力场、爆炸火团的组级入场/退场。
+- 本侧降级：取消错误的多段缩放入场；固定结构保留既有出生形式。仅从完整1倍结构追加有限缩到零的退场，爆炸取消额外膨胀倍率，力量感由移动火团与冲击环表达。已接入的单片尺寸寿命曲线继续使用现有PD通路。不能保证提前死亡或脉冲中断时组形变完全连续；前置修复后恢复验证，不能在本模组复制缩放播放器。
+
+### [需求] 移动锚点及热更空间变量提供相邻样本插值
+
+- 状态：未决，2026-10-09第61轮；停止改写锚点/变量插值器。
+- 目标模型：移动黑洞/重力场、水晶、持续光束与拖尾的所有构件在高刷下共用连续的位姿，相位一致，不能20Hz闪移。
+- 现有能力：ParticleGroup.setPivot下发BindPivot(Fixed)，客户端applySlot直接替换pivotFixed；PlasmaBeam使用setVariableLive空间端点，热更新是立即赋常量。现有Emitter Movable锚点按最后样本位置+速度×partialTick外推，未用相邻样本插值，已在本文件§1记录；track头部与尾迹因此不严格同相位。
+- 期望API：`group.anchor(Anchor.Movable)`/`updateAnchor(prev,current)`、`setVariableInterpolated(name,value,ticks,easing)`；位置与朝向支持相邻服务器样本插值，明确断流、暂停、瞬移语义；发射器与运行时头部沿同一锚点求值。
+- 影响面：BlackHoleFx.followCenter、GravityField移动场、CrystalReaction.setPivot、PlasmaBeam端点、Trajectory.ensureEmitter。
+- 本侧降级：保留现有锚点、空间变量与发射器通路，不在本侧保存/积分一套替代粒子位姿；本轮改善起落曲线，移动的帧间连续性仍待前置补齐。

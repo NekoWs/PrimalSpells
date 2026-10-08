@@ -120,7 +120,7 @@ object WandCastingScenes {
                 80 -> listOf(Check(name, t, "repeated-cast-does-not-restart-equip", repeatCast && WandCastingFx.ready(ctx.player, first), "cast=$repeatCast"))
                 120 -> listOf(Check(name, t, "switch-wand-restarts-equip-only-once", switchBlocked && switchCast && WandCastingFx.ready(ctx.player, second), "blocked=$switchBlocked cast=$switchCast"))
                 144 -> listOf(Check(name, t, "put-away-keeps-finite-exit-animation", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
-                148 -> listOf(Check(name, t, "put-away-cleans-after-exit", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                150 -> listOf(Check(name, t, "put-away-cleans-after-exit", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 192 -> listOf(Check(name, t, "offhand-exit-still-visible", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 208 -> listOf(Check(name, t, "offhand-exit-cleaned", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 180 -> listOf(Check(name, t, "offhand-has-equip-and-casting", offhandBlocked && offhandCast, "blocked=$offhandBlocked cast=$offhandCast"))

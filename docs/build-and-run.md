@@ -339,3 +339,10 @@ wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thi
 选择black_hole,black_hole_moving,spell_resonance,wand_casting,wand_casting_first_person,wand_casting_wide,wand_casting_front,wand_aim。
 客户端场景采样原生模型属性验证待机变化、主副手施法后亮态和300ms后复原；像素门禁验证t29（施法下一tick）两种冷却已经可见。短退场适配本轮要求，具体门槛见design/wand-casting.md。
 本轮独立装配目录build/capture/round60out仅包含8个对应场景的Junction，不把旧场景媒体计为新证据。日志异常门禁不变。
+
+### 第61轮动画连续性验收
+
+`./gradlew build --console=plain`；后台`runCapture -Pcapture=all`覆盖19场。
+镜头纯曲线验证：按§7使用K2JVMCompiler编译`client/CameraImpulse.kt`与`tools/verify/CameraImpulseCheck.kt`，运行`CameraImpulseCheckKt`。
+当前实机原始证据`build/capture/final61b.log`、`final61c.log`、`final61d.log`、`summary61b.tsv`、`summary61c.tsv`、`summary61d.tsv`、`runs61.tsv`及`out/`；不能关闭OSHI日志异常门禁。
+连续性设计、真实边界与结果见[animation-continuity.md](design/animation-continuity.md)。

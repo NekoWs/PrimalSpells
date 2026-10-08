@@ -41,7 +41,7 @@ class LongDistanceCast : Modifier() {
                 val group = manager.createGroup(destination)
                 Draw.circle(manager, destination, 0.45, 48, colorFn = ColorSource.of(Color.ofInt(180, 135, 255, 255)),
                     scale = 0.65f, group = group, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
-                group.scale(1.6f, 4).delay(4).scale(0.05f, 4).destroyAfter(4)
+                group.scale(1.6f, 4).delay(4).scale(0f, 4).destroyAfter(4)
             }
         }
     }

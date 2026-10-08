@@ -15,7 +15,7 @@ import kotlin.math.sin
 /** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
     const val EQUIP_TICKS = 8
-    const val EXIT_TICKS = 6
+    const val EXIT_TICKS = 8
     private const val GEM_FORWARD = 0.85
     private const val GEM_UP = 0.25
     private const val GEM_SIDE = 0.38
@@ -33,6 +33,8 @@ object WandCastingFx {
         var lastEyeHeight = -1.0
         var lastBusy = ""
         var lastSide = 0.0
+        private var delayFx: ParticleGroup? = null
+        private var rechargeFx: ParticleGroup? = null
         val ready: Boolean get() = level.gameTime - started >= EQUIP_TICKS
         private val elapsed: Double get() = (level.gameTime - started) * 50.0
 
@@ -43,10 +45,10 @@ object WandCastingFx {
                 ax=cos(theta)*1.2;az=sin(theta)*1.2;
                 bx=cos(theta+2*PI/3)*1.2;bz=sin(theta+2*PI/3)*1.2;
                 scatter=sin(i*91.71)*0.5+0.5;
-                dissolve=min(1,max(0,(t-retireAt-scatter*50)/200));
+                dissolve=min(1,max(0,(t-retireAt-scatter*50)/300));
                 x=fx+ax+(bx-ax)*q;y=fy+sin(t*0.004+i*0.55)*0.018+dissolve*dissolve*(0.08+scatter*0.08);
                 z=fz+az+(bz-az)*q;
-                sc=min(1,max(0,(t/260-q)*24))*(1-dissolve);
+                sc=min(1,max(0,(t/260-q)*24))*sqrt(1-dissolve*dissolve*(3-2*dissolve));
                 r=0.26;g=0.78;b=0.86;a=1;
             """)
             // 两枚块状菱形符印持续陪伴宝石；呼吸只改变尺寸，不周期关闭可见性。
@@ -56,47 +58,52 @@ object WandCastingFx {
                 ax=cos(edge*PI/2);ay=sin(edge*PI/2);
                 bx=cos((edge+1)*PI/2);by=sin((edge+1)*PI/2);
                 turn=t*0.00055+lane*PI;
-                rx=(lane*2-1)*(0.25+0.015*sin(turn));ry=sin(turn)*0.05;
-                vx=rx+(ax+(bx-ax)*u)*0.075;
-                vy=ry+(ay+(by-ay)*u)*0.075;
+                rx=side/max(0.001,abs(side))*(0.14+lane*0.075+0.012*sin(turn));ry=-0.075+(lane*2-1)*0.035+sin(turn)*0.02;
+                vx=rx+(ax+(bx-ax)*u)*0.05;
+                vy=ry+(ay+(by-ay)*u)*0.05;
                 x=hx+cos(yaw)*vx+ux*vy;
                 y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
                 sc=min(1,max(0,(t-260)/100))*(0.9+0.1*sin(t*0.003+lane*PI))*sqrt(remaining);
                 r=0.38+lane*0.16;g=0.92;b=1;a=1;
             """)
-            // 施法后束印张开卸能，白色夹片回位表示施放间隔恢复；从第一帧就完整可见。
-            group(8, 0.046875f, """
-                lane=floor(i/4);node=i-lane*4;
-                done=min(1,max(0,(t-delayEnd)/160));
-                vx=(lane*2-1)*(0.24+0.12*(1-dp)*(1-dp)+(node-floor(node/2)*2)*0.045);
-                vy=(floor(node/2)*2-1)*0.10;
-                x=hx+cos(yaw)*vx+ux*vy;y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
-                sc=delayOn*(1-done)*remaining;
-                r=0.92;g=0.96;b=1;a=1;
-            """)
-            group(36, 0.09375f, """
-                lane=floor(i/12);node=i-lane*12;row=floor(node/3);col=node-row*3-1;
-                theta=PI/2+yaw+lane*2*PI/3;
-                done=min(1,max(0,(t-rechargeEnd-row*15)/160));
-                rad=1.08+done*0.08;
-                x=fx+cos(theta)*rad-sin(theta)*col*0.105;
-                z=fz+sin(theta)*rad+cos(theta)*col*0.105;
-                y=fy+0.075+row*0.125+done*done*0.22;
-                shape=1-abs(row-1.5)*0.18-abs(col)*0.12;
-                sc=rechargeOn*shape*(1-done)*remaining;
-                lit=min(1,max(0,floor(rp*4-row+1)));
-                lit=lit*min(1,3-row)+floor(rp)*max(0,row-2);
-                r=0.16+lit*0.12;g=0.32+lit*0.34;b=0.72+lit*0.28;a=1;
-            """)
+            // 白色束印快速展开卸能，再沿进度回位；靠近杖首，避免横跨第一人称上半屏。
+
+
             group(1, 0.0625f, """
                 x=hx;y=hy;z=hz;
-                sc=min(1,max(0,(t-260)/100))*remaining;
+                sc=min(1,max(0,(t-260)/100))*sqrt(remaining);
                 r=0.72;g=1;b=0.95;a=1;
             """)
             update()
         }
 
-        private fun group(count: Int, size: Float, code: String) {
+        private fun newDelayFx(): ParticleGroup = group(8, 0.046875f, """
+                lane=floor(i/4);node=i-lane*4;
+                done=min(1,max(0,(t-delayEnd)/200));done=done*done*(3-2*done);
+                appear=min(1,max(0,(t-delayStart)/100));appear=appear*appear*(3-2*appear);
+                vx=side/max(0.001,abs(side))*(0.13+lane*0.08+0.04*(1-dp)*(1-dp)+(node-floor(node/2)*2)*0.025);
+                vy=-0.03+(floor(node/2)*2-1)*0.075;
+                x=hx+cos(yaw)*vx+ux*vy;y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
+                sc=delayOn*appear*(1-done)*sqrt(remaining);
+                r=0.92;g=0.96;b=1;a=1;
+            """)
+
+        private fun newRechargeFx(): ParticleGroup = group(36, 0.09375f, """
+                lane=floor(i/12);node=i-lane*12;row=floor(node/3);col=node-row*3-1;
+                theta=PI/2+yaw+lane*2*PI/3;
+                done=min(1,max(0,(t-rechargeEnd-row*15)/200));done=done*done*(3-2*done);
+                appear=min(1,max(0,(t-rechargeStart)/100));appear=appear*appear*(3-2*appear);
+                rad=1.08+done*0.08;
+                x=fx+cos(theta)*rad-sin(theta)*col*0.105;
+                z=fz+sin(theta)*rad+cos(theta)*col*0.105;
+                y=fy+0.075+row*0.125+done*done*0.22;
+                shape=1-abs(row-1.5)*0.18-abs(col)*0.12;
+                sc=rechargeOn*appear*shape*(1-done)*sqrt(remaining);
+                lit=min(1,max(0,rp*4-row));lit=lit*lit*(3-2*lit);
+                r=0.16+lit*0.12;g=0.32+lit*0.34;b=0.72+lit*0.28;a=1;
+            """)
+
+        private fun group(count: Int, size: Float, code: String): ParticleGroup {
             val manager = ParticleManager.of(level)
             val group = manager.createGroup(player.position())
             repeat(count) {
@@ -105,12 +112,15 @@ object WandCastingFx {
                     .lifetime(-1).spawn())
             }
             group.defineEntity("holder", player.uuid)
+                .setVariable("clockOffset", elapsed)
                 .setVariable("seed", (player.uuid.hashCode() and 65535).toDouble())
                 .setVariable("eh", player.eyeHeight.toDouble()).setVariable("side", handOffset(player, wand))
-                .setVariable("dp", 0.0).setVariable("rp", 0.0)
+                .setVariable("delayStart", -1.0e12).setVariable("rechargeStart", -1.0e12)
+                .setVariable("delayDuration", 1.0).setVariable("rechargeDuration", 1.0)
                 .setVariable("busy", 0.0).setVariable("delayOn", 0.0).setVariable("rechargeOn", 0.0)
                 .setVariable("retireAt", 1.0e12).setVariable("delayEnd", 1.0e12).setVariable("rechargeEnd", 1.0e12)
             group.expression("""
+                now=t+clockOffset;
                 fx=get_entity_x(holder);fy=get_entity_y(holder)+0.06;fz=get_entity_z(holder);
                 yaw=get_entity_yaw(holder)*PI/180;
                 dx=get_entity_dirx(holder);dy=get_entity_diry(holder);dz=get_entity_dirz(holder);
@@ -118,10 +128,13 @@ object WandCastingFx {
                 hx=fx+dx*$GEM_FORWARD+cos(yaw)*side+ux*$GEM_UP;
                 hy=fy-0.06+eh+dy*$GEM_FORWARD+uy*$GEM_UP;
                 hz=fz+dz*$GEM_FORWARD+sin(yaw)*side+uz*$GEM_UP;
-                remaining=1-min(1,max(0,(t-retireAt)/250));
-                $code
+                fade=min(1,max(0,(now-retireAt)/350));remaining=1-fade*fade*(3-2*fade);
+                dp=min(1,max(0,(now-delayStart)/delayDuration));
+                rp=min(1,max(0,(now-rechargeStart)/rechargeDuration));
+                ${code.replace(Regex("\\bt\\b"), "now")}
             """.trimIndent())
             groups += group
+            return group
         }
 
         private fun variable(name: String, value: Double) = groups.forEach { it.setVariableLive(name, value.toString()) }
@@ -129,25 +142,27 @@ object WandCastingFx {
         fun update() {
             val delay = wand.status.delay.coerceAtLeast(0.0)
             val recharge = wand.status.recharge.coerceAtLeast(0.0)
-            if (lastDelay != delay) {
-                if (delay > 0) {
-                    variable("dp", 1 - delay / wand.status.lastDelay.coerceAtLeast(delay))
-                    variable("delayOn", 1.0); variable("delayEnd", 1.0e12)
-                } else if (lastDelay > 0) {
-                    // 完成时保留最后进度，让PD以自己的播放时钟收尾，而不是直接把可见性切零。
-                    variable("dp", 1.0); variable("delayEnd", elapsed)
-                }
-                lastDelay = delay
+            // 每轮状态有独立PD会话；重复施法时旧提示正常收尾，新提示从零展开。
+            fun finish(group: ParticleGroup?, end: String) {
+                group?.setVariableLive(end, elapsed.toString())
+                group?.destroyAfter(7)
             }
-            if (lastRecharge != recharge) {
-                if (recharge > 0) {
-                    variable("rp", 1 - recharge / wand.status.lastRecharge.coerceAtLeast(recharge))
-                    variable("rechargeOn", 1.0); variable("rechargeEnd", 1.0e12)
-                } else if (lastRecharge > 0) {
-                    variable("rp", 1.0); variable("rechargeEnd", elapsed)
-                }
-                lastRecharge = recharge
+            fun begin(group: ParticleGroup, prefix: String, duration: Double) {
+                group.setVariableLive(prefix + "Start", elapsed.toString())
+                group.setVariableLive(prefix + "Duration", (duration * 50.0).toString())
+                group.setVariableLive(prefix + "On", "1")
             }
+            if (delay > lastDelay && delay > 0) {
+                if (lastDelay > 0) finish(delayFx, "delayEnd")
+                delayFx = newDelayFx().also { begin(it, "delay", delay) }
+            } else if (delay == 0.0 && lastDelay > 0) finish(delayFx, "delayEnd")
+            if (recharge > lastRecharge && recharge > 0) {
+                if (lastRecharge > 0) finish(rechargeFx, "rechargeEnd")
+                rechargeFx = newRechargeFx().also { begin(it, "recharge", recharge) }
+            } else if (recharge == 0.0 && lastRecharge > 0) finish(rechargeFx, "rechargeEnd")
+            lastDelay = delay
+            lastRecharge = recharge
+            groups.removeAll { it.size() == 0 }
             val busy = if (delay > 0 || recharge > 0) "1" else "0"
             if (lastBusy != busy) { groups.forEach { it.setVariableLive("busy", busy) }; lastBusy = busy }
             val eyeHeight = player.eyeHeight.toDouble()
@@ -254,12 +269,12 @@ object WandCastingFx {
         group.setVariable("cx", center.x).setVariable("cy", center.y).setVariable("cz", center.z)
             .setVariable("dx", forward.x).setVariable("dy", forward.y).setVariable("dz", forward.z)
             .expression("""
-                p=min(1,t/200);h=sin(i*127.1)*43758.5453;h=h-floor(h);
+                p=min(1,t/250);birth=min(1,t/60);birth=birth*birth*(3-2*birth);h=sin(i*127.1)*43758.5453;h=h-floor(h);
                 angle=i*2.399963;spread=sin(PI*p)*(0.08+h*0.16);
                 x=cx+dx*p*(0.25+h*0.45)+cos(angle)*spread;
                 y=cy+dy*p*(0.25+h*0.45)+sin(angle)*spread;
                 z=cz+dz*p*(0.25+h*0.45)+sin(angle*1.71)*spread;
-                sc=(1-p)*(1-p);r=0.73;g=1;b=0.92;a=1;
+                sc=birth*(1-p)*(1-p);r=0.73;g=1;b=0.92;a=1;
             """.trimIndent()).destroyAfter(6)
     }
 

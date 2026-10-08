@@ -277,6 +277,90 @@
               "type": "minecraft:model",
               "model": "primalspells:item/wand_crystal_3"
             }
+          },
+          {
+            "threshold": 4,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_4"
+            }
+          },
+          {
+            "threshold": 5,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_5"
+            }
+          },
+          {
+            "threshold": 6,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_6"
+            }
+          },
+          {
+            "threshold": 7,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_7"
+            }
+          },
+          {
+            "threshold": 8,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_8"
+            }
+          },
+          {
+            "threshold": 9,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_9"
+            }
+          },
+          {
+            "threshold": 10,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_10"
+            }
+          },
+          {
+            "threshold": 11,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_11"
+            }
+          },
+          {
+            "threshold": 12,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_12"
+            }
+          },
+          {
+            "threshold": 13,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_13"
+            }
+          },
+          {
+            "threshold": 14,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_14"
+            }
+          },
+          {
+            "threshold": 15,
+            "model": {
+              "type": "minecraft:model",
+              "model": "primalspells:item/wand_crystal_15"
+            }
           }
         ]
       }

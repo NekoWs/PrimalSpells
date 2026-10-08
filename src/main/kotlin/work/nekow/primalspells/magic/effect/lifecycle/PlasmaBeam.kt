@@ -70,7 +70,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             "ex" to end.x, "ey" to end.y, "ez" to end.z)) beam.setVariable(name, value)
         beam.setVariable("endMs", 1.0e9)
         // 实色方点拼出像素束；双层螺旋与退场径向散开，透明度始终为1。
-        beam.expression("u=(i%192)/191;layer=floor(i/192);dx=ex-sx;dz=ez-sz;ll=max(0.001,sqrt(dx*dx+dz*dz));amp=layer*0.06;ang=u*36-t*0.045;out=max(0,t-endMs)/400;off=amp+out*0.3;x=floor((sx+(ex-sx)*u-dz/ll*off*cos(ang))*32)/32;y=floor((sy+(ey-sy)*u+off*sin(ang))*32)/32;z=floor((sz+(ez-sz)*u+dx/ll*off*cos(ang))*32)/32;a=1;sc=1;")
+        beam.expression("u=(i%192)/191;layer=floor(i/192);dx=ex-sx;dz=ez-sz;ll=max(0.001,sqrt(dx*dx+dz*dz));amp=layer*0.06;ang=u*36-t*0.045;out=min(1,max(0,(t-endMs)/300));out=out*out*(3-2*out);birth=min(1,t/100);birth=birth*birth*(3-2*birth);off=amp+out*0.3;x=sx+(ex-sx)*u-dz/ll*off*cos(ang);y=sy+(ey-sy)*u+off*sin(ang);z=sz+(ez-sz)*u+dx/ll*off*cos(ang);a=1;sc=birth*(1-out);")
 
         return beam
     }
@@ -80,7 +80,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), Color.ofInt(102, 209, 247), 64, 0.14, 14)
     }
     override fun onDie() {
-        group?.setVariableLive("endMs", (status.age * 50).toString())
+        group?.setVariableLive("endMs", ((status.age - 1).coerceAtLeast(0) * 50).toString())
         group?.destroyAfter(8)
         worldBurst()
         group = null

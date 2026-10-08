@@ -86,4 +86,11 @@
 
 两个黑洞互吸移动后，存活星尘批次超过512，PD发出519/514条速度更新，客户端抛DecoderException断线。
 已核对run/client/logs/latest.log和lib的1.0.14-ALPHA源码；这是前置API缺陷，本模组不得另写替代实现。
-需求与验收边界见[pd-api-requests.md](pd-api-requests.md)最后一项。保持未解决，待PD修复后复验spell_stability。
+需求与验收边界见[pd-api-requests.md](pd-api-requests.md)「批量速度更新超过512成员」条目。保持未解决，待PD修复后复验spell_stability。
+
+## 第61轮：严格动画连续性受PD前置阻塞（2026-10-09）
+
+- 本侧有限收尾、法杖状态动画与镜头脉冲已修改，验收见[动画连贯性](../design/animation-continuity.md)。
+- 固定结构的零尺寸入场、提前死亡/脉冲中断时继承当前倍率，以及移动轴心/光束/尾迹帧间插值仍未完成。
+- PD的ScaleBy每条从1计算，BindPivot(Fixed)和热更空间变量立即赋值，Emitter锚点外推与track头部不同相位。
+- 按前置政策停止这些接入点，未修改lib或自研播放器；需求及恢复条件见[pd-api-requests.md](pd-api-requests.md)最后两项。

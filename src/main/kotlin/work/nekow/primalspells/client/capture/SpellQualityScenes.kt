@@ -138,11 +138,16 @@ object SpellQualityScenes {
                 if (t == 18) crystal = MagicManager.projectiles.first { it.id == "dormant_crystal" }
                 if (t == 20) cast(ctx, listOf("freeze_charge", "plasma_beam"), -3.0, floor-0.5, -4.0)
                 if (t == 45 || t == 90 || t == 115 || t == 145 || t == 170 || t == 190) MagicManager.projectiles.forEach { it.alive = false }
-                if (t == 65) cast(ctx, listOf("speed_boost", "diffusion", "volatile", "freeze_charge", "small_explosion"), 0.0, floor+1.0, -3.0)
-                if (t == 66) {
-                    bomb = MagicManager.projectiles.first { it.id == "small_explosion" }
-                    bomb!!.status.pos.set(0f, floor+2.0f, 0f)
-                    bomb!!.alive = false
+                if (t == 65) {
+                    cast(ctx, listOf("speed_boost", "diffusion", "volatile", "freeze_charge", "small_explosion"), 0.0, floor+1.0, -3.0)
+                    // 真实施法先进入pendingAdd；flush后、首次移动前保存对象，不遗漏断言。
+                    work.nekow.primalspells.util.Deferred.after(ctx.level, 0) {
+                        bomb = MagicManager.projectiles.firstOrNull { it.id == "small_explosion" }
+                        bomb?.let {
+                            it.status.pos.set(0f, floor+2.0f, 0f)
+                            it.alive = false
+                        }
+                    }
                 }
                 if (t == 100) {
                     cast(ctx, listOf("freeze_charge", "fireball"), -4.0, floor+1.0, -1.0)
@@ -186,8 +191,8 @@ object SpellQualityScenes {
                 2 -> listOf(Check(name, t, "all-modifier-projectile-assemblies", matrixOk && matrix >= 400, "pairs=$matrix independent=$matrixOk"))
                 35 -> listOf(Check(name, t, "beam-charges-crystal-and-transfers-ice", crystal!!.storedEnergy > 0 && crystal!!.status.freezeTicks > 0 && !crystal!!.alive,
                     "energy=${crystal!!.storedEnergy} freeze=${crystal!!.status.freezeTicks} alive=${crystal!!.alive}"))
-                68 -> listOf(Check(name, t, "moving-bomb-keeps-modified-explosion", bomb!!.speed > 0 && bomb!!.maxAge >= 40 && bomb!!.status.explosionRadius == 6f && bomb!!.status.explosionDamage == 12.0,
-                    "speed=${bomb!!.speed} age=${bomb!!.maxAge} radius=${bomb!!.status.explosionRadius} damage=${bomb!!.status.explosionDamage}"),
+                68 -> listOf(Check(name, t, "moving-bomb-keeps-modified-explosion", bomb != null && bomb!!.speed > 0 && bomb!!.maxAge >= 40 && bomb!!.status.explosionRadius == 6f && bomb!!.status.explosionDamage == 12.0,
+                    "speed=${bomb?.speed} age=${bomb?.maxAge} radius=${bomb?.status?.explosionRadius} damage=${bomb?.status?.explosionDamage}"),
                     Check(name, t, "explosion-applies-freeze", FrozenStatus.isFrozen(frozenTarget!!), "frozen=${FrozenStatus.isFrozen(frozenTarget)}"))
                 110 -> listOf(Check(name, t, "ice-fire-react-and-consume-both", MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "shots=${MagicManager.projectiles.map { it.id }}"))
                 140 -> listOf(Check(name, t, "black-hole-stores-consumed-shot", hole != null && hole!!.storedEnergy > 0 && MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "energy=${hole?.storedEnergy}"))

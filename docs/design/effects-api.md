@@ -3,7 +3,7 @@
 > 第53轮已改为MC实色硬边方粒；下面早期柔光/alpha渐隐说明仅供历史参考，当前规范见 [minecraft-visuals.md](minecraft-visuals.md)。
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
-> **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。当前卡在「程序化粒子的贴图/UV/各向异性/朝向/加色」这一组能力上，需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
+> **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第61轮新的组缩放接续与移动锚点插值缺口见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
 （当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.14-ALPHA`）。
@@ -716,3 +716,5 @@ PD `ParticleGroup.setPivot` 更新已生成固定结构的中心；`expression` 
 PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴在六面棱柱表面（alignTo对齐的是长轴，不能用它对齐法线）；
 裂纹/冲击用固定色阶折线与有限寿命，碎片速度/重力交给PD公开ParticleBatch/Handle。
 效果要求及接入见 [spell-quality.md](spell-quality.md)，不使用alpha渐隐或加法混合。
+
+第61轮动画连贯性：单片尺寸曲线继续接入；组ScaleBy接续和Fixed轴心插值已发现前置能力缺口并停止接入。当前范围、降级与恢复条件见[animation-continuity.md](animation-continuity.md)及未决需求最后两条。

@@ -90,3 +90,5 @@ PixelVfx只构造几何/初值，未增加自有粒子引擎、渲染器或PD替
 重点四场（额外包含expansion_crystals）装配860帧、32/32项玩法检查及可见性/零残留/媒体输出通过，画廊build/capture/out/index.html。
 装配总体仍FAIL：既有OSHI/Perflib/JNA五条日志错误未消除；未关闭异常门禁。长时PD断线另有build/verify/black-hole-batch-disconnect.log。
 其余10场只保留本轮帧和meta，本轮没有重新装配这些场景的视频/像素报告。合并来源见runs.tsv与summary-all55.tsv。
+
+第61轮爆炸火团移动阶段与有限收束相互交接，镜头冲击仅限近场；高速炸弹验收在pendingAdd flush后取样，避免漏跑断言。当前规则和证据见[动画连贯性](animation-continuity.md)。

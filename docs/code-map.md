@@ -289,3 +289,5 @@ client/render/WandHandPose.kt：原版70°手持投影与世界FOV的宝石位�
 WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为分面低模有限材质，移除第58轮写实图集，当前资源以design/wand-materials.md为准。
 
 第60轮：client/render/WandModelProperty.kt选择原生物品模块待机/晶体亮态；network/WandCastPayload.kt由WandCastingFx.cast发给追踪玩家，ClientPayloadSink.wandCast在客户端入口安装处理器。Wand.spell结算后调用WandCastingFx.cooldownsChanged立即刷新真实进度，不改变牌堆顺序。
+
+第61轮镜头反馈：`client/ScreenShakeClient.kt`消费有限冲击，`client/CameraImpulse.kt`提供可离线验证的纯时间曲线；视觉生命周期口径见[动画连贯性](design/animation-continuity.md)。

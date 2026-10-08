@@ -90,3 +90,5 @@ WandItem按WAND_ID保护组件同步造成的重新装备仍保留；但原版Mi
 60°/90°第一视角在70帧连续窗口的符印专属像素最少12786/3635，均无断档。冷却完成后的白边覆盖3721→0，琥珀柱3484→0；独立有限收尾及末尾粒子归零通过。主副手高度和空手对照通过。
 证据：build/capture/round59out/index.html与report.txt（仅本轮6场）、build/capture/out/summary59.tsv、build/capture/final59.log、build/verify/wand-model59.txt。JAR模型/材质字节一致，旧图集无残留。
 整体报告仍因既有5条Windows OSHI/Perflib/JNA环境错误失败，未过滤日志异常门禁；不能把6场通过说成整个流水线通过。
+
+第61轮以连续性为优先：8tick有限退场、逐帧冷却进度、独立重复施法会话、16级宝石短余光；当前口径覆盖此前6tick/4级说明，见[动画连贯性](animation-continuity.md)。

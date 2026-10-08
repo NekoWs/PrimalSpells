@@ -53,7 +53,7 @@ class BlackHoleFx {
                     .color(if (index % 3 == 0) DUST_BRIGHT else DUST_COLOR)
                     .scale(if (index % 3 == 0) 0.55f else 0.8f)
                     .style(ParticleStyle.SQUARE).glowing(true).additive(false)
-                    .lifetime(60).spawn()?.also { it.setVelocity(tangent) },
+                    .lifetime(60).sizeCurve(*PixelVfx.lifeKeys(60)).spawn()?.also { it.setVelocity(tangent) },
             )
         }
     }
@@ -72,12 +72,12 @@ class BlackHoleFx {
     }
 
     /** 保持实色，原位旋转着塌缩并按时销毁，直接给现有组追加指令；提前死亡也无需重铺或延迟任务。 */
-    fun clear() {
-        sucked?.clear()
+    fun clear(manager: ParticleManager) {
+        PixelVfx.retireBatch(manager, sucked, lastCenter ?: Vec3.ZERO, 12)
         sucked = null
-        boundary?.scale(0.08f, 4, EasingType.EASE_IN)?.destroyAfter(6)
+        PixelVfx.retire(boundary, 10)
         boundary = null
-        core?.scale(0.05f, 6, EasingType.EASE_IN)?.destroyAfter(8)
+        PixelVfx.retire(core, 10)
         core = null
     }
 

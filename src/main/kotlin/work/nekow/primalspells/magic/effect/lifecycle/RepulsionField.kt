@@ -59,7 +59,7 @@ class RepulsionField : BaseEffect() {
         }
     }
     override fun onDie() {
-        group?.remove(); group = null
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.retire(group); group = null
         level?.let { world -> work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world),
             Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), Color.ofInt(245, 145, 80), 128, 0.32, 14) }
     }

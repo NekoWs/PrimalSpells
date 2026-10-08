@@ -88,6 +88,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
             // 4. 清理只增不减的客户端缓存
             WandHudRenderer.clear()
             WandModelProperty.clear()
+            ScreenShakeClient.clear()
             SpellSlotTracker.clear()
         }
 

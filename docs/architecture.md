@@ -258,7 +258,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 | `client/tooltip/` | `ClientTooltipHandler`（组装词条）、`WandSpellTooltip`/`PouchTooltip`（自定义 tooltip 组件，都高亮选中槽）、`SpellSlotTracker`（法杖与小包共用的「预览槽位」缓存） | `RenderTooltipEvent.GatherComponents` + 组件工厂 |
 | `client/input/` | `SpellSlotScrollHandler`（滚轮选槽：法杖与小包共用，发 `SelectSpellSlotPayload`）、`ClientContainerDragHandler`（Ctrl+左键拖拽交换，复用原版 `slotClicked(PICKUP)` 协议） | `ScreenEvent`，注册在 `PrimalSpellsClient` |
 | `client/render/` | `DroneEntityModel`/`DroneEntityRenderer`（立方体/球体调试实体已随死代码清理删除） | `EntityRenderersEvent` |
-| `client/ScreenShakeClient.kt` | 镜头冲击求值：`ViewportEvent.ComputeCameraAngles`（偏航/俯仰/翻滚）+ `ComputeFov`（冲击瞬间视野张开）；相位按 tick 推进、渲染帧用 partialTick 插值（帧率无关）；整体乘原版 `options.damageTiltStrength`（设 0 = 玩家关掉，不再打扰） | 消费 `ScreenShakePayload`，注册在 `PrimalSpellsClient` |
+| `client/ScreenShakeClient.kt` | 镜头冲击求值：`ViewportEvent.ComputeCameraAngles`（有限偏航/俯仰冲击，不改变翻滚/FOV）；CameraImpulse按世界时间+partialTick逐帧求值，脉冲两端归零，叠加不重置相位；整体乘原版 `options.damageTiltStrength`（设 0 = 玩家关掉，不再打扰） | 消费 `ScreenShakePayload`，注册在 `PrimalSpellsClient` |
 | `client/PrimalSpellsClient.kt` | 客户端入口（`@Mod(dist = CLIENT)`）：安装 `ClientPayloadSink`、集中注册以上全部、登出清理缓存 | — |
 
 划分原则：**公共侧不 import 客户端类**；纯客户端事件不挂在 `PrimalSpells`（公共入口）上。

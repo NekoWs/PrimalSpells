@@ -133,20 +133,21 @@ class GravityField : AreaFieldEffect(
         // 还没落地的溅射一并作废：场都没了，地面上不该再压出环来
         pendingImpacts.forEach { it.cancel() }
         pendingImpacts.clear()
-        shell?.remove()
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.retire(shell)
         work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, center, Color.ofInt(130, 215, 255),
             1600, 0.18, 10, 0.003, EFFECT_RADIUS * projectile.areaScale)
         work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, center, Vec3(0.0, 1.0, 0.0),
             0.5 * projectile.areaScale, Color.ofInt(130, 215, 255), 12, 6f)
         work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, center, Color.ofInt(130, 215, 255), 128, 0.26, 14)
         shell = null
-        falling?.clear()
-        splashes?.clear()
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.retireBatch(manager, falling, center)
+        falling = null
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.retireBatch(manager, splashes, center)
         splashes = null
-        // 固定井环结束时发出落地碎屑，还在下压的波环立即销毁，避免场结束后继续落地
-        wellRing?.remove()
+        // 取消落地回调后，井环与在途波环有限收束，避免场结束后继续产生落点冲击
+        work.nekow.primalspells.magic.effect.visual.PixelVfx.retire(wellRing)
         wellRing = null
-        for (ring in rings) ring.remove()
+        for (ring in rings) work.nekow.primalspells.magic.effect.visual.PixelVfx.retire(ring)
         rings.clear()
     }
 
@@ -259,7 +260,7 @@ class GravityField : AreaFieldEffect(
             }
         }
         group.move(0.0, -fall, 0.0, fallTicks, EasingType.EASE_IN)
-        group.destroyAfter(fallTicks)
+        group.delay((fallTicks - 3).coerceAtLeast(0)).scale(0f, 4, EasingType.EASE_IN_OUT).destroyAfter(6)
         // 落地那一拍：地面溅起一圈（一次性粒子）+ 镜头被撞一下。
         // 环的下落由 PD 在客户端本地求值，服务端只知道「[fallTicks] 之后落地」，所以这里排进延迟队列。
         pendingImpacts += Deferred.after(manager.level, fallTicks) {

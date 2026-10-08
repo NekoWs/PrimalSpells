@@ -292,3 +292,5 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 第61轮镜头反馈：`client/ScreenShakeClient.kt`消费有限冲击，`client/CameraImpulse.kt`提供可离线验证的纯时间曲线；视觉生命周期口径见[动画连贯性](design/animation-continuity.md)。
 
 第63轮：移除`modifier/ClusterBomb.kt`及其注册/资源；新增`effect/visual/LaserTrace.kt`，从真实扫掠段生成短激光。`SpellQualityScenes.mechanics`覆盖寿命、刻迁移、量子命中和轨道速度；当前矩阵432组合。
+
+本机OSHI排障：`tools/verify/RepairPerformanceCounters.ps1`（管理员备份/重建/验证脚本）；运行口径见build-and-run的OSHI小节，未解决状态见issues/open.md §3.1。

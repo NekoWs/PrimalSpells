@@ -365,3 +365,15 @@ ParticleManager.spawnAll公开上限256与运动载荷上限是不同口径；10
 全量录制新增`spell_mechanics`（220刻），其余19场保留。爆炸判据改为暖色，与随机橙黄火舌匹配；去除已删除的蓝色外环依赖，最低可见性/空场/零残留门禁保留。电弧断言改为第五次衰减命中；静止光束墙挡阶段清理上一阶段尚在显示的浮字；集束夹具改为弹跳复制的独立配方继承。环绕范围判据与增大的半径同步。
 
 第63轮最终来源为63b的14场与63c的6场补录；`build/capture/out/runs63.tsv`逐场记录来源。20场共3749帧、零丢帧、196项玩法断言全部通过；新增机制场26项全部通过。构建通过，逐场视觉门禁通过。总体报告仍被本机OSHI的5条异常阻断，不能声明流水线整体通过；该环境问题独立登记在issues/open.md §3.1。
+
+## OSHI本机计数器排障（2026-10-09，尚未验证修复）
+
+OSHI是Minecraft自带的操作系统/硬件信息库。此处异常发生在CrashReport.preload收集系统报告时，早于法术初始化；当前问题是Windows性能计数器查询失败后当前进程返回null，并非黑洞结算异常。
+
+官方流程：[Microsoft计数器重建](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/manually-rebuild-performance-counters)、[lodctr参数](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/lodctr)、[OSHI配置说明](https://www.oshi.ooo/xref/oshi/util/GlobalConfig.html)。`oshi.os.windows.hkeyperfdata=false`是受支持的备用路径，但本机仍缺少当前PID，不能采用该配置冒充修好。
+
+管理员PowerShell可执行`tools/verify/RepairPerformanceCounters.ps1`；指定`-RestoreFrom <本机备份INI>`可显式还原，`-RestartServices`执行微软流程中的查询服务重启。脚本不会自动重启电脑。每次先备份到`build/verify/oshi/backup-时间戳`，输出result.txt；必须看复查结果，不能只看lodctr退出码。生产模组不注入/替换OSHI、不隐藏硬件采集错误。
+
+本次已重建两种位宽、同步WMI、修正PerfOS错误值类型；英文Counter仍错误87，OSHI仍返回null，Windows拒绝重启WMI服务。待用户重启后复验。通过条件：OSHI当前PID非null、CPU时间/物理与虚拟内存为真实有效数据；新runCapture日志无对应异常，总体日志门禁通过。
+
+修复尝试后63d重新启动客户端并补录spell_mechanics：220帧/零丢帧/26项全通过；`build/capture/final63d.log`仍含同样5条OSHI异常，PerfOS字段类型警告已消失。用户选择稍后手动保存工作并重启，禁止本轮自动重启；重启后的系统/录制复验尚未进行。

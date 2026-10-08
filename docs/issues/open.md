@@ -71,7 +71,11 @@
 - 复现：`pwsh tools/capture/capture.ps1 -Scene black_hole,gravity_field`；本轮修改前的基线也出现相同日志。
 - 影响：无法宣称录制流水线整体通过；第49轮两场及第52轮五场均1280×720、零丢帧，末尾PD粒子数为零，视觉判据通过。
 - 涉及：Windows Perflib/OSHI，`run/capture/logs/latest.log`、`tools/capture/assemble.py` 的日志门禁。
-- 下一步：检查该主机性能计数器环境或上游 OSHI 兼容性，再重跑；未过滤异常或关闭日志门禁。
+- 2026-10-09排查：OSHI 6.9.0读取虚拟注册表`Perflib\009\Counter`返回Windows错误87（参数错误）；该语言键由Windows动态提供，不能用PowerShell的`Test-Path/Get-Item`判为“文件/键不存在”。直接WMI能查询当前进程；OSHI注册表/PDH路径只返回约128个进程，而WMI/WTS约410个，缺少当前Java PID，导致MC的SystemReport连续3次空指针。
+- 已执行：管理员权限下备份Perflib/PerfOS与原始PerfStringBackup.INI；按微软流程重建64/32位计数器、从本机原始备份恢复、同步WMI。PerfOS的禁用字段原为字符串“0”，已规范为DWORD 0。相关备份和逐次结果在`build/verify/oshi/backup-*`。
+- 复查仍失败：英文表读取错误和OSHI当前进程null未恢复；WMI服务重启被Windows拒绝，服务保持运行。不能把命令返回0当成修复完成。
+- 可审查脚本：`tools/verify/RepairPerformanceCounters.ps1`（必须管理员；先备份、只规范数值0，不关闭计数器；可选服务重启，失败也恢复原先运行的依赖服务）。官方依据见build-and-run的OSHI小节。
+- 用户已选择稍后保存工作并手动重启，本轮不自动重启。修复尝试后的63d新客户端仍记录5条OSHI异常，26项法术机制断言全过。下一步：重启后重新验证真实OSHI进程数据和runCapture；仍失败则继续系统计数器组件排障。未过滤异常、关闭日志门禁或篡改SystemReport。
 
 ### 🟡 3.2 录制装配器的NoVideo参数未生效（2026-10-08）
 

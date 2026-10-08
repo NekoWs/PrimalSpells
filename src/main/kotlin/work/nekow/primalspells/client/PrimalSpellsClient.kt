@@ -20,6 +20,9 @@ import work.nekow.primalspells.client.input.SpellSlotScrollHandler
 import work.nekow.primalspells.client.render.DroneEntityModel
 import work.nekow.primalspells.client.render.DroneEntityRenderer
 import work.nekow.primalspells.client.render.ParticleTextures
+import work.nekow.primalspells.client.render.WandHandPose
+import work.nekow.primalspells.registry.ModItems
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent
 import work.nekow.primalspells.client.tooltip.ClientPouchTooltip
 import work.nekow.primalspells.client.tooltip.ClientTooltipHandler
 import work.nekow.primalspells.client.capture.CaptureDriver
@@ -81,6 +84,11 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
             // 4. 清理只增不减的客户端缓存
             WandHudRenderer.clear()
             SpellSlotTracker.clear()
+        }
+
+        bus.addListener<RegisterClientExtensionsEvent> { event ->
+            val wands = listOf(ModItems.WAND.get()) + ModItems.WAND_TIERS.values.map { it.get() }
+            event.registerItem(WandHandPose, *wands.toTypedArray())
         }
 
         bus.addListener<RegisterClientTooltipComponentFactoriesEvent> { event ->

@@ -1,6 +1,6 @@
 {
-  "parent": "minecraft:item/handheld",
+  "parent": "primalspells:item/wand",
   "textures": {
-    "layer0": "primalspells:item/wand_t3"
+    "metal": "minecraft:block/iron_block"
   }
 }

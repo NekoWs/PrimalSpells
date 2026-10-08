@@ -57,8 +57,8 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
-    "wand_casting_first_person": {"length": 220, "title": "第一视角持杖 / 汇聚点与冷却", "decay": "instant", "quiet": (0, 8), "fade_window": (185, 200)},
-    "wand_casting": {"length": 220, "title": "三角法阵展开 / 汇聚待机 / 双冷却 / 切杖", "decay": "instant", "quiet": (0, 8), "fade_window": (185, 200)},
+    "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角持杖 / 汇聚点与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
+    "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 汇聚待机 / 双冷却 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
     "spell_stability": {"length": 180, "title": "双场穿墙 / 即时追踪 / 晶体预算", "decay": "gradual", "quiet": (0, 8)},
     "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
@@ -139,6 +139,7 @@ for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
 SCENES["explosion"]["decay"] = "collapse"
+SCENES["wand_casting_wide"] = {**SCENES["wand_casting_first_person"], "title": "宽视野90度 / 宝石位置校准 / 副手镜像"}
 
 #: 「特效像素」判据：**偏冷的亮**像素（蓝 ≥ 红）。黑底摄影棚里只有粒子满足：
 #: 木桩是棕色（红 > 蓝）、地面是灰黑（不够亮）、火球拖尾是橙色（红 > 蓝）。
@@ -164,6 +165,13 @@ MIN_DECAY_FRAMES = 4
 INSTANT_DECAY_MAX_FRAMES = 3
 
 CONTACT_PICKS = 12
+
+
+def wand_mask(path: Path) -> "np.ndarray":
+    # 宝石自身为饱和蓝色；只计青色/白色方粒，不能把手持模型当成退场粒子。
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (g > 150) & (b > 160) & (g > b * 0.87) & ((b - r) > 14)
 
 
 def blue_mask(path: Path) -> "np.ndarray":
@@ -345,7 +353,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     # 爆炸场景声明 `metric: warm`（饱和暖色）；火球拖尾声明 `metric: orange`（加法混合的橙黄火花，
     # 见 `orange_mask` 的标定说明）。粉色破口判据始终独立于它。
     metric = spec.get("metric", "blue")
-    cover = {"warm": warm_cover, "orange": orange_cover}.get(metric, blue_cover)
+    cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"warm": warm_cover, "orange": orange_cover}.get(metric, blue_cover)
     result["cover"] = cover
     result["blue_cover"] = blue_cover
     result["red_cover"] = red_cover
@@ -408,6 +416,24 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         result["asserts"].append(
             ("退场立即且干净", span <= INSTANT_DECAY_MAX_FRAMES, f"50%→5% 跨 {span} 帧（要求 ≤{INSTANT_DECAY_MAX_FRAMES}）"),
         )
+
+    if spec.get("wand_cooldowns"):
+        # 固定第三人称机位，脚下范围排除模型和上方火球；独立验证两种冷却完成后的收尾。
+        ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+
+        def cooldown_pixels(tick, gold=False):
+            a = np.asarray(Image.open(ticks[tick]).convert("RGB"), dtype=np.int16)[490:660, 400:880]
+            r, g, b = a[..., 0], a[..., 1], a[..., 2]
+            mask = ((abs(r-245) <= 6) & (abs(g-168) <= 6) & (abs(b-64) <= 6)) if gold else (
+                (r >= 220) & (g >= 230) & (b >= 245) & ((b-r) > 12))
+            return int(mask.sum())
+
+        white = [cooldown_pixels(t) for t in range(45, 55)]
+        gold = [cooldown_pixels(t, True) for t in range(65, 73)]
+        for label, seq in [("施放间隔白边", white), ("充能琥珀线", gold)]:
+            result["asserts"].append((label + "完成后仍有有限收尾",
+                seq[0] > 50 and sum(v > 10 for v in seq) >= 4 and seq[-1] <= seq[0] * .05,
+                f"独立颜色覆盖 {seq}，结束后至少4帧可见且末尾≤5%"))
 
     # 护盾专属：静止窗口必须干净、受击窗口必须有多次「亮起→消失」
     if "quiet" in spec:

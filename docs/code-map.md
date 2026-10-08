@@ -275,3 +275,8 @@ Tracking不再有延迟参数。SpellQualityScenes新增spell_stability短时碰
 
 第56轮：持杖法阵/待机/冷却/装备预热在magic/effect/visual/WandCastingFx.kt，WandManager驱动会话，
 Wand.spell检查装备预热，castHand使用共同施法点；实机流程在client/capture/WandCastingScenes.kt。
+
+
+第57轮：tools/wands/generate_models.py生成全部7个法杖的24元件立体模型；WandCastingFx共用宝石位置、随机内部吸入、双冷却完成退场、切杖退场和成功施法迸发。CaptureScenes.Scene.showHands和CaptureDriver的RenderGuiEvent.Pre取消用于第一视角实机模型验收。
+
+client/render/WandHandPose.kt：原版70°手持投影与世界FOV的宝石位置补偿，由PrimalSpellsClient的RegisterClientExtensionsEvent注册到7个法杖物品。

@@ -306,3 +306,10 @@ magic/modifier  ──→ magic/core, magic/effect
 
 持杖会话与PD造型WandCastingFx放在magic/effect/visual；开发录制WandCastingScenes放在client/capture。
 说明见design/wand-casting.md。本轮没有文件迁移；公开侧不引用Minecraft客户端类，CameraType只在录制驱动使用。
+
+
+### 第57轮新增文件落位
+
+法杖原版JSON方块模型源生成器位于tools/wands/generate_models.py；7个等级模型仍在assets/primalspells/models/item。没有新位图或自制客户端粒子/模型渲染器，原持杖接线与录制类原位扩展。
+
+第一人称FOV显示校准WandHandPose位于client/render，由PrimalSpellsClient注册IClientItemExtensions；公共侧不得依赖它。

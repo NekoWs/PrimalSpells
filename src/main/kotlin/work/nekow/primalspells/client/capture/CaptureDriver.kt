@@ -3,6 +3,7 @@ package work.nekow.primalspells.client.capture
 import net.minecraft.client.Minecraft
 import net.minecraft.client.CameraType
 import net.minecraft.client.Screenshot
+import net.minecraft.client.tutorial.TutorialSteps
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.Registries
 import net.minecraft.server.MinecraftServer
@@ -22,6 +23,7 @@ import net.minecraft.world.level.levelgen.presets.WorldPresets
 import net.neoforged.fml.loading.FMLEnvironment
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderFrameEvent
+import net.neoforged.neoforge.client.event.RenderGuiEvent
 import net.neoforged.neoforge.common.NeoForge
 import org.lwjgl.glfw.GLFW
 import org.slf4j.LoggerFactory
@@ -145,6 +147,8 @@ object CaptureDriver {
         scenes = CaptureScenes.all().filter { wanted == "all" || it.name in wanted.split(',') }
         NeoForge.EVENT_BUS.addListener<ClientTickEvent.Post> { onClientTick() }
         NeoForge.EVENT_BUS.addListener<RenderFrameEvent.Post> { onRenderFrame() }
+        // MC的隐藏HUD同时隐藏第一人称物品；模型场景只取消GUI绘制，保留真正的持物渲染。
+        NeoForge.EVENT_BUS.addListener<RenderGuiEvent.Pre> { if (scene?.showHands == true) it.isCanceled = true }
         log("install: value=$wanted out=${outRoot.absolutePath} scenes=${scenes.map { it.name }}")
         if (scenes.isEmpty()) abortRequested = true
     }
@@ -233,6 +237,7 @@ object CaptureDriver {
         mc.window.setWidth(1280)
         mc.window.setHeight(720)
         mc.framebufferSizeChanged()
+        mc.tutorial.setStep(TutorialSteps.NONE)
         mc.options.pauseOnLostFocus = false
         mc.options.bobView().set(false)
         mc.options.fovEffectScale().set(0.0)
@@ -307,6 +312,8 @@ object CaptureDriver {
         sceneLog.appendLine("lengthTicks\t${next.lengthTicks}")
         sceneLog.appendLine("warmupTicks\t${next.warmupTicks}")
         sceneLog.appendLine("thirdPerson\t${next.thirdPerson}")
+        sceneLog.appendLine("showHands\t${next.showHands}")
+        if (mc.gui.hud.isHidden() == next.showHands) mc.gui.hud.toggle()
         mc.options.fov().set(next.fov)
         mc.options.cameraType = if (next.thirdPerson) CameraType.THIRD_PERSON_BACK else CameraType.FIRST_PERSON
         log("=== scene ${next.name} start (warmup=${next.warmupTicks}, length=${next.lengthTicks}) ===")

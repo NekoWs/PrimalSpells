@@ -57,6 +57,7 @@ class Scene(
     val thirdPerson: Boolean = false,
     val moveCamera: Boolean = true,
     val fov: Int = 70,
+    val showHands: Boolean = false,
     val prepare: (CaptureDriver.SceneCtx) -> Unit,
     val camera: (CaptureDriver.SceneCtx, Int) -> Pose,
     val start: (CaptureDriver.SceneCtx) -> Unit = {},

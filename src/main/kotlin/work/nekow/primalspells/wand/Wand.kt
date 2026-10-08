@@ -194,6 +194,7 @@ class Wand(var id: String) {
             }
         }
 
+        var castVisualPlayed = false
         for (projectile in magics.filterIsInstance<Projectile>()) {
             if (!consumeMana(projectile)) continue
             val p = projectile.clone()
@@ -206,6 +207,10 @@ class Wand(var id: String) {
             p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toVector3f()
             p.velocity = caster.lookAngle.toVector3f().normalize()
             p.spell()
+            if (!castVisualPlayed) {
+                work.nekow.primalspells.magic.effect.visual.WandCastingFx.cast(caster, this)
+                castVisualPlayed = true
+            }
             status.recharge += p.recharge
             status.delay += p.delay
 

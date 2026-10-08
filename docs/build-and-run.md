@@ -312,3 +312,12 @@ wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thi
 
 
 黑洞环移除后，移动像素检查取固定边界星点色板，保留原游戏tick与60px双向位移门槛；不用已删除的内盘色板判空。
+
+
+### 9.10 第57轮：真实法杖模型与退场
+
+执行gradlew runCapture -Pcapture=wand_casting,wand_casting_first_person，配合§9的后台启动与300秒超时护栏；合成时只纳入本次重新录制的场景，勿将上次帧标为本次结果。
+两场各220tick；第一视角showHands=true，保持HUD状态为可见以让MC渲染手持物品，随后仅取消RenderGuiEvent.Pre绘制UI。第三视角不变。
+退场改为t187–216有限解体，50%→5%至少4帧；玩法检查验证放下后粒子仍短暂保留、16tick后归零。随机汇聚、白色间隔退场、琥珀充能收束和宝石发射需检查真实PNG/GIF，不只看服务端粒子数。
+
+宽视野复验额外录wand_casting_wide（90°，220tick），默认第一视角60°；青白专属像素判据排除饱和蓝宝石，不把模型消失当成粒子退场。录制同时关闭原版教程气泡，避免UI遮住宝石。

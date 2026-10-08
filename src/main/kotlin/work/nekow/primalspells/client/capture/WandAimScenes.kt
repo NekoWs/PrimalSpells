@@ -1,5 +1,7 @@
 package work.nekow.primalspells.client.capture
 
+import net.minecraft.client.Minecraft
+import work.nekow.primalspells.mixin.ItemInHandRendererAccessor
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
@@ -25,7 +27,7 @@ object WandAimScenes {
         lateinit var wand: Wand
         lateinit var dummy: TestDummyEntity
         var stack = ItemStack.EMPTY
-        val results = linkedMapOf<String, Boolean>()
+        val results = java.util.concurrent.ConcurrentSkipListMap<String, Boolean>()
         fun fire(ctx: CaptureDriver.SceneCtx, label: String) {
             val aim = WandAim.target(ctx.player)
             results["$label-cast"] = wand.spell(ctx.player)
@@ -39,6 +41,22 @@ object WandAimScenes {
                     override fun onHitEntity(target: Entity) { if (target === dummy && label != "occluded") results["$label-hit"] = true }
                     override fun onHitBlock(pos: org.joml.Vector3f) { if (label == "occluded" && pos.z in 6f..7f) results["$label-hit"] = true }
                 })
+            }
+        }
+        fun checkUseCallback(hand: InteractionHand, label: String) {
+            Minecraft.getInstance().execute {
+                val mc = Minecraft.getInstance()
+                val renderer = mc.gameRenderer.itemInHandRenderer
+                val heights = renderer as ItemInHandRendererAccessor
+                val before = if (hand == InteractionHand.MAIN_HAND) heights.primalspells_mainHandHeight() else heights.primalspells_offHandHeight()
+                renderer.itemUsed(hand)
+                val after = if (hand == InteractionHand.MAIN_HAND) heights.primalspells_mainHandHeight() else heights.primalspells_offHandHeight()
+                results["$label-equipped-before-use"] = before > 0.95f && mc.player?.getItemInHand(hand)?.item is WandItem
+                results["$label-use-keeps-height"] = after == before
+                if (hand == InteractionHand.OFF_HAND) {
+                    renderer.itemUsed(InteractionHand.MAIN_HAND)
+                    results["non-wand-use-still-lowers"] = mc.player?.mainHandItem?.isEmpty == true && heights.primalspells_mainHandHeight() == 0f
+                }
             }
         }
         return Scene(name, "准星瞄准：近处 / 副手远处 / 方块遮挡", 24, 160, showHands = true,
@@ -66,12 +84,14 @@ object WandAimScenes {
             tick = { ctx,t ->
                 when(t) {
                     8 -> ctx.player.setItemInHand(InteractionHand.MAIN_HAND,stack)
+                    23 -> checkUseCallback(InteractionHand.MAIN_HAND,"main")
                     28 -> fire(ctx,"near")
                     50 -> {
                         dummy.setPos(.5,ctx.floorBlockY(0,0)+1.0,12.5)
                         ctx.player.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY)
                         ctx.player.setItemInHand(InteractionHand.OFF_HAND,stack)
                     }
+                    65 -> checkUseCallback(InteractionHand.OFF_HAND,"offhand")
                     70 -> fire(ctx,"far-offhand")
                     100 -> {
                         for (y in ctx.floorBlockY(0,0)+1..ctx.floorBlockY(0,0)+4)

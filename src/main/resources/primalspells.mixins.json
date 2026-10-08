@@ -5,7 +5,9 @@
   "mixins": [],
   "client": [
     "AbstractContainerScreenMixin",
-    "AbstractContainerScreenInvokerMixin"
+    "AbstractContainerScreenInvokerMixin",
+    "WandUseAnimationMixin",
+    "ItemInHandRendererAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -230,7 +230,7 @@
 | 路径 | 内容 |
 |---|---|
 | `META-INF/neoforge.mods.toml` | modId/版本/作者/依赖（neoforge、particledrawing、minecraft）/mixin 配置声明；`${...}` 由 `build.gradle` 的 `ProcessResources` 插值 |
-| `primalspells.mixins.json` | mixin 包名与两个客户端 mixin（`package` 字段与 Java 源码包名绑定） |
+| `primalspells.mixins.json` | mixin 包名与客户端 mixin（`package` 字段与 Java 源码包名绑定） |
 | `assets/primalspells/items/<id>.json` | 物品定义（1.21+ 数据驱动格式） |
 | `assets/primalspells/models/item/<id>.json` | 物品模型 |
 | `assets/primalspells/textures/{item,entity}/*.png` | 法术物品贴图与无人机实体贴图 |
@@ -284,3 +284,6 @@ client/render/WandHandPose.kt：原版70°手持投影与世界FOV的宝石位�
 第58轮：wand/WandAim.kt取准星射线的最近可见实体/方块并校准宝石发射方向；item/WandItem.kt按WAND_ID避免同步引发重新装备。client/render/WandArmPose.kt和META-INF/enumextensions.json提供第三人称握持姿势。tools/wands/generate_models.py改为原创OBJ网格生成器，wand_atlas.png材质来源见docs/design/wand-materials.md；client/capture/WandAimScenes.kt验证近远主副手命中及墙体遮挡。
 
 第58轮录制：CaptureScenes.Scene.thirdPersonFront与CaptureDriver的相机选择支持wand_casting_front正面握持证据。
+
+第59轮：mixin/WandUseAnimationMixin.java取消原版itemUsed对法杖手持高度的清零；ItemInHandRendererAccessor.java供实机回归读取主副手高度。WandAimScenes检查实际使用回调和非杖对照。
+WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为分面低模有限材质，移除第58轮写实图集，当前资源以design/wand-materials.md为准。

@@ -12,7 +12,7 @@ import java.util.UUID
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** 持杖法阵、随机吸入和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
+/** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
     const val EQUIP_TICKS = 16
     const val EXIT_TICKS = 16
@@ -37,7 +37,7 @@ object WandCastingFx {
         private val elapsed: Double get() = (level.gameTime - started) * 50.0
 
         init {
-            group(96, 0.0625f, """
+            group(72, 0.09375f, """
                 lane=floor(3*i/n);q=3*i/n-lane;
                 theta=PI/2+yaw+lane*2*PI/3;
                 ax=cos(theta)*1.2;az=sin(theta)*1.2;
@@ -49,37 +49,22 @@ object WandCastingFx {
                 sc=min(1,max(0,(t/600-q)*24))*sqrt(1-dissolve);
                 r=0.26;g=0.78;b=0.86;a=1;
             """)
-            // 六束长弧光流，每束240个连续采样点；随机落点与控制点按轮次变化。
-            // PD逐帧计算三次Bezier及尾宽，不使用运行时逐tick发射或另建粒子驱动。
-            group(1440, 0.01875f, """
-                jet=floor(i/240);q=(i-jet*240)/239;
-                h=sin(jet*127.1+seed)*43758.5453;h=h-floor(h);
-                period=1900+h*700;phase=max(0,min(t,retireAt)-650)/period+h;
-                cycle=floor(phase);p=phase-cycle;
-                s1=sin(jet*12.9898+cycle*78.233+seed)*43758.5453;s1=s1-floor(s1);
-                s2=sin(jet*39.346+cycle*11.135+seed)*19341.171;s2=s2-floor(s2);
-                root=sqrt(s1);w1=1-root;w2=root*(1-s2);w3=root*s2;
-                theta=PI/2+yaw;
-                sx=fx+1.13*(w1*cos(theta)+w2*cos(theta+2*PI/3)+w3*cos(theta+4*PI/3));
-                sz=fz+1.13*(w1*sin(theta)+w2*sin(theta+2*PI/3)+w3*sin(theta+4*PI/3));
-                u=max(0,p-q*0.62);pull=pow(u,1.7);
-                end=min(1,max(0,(t-retireAt-h*200)/550));pull=pull+(1-pull)*end*end;
-                bow=0.8+s1*0.6;angle=theta+s2*2*PI;
-                c1x=sx+cos(angle)*bow;c1z=sz+sin(angle)*bow;
-                c2x=hx+cos(angle+1.4)*bow*0.65-dx*0.35;
-                c2z=hz+sin(angle+1.4)*bow*0.65-dz*0.35;
-                v=1-pull;
-                x=v*v*v*sx+3*v*v*pull*c1x+3*v*pull*pull*c2x+pull*pull*pull*hx;
-                y=v*v*v*fy+3*v*v*pull*(fy+0.8)+3*v*pull*pull*(hy+0.35)+pull*pull*pull*hy;
-                z=v*v*v*sz+3*v*v*pull*c1z+3*v*pull*pull*c2z+pull*pull*pull*hz;
-                born=650+(cycle-h)*period;
-                active=min(1,max(0,(retireAt-born)*10));
-                sc=min(1,max(0,(t-650)/250))*active*sqrt(1-end)*(1-q*0.75);
-                sc=sc*min(1,max(0,u*80))*min(1,max(0,(1-p)*12))*(0.7+0.3*pull);
-                warm=jet-floor(jet/3)*3;
-                r=0.45+0.38*pull+0.12*min(1,warm);g=0.87+0.13*pull;b=1;a=1;
+            // 两枚块状菱形符印持续陪伴宝石；呼吸只改变尺寸，不周期关闭可见性。
+            group(16, 0.046875f, """
+                lane=floor(i/8);q=(i-lane*8)/8;
+                edge=floor(q*4);u=q*4-edge;
+                ax=cos(edge*PI/2);ay=sin(edge*PI/2);
+                bx=cos((edge+1)*PI/2);by=sin((edge+1)*PI/2);
+                turn=t*0.00055+lane*PI;
+                rx=(lane*2-1)*(0.25+0.015*sin(turn));ry=sin(turn)*0.05;
+                vx=rx+(ax+(bx-ax)*u)*0.075;
+                vy=ry+(ay+(by-ay)*u)*0.075;
+                x=hx+cos(yaw)*vx+ux*vy;
+                y=hy+uy*vy;z=hz+sin(yaw)*vx+uz*vy;
+                sc=min(1,max(0,(t-600)/200))*(0.9+0.1*sin(t*0.003+lane*PI))*sqrt(remaining);
+                r=0.38+lane*0.16;g=0.92;b=1;a=1;
             """)
-            group(60, 0.046875f, """
+            group(48, 0.09375f, """
                 lane=floor(3*i/n);q=3*i/n-lane;theta=PI/2+yaw+lane*2*PI/3;
                 done=min(1,max(0,(t-delayEnd-q*120)/400));
                 ax=cos(theta)*(1.29+done*0.1);az=sin(theta)*(1.29+done*0.1);
@@ -88,17 +73,19 @@ object WandCastingFx {
                 sc=min(1,max(0,(dp-q)*18))*delayOn*(1-done)*remaining;
                 r=0.92;g=0.96;b=1;a=1;
             """)
-            group(60, 0.0625f, """
-                lane=floor(3*i/n);q=3*i/n-lane;theta=PI/2+yaw+lane*2*PI/3;
-                done=min(1,max(0,(t-rechargeEnd-q*120)/400));
-                rad=(1.08-0.7*rp)*(0.45+q*0.55);
-                sx=fx+cos(theta)*rad;sz=fz+sin(theta)*rad;
-                x=sx+(hx-sx)*done*done;y=fy+0.025+(hy-fy)*done*done;
-                z=sz+(hz-sz)*done*done;
-                sc=rechargeOn*min(1,max(0,(t-600)/150))*(1-done)*remaining;
+            // 三根充能柱始终使用脚下坐标，视线俯仰和宝石位置不改变其形状。
+            group(36, 0.125f, """
+                lane=floor(i/12);node=i-lane*12;row=floor(node/3);col=node-row*3-1;
+                theta=PI/2+yaw+lane*2*PI/3;
+                done=min(1,max(0,(t-rechargeEnd-row*20)/400));
+                rad=1.08+done*0.08;
+                x=fx+cos(theta)*rad-sin(theta)*col*0.105;
+                z=fz+sin(theta)*rad+cos(theta)*col*0.105;
+                y=fy+0.075+row*0.125+done*done*0.22;
+                sc=rechargeOn*min(1,max(0,(rp*4-row)*3-0.5))*(1-done)*remaining;
                 r=0.96;g=0.66;b=0.25;a=1;
             """)
-            group(1, 0.03125f, """
+            group(1, 0.0625f, """
                 x=hx;y=hy;z=hz;
                 sc=min(1,max(0,(t-600)/200))*remaining;
                 r=0.72;g=1;b=0.95;a=1;
@@ -229,7 +216,7 @@ object WandCastingFx {
         return state(player, wand).ready
     }
 
-    /** 模型宝石位于视线右上方，施法和汇聚共用同一相机正交基；副手/左惯用手镜像。 */
+    /** 模型宝石位于视线右上方，施法和符印共用同一相机正交基；副手/左惯用手镜像。 */
     fun origin(caster: Entity, wand: Wand): Vec3 {
         val player = caster as? ServerPlayer
         if (player == null || selected(player) !== wand) return caster.eyePosition.add(0.0, -0.1, 0.0)
@@ -249,9 +236,9 @@ object WandCastingFx {
         val forward = work.nekow.primalspells.wand.WandAim.direction(caster, center)
         val manager = ParticleManager.of(caster.level())
         val group = manager.createGroup(center)
-        repeat(64) { i ->
+        repeat(24) { i ->
             group.add(manager.create().position(center).color(Color.ofInt(195, 253, 240))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<8) 0.09375f else 0.046875f, 0.046875f)
+                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<6) 0.1875f else 0.125f, 0.125f)
                     .glowing(true).additive(false)).lifetime(10).spawn())
         }
         group.setVariable("cx", center.x).setVariable("cy", center.y).setVariable("cz", center.z)

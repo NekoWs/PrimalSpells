@@ -37,7 +37,7 @@ object WandCastingScenes {
             wand.load(); wand.status.mana = wand.mana
             return stack to wand
         }
-        return Scene(name, "持杖三角法阵 / 待机汇聚 / 施放间隔与充能", 24, 220,
+        return Scene(name, "持杖三角法阵 / 悬浮符印 / 施放间隔与充能", 24, 220,
             thirdPerson = !firstPerson, thirdPersonFront = front, fov = fov, showHands = firstPerson,
             prepare = { ctx ->
                 val floor = ctx.floorBlockY(0, 0)
@@ -69,7 +69,8 @@ object WandCastingScenes {
                         gemOriginMatches = firstCast && shot != null && shot.position.distance(gem.toVector3f()) < 0.0001f
                     }
                 }
-                if (t == 72) repeatCast = first.spell(ctx.player)
+                // 等第一轮充能收尾结束再重复施法，避免将下一轮柱体当成退场残留。
+                if (t == 78) repeatCast = first.spell(ctx.player)
                 if (t == 95) ctx.player.setItemInHand(InteractionHand.MAIN_HAND, secondStack)
                 if (t == 96) switchBlocked = !second.spell(ctx.player)
                 if (t == 115) switchCast = second.spell(ctx.player)

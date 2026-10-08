@@ -7,8 +7,8 @@
   "emissive_ambient": true,
   "ambientocclusion": false,
   "textures": {
-    "particle": "primalspells:item/wand_atlas",
-    "atlas": "primalspells:item/wand_atlas"
+    "particle": "minecraft:block/white_concrete",
+    "base": "minecraft:block/white_concrete"
   },
   "display": {
     "firstperson_righthand": {

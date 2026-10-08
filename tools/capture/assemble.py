@@ -58,8 +58,8 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
     "wand_aim": {"metric": "wand", "length": 160, "title": "近远准星命中 / 副手 / 遮挡 / 稳定握持", "decay": "gradual", "quiet": (0, 8), "fade_window": (129, 159)},
-    "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角持杖 / 汇聚点与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
-    "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 汇聚待机 / 双冷却 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
+    "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角低模持杖 / 常驻符印与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
+    "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 块状符印 / 充能柱 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
     "spell_stability": {"length": 180, "title": "双场穿墙 / 即时追踪 / 晶体预算", "decay": "gradual", "quiet": (0, 8)},
     "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
@@ -141,7 +141,7 @@ for _scene, _spec in SCENES.items():
         _spec["decay"] = "collapse"
 SCENES["explosion"]["decay"] = "collapse"
 SCENES["wand_casting_wide"] = {**SCENES["wand_casting_first_person"], "title": "宽视野90度 / 宝石位置校准 / 副手镜像"}
-SCENES["wand_casting_front"] = {**SCENES["wand_casting_first_person"], "title": "第三人称正面握柄 / 左右手姿势 / 弧光汇聚"}
+SCENES["wand_casting_front"] = {**SCENES["wand_casting_first_person"], "title": "第三人称正面握柄 / 左右手姿势 / 块状符印"}
 
 #: 「特效像素」判据：**偏冷的亮**像素（蓝 ≥ 红）。黑底摄影棚里只有粒子满足：
 #: 木桩是棕色（红 > 蓝）、地面是灰黑（不够亮）、火球拖尾是橙色（红 > 蓝）。
@@ -391,6 +391,18 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
 
+    if scene in ("wand_casting_first_person", "wand_casting_wide"):
+        # 上半屏符印的独立掩码，排除脚下常驻三角形；跨多个旧弧流周期检查不能断档。
+        tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        def glyph_pixels(tick):
+            a = np.asarray(Image.open(tick_frames[tick]).convert("RGB"), dtype=np.int16)[20:440, 640:1220]
+            r, g, b = a[..., 0], a[..., 1], a[..., 2]
+            # 两枚符印的离散青色，排除宝石、白色焦点/迸发及低G的脚下法阵。
+            return int(((r <= 150) & (g >= 225) & (b >= 245)).sum())
+        idle_pixels = [glyph_pixels(t) for t in range(25, 95)]
+        result["asserts"].append(("宝石idle持续可见无周期断档", min(idle_pixels) >= 120,
+            f"tick25–94上方符印最少{min(idle_pixels)}像素，要求每帧≥120"))
+
     # 多系统场景可指定独立时间窗；保留同样的最低像素数与渐隐跨度门槛。
     fade_cover, fade_peak, fade_idx, fade_empty = cover, peak, peak_idx, empty
     if "fade_window" in spec:
@@ -435,8 +447,8 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             return int(mask.sum())
 
         white = [cooldown_pixels(t) for t in range(45, 55)]
-        gold = [cooldown_pixels(t, True) for t in range(65, 73)]
-        for label, seq in [("施放间隔白边", white), ("充能琥珀线", gold)]:
+        gold = [cooldown_pixels(t, True) for t in range(65, 78)]
+        for label, seq in [("施放间隔白边", white), ("充能琥珀柱", gold)]:
             result["asserts"].append((label + "完成后仍有有限收尾",
                 seq[0] > 50 and sum(v > 10 for v in seq) >= 4 and seq[-1] <= seq[0] * .05,
                 f"独立颜色覆盖 {seq}，结束后至少4帧可见且末尾≤5%"))

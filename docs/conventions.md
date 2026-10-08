@@ -317,3 +317,7 @@ magic/modifier  ──→ magic/core, magic/effect
 ### 第58轮新增文件落位
 
 准星目标选择WandAim位于wand；真实瞄准碰撞录制WandAimScenes位于client/capture。第三人称枚举参数WandArmPose位于client/render，META-INF/enumextensions.json由mods.toml声明；公共侧不引用这些客户端类。法杖OBJ、MTL及显示模型仍在assets/primalspells/models/item，原创图集在textures/item，来源与提示词在docs/design/wand-materials.md。没有文件迁移或新渲染引擎。
+
+### 第59轮新增文件落位
+
+WandUseAnimationMixin.java与ItemInHandRendererAccessor.java放src/main/java/work/nekow/primalspells/mixin/，仅列入primalspells.mixins.json的client列表。前者处理原版成功使用的高度路径，后者用于客户端实机高度回归；公共服务端代码不引用它们。包结构和旧文件位置未变，无旧→新迁移。

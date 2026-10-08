@@ -326,3 +326,10 @@ wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thi
 
 新增wand_aim验证主副手近远命中和遮挡；wand_casting_front使用Scene.thirdPersonFront展示正面握柄。正面抬头取景的弹体比俯视取景飞行更久，夹具在完成真实出生点检查后提前结束弹体，使158/208tick的归零断言只衡量持杖退场；219tick仍独立验证全部投射物及PD粒子归零。
 装配器只读取当前场景实际使用的色域指标，不改变掩码阈值和验收门槛；持杖场景新增缺失材质警告检查。
+
+### 第59轮低模法杖与idle回归
+
+录制 `-Pcapture=spell_resonance,wand_casting,wand_casting_first_person,wand_casting_wide,wand_casting_front,wand_aim`。
+法杖新增主副手原版itemUsed高度回调与空手对照；60°/90°视角按两枚符印专属色域逐帧检查，排除模型和焦点掩盖断档。充能柱只读脚下坐标，t65–77独立观察完整收尾，t78再重复施法，避免效果重叠污染断言。
+在当前录制之前遗留其它场景目录时，不把历史帧当成本轮证据；仅装配本轮6个目录（可在build/capture/round59out放6个指向out对应目录的Junction，再 `python tools/capture/assemble.py --out build/capture/round59out`）。
+结果回填design/wand-casting.md；运行日志异常门禁保持。

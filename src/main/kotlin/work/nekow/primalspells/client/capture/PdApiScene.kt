@@ -26,6 +26,9 @@ object PdApiScene {
         var finite: ParticleGroup? = null
         var variable: ParticleGroup? = null
         var variableId: UUID? = null
+        var variableCompletedAt = -1L
+        var expressionCompletedAt = -1L
+        var finiteExpression: ParticleGroup? = null
         var completedAt = -1L
         var beganAt = 0L
         var probe: BridgeParticle? = null
@@ -77,8 +80,8 @@ object PdApiScene {
                     variable = pm.createGroup(Vec3(0.0, floor + 3.0, 1.0)).also { g ->
                         val h = pm.create().position(0.0, floor+3.0, 1.0).scale(2f).glowing(true).lightLevel(0).lifetime(-1).spawn()
                         variableId = h?.id; g.add(h)
-                        g.setVariable("px", 0.0).setVariable("py", floor+3.0)
-                            .expression("x=px;y=py;z=1;sc=1;r=0.2;g=0.8;b=1;a=1;")
+                        g.setVariable("presence", 1.0).setVariable("px", 0.0).setVariable("py", floor+3.0)
+                            .expression("x=px;y=py;z=1;sc=presence;r=0.2;g=0.8;b=1;a=1;")
                     }
                 }
                 if (t in 13..35) variable?.setVariableInterpolated("px", ((t-12)*0.04).toString(), 1)
@@ -103,7 +106,17 @@ object PdApiScene {
                 if (t == 80) sample("removed")
                 if (t == 52) finite?.scaleTo(0f, 8, EasingType.EASE_IN_OUT)
                     ?.onAnimationComplete { completedAt = ctx.level.gameTime - beganAt }?.retire()
-                if (t == 90) { panel?.remove(); variable?.remove() }
+                if (t == 50) variable?.setVariableInterpolated("presence", "0", 20)?.onAnimationComplete {
+                    variableCompletedAt = ctx.level.gameTime - beganAt
+                }?.retire()
+                // 重定向既取消旧结束点，也保留当前值；不能在原来的t70完成。
+                if (t == 55) variable?.setVariableInterpolated("presence", "0", 24)?.retire()
+                if (t == 60) finiteExpression = pm.createGroup(Vec3(1.0, floor+3.0, 1.0)).also { g ->
+                    g.add(pm.create().position(1.0, floor+3.0, 1.0).scale(2f).glowing(true).lifetime(-1).spawn())
+                    g.expression("x=1;y=${floor+3.0};z=1;sc=max(0,1-t/400);r=0.2;g=0.8;b=1;a=1;", 8)
+                        .onAnimationComplete { expressionCompletedAt = ctx.level.gameTime - beganAt }.retire()
+                }
+                if (t == 90) panel?.remove()
             }, checksAt = { ctx, t -> if(t == 119) {
                 val s = samples
                 listOf(
@@ -113,6 +126,8 @@ object PdApiScene {
                     Check(name,t,"stationary-particle-dark-bright-dark", s.keys.containsAll(listOf("dark","lit","moved","relit","removed")) && s["lit"]!!>s["dark"]!! && s["relit"]!!>s["dark"]!! && s["moved"]==s["dark"] && s["removed"]==s["dark"],"samples=$s"),
                     Check(name,t,"client-completion-before-fallback",completedAt in 47..55,"callbackAfter=$completedAt expected~48 fallback>=68"),
                     Check(name,t,"completed-group-removed",finite?.size()==0,"members=${finite?.size()}"),
+                    Check(name,t,"expression-variable-redirect-completes-before-fallback",variableCompletedAt in 67..77 && variable?.size()==0,"callbackAfter=$variableCompletedAt expected~67 firstFallback=78 redirectedFallback=87"),
+                    Check(name,t,"finite-expression-completes-before-fallback",expressionCompletedAt in 56..63 && finiteExpression?.size()==0,"callbackAfter=$expressionCompletedAt expected~56 fallback>=76"),
                     Check(name,t,"pd-particles-zero",pmCount(ctx)==0,"remaining=${pmCount(ctx)}")
                 )
             } else emptyList() }, finish = { probe?.remove(); interpolation?.remove() })

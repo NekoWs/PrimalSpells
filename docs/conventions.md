@@ -213,7 +213,7 @@ magic/modifier  ──→ magic/core, magic/effect
 ## 9. 外部依赖政策：ParticleDrawing（硬性）
 
 `particledrawing` 是本模组的**必需前置**（`neoforge.mods.toml`：`required` + `AFTER`），
-仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.16-ALPHA`）。
+仍是 **ALPHA**，当前锁定版本见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.17-ALPHA`）。
 它是粒子能力的**唯一实现方**，PrimalSpells 只负责接线。
 
 **红线：遇到它的 API 缺陷 / 签名不符 / 能力缺失时，不得在本模组自行编写另一套实现。**
@@ -241,7 +241,7 @@ magic/modifier  ──→ magic/core, magic/effect
 - 升级依赖的固定流程（都用 `gradle.properties` 做单一数据源，不再手改 `mods.toml`）：
   新 jar 放 `lib/`（**主 jar 与 `-sources.jar` 一起换**；后者只作 API 对照、**不接进构建**，
   见 [build-and-run.md](build-and-run.md) 第 2 节）→ 改 `particledrawing_version`（jar 文件名版本段）与 `particledrawing_version_range`
-  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.16-ALPHA,)`，写 `[1.0.14,)` 不匹配 `1.0.16-ALPHA`）→
+  （下限 = 该版本；**预发布必须带标识**，如当前的 `[1.0.17-ALPHA,)`，写 `[1.0.14,)` 不匹配 `1.0.17-ALPHA`）→
   `./gradlew build --no-build-cache`；
   **构建失败就回到上面两条（停下 + 提需求），不要就地绕开**。
 
@@ -348,3 +348,14 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 ## 第72轮验证落位
 
 新增client/capture/PdApiScene.kt，仅开发录制装载，观察原生track曲线、变量收敛、Bridge子帧尺寸与静止光照、组完成回报。LightSample只接收原版extract输出供断言，不提交顶点、不注册渲染器；公共侧不引用此类。前置源码不在本仓库修改。
+
+
+## 第73轮新增落位
+
+| 文件 | 职责 |
+|---|---|
+| `magic/modifier/OmnidirectionalScatter.kt` | 全向散射卡，激活时旋转初速并抵扣冷却 |
+| `entity/DummyStatsDisplay.kt` | 服务端原版TextDisplay双行统计板，与假人一起清理 |
+| `client/capture/SpellChainScene.kt` | 束壳截点、穿刺荷载、强追踪、机枪配方、伤害合并与十秒归零 |
+
+没有移动原有类；伤害跳字仍在entity/DamageNumber，统计簿记归TestDummyEntity，渲染复用原版TextDisplay。

@@ -61,7 +61,7 @@
   "lore.primalspells.extended_lifetime.desc": "延长法术存在时间",
   "lore.primalspells.piercing.desc": "无限穿刺并允许自伤；返弹也可能命中施法者。",
   "lore.primalspells.bounce_explosion.desc": "使法术在每次弹跳时爆炸。",
-  "lore.primalspells.homing.desc": "使法术追踪最近的实体。",
+  "lore.primalspells.homing.desc": "在5格内锁定生物中心，持续强力转向；保持投射物速度。",
   "lore.primalspells.bounce_duplicate.desc": "使法术在每次弹跳时生成复制体。",
   "lore.primalspells.gradual_accelerate.desc": "初始缓慢，后逐渐加速。",
   "lore.primalspells.gradual_decelerate.desc": "初始快速，后逐渐减速。",
@@ -112,7 +112,7 @@
   "item.primalspells.long_distance_cast": "远距施放",
   "lore.primalspells.long_distance_cast.desc": "将本次法术出生点前移6格，遇墙截断；叠加最多12格。",
   "item.primalspells.plasma_beam": "等离子束",
-  "lore.primalspells.plasma_beam.desc": "束源发出6格光束，遇墙截断；每5刻伤害1.5，最多4个目标。持续最多40刻。",
+  "lore.primalspells.plasma_beam.desc": "晶格束源发出6格光束，遇墙或护盾截断；每刻伤害1.5，最多4个目标，持续40刻。可伤及施法者。",
   "item.primalspells.repulsion_field": "斥力场",
   "lore.primalspells.repulsion_field.desc": "展开半径4格的斥力场，推开魔法与原版投射物（包括自己的），持续120刻。",
   "item.primalspells.freeze_charge": "冰冻附魔",
@@ -163,5 +163,8 @@
   "item.primalspells.recoil_boost": "反冲增幅",
   "lore.primalspells.recoil_boost.desc": "施法后坐力增加0.35，可用于反冲推进。",
   "lore.primalspells.recoil": "后坐力：%s",
-  "lore.primalspells.charge_time": "蓄能：%st"
+  "lore.primalspells.charge_time": "蓄能：%st",
+  "item.primalspells.omnidirectional_scatter": "全向散射",
+  "lore.primalspells.omnidirectional_scatter.desc": "散射 +720°：向全空间随机发射。施放延迟 -10刻，充能时间 -20刻。",
+  "entity.primalspells.dummy.stats": "DPS：%s\n总伤：%s"
 }

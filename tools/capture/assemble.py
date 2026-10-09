@@ -57,6 +57,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "spell_chain": {"length": 400, "title": "束壳截点 / 穿刺触发 / 强追踪 / 机枪 / 假人统计", "metric": "blue", "quiet": (0, 6), "decay": "collapse"},
     "wand_aim": {"metric": "wand", "length": 160, "title": "近远准星命中 / 副手 / 遮挡 / 稳定握持", "decay": "gradual", "quiet": (0, 8), "fade_window": (129, 159)},
     "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角低模持杖 / 常驻符印与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
     "wand_casting": {"wand_cooldowns": True, "metric": "wand", "length": 220, "title": "三角法阵展开 / 角点锁印 / 双层冷却导槽 / 切杖", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},

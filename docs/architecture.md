@@ -285,7 +285,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 5. **修饰器之间没有先后顺序**：所有抽到的修饰器都作用在同一枚投射物上（例如「火球 + 伤害增强 + 穿刺」= 基础 + 增强 − 惩罚）。修饰器效果只允许**可交换**运算：累加、累乘、乘零；禁止钳制（`coerceAtLeast`）与「重设绝对值」（如 `normalize().mul(绝对速度)`）。同类叠加用 `stackScale`/`isStackPrimary`。写法要求见 `magic/core/Modifier.kt`。
 6. **`status` 是所有 effect 共享的可变状态**：同阶段内的写入顺序就是注入顺序（抽牌顺序），但这只保证「确定性」，任何效果都不应依赖它。
 7. **命中回调每个 tick 都会触发**（投射物停在实体体内时）：穿刺玩法依赖这一点，`Move` 刻意不去重。
-8. **触发法术 payload 是一次性的**：释放即清空，穿刺多次命中不会重复释放。
+8. **触发法术 payload 是一次性的**：释放即清空，穿刺的实体命中只结算本体伤害，荷载保留至方块命中；释放后不会重复。
 9. **公共侧不引用客户端类**：S→C 包一律经 `network/ClientPayloadSink` 转发（见 §6）。
 10. **粒子表现有两条路**：法术粒子走 `particledrawing`（`wand.status.particleManager`，服务端权威 + 客户端插值）——投射物本体/拖尾/黑洞与重力场的球壳与运动粒子/护盾玻璃面板都在这一路（集合簿记用 PD 的 `ParticleBatch`，见 §9）；纯装饰性的一次性撒点走原版 `ServerLevel.sendParticles`（爆炸、无人机、传送、护盾弹开命中）。
 11. **区域场每 tick 结算、离开即解除**：`AreaFieldEffect` 每 tick 刷新迟缓并施加拉拽，实体离开范围（或效果结束）时**立刻**撤销迟缓，不留尾巴。
@@ -315,7 +315,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 > 重力场改为经线/刻度波/双井环，固定结构淡出。当前模型、预算和验证见
 > [design/field-effects.md](design/field-effects.md)；下方注明轮次的旧接线记录保留供迁移追溯。
 
-- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.14-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.17-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 集合类粒子（黑洞球壳、被吸入粒子、下落粒子）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见
@@ -406,7 +406,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
   1.0.11-ALPHA 再补批量设速/批量施力（`setVelocityAll`/`applyForceAll`）与「运动指令解除实体锚点」的修正。
 - 历史 problem 记录：未决需求见 [issues/pd-api-requests.md](issues/pd-api-requests.md)，已闭环条目见 [issues/resolved.md](issues/resolved.md) 附录 B
   （6 条已全部闭环：PD 修了 3 处位置链路偏差 + 补了 `position`/`trackAll`/`applyForce`/`attachTo`）。
-- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.14-ALPHA**），本模组的
+- ✅ **依赖构建口径（已解决）**：PD 每加一批 API 就提 `mod_version`（当前 **1.0.17-ALPHA**），本模组的
   `particledrawing_version_range=[1.0.14-ALPHA,)` 已能表达「最低可用构建」——旧构建（没有 `position`/`applyForce`/
   `attachTo`/`trackAll`，或 §7.3 的 `ParticleBatch`/三入口锚点，或 1.0.10 的 `setVelocityAll`/`applyForceAll`）
   会在加载期被 FML 拒绝，不再等到运行期报 `NoSuchMethodError`。
@@ -540,3 +540,12 @@ WandItem为所有法杖提供原版USE_EFFECTS=UseEffects(canSprint=true,interac
 ## 第72轮：PD外观与完成信号
 
 PD1.0.16负责track位置与寿命外观分离、原生尺寸/颜色帧间插值、变量目标重定向和静止光照缓存刷新。普通有限编排退场由客户端完成信号驱动清理，服务端兜底属于PD；本侧仅给几何和时长。法杖及束端表达式暂不接retire，因为表达式/变量仍不进入该完成通路，缺口见issues/pd-api-requests第72轮。其余法术结算、20刻聚光锁定、5墙反弹、护盾真实子步交点和长按原速均保留。
+
+
+## 第73轮：短距制导与负延迟
+
+Tracking在GUIDANCE阶段旋转当前速度指向锁定生物的碰撞箱中心，数值修饰在前、Move真实碰撞在后；方向对准不增加速度。有效目标持续保留，掉落物、显示实体、盟友及创造/旁观玩家不进入目标集合。
+
+负delay既抵扣本次卡牌累计delay，也降低法杖基础delay下限；正delay仍沿用与法杖基础下限取大的口径。链锯在抽牌位置清零，后置正delay仍可追加。全向散射只在激活阶段旋转初速，全空间均匀随机，不在飞行中不断重抽方向。
+
+持续光束先按真实球壳入射点从近到远测试护盾，再用同一个截点绘制、伤害及水晶反应；不改变静态束源的位置和朝向。穿刺仍绕过护盾。起点在生物碰撞箱内也参与束伤害，保证自伤和近距离判定。

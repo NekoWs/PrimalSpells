@@ -83,6 +83,7 @@ object MagicManager {
         register { Piercing() }
         register { BounceExplosion() }
         register { Homing() }
+        register { OmnidirectionalScatter() }
         register { BounceDuplicate() }
         register { GradualAccelerate() }
         register { GradualDecelerate() }

@@ -512,6 +512,10 @@ class EnergyShield : Modifier() {
         else -> null
     }
 
+    /** 返回真实球壳的入射点，仅供持续束按近远排序；格挡仍走正式结算。 */
+    fun segmentEntry(holder: Entity, from: Vector3f, to: Vector3f): Vec3? =
+        shellEntry(from, to, shellCenter(holder), allowInsideStart = false)?.let { Vec3(it) }
+
     /**
      * 球壳球心（世界坐标）：相对脚底抬高到身体中段（[shellCenterOffset]），比眼睛位置更贴近「包裹全身」。
      *
@@ -755,6 +759,10 @@ class EnergyShield : Modifier() {
                 val offsets = panel.ring + if (withFill) fillOffsets(panel) else emptyList()
                 val normal = panel.center.normalize()
                 offsets.forEachIndexed { i, offset ->
+                    // 碎屑仅保留八分之一，格挡填充减至四分之一；完整轮廓保留。
+                    if (drift != null && i % 8 != 0) return@forEachIndexed
+                    if (drift == null && withFill && i >= panel.ring.size && i % 4 != 0) return@forEachIndexed
+                    if (drift == null && withFill && i < panel.ring.size && i % 3 != 0) return@forEachIndexed
                     val edge = i < panel.ring.size
                     val handle = manager.create().position(center.add(offset))
                         .color(if (edge) edgeColor else fillColor)
@@ -772,12 +780,7 @@ class EnergyShield : Modifier() {
                         handle?.applyForce(Vec3(0.0, -0.012, 0.0), -1)
                     } else group?.add(handle)
                 }
-                if (withFill) {
-                    // 晶格裂纹从受击面心向边角扩展，短命白线有明确冲击方向。
-                    for (end in panel.ring.filterIndexed { i, _ -> i % 12 == 0 })
-                        work.nekow.primalspells.magic.effect.visual.PixelVfx.arc(manager, center.add(panel.center),
-                            center.add(end), edgeColor)
-                }
+
             }
             group?.destroyAfter(holdTicks + fadeTicks + 13)
         }

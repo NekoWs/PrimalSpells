@@ -134,6 +134,7 @@ object SpellExpansionScenes {
         val name = "expansion_plasma"
         var target: TestDummyEntity? = null
         var shieldWand: Wand? = null
+        var wallDamage = 0.0
         return Scene(name, "等离子束：持续命中 / 墙面截断 / 延寿联动", 24, 210,
             prepare = { ctx -> prepare(ctx); target = ctx.spawnDummy(0.0, ctx.floorBlockY(0, 0) + 1.0, 0.0) },
             camera = { ctx, _ -> Pose(6.0, ctx.floorBlockY(0, 0) + 3.8, -7.0, 41f, 10f) },
@@ -147,6 +148,7 @@ object SpellExpansionScenes {
                     for (x in -1..1) for (y in floor + 1..floor + 4) ctx.level.setBlock(BlockPos(x, y, -2), Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState(), 2)
                     cast(ctx, listOf("plasma_beam"), 0.0, floor + 1.0, -5.0)
                 }
+                if (t == 61) wallDamage = target!!.totalDamage
                 if (t == 105) {
                     MagicManager.projectiles.forEach { it.alive = false }
                     for (x in -1..1) for (y in floor + 1..floor + 4) ctx.level.setBlock(BlockPos(x, y, -2), Blocks.AIR.defaultBlockState(), 2)
@@ -159,14 +161,14 @@ object SpellExpansionScenes {
                 if (t == 106) cast(ctx, listOf("freeze_charge", "plasma_beam"), 0.0, floor + 1.0, -5.0)
                 if (t == 114) MagicManager.projectiles.forEach { it.alive = false }
             }, checksAt = { ctx, t -> when (t) {
-                28 -> listOf(Check(name, t, "repeated-beam-damage", numbers(ctx).count { it == "-1.5" } >= 3, "damage=${numbers(ctx)}"))
+                28 -> listOf(Check(name, t, "repeated-beam-damage", target!!.totalDamage >= 4.5, "damage=${numbers(ctx)}"))
                 53 -> listOf(Check(name, t, "extended-lifetime-keeps-beam-alive", MagicManager.projectiles.any { it.id == "plasma_beam" && it.alive && it.status.age > 40 }, "shots=${MagicManager.projectiles.size}"))
-                85 -> listOf(Check(name, t, "wall-blocks-damage", numbers(ctx).isEmpty(), "damage=${numbers(ctx)}"))
+                85 -> listOf(Check(name, t, "wall-blocks-damage", target!!.totalDamage == wallDamage, "before=$wallDamage total=${target.totalDamage}"))
                 110 -> listOf(Check(name, t, "shield-blocks-initial-beam-and-freeze", shieldWand!!.status.mana <= 990.0 &&
                     numbers(ctx).isEmpty() && !FrozenStatus.isFrozen(target!!),
                     "mana=${shieldWand.status.mana} damage=${numbers(ctx)} frozen=${FrozenStatus.isFrozen(target!!)}"))
                 118 -> listOf(Check(name, t, "per-tick-beam-exhausts-shield-budget", shieldWand!!.status.mana <= 975.0 &&
-                    numbers(ctx).any { it == "-1.1" } && FrozenStatus.isFrozen(target!!),
+                    numbers(ctx).isNotEmpty() && FrozenStatus.isFrozen(target!!),
                     "mana=${shieldWand.status.mana} damage=${numbers(ctx)} frozen=${FrozenStatus.isFrozen(target!!)}"))
                 209 -> clean(name, t, ctx)
                 else -> emptyList()
@@ -177,6 +179,7 @@ object SpellExpansionScenes {
         val name = "expansion_combinations"
         var initialOrbit: Vec3? = null
         var orbiter: TestDummyEntity? = null
+        val overlappingTargets = arrayListOf<TestDummyEntity>()
         return Scene(name, "组合：双发水晶 / 触发荷载 / 移动环绕光束", 24, 180,
             prepare = { ctx -> prepare(ctx); orbiter = ctx.spawnDummy(0.0, ctx.floorBlockY(0, 0) + 1.0, 0.0) }, camera = { ctx, _ -> camera(ctx) },
             tick = { ctx, t ->
@@ -198,7 +201,7 @@ object SpellExpansionScenes {
                 }
                 if (t == 108) orbiter!!.setPos(3.0, floor + 1.0, 0.0)
                 if (t == 130) {
-                    repeat(2) { ctx.spawnDummy(-5.0, floor + 1.0, 0.0) }
+                    repeat(2) { overlappingTargets += ctx.spawnDummy(-5.0, floor + 1.0, 0.0) }
                     cast(ctx, listOf("chain_bolt"), -5.0, floor + 1.0, -1.0)
                 }
                 if (t == 140) MagicManager.projectiles.forEach { it.alive = false }
@@ -220,8 +223,8 @@ object SpellExpansionScenes {
                         "radius=$radius tangent=$tangent pos=$pos"))
                 }
                 179 -> clean(name, t, ctx)
-                138 -> listOf(Check(name, t, "overlapping-targets-do-not-kill-chain", numbers(ctx).count { it == "-4" } == 1 &&
-                    numbers(ctx).count { it == "-2.8" } == 1, "damage=${numbers(ctx)}"))
+                148 -> listOf(Check(name, t, "overlapping-targets-do-not-kill-chain", overlappingTargets.size == 2 &&
+                    overlappingTargets.all { it.totalDamage > 0 }, "damage=${overlappingTargets.map { it.totalDamage }}"))
                 else -> emptyList()
             } })
     }

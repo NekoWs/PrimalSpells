@@ -27,7 +27,7 @@ import kotlin.math.atan2
  *
  * - 血量为 int 上限，永不死亡
  * - 不接受任何治疗（[heal] 无效；负/零伤害视为 0）
- * - 每次受到伤害时头顶跳出本次伤害量数字（见 [DamageNumber]）
+ * - 短窗口合并伤害跳字并保留命中次数，显示最近一秒DPS及十秒无操作重置的总伤（见 [DamageNumber]）
  * - 不受击退（靶子保持原地）
  * - 空手右键回收木桩（连同装备掉落，避免物品丢失）；手持物品右键仍可给木桩穿戴
  *
@@ -51,11 +51,37 @@ class TestDummyEntity(
      */
     private val attackWand = Wand("dummy_attack")
 
+    /** 十秒无伤害后重置的单次测试累计伤害。 */
+    var totalDamage = 0.0
+        private set
+    /** 最近一秒的实际伤害总量，单位伤害/秒。 */
+    val dps: Double get() = recent.sumOf { it.second }
+    private val recent = ArrayDeque<Pair<Long, Double>>()
+    private data class Batch(var damage: Double = 0.0, var hits: Int = 0)
+    private val pending = linkedMapOf<work.nekow.primalspells.magic.core.SpellDamageType?, Batch>()
+    private var lastDamageTick = Long.MIN_VALUE
+    private var nextPopupTick = Long.MAX_VALUE
+    private var popupLane = 0
+    private var statsDisplay: DummyStatsDisplay? = null
+
     override fun hurtServer(level: ServerLevel, source: DamageSource, amount: Float): Boolean {
         if (isRemoved || !isAlive) return false
         if (amount <= 0) return false // 会让生命值增加的"伤害"（治疗）一律归零
-        // 头顶跳出本次伤害量数字
-        spawnDamageNumber(level, position().add(0.0, bbHeight + 0.35, 0.0), amount.toDouble(), work.nekow.primalspells.magic.core.SpellDamageType.fromMessageId(source.msgId))
+        val now = level.gameTime
+        if (lastDamageTick != Long.MIN_VALUE && now - lastDamageTick >= 200) resetStats()
+        lastDamageTick = now
+        totalDamage += amount
+        recent.addLast(now to amount.toDouble())
+        val type = work.nekow.primalspells.magic.core.SpellDamageType.fromMessageId(source.msgId)
+        pending.getOrPut(type) { Batch() }.also { it.damage += amount; it.hits++ }
+        if (nextPopupTick == Long.MAX_VALUE) nextPopupTick = now + 5
+        if (statsDisplay?.isRemoved != false) {
+            statsDisplay = DummyStatsDisplay(this, level).also {
+                it.setPos(x, y + bbHeight + 1.7, z)
+                it.update(dps, totalDamage)
+                level.addFreshEntity(it)
+            }
+        }
         return true
     }
 
@@ -74,6 +100,33 @@ class TestDummyEntity(
         val stack = getItemInHand(InteractionHand.MAIN_HAND)
         if (stack.item is WandItem) WandItem.getWand(stack)?.tick(this, level)
         driveAttack(level)
+        updateDamageStats(level)
+    }
+
+    private fun resetStats() {
+        totalDamage = 0.0
+        recent.clear()
+        pending.clear()
+        nextPopupTick = Long.MAX_VALUE
+        lastDamageTick = Long.MIN_VALUE
+        statsDisplay?.update(0.0, 0.0)
+    }
+
+    private fun updateDamageStats(level: ServerLevel) {
+        val now = level.gameTime
+        while (recent.isNotEmpty() && now - recent.first().first >= 20) recent.removeFirst()
+        if (lastDamageTick != Long.MIN_VALUE && now - lastDamageTick >= 200) resetStats()
+        if (now >= nextPopupTick) {
+            // 5刻收集窗口合并同类伤害；×N保留命中次数，各批在不同横向槽位升起。
+            for ((type, batch) in pending) {
+                val lane = popupLane++ % 5 - 2
+                spawnDamageNumber(level, position().add(0.0, bbHeight + 0.15 + (popupLane % 2) * 0.15, 0.0),
+                    batch.damage, type, batch.hits, lane * 0.6f)
+            }
+            pending.clear()
+            nextPopupTick = Long.MAX_VALUE
+        }
+        if (now % 4L == 0L) statsDisplay?.update(dps, totalDamage)
     }
 
     /**

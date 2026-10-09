@@ -12,8 +12,8 @@
 > **出现时机**：需求清单与登记**只在本次功能要求涉及 ParticleDrawing API 时**才出现
 > （特效接线、升级导致 API 变化、需求要求用它的能力）；与之无关的工作不要在这里添条目。
 >
-> 当前锁定版本：见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.16-ALPHA`，
-> `lib/particledrawing-1.0.16-ALPHA.jar` 另附 `-sources.jar` 便于核对签名）。
+> 当前锁定版本：见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.17-ALPHA`，
+> `lib/particledrawing-1.0.17-ALPHA.jar` 另附 `-sources.jar` 便于核对签名）。
 
 ---
 
@@ -21,15 +21,15 @@
 
 ---
 
-## 第72轮：完成回报尚未覆盖表达式与变量缓动（2026-10-09）
+## 第73轮：变量完成终点丢失与重定向兜底过期（2026-10-09）
 
-- 状态：1.0.16-ALPHA新onAnimationComplete/retire部分接入，停止表达式/变量通路的完成销毁接入。
-- 目标：脚下三角形presence归零及施放/充能内外边表达式收尾，等客户端真正完成和桥接插值结束后清理；中断后以当前值继续。
-- 现有能力：普通scaleTo等有限糖指令可回报完成；setVariableInterpolated通过独立SetProgramVarEasePayload下发，不更新ParticleGroup.timelineEndMs，纯expression组hasFiniteInstruction=false，retire直接警告并返回。ClientAnimationProgramManager.tick的expressionFrame分支continue，跳过reportCompletionIfDue；表达式上即使追加有限糖指令也不会正常回报，且该分支不执行糖指令。不能用无效果有限命令充当完成标记。
-- 期望：把变量缓动的有限时长纳入客户端和服务端完成账本（支持新目标取消旧结束点、最后一个有效缓动完成后回报）；表达式组同样参与完成检测，或提供显式retireVariable(name,target,duration,easing)与有限表达式结束时刻。onAnimationComplete/retire在这两条通路不得静默不生效，客户端缺席仍由PD兜底。
-- 影响：WandCastingFx主阵presence/延迟及充能提示、PlasmaBeam表达式收尾；普通PixelVfx组已可使用新接口。
-- 临时处理：保留原有有限定时销毁与余量，不自写回报协议/客户端播放器。ParticleHandle.resize与Batch成员仍沿用现有有限清理，不假装已取得组完成信号。
-- 验收：表达式组只调用setVariableInterpolated(presence,0,7).retire即可在当帧归零并完成位置/尺寸插值后销毁；重复重定向不提前触发旧回调；无客户端不泄漏，切维/登出清理有效。
+- 状态：1.0.17-ALPHA实机确认，停止变量缓动完成回报接入；有限expression时长的客户端回报已通过。
+- 目标：主法阵presence归零、冷却提示及等离子束退场，在客户端确实完成并留足桥接余量后清理；缓动重定向不能沿用旧兜底提前完成。
+- 复现：PdApiScene在t50对presence缓动20t并登记回调/retire，t55重定向为24t。最后有效终点t79（相对beganAt=t12为67），实机回调却在相对78，即t90，正好等于第一次登记t50+20t缓动+20t兜底；不是客户端上报。重定向后的正确兜底应为t99（相对87）。WandCastingScenes放下主手t140后，t154仍有240粒子，直到旧服务端兜底到时才回收；副手t190后t219仍有240粒子。
+- 源码：ClientAnimationProgramManager.tick先取ledgerEnd，再applyVarEases；后者在now到达终点时立即移除ease。reportCompletionIfDue要求now>=ledgerEnd+50ms，当帧未到、下一帧终点已从账本消失，纯变量表达式组永远错过信号。ServerProgramCompletion.scheduleFallback的任务不带登记版本，重定向后旧任务仍直接移除最新entry并fire。
+- 期望：保存已完成变量的最终账本端点直到上报（重定向更新/失效旧端点），或在完成那帧记录待上报终点；旧fallback用版本/令牌取消，只有最后有效登记可触发。onAnimationComplete真正由客户端完成时调用，有限expression和变量混合亦需覆盖。
+- 临时处理：沿用上个已验证版本的有限清理，不自写回调、客户端播放器或伪造有限指令。WandCastingFx原有presence8t+12t清理与冷却表达式7t清理保留；等离子presence6t+8t清理保留。原生有限expression施法迸发可正常使用expression(code,5).retire。
+- 验收：上述重定向在相对67～77以内收到客户端回调，不能在相对78旧兜底时伪装完成；无客户端只按最后登记t99兜底。主/副手法阵分别在t154/t208清空；切维、登出无残留。
 
 ---
 
@@ -41,7 +41,7 @@
 | `.pdrawc` 动画特效尚未在 PrimalSpells 侧接线 | 播放器侧 API（含 `EffectCallbacks`/`EffectVarStore`）已具备 | 法术目前只有程序化粒子（`Trajectory`）+ 发射器，没有编辑器导出的动画 | 记为功能排期项，**不是** API 缺陷 |
 | 位置指令会清掉速度与力 | `ServerParticleEngine.takeOverPosition`：`move`/`track`/`trackAll` 一律 `velocity=0`、`accel=0` | 「位置驱动」与「速度/力驱动」不能混用在同一颗粒子上 | 同一粒子只选一种驱动方式；见 [design/effects-api.md §0.3](../design/effects-api.md) |
 | 运动指令一律解除实体锚点 | 位置（`move`/`track`）、速度（`setVelocity`/`setVelocityAll`）、力（`applyForce`/`applyForceAll`）都接管位置 | 先 `attachTo` 再给速度/力＝锚点被解掉，粒子不再跟随实体 | 1.0.11-ALPHA 起口径统一 |
-| 发射器与可移动组轴心按相邻服务器样本插值 | PD 1.0.16-ALPHA提供Movable样本和updateAnchor | 无需本侧压后一tick | Trajectory传当前位置，与track头部同相位；固定朝向结构显式Orient.WORLD |
+| 发射器与可移动组轴心按相邻服务器样本插值 | PD 1.0.17-ALPHA提供Movable样本和updateAnchor | 无需本侧压后一tick | Trajectory传当前位置，与track头部同相位；固定朝向结构显式Orient.WORLD |
 | **粒子「实际尺寸」不是 `scale` 本身** | `BridgeParticle`：`quadSize = scale × EDITOR_TO_MC_SCALE × texScale`；16×16 贴图 `texScale = 1` ⇒ **渲染整宽 = scale × 0.2 格** | 按「scale = 格数」估密度会偏小；要按世界格给尺寸用 `anisoWorld` | 本侧的换算：`scale = 格数 × 5`（见 `Trajectory` 的尺寸常量注释）；`anisoWorld` 口径的粒子**吃不到** `resize` |
 
 ---

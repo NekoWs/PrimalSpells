@@ -773,3 +773,12 @@ ConcentratedLightFx只使用PD 1.0.15公开ParticleBatch.trackAll、spawnAll、�
 PixelVfx.retire/shatter用scaleTo(...).retire()替换服务端ticks+2掐表销毁；组有限指令完成由客户端上报，额外2刻桥接收尾，客户端缺席由PD负责兜底。原生寿命曲线碎片不改成整组缩向场心。
 
 法杖脚下位置保留实体getter，这是直接锚定玩家位置的合适表达；新版Bridge已插值表达式尺寸/颜色。法阵presence缓动与冷却表达式的定时销毁暂不改成retire：setVariableInterpolated不更新有限时间轴、表达式分支跳过完成上报，见第72轮API需求。禁止用无效果有限指令伪造完成标记，也不自写客户端回调或尺寸播放器。
+
+
+## 第73轮：1.0.17-ALPHA部分接线与变量回报阻塞
+
+有限`expression(code,durationTicks)`已提供实际求值终点，施法迸发改为`expression(code,5).retire()`；原生有限表达式回调和清理有实机证据。粒子寿命改由组结束清理，保留默认2刻桥接余量。
+
+变量缓动接入后实机发现：结束当帧移除变量账本，但上报还要再等50ms，导致纯变量表达式组漏报；重定向还会被旧fallback触发。不能把服务端兜底当客户端完成。WandCastingFx与PlasmaBeam保留原有有限清理（presence8t/12t、冷却7t、光束presence6t/8t），第73轮请求见issues/pd-api-requests。没有本侧回调协议或粒子播放器。
+
+护盾截束先在服务端算好正式截点，阻挡当刻端点用setVariableLive发布，其余连续移动保持1刻空间缓动。新束源和主束共用实际起点，退场都由PD表达式与变量驱动，有限定时只负责已有资源回收。

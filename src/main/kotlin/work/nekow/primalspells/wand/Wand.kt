@@ -156,15 +156,18 @@ class Wand(var id: String) {
         status.delay = 0.0
         status.recharge = 0.0
         draw(cast)
-        val delayReset = castHand(caster, hand)
+        val result = castHand(caster, hand)
         // 通常以法杖delay为完整刻下限；成功施放链锯时允许清零，后置卡仍可追加delay。
-        status.delay = (if (delayReset) status.delay else max(status.delay, delayTicks())).coerceAtLeast(0.0)
+        status.delay = (if (result.resetDelay) status.delay else max(status.delay,
+            (delayTicks() + result.delayReduction).coerceAtLeast(0.0))).coerceAtLeast(0.0)
         status.recharge = status.recharge.coerceAtLeast(0.0)
         status.lastDelay = status.delay
         status.lastRecharge = status.recharge
         work.nekow.primalspells.magic.effect.visual.WandCastingFx.cooldownsChanged(caster, this)
         return true
     }
+
+    private data class CastResult(val resetDelay: Boolean, val delayReduction: Double)
 
     /**
      * 执行手牌：先将所有 [Modifier] 的法术效果提取出来（消耗法力、累加 delay/recharge），
@@ -173,8 +176,9 @@ class Wand(var id: String) {
      * @param caster 施法者实体
      * @param hand   当前手牌列表（本方法负责清空）
      */
-    private fun castHand(caster: Entity, hand: ArrayList<Magic>): Boolean {
+    private fun castHand(caster: Entity, hand: ArrayList<Magic>): CastResult {
         var delayReset = false
+        var delayReduction = 0.0
         val magics = arrayListOf<Magic>()
         magics += hand
 
@@ -184,6 +188,7 @@ class Wand(var id: String) {
             if (consumeMana(it)) {
                 status.recharge += it.recharge
                 status.delay += it.delay
+                delayReduction += min(0.0, it.delay.toDouble())
                 true
             } else {
                 false
@@ -210,6 +215,7 @@ class Wand(var id: String) {
                 castVisualPlayed = true
             }
             status.recharge += p.recharge
+            delayReduction += min(0.0, p.delay.toDouble())
             if (p.resetsCastDelay) { status.delay = 0.0; delayReset = true }
             status.delay += p.delay
 
@@ -221,7 +227,7 @@ class Wand(var id: String) {
         // 手牌在 payload 抽取完成后统一丢弃：过早 discard 会触发 reload，
         // 导致触发法术（TriggerSpell）重新抽到刚施放的牌（含自身）。
         discard()
-        return delayReset
+        return CastResult(delayReset, delayReduction)
     }
 
     /**

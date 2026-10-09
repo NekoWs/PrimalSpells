@@ -152,7 +152,7 @@ object WandCastingFx {
 
         fun retire() {
             expires = level.gameTime + EXIT_TICKS
-            // PD1.0.16的变量缓动尚不参与完成回报；暂保留余量，需求落地后改retire。
+            // PD1.0.17变量结束点被过早移除，完成上报仍缺失；保留既有有限清理，见第73轮API需求。
             groups.forEach { it.setVariableInterpolated("presence", "0", 8, EasingType.LINEAR).destroyAfter(EXIT_TICKS) }
             retiring += this
         }
@@ -243,7 +243,7 @@ object WandCastingFx {
         repeat(24) { i ->
             group.add(manager.create().position(center).color(Color.ofInt(195, 253, 240))
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<6) 0.1875f else 0.125f, 0.125f)
-                    .glowing(true).additive(false)).lifetime(6).spawn())
+                    .glowing(true).additive(false)).lifetime(-1).spawn())
         }
         group.setVariable("cx", center.x).setVariable("cy", center.y).setVariable("cz", center.z)
             .setVariable("dx", forward.x).setVariable("dy", forward.y).setVariable("dz", forward.z)
@@ -254,7 +254,7 @@ object WandCastingFx {
                 y=cy+dy*p*(0.25+h*0.45)+sin(angle)*spread;
                 z=cz+dz*p*(0.25+h*0.45)+sin(angle*1.71)*spread;
                 sc=birth*(1-p)*(1-p);r=0.73;g=1;b=0.92;a=1;
-            """.trimIndent()).destroyAfter(6)
+            """.trimIndent(), 5).retire()
     }
 
     /** 登出清理活动法阵；有限退场组的销毁已由PD调度。 */

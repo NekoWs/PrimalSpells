@@ -21,16 +21,16 @@ import work.nekow.primalspells.util.Lore
  * 头顶伤害数字：基于 [Display.TextDisplay] 的文本实体。
  *
  * - 始终面向玩家（billboard = center）
- * - 跳出动画：先快后慢（ease-out），缩放从 0.35 逐渐变大到 1.0，同时向上飘动
+ * - 跳出动画：先快后慢（ease-out），缩放从 0.35 逐渐变大到 0.6，末4刻收尾，同时向上飘动
  * - 明亮红色加粗，便于阅读
- * - 约 1.5 秒后消失
+ * - 约 1.2 秒后清理；合并跳字用 ×N 表示真实命中次数
  *
  * 26.2 的 Display/TextDisplay 所有 setter 均为私有，唯一数据入口是
  * `readAdditionalSaveData(ValueInput)`（protected，子类可用），故每 tick 构造
  * CompoundTag + [TagValueInput] 重新加载（transformation 每 tick 更新，
  * 客户端经 entityData 同步 + interpolation_duration 平滑插值）。
  */
-class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: work.nekow.primalspells.magic.core.SpellDamageType? = null) :
+class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: work.nekow.primalspells.magic.core.SpellDamageType? = null, val hitCount: Int = 1, val column: Float = 0f) :
     Display.TextDisplay(EntityTypes.TEXT_DISPLAY, level) {
 
     private var life = 0
@@ -39,6 +39,7 @@ class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: 
     private val data = CompoundTag().apply {
         val text = (damageType?.let { Component.translatable("damage.primalspells.hit", Lore.formatDouble(amount), it.text) }
             ?: Component.literal("-" + Lore.formatDouble(amount)))
+            .append(if (hitCount > 1) Component.literal(" ×$hitCount") else Component.empty())
             .withStyle { it.withColor(TextColor.fromRgb(damageType?.color ?: BRIGHT_RED)).withBold(true) }
         ComponentSerialization.CODEC
             .encodeStart(NbtOps.INSTANCE, text)
@@ -60,7 +61,7 @@ class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: 
 
     override fun tick() {
         super.tick()
-        if (++life > 30) {
+        if (++life > 24) {
             discard()
             return
         }
@@ -71,6 +72,8 @@ class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: 
         }
     }
 
+    override fun shouldBeSaved(): Boolean = false
+
     private fun reloadData(level: ServerLevel) {
         readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), data))
     }
@@ -79,11 +82,13 @@ class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: 
     private fun applyTransformation(t: Int) {
         val grow = (t / 12f).coerceAtMost(1f)
         val easeOut = 1f - (1f - grow) * (1f - grow)
-        val scale = 0.35f + 0.65f * easeOut
-        val riseP = (t / 30f).coerceAtMost(1f)
-        val rise = 0.9f * (1f - (1f - riseP) * (1f - riseP))
+        val exit = ((24 - t) / 4f).coerceIn(0f, 1f)
+        val scale = (0.35f + 0.25f * easeOut) * exit * exit * (3f - 2f * exit)
+        val riseP = (t / 24f).coerceAtMost(1f)
+        // 匀速上升使相邻批次保持固定行距，避免末段挤成一团。
+        val rise = 1.2f * riseP
         val transformation = Transformation(
-            Vector3f(0f, rise, 0f),
+            Vector3f(column, rise, 0f),
             Quaternionf(),
             Vector3f(scale, scale, scale),
             Quaternionf()
@@ -101,6 +106,6 @@ class DamageNumber(level: Level, pos: Vec3, val amount: Double, val damageType: 
 }
 
 /** 在 [level] 的 [pos] 处生成一个向上飘动、逐渐变大的伤害数字 */
-fun spawnDamageNumber(level: ServerLevel, pos: Vec3, amount: Double, type: work.nekow.primalspells.magic.core.SpellDamageType? = null) {
-    level.addFreshEntity(DamageNumber(level, pos, amount, type))
+fun spawnDamageNumber(level: ServerLevel, pos: Vec3, amount: Double, type: work.nekow.primalspells.magic.core.SpellDamageType? = null, hitCount: Int = 1, column: Float = 0f) {
+    level.addFreshEntity(DamageNumber(level, pos, amount, type, hitCount, column))
 }

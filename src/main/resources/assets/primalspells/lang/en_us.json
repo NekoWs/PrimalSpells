@@ -61,7 +61,7 @@
   "lore.primalspells.extended_lifetime.desc": "Extends the spell's lifetime.",
   "lore.primalspells.piercing.desc": "Unlimited piercing and self damage; returning projectiles can hit their caster.",
   "lore.primalspells.bounce_explosion.desc": "Causes the spell to explode on each bounce.",
-  "lore.primalspells.homing.desc": "Causes the spell to track the nearest entity.",
+  "lore.primalspells.homing.desc": "Locks onto a creature within 5 blocks and turns sharply toward its center without changing speed.",
   "lore.primalspells.bounce_duplicate.desc": "Duplicates the spell on each bounce.",
   "lore.primalspells.gradual_accelerate.desc": "Starts slow and gradually accelerates.",
   "lore.primalspells.gradual_decelerate.desc": "Starts fast and gradually decelerates.",
@@ -112,7 +112,7 @@
   "item.primalspells.long_distance_cast": "Long-Distance Cast",
   "lore.primalspells.long_distance_cast.desc": "Moves the cast origin forward 6 blocks, stopping at walls. Stacking is capped at 12 blocks.",
   "item.primalspells.plasma_beam": "Plasma Beam",
-  "lore.primalspells.plasma_beam.desc": "Emits a 6-block beam blocked by walls. Deals 1.5 damage every 5 ticks to up to 4 targets; lasts at most 2s.",
+  "lore.primalspells.plasma_beam.desc": "A crystal source projects a 6-block beam, stopped by walls and shields. 1.5 damage per tick to up to 4 targets for 40t. Can hurt the caster.",
   "item.primalspells.repulsion_field": "Repulsion Field",
   "lore.primalspells.repulsion_field.desc": "A 4-block field pushes magic and vanilla projectiles, including your own, for 120 ticks.",
   "item.primalspells.freeze_charge": "Freeze Charge",
@@ -163,5 +163,8 @@
   "item.primalspells.recoil_boost": "Recoil Surge",
   "lore.primalspells.recoil_boost.desc": "Adds 0.35 cast recoil. Can propel the caster backwards.",
   "lore.primalspells.recoil": "Recoil: %s",
-  "lore.primalspells.charge_time": "Windup: %st"
+  "lore.primalspells.charge_time": "Windup: %st",
+  "item.primalspells.omnidirectional_scatter": "Omnidirectional Scatter",
+  "lore.primalspells.omnidirectional_scatter.desc": "Spread +720°: scatter in every direction. Cast delay -10t; recharge -20t.",
+  "entity.primalspells.dummy.stats": "DPS: %s\nTotal: %s"
 }

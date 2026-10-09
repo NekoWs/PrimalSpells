@@ -331,3 +331,14 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 ## 第72轮PD接线
 
 client/capture/PdApiScene.kt为前置运行时回归；magic/effect/visual/PixelVfx.kt使用有限编排完成销毁；ConcentratedLightFx恢复trackAll+sizeCurve；magic/effect/lifecycle/PlasmaBeam.kt恢复一刻端点缓动。依赖版本与加载下限统一在gradle.properties，lib主JAR和sources同时替换。
+
+
+## 第73轮新增落位
+
+| 文件 | 职责 |
+|---|---|
+| `magic/modifier/OmnidirectionalScatter.kt` | 全向散射卡，激活时旋转初速并抵扣冷却 |
+| `entity/DummyStatsDisplay.kt` | 服务端原版TextDisplay双行统计板，与假人一起清理 |
+| `client/capture/SpellChainScene.kt` | 束壳截点、穿刺荷载、强追踪、机枪配方、伤害合并与十秒归零 |
+
+没有移动原有类；伤害跳字仍在entity/DamageNumber，统计簿记归TestDummyEntity，渲染复用原版TextDisplay。

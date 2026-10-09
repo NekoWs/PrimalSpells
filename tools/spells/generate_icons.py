@@ -13,7 +13,7 @@ MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','exte
              'piercing','bounce_explosion','homing','bounce_duplicate','gradual_accelerate',
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
-             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost')
+             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter')
 IDS = PROJECTILES + MODIFIERS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
 ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
@@ -79,6 +79,12 @@ def icon(name):
         else:
             arrow((15,10),(6,10),ORANGE)
             arrow((15,22),(6,22),ORANGE)
+    elif name=='omnidirectional_scatter':
+        for end in ((16,6),(26,16),(16,26),(6,16)):
+            arrow((16,16),end,BLUE,2)
+        for end in ((8,8),(24,8),(24,24),(8,24)):
+            line(((16,16),end),PURPLE,2);box(*end,YELLOW,1)
+        box(16,16,WHITE,2)
     elif name=='chainsaw':
         d.polygon(((8,22),(6,19),(9,15),(12,17),(14,14),(18,18),(14,23)),fill=ORANGE)
         d.polygon(((13,15),(20,7),(24,7),(25,11),(18,19)),fill='#768997')

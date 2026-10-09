@@ -21,6 +21,8 @@ import work.nekow.primalspells.util.HitResult
  */
 class Trigger : BaseEffect() {
     override fun onHit(result: HitResult) {
+        // 穿刺只保留本体伤害；荷载一直带到方块命中。
+        if (projectile.maxHitTargets < 0 && result.type == work.nekow.primalspells.util.HitType.ENTITY) return
         val triggerSpell = projectile as? TriggerSpell ?: return
         val payload = triggerSpell.payload
         if (payload.isEmpty()) return

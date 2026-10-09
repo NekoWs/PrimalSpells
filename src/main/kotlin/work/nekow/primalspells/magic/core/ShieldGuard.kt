@@ -54,6 +54,16 @@ object ShieldGuard {
         WandItem.getWand(entity.getItemInHand(hand))?.loadedMagics?.any { it is EnergyShield } == true
     }
 
+    /** 持续光束按球壳实际交点排序，避免先扣远处护盾的法力。 */
+    fun segmentEntry(entity: LivingEntity, from: org.joml.Vector3f, to: org.joml.Vector3f): Vec3? {
+        for (hand in HANDS) {
+            val wand = WandItem.getWand(entity.getItemInHand(hand)) ?: continue
+            val shield = wand.loadedMagics.firstOrNull { it is EnergyShield } as? EnergyShield ?: continue
+            shield.segmentEntry(entity, from, to)?.let { return it }
+        }
+        return null
+    }
+
     /** 按本刻真实相邻子步测试球壳，早于本体命中和视觉阶段。 */
     fun interceptSegment(level: ServerLevel, entity: LivingEntity, projectile: Projectile,
                          from: org.joml.Vector3f, to: org.joml.Vector3f): Boolean =

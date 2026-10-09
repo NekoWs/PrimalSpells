@@ -316,3 +316,8 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 ## 第68轮：固定聚光与多卡防御
 
 `projectile/ConcentratedLight.kt`锁定出生点/方向并默认5次反弹；`effect/visual/ConcentratedLightFx.kt`双菱形镜阵/轴向光矛。`modifier/EnergyShield.kt`多卡立方窗口预算与破盾当次吸收；`core/ShieldGuard.kt`、`projectile/Projectile.kt`、`effect/lifecycle/{SpellDamage,Explosion}.kt`共享当次拦截目标，避免同次复合伤害再次穿破口。`entity/TestDummyEntity.kt`禁止直接push；实机对照见`client/capture/ShieldBalanceScene.kt`，方向/原地/5次真实墙反弹见RecoilLightScene。
+
+
+## 第70轮：轻反冲与护盾拦截次序
+
+高速汇聚之光护盾消失：Projectile.hitEntity的护盾前置拦截 → Move收到true终止入射扫描 → ShieldGuard/EnergyShield修改壳外位置与反射速度。回归在ShieldBalanceScene的fast-light-*与reflected-light-*，覆盖4.8/24/64格每刻和斜入射。

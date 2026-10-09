@@ -71,8 +71,10 @@ class ChainArc : BaseEffect(), DirectDamage {
             val incoming = end.subtract(start).let { if (it.lengthSqr() > 1e-8) it else heading }
             status.velocity.set(incoming.x.toFloat(), incoming.y.toFloat(), incoming.z.toFloat())
             // 使用公共命中分派，让爆炸、复制等命中修正也在真实落点生效。
-            projectile.hitEntity(target)
-            status.velocity.set(drift)
+            if (projectile.hitEntity(target)) {
+                // 护盾反射了跃迁来向；保留反射方向，只恢复原有慢漂移速率。
+                status.velocity.normalize().mul(drift.length())
+            } else status.velocity.set(drift)
         }
     }
 

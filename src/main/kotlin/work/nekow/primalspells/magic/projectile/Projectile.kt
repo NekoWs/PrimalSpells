@@ -33,6 +33,8 @@ abstract class Projectile: Magic() {
     var damageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE
     var mass: Double = 1.0
         set(value) { field = work.nekow.primalspells.magic.core.MagicMass.valid(value) }
+    /** 蓄能法术可选择在付费出手时施加轻反冲，而非等待释放。 */
+    var recoilOnCast: Boolean = false
     /** 后坐力基值、修正加值与倍率分开累积，避免修正牌顺序影响结果。 */
     var recoil: Double = 0.0
     var recoilBonus: Double = 0.0
@@ -52,12 +54,12 @@ abstract class Projectile: Magic() {
 
     fun queueCastRecoil() {
         recoilQueued = true
-        if (!awaitingRelease) releaseCastRecoil()
+        if (!awaitingRelease || recoilOnCast) releaseCastRecoil()
     }
 
     /** 仅付费的直接施法排队；复制/触发子弹不会给持有者重复施加反冲。 */
     fun releaseCastRecoil() {
-        if (!recoilQueued || recoilApplied || awaitingRelease || !caster.isAlive || caster.isSpectator) return
+        if (!recoilQueued || recoilApplied || (awaitingRelease && !recoilOnCast) || !caster.isAlive || caster.isSpectator) return
         recoilApplied = true
         val force = ((recoil + recoilBonus).coerceAtLeast(0.0) * recoilMultiplier).coerceIn(0.0, 2.0)
         if (!force.isFinite() || force <= 0.0) return
@@ -136,7 +138,11 @@ abstract class Projectile: Magic() {
     private fun currentDirection(): Vector3f = if (status.velocity.lengthSquared() > 1e-8f)
         Vector3f(status.velocity).normalize() else Vector3f(launchDirection.x.toFloat(), launchDirection.y.toFloat(), launchDirection.z.toFloat())
 
-    fun hitEntity(entity: Entity) {
+    /** 返回true表示被护盾反射，调用方必须放弃当前的入射路径，不分派实体命中。 */
+    fun hitEntity(entity: Entity): Boolean {
+        val level = entity.level() as? net.minecraft.server.level.ServerLevel
+        if (entity is net.minecraft.world.entity.LivingEntity && level != null &&
+            work.nekow.primalspells.magic.core.ShieldGuard.absorbProjectile(level, entity, this)) return true
         val offset = Vector3f(status.pos).sub(entity.position().toVector3f())
         val direction = currentDirection()
         val impactNormal = if (offset.lengthSquared() > 1e-8f) offset.normalize() else Vector3f(direction).negate()
@@ -152,6 +158,7 @@ abstract class Projectile: Magic() {
         effects.forEach { it.onHit(result) }
         onHitEntity(entity)
         onHit(result)
+        return false
     }
 
     fun hitBlock(pos: Vector3f, faceNormal: Vector3f) {

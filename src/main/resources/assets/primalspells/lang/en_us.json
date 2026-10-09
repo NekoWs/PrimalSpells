@@ -157,7 +157,7 @@
   "lore.primalspells.mass": "Mass: %s",
   "damage.primalspells.hit": "−%s %s",
   "item.primalspells.concentrated_light": "Concentrated Light",
-  "lore.primalspells.concentrated_light.desc": "Deploys a stationary focusing array with a locked direction. Fires after 20 ticks and bounces off walls 5 times. The array recoils visually without pushing the caster.",
+  "lore.primalspells.concentrated_light.desc": "Deploys a stationary focusing array with a locked direction. Fires after 20 ticks and bounces off walls 5 times. Casting gives a small kick; the array recoils visually when the beam fires.",
   "item.primalspells.recoil_damper": "Recoil Damper",
   "lore.primalspells.recoil_damper.desc": "Multiplies cast recoil by 0.25. Stacks.",
   "item.primalspells.recoil_boost": "Recoil Surge",

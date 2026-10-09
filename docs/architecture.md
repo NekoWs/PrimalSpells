@@ -519,3 +519,10 @@ TestDummyEntity在knockback之外覆盖push(x,y,z)，并设原版KNOCKBACK_RESIS
 ## 第69轮：纯视觉发射反冲
 
 汇聚之光不再调用releaseCastRecoil，基础recoil归零；付费施法排队不会在释放时推施法者，反冲增幅也不会为本法术触发实际推力。20刻蓄能、世界部署点/方向和5次反弹不变。反冲只在ConcentratedLightFx的镜阵上表现。
+
+
+## 第70轮：轻反冲与护盾拦截次序
+
+Projectile.hitEntity现在先调用ShieldGuard拦截，成功返回true，不计hitTargets、不置死亡、不派发onHitEntity/onHit；Move收到true立即结束本刻旧扫掠，保留护盾给出的壳外位置与反射速度。避免先死亡后反射，以及旧newPos覆盖反射位置。伤害通道里的ShieldGuard仍为绕过公共命中入口的光束提供兜底。ChainArc的跃迁入口同样尊重true，恢复慢漂移速率但保留被反射的方向。
+
+Projectile.recoilOnCast默认为false，蓄能法术可显式true让付费queueCastRecoil立即施力；releaseCastRecoil仍用recoilApplied保证一次性，复制/触发不排队。汇聚之光recoil=0.06、recoilOnCast=true，在拿牌实际付费出手时轻推，20刻释放不再次推。

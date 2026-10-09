@@ -413,3 +413,10 @@ class MyPassive : Modifier() {
 concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→中英语言→图标生成器→真实录制完整接入，18投射物+28修正=46张卡。汇聚之光既有一次反弹仍由Move/Projectile.hitBlock管理，可与弹跳、穿刺、速度、伤害、延寿等原配方联动。
 
 第68轮：需要固定部署的蓄能法术只用出生时的launchDirection与status.pos，不能在蓄能tick重新取玩家lookAngle/杖首。护盾拦截属于整次命中语义：新直接/爆炸伤害应遵守Projectile.shieldedImpactTargets，禁止对刚开破口的同次已拦截目标再次结算；新的一枚投射物不共享该集合。护盾只对主卡记账，增加卡数同时影响抗性和滚动预算，不能再引入固定全局窗口上限。
+
+
+## 第70轮：轻反冲与护盾拦截次序
+
+公共Projectile.hitEntity返回true表示护盾拦截，不是实体命中；自定义碰撞/跃迁必须立即放弃旧路径，不能继续用入射位置/速度覆盖反射结果，也不能消耗命中次数或触发荷载。普通命中返回false，按原有回调和死亡规则执行。
+
+蓄能法术设置recoilOnCast=true可在付费施法时反冲；默认false保持等待释放。子弹不调用queueCastRecoil，不重复推动施法者。

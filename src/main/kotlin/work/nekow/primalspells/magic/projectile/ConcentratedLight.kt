@@ -21,7 +21,7 @@ class ConcentratedLight : Projectile() {
         mana = 90.0; delay = 70; recharge = 20; maxAge = 80
         speed = 3f; dragCoeff = 0f; hitRadius = 0.15
         maxBounces = 5; bounceScaler.set(1f,1f,1f)
-        recoil = 0.0; mass = 2.0; status.damage = 36.0
+        recoil = 0.06; recoilOnCast = true; mass = 2.0; status.damage = 36.0
         damageType = SpellDamageType.ENERGY
         awaitingRelease = true
         effects += Hurt()
@@ -43,7 +43,7 @@ class ConcentratedLight : Projectile() {
             val direction = launchDirection
             status.velocity.set(direction.x.toFloat(),direction.y.toFloat(),direction.z.toFloat()).mul(launchSpeed)
             awaitingRelease = false; motionEnabled = true; releasedAtAge = status.age
-            // 发射反冲只由聚光阵表现，不给施法者施加速度。
+            // 出手已轻推一次；释放只播放镜阵反冲，不再施加第二次推力。
         }
         super.tick()
     }

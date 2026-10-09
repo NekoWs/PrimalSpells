@@ -157,7 +157,7 @@
   "lore.primalspells.mass": "质量：%s",
   "damage.primalspells.hit": "−%s %s",
   "item.primalspells.concentrated_light": "汇聚之光",
-  "lore.primalspells.concentrated_light.desc": "在施放位置留下锁定方向的聚光阵，20刻后发射高速强光，自带5次墙面反弹；镜阵产生视觉反冲，不推动施法者。",
+  "lore.primalspells.concentrated_light.desc": "在施放位置留下锁定方向的聚光阵，20刻后发射高速强光，自带5次墙面反弹；施法时轻微推退施法者，射出时镜阵产生视觉反冲。",
   "item.primalspells.recoil_damper": "后坐力阻尼",
   "lore.primalspells.recoil_damper.desc": "将施法后坐力降至四分之一；可叠加。",
   "item.primalspells.recoil_boost": "反冲增幅",

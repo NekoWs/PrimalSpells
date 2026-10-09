@@ -47,15 +47,19 @@ object RecoilLightScene {
                     record(t,"recoil-modifier-order-independent",abs(a-b)<1e-6,"$a/$b")
                     val stacked=fire(listOf("recoil_damper","recoil_damper","fireball"))
                     record(t,"recoil-damper-stacks",abs(stacked/base-0.0625)<1e-6,"ratio=${stacked/base}")
+                    val focused=fire(listOf("concentrated_light"))
+                    record(t,"focused-light-paid-cast-small-recoil",abs(focused-0.06)<1e-6,"kick=$focused")
+                    // 付费检查只验证出手推力，立即结束其蓄能，避免污染后续独立发射镜头。
+                    MagicManager.projectiles.filterIsInstance<ConcentratedLight>().filter{it.caster===pig}.forEach{it.alive=false}
                     pig.deltaMovement=Vec3.ZERO
                     val child=MagicManager.create("fireball") as Projectile;child.caster=pig;child.wand=Wand("child");child.position=Vector3f(8f,floor+4f,0f);child.velocity=Vector3f(0f,0f,1f);child.spell()
                     record(t,"unarmed-child-does-not-kick",pig.deltaMovement.lengthSqr()==0.0,"velocity=${pig.deltaMovement}")
                     child.alive=false;child.die()
                     val charged=MagicManager.create("concentrated_light") as ConcentratedLight
                     charged.caster=pig;charged.wand=Wand("charged-recoil");charged.position=Vector3f(8f,floor+4f,0f);charged.velocity=Vector3f(0f,0f,1f);charged.spell();charged.queueCastRecoil()
-                    record(t,"charged-recoil-waits-for-release",pig.deltaMovement.lengthSqr()==0.0,"velocity=${pig.deltaMovement}")
-                    charged.status.age=20;charged.recoilBonus=0.35;charged.tick();val kick=pig.deltaMovement.length()
-                    record(t,"focused-light-release-never-pushes-caster",kick==0.0 && pig.deltaMovement.lengthSqr()==0.0,"kick=$kick")
+                    record(t,"focused-light-small-recoil-on-cast",abs(pig.deltaMovement.length()-0.06)<1e-6,"velocity=${pig.deltaMovement}")
+                    charged.status.age=20;charged.tick();val kick=pig.deltaMovement.length()
+                    record(t,"focused-light-release-does-not-repeat-recoil",abs(kick-0.06)<1e-6 && abs(pig.deltaMovement.length()-kick)<1e-6,"kick=$kick")
                     charged.alive=false;charged.die();pig.discard()
                     val target=EntityTypes.PIG.create(ctx.level,EntitySpawnReason.COMMAND)!!
                     target.setPos(0.0,floor+3.55,2.0);target.setNoAi(true);target.setNoGravity(true);target.getAttribute(Attributes.MAX_HEALTH)!!.baseValue=100.0;target.health=100f;ctx.level.addFreshEntity(target)

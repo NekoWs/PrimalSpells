@@ -95,7 +95,8 @@ class Move(
                             // 等价于「以检查点为中心、半边长 = hitRadius 的立方体与实体碰撞箱相交」
                             if (entity.boundingBox.inflate(hitRadius).contains(px, py, pz)) {
                                 status.pos = checkPos
-                                projectile.hitEntity(entity)
+                                // 护盾已把弹体放回壳外并反射；不能再沿旧路径扫掠或用newPos覆盖它。
+                                if (projectile.hitEntity(entity)) return
                             }
                         }
                         if (!projectile.alive || !projectile.motionEnabled) return

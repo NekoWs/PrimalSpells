@@ -176,7 +176,7 @@ object SpellChainScene {
                 if(t==65) {visibleBeam?.alive=false;holder?.discard();behind?.discard()}
                 if(t==90) {
                     val target=ctx.spawnDummy(-5.0,floor+2.0,3.0)
-                    val start=target.boundingBox.center.add(0.0,0.0,-3.0)
+                    val start=target.boundingBox.center.add(0.0,0.0,-0.8)
                     val p=shot("fireball",start,listOf("homing"));p.status.velocity.set(p.status.velocity.length(),0f,0f)
                     val speed=p.status.velocity.length();p.tick()
                     record(t,"short-homing-locks-center-immediately",abs(p.status.velocity.x)<1e-5 && p.status.velocity.z>0 && p.status.velocity.length()<=speed,"velocity=${p.status.velocity}")

@@ -101,14 +101,17 @@ class Trajectory(
             emitFieldAfterglow(manager, pos, side, up)
             return
         }
-        val specs = ArrayList<ParticleSpawnSpec>(DEATH_SPARKS)
-        val velocities = ArrayList<Vec3>(DEATH_SPARKS)
-        repeat(DEATH_SPARKS) { i ->
+        val compact = projectile.id in setOf("fireball", "trigger_fireball", "drone_bolt")
+        val sparks = if (compact) 6 else DEATH_SPARKS
+        val sparkSpeed = if (compact) 0.065 else DEATH_SPEED
+        val specs = ArrayList<ParticleSpawnSpec>(sparks)
+        val velocities = ArrayList<Vec3>(sparks)
+        repeat(sparks) { i ->
             val theta = GOLDEN_ANGLE * i + hash01(seed, i + 401) * TAU
             val outward = side.scale(cos(theta)).add(up.scale(sin(theta)))
-            velocities += outward.normalize().scale(DEATH_SPEED * (0.5 + hash01(seed, i + 421)))
-                .add(dir.scale(-DEATH_SPEED * 0.4))
-            val lifetime = DEATH_LIFETIME_MIN +
+            velocities += outward.normalize().scale(sparkSpeed * (0.5 + hash01(seed, i + 421)))
+                .add(dir.scale(-sparkSpeed * 0.4))
+            val lifetime = if (compact) 3 + (hash01(seed, i + 481) * 3).toInt() else DEATH_LIFETIME_MIN +
                 (hash01(seed, i + 481) * (DEATH_LIFETIME_MAX - DEATH_LIFETIME_MIN)).toInt()
             val size = MOTE_SIZE_MIN + (MOTE_SIZE_MAX - MOTE_SIZE_MIN) * hash01(seed, i + 461)
             specs += ParticleSpawnSpec().position(pos)
@@ -210,7 +213,9 @@ class Trajectory(
         strength: Float,
     ) {
         if (intensity <= 0f || strength <= 0f) return
-        val count = (MOTE_BASE * intensity * (0.6f + 0.4f * strength)).roundToInt().coerceIn(1, MOTE_MAX)
+        val compact = projectile.id in setOf("fireball", "trigger_fireball", "drone_bolt")
+        if (compact && status.age % 2 != 0) return
+        val count = if (compact) 1 else (MOTE_BASE * intensity * (0.6f + 0.4f * strength)).roundToInt().coerceIn(1, MOTE_MAX)
         val specs = ArrayList<ParticleSpawnSpec>(count)
         val velocities = ArrayList<Vec3>(count)
         repeat(count) { i ->

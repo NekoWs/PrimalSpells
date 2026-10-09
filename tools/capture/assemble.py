@@ -57,6 +57,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "machinegun_visual": {"length": 170, "title": "连续机枪 / 随机弧刃 / 一格追踪", "metric": "white", "white_roi": (540, 415, 800, 550), "quiet": (0, 6), "short_exit": True, "decay": "gradual", "fade_window": (86, 105)},
     "spell_chain": {"length": 400, "title": "束壳截点 / 穿刺触发 / 强追踪 / 机枪 / 假人统计", "metric": "blue", "quiet": (0, 6), "decay": "collapse"},
     "wand_aim": {"metric": "wand", "length": 160, "title": "近远准星命中 / 副手 / 遮挡 / 稳定握持", "decay": "gradual", "quiet": (0, 8), "fade_window": (129, 159)},
     "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角低模持杖 / 常驻符印与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},
@@ -190,6 +191,13 @@ def wand_mask(path: Path) -> "np.ndarray":
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     return (g > 150) & (b > 160) & (g > b * 0.80) & ((b - r) > 40)
+
+
+def white_spell_mask(path: Path) -> "np.ndarray":
+    # 只取发光白金弹道/切痕，排除摄影棚木桩；机枪ROI另排除头顶伤害跳字。
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (r > 235) & (g > 220) & (b > 180)
 
 
 def blue_mask(path: Path) -> "np.ndarray":
@@ -364,20 +372,23 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
 
     # 只读取本场判据使用的色域，避免每个新增持杖取景都重复解码五遍整段录制。
     metric = spec.get("metric", "blue")
-    blue_cover = [int(blue_mask(f).sum()) for f in frames] if metric not in ("wand", "warm", "orange") else []
+    blue_cover = [int(blue_mask(f).sum()) for f in frames] if metric not in ("wand", "warm", "orange", "white") else []
     red_cover = [int(red_mask(f).sum()) for f in frames] if "breach" in spec or "breach_fade" in spec else []
     # 第一人称蓄能取杖首上方，排除收杖后原版裸手的肤色；保留同样的可见性/退场门槛。
     warm_roi = spec.get("warm_roi")
     warm_cover = [int((warm_mask(f)[warm_roi[1]:warm_roi[3], warm_roi[0]:warm_roi[2]] if warm_roi else warm_mask(f)).sum()) for f in frames] if metric == "warm" else []
+    white_roi = spec.get("white_roi")
+    white_cover = [int((white_spell_mask(f)[white_roi[1]:white_roi[3], white_roi[0]:white_roi[2]] if white_roi else white_spell_mask(f)).sum()) for f in frames] if metric == "white" else []
     orange_cover = [int(orange_mask(f).sum()) for f in frames] if metric == "orange" else []
     dark_cover = [int(dark_mask(f).sum()) for f in frames] if "dark_core" in spec else []
     # 标准判据（空场起飞 / 真的渲染 / 退场 / 静止窗口）用哪一个像素判据：默认蓝（冷色粒子），
     # 爆炸场景声明 `metric: warm`（饱和暖色）；火球拖尾声明 `metric: orange`（加法混合的橙黄火花，
     # 见 `orange_mask` 的标定说明）。粉色破口判据始终独立于它。
-    cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"warm": warm_cover, "orange": orange_cover}.get(metric, blue_cover)
+    cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"warm": warm_cover, "orange": orange_cover, "white": white_cover}.get(metric, blue_cover)
     result["cover"] = cover
     result["blue_cover"] = blue_cover
     result["red_cover"] = red_cover
+    result["white_cover"] = white_cover
     result["warm_cover"] = warm_cover
     result["orange_cover"] = orange_cover
     result["dark_cover"] = dark_cover

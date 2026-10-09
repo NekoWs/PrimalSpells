@@ -114,4 +114,63 @@ object SpellTimingScenes {
                 else -> emptyList()
             }})
     }
+    /** 连续80刻真实机枪：观察密集命中，核对粒子驻留量、切痕变化及一格追踪边界。 */
+    fun machinegun(): Scene {
+        val name="machinegun_visual"
+        lateinit var gun: Wand
+        lateinit var source: TestDummyEntity
+        lateinit var target: TestDummyEntity
+        val checks=linkedMapOf<Int,MutableList<Check>>()
+        val rolls=hashSetOf<Int>()
+        var rounds=0
+        var peak=0
+        fun record(t:Int,id:String,ok:Boolean,detail:String) {
+            checks.getOrPut(t){arrayListOf()}.add(Check(name,t,id,ok,detail))
+        }
+        return Scene(name,"高频触发机枪 / 随机弧刃 / 一格追踪",24,170,
+            prepare={ctx ->
+                val floor=ctx.floorBlockY(0,0)
+                for(x in -12..12) for(z in -12..12) for(y in floor+1..floor+10)
+                    ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
+                ctx.buildStudio(0,0,floor);ctx.setup(true,4.0,floor+4.0,-8.0,28f,10f)
+                source=ctx.spawnDummy(0.0,floor+1.0,-5.0)
+                source.yRot=0f;source.xRot=0f
+                target=ctx.spawnDummy(0.0,floor+1.0,0.0)
+                gun=Wand("continuous-trigger-gun");gun.delayTickCount=10.0;gun.rechargeTickCount=20.0
+                gun.magics+=listOf("double_cast","trigger_fireball","mana_injection","omnidirectional_scatter","chainsaw").map{MagicManager.create(it)!!}
+                gun.load();gun.status.mana=10000.0
+            },camera={ctx,_ -> Pose(4.0,ctx.floorBlockY(0,0)+4.0,-8.0,28f,10f)},
+            tick={ctx,t ->
+                if(t in 8..87) { if(gun.spell(source))rounds++;gun.tick() }
+                for(p in MagicManager.projectiles) {
+                    val fx=p.effects.filterIsInstance<work.nekow.primalspells.magic.effect.visual.ChainsawFx>().firstOrNull() ?: continue
+                    val axis=fx.lastCutAxis
+                    if(axis.lengthSqr()>0.1) rolls+=(kotlin.math.atan2(axis.y,axis.x)*12).toInt()
+                }
+                peak=maxOf(peak,ParticleManager.of(ctx.level).getEngine().particleCount())
+                if(t==100) {
+                    record(t,"machinegun-every-tick-and-real-damage",rounds==80 && target.totalDamage>=320.0,"rounds=$rounds damage=${target.totalDamage}")
+                    record(t,"cut-orientations-vary",rolls.size>=8,"directions=${rolls.size}")
+                    record(t,"sustained-particles-stay-readable",peak<900,"peak=$peak")
+                    MagicManager.projectiles.forEach{it.alive=false}
+                    source.discard();target.discard()
+                    // 隔离范围检查，不借用命中箱范围判定锁定距离。
+                    fun probe(distance:Double):Boolean {
+                        val dummy=ctx.spawnDummy(-6.0,ctx.floorBlockY(0,0)+2.0,4.0)
+                        val p=MagicManager.create("fireball") as Projectile
+                        SpellAssembly.apply(p,listOf(MagicManager.create("homing") as Modifier))
+                        p.caster=ctx.player;p.wand=Wand("radius-probe");p.position=dummy.boundingBox.center.add(-distance,0.0,0.0).toVector3f()
+                        p.velocity=Vector3f(0f,0f,1f);p.spell();p.collisionEnabled=false;p.tick()
+                        val turned=p.status.velocity.x>0.1f
+                        p.alive=false;p.die();dummy.discard();return turned
+                    }
+                    record(t,"homing-one-block-radius",probe(0.9) && !probe(1.1),"0.9 inside / 1.1 outside")
+                }
+                if(t==169) {
+                    record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}")
+                    record(t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
+                }
+            },checksAt={_,t -> checks[t] ?: emptyList()})
+    }
+
 }

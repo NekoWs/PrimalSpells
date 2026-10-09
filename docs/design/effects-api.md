@@ -6,10 +6,10 @@
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第62轮已接入组缩放接续与移动锚点插值；未决需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
-（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.16-ALPHA`）。
+（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.17-ALPHA`）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
-**当前锁定版本：`1.0.16-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
+**当前锁定版本：`1.0.17-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
 `-sources.jar` 为准，不看旧版本记忆）。
 
 **触发条件**（满足任一即进入本政策）：

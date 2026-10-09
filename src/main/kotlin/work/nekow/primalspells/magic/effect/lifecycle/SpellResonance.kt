@@ -23,7 +23,7 @@ class SpellResonance : BaseEffect() {
         val manager = ParticleManager.of(level)
         val center = pos()
         val count = projectile.modifiers.values.sum()
-        if (projectile.id !in setOf("laser", "plasma_beam", "chain_bolt", "delayed_cast", "chainsaw") && status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
+        if (projectile.id !in setOf("laser", "plasma_beam", "chain_bolt", "delayed_cast", "chainsaw", "fireball", "trigger_fireball", "drone_bolt") && status.age % 4 == 0 && (count > 0 || status.velocity.lengthSquared() > 0.01f)) {
             PixelVfx.burst(manager, center, tint(), 8 + count * 3, 0.045, 4, 0.0)
         }
         // 护盾卡也能包裹发射出去的法术：真实反射敌方魔法弹，归属改为当前施法者。
@@ -59,11 +59,16 @@ class SpellResonance : BaseEffect() {
         if (result.entity != null && projectile.effects.none { it is Hurt || it is DirectDamage || it is Explosion }
             && ("damage_boost" in projectile.modifiers || status.freezeTicks > 0))
             SpellDamage.hit(level, result.entity, projectile, status.damage.coerceAtLeast(1.0))
-        PixelVfx.burst(ParticleManager.of(level), p, tint(), if (projectile.id == "laser") 16 else 48 + projectile.modifiers.values.sum() * 12, if (projectile.id == "laser") 0.1 else 0.22, if (projectile.id == "laser") 5 else 12)
+        // 高频弹已有尾迹和专属刃痕；命中只给紧贴落点的少量火星，经济修正不放大喷发。
+        if (projectile.id in setOf("fireball", "trigger_fireball", "drone_bolt", "chainsaw")) {
+            PixelVfx.burst(ParticleManager.of(level), p, tint(), if (projectile.id == "chainsaw") 2 else 6,
+                0.06, 4, 0.006, 0.04)
+        } else {
+            PixelVfx.burst(ParticleManager.of(level), p, tint(), if (projectile.id == "laser") 16 else 48 + projectile.modifiers.values.sum() * 12, if (projectile.id == "laser") 0.1 else 0.22, if (projectile.id == "laser") 5 else 12)
+        }
     }
     private fun tint(): Color = when {
         status.freezeTicks > 0 -> Color.ofInt(128, 222, 255)
-        "mana_injection" in projectile.modifiers -> Color.ofInt(102, 240, 154)
         "volatile" in projectile.modifiers -> Color.ofInt(255, 154, 60)
         "energy_shield" in projectile.modifiers -> Color.ofInt(100, 195, 255)
         else -> projectile.bodyColor

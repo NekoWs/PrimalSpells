@@ -68,11 +68,11 @@ object SpellQualityScenes {
                     largeBatchOk = batch.size() == 1024
                 }
                 if (t == 125) {
-                    target = ctx.spawnDummy(2.0, floor+2.0, -2.0)
+                    target = ctx.spawnDummy(0.6, floor+2.0, -2.0)
                     val p = MagicManager.create("fireball") as Projectile
                     SpellAssembly.apply(p, listOf(MagicManager.create("homing") as Modifier))
                     p.caster = ctx.player; p.wand = Wand("first-tick-tracking")
-                    p.position = Vector3f(0f, floor+2.0f, -2f); p.velocity = Vector3f(0f, 0f, 1f)
+                    p.position = Vector3f(0f, target!!.boundingBox.center.y.toFloat(), -2f); p.velocity = Vector3f(0f, 0f, 1f)
                     p.spell(); probe = p
                     val launchSpeed = p.status.velocity.length()
                     p.tick()
@@ -150,7 +150,7 @@ object SpellQualityScenes {
                     repeat(41) { decelerate.status.age=it;decelerate.tick() }
                     record("deceleration-2-to-0.3",kotlin.math.abs(start-1.6f)<.001 && kotlin.math.abs(decelerate.status.velocity.length()-.24f)<.001,"start=$start end=${decelerate.status.velocity.length()}")
                     decelerate.die()
-                    val target=ctx.spawnDummy(3.0,floor+2.0,0.0)
+                    val target=ctx.spawnDummy(0.8,floor+2.0,0.0)
                     val center=target.boundingBox.center
                     val tracking=probe("fireball",listOf("homing"),Vector3f(0f,center.y.toFloat(),0f));tracking.tick()
                     record("homing-body-center",tracking.status.velocity.x>0 && kotlin.math.abs(tracking.status.velocity.y)<.001,"velocity=${tracking.status.velocity}")

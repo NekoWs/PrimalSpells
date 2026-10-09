@@ -506,3 +506,17 @@ WandCastingScenes恢复已有有限清理后，t154主手退场、t208副手退�
 
 
 最终媒体生成全部完成，五条场景的原生/像素/媒体门禁全部PASS。spell_mechanics的25项原生检查、可见性、空场与零残留均通过，但混合特效全局退场门禁FAIL：峰值出现在第11帧，50%→5%跨度14帧，超过该旧场景3帧瞬退阈值。同一场景前两轮该像素门禁通过；未放宽门禁，波动问题登记issues/open。最终总体FAIL包含这一像素门禁及上述5行OSHI，不能宣称所有报告PASS。配方/独立实例矩阵本轮为522组合。
+
+
+## 第75轮：高频机枪与一格追踪（2026-10-09）
+
+`gradlew.bat build --console=plain`成功。后台录制`machinegun_visual,spell_chain,spell_timing,spell_stability,spell_mechanics,spell_resonance`，日志`build/capture-turn75.log`；六场1440帧、零丢帧，139/139项游戏内检查通过。新增场景连续80刻走真实五卡机枪（含注入玛那经济修正），每刻成功施法，靶子实际受伤480，切痕方向52种、场内粒子驻留峰值96；追踪0.9格内转向、1.1格外不转向；最终投射物与PD粒子均为0。
+
+人工查看machinegun_visual第50帧：连续弹道清晰，命中周围无大片绿色碎屑或固定米字，靶子及周围空间可辨认。白金切痕维持实色方粒和尺寸起落。追踪旧夹具的目标调整到1格内，保留即时转向与中心命中证明。
+
+新场景的初版暖色像素门禁误把木桩及头顶文字计入；改为白金色阈值`R>235,G>220,B>180`与固定ROI`(540,415)-(800,550)`，只观察弹道/切痕，排除木桩和伤害跳字。使用已有short_exit严格判据（95%→5%为3～10帧、最大单帧下降≤35%、归零前≤10%），而非长退场的50%→5%至少4帧；新粒子本身寿命3～4刻，不能要求延长动画来迁就旧长退场门禁。复用同批原始帧运行`python tools/capture/assemble.py`，日志`build/capture-turn75-metrics.log`。
+
+既有spell_mechanics混合退场门禁波动和OSHI五行启动异常仍如实保留；不修改它们的阈值，也不能据本轮关闭PD变量完成问题。
+
+
+最终补充：链锯刃面使用修正后的status.velocity，而非固定原始launchDirection，确保全向散射/追踪后视觉平面与实际运动一致。针对这一视觉改动重跑machinegun_visual，日志`build/capture-turn75-final.log`：170帧、零丢帧、6/6检查通过，80次480伤害、47种方向、峰值96；短退场95%→5%跨3帧、单帧最大下降32.8%、归零前2.7%，可见性/空场/零残留/媒体全部PASS。前一批六场回归证据完整保存在`build/capture/turn75-regression`，最新机枪帧/视频保存在`build/capture/out/machinegun_visual`。最终总体仅剩既有OSHI异常；旧混合场景问题留在上一批回归报告中，未关闭。

@@ -345,3 +345,6 @@ client/capture/PdApiScene.kt为前置运行时回归；magic/effect/visual/Pixel
 
 
 第74轮：Wand.drawChain负责深度优先作用域，payChain负责递归付费和整次费用汇总；移除未使用的平铺draw/drawFrom路径。SpellAssembly.apply规范化本链配方，copy为同源复制体深拷贝荷载树。Trigger/DelayedTrigger不再继承父链修正；SpellChainScene覆盖嵌套、兄弟链、退款、复制荷载及机枪配方。
+
+
+第75轮：SpellTimingScenes.machinegun注册machinegun_visual场景，80刻连续真实机枪、切痕方向变化、粒子驻留量、一格追踪内外边界与零残留。ChainsawFx绘制随机单弧；Trajectory和SpellResonance减少高频弹重复碎屑；Homing基础半径1格。

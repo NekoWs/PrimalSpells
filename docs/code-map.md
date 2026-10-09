@@ -11,7 +11,7 @@
 
 | 我想… | 主要文件 | 关联文件 |
 |---|---|---|
-| 改施法节奏 / 牌堆抽牌规则 | `wand/Wand.kt`（`spell`/`draw`/`castHand`/`reloadIfNeeded`） | `item/WandItem.kt`（触发时机）、`wand/WandManager.kt`（持有者/回收/懒加载） |
+| 改施法节奏 / 牌堆抽牌规则 | `wand/Wand.kt`（`spell`/`drawChain`/`payChain`/`castHand`/`reloadIfNeeded`） | `item/WandItem.kt`（触发时机）、`wand/WandManager.kt`（持有者/回收/懒加载） |
 | 改法杖等级数值（法力/充能速度/施放延迟/充能时间/槽位/施放数权重） | `wand/WandTier.kt`（**等级表 = 唯一事实源**） | [design/wand-tiers.md](design/wand-tiers.md)（口径）、`wand/Wand.kt`（消耗与冷却） |
 | 改投射物飞行 / 碰撞 | `magic/effect/geometry/Move.kt` | `magic/projectile/Projectile.kt`（`hitBlock`/`hitEntity`） |
 | 改命中伤害 | `magic/effect/lifecycle/Hurt.kt` | `magic/core/MagicStatus.kt`（`damage`） |
@@ -342,3 +342,6 @@ client/capture/PdApiScene.kt为前置运行时回归；magic/effect/visual/Pixel
 | `client/capture/SpellChainScene.kt` | 束壳截点、穿刺荷载、强追踪、机枪配方、伤害合并与十秒归零 |
 
 没有移动原有类；伤害跳字仍在entity/DamageNumber，统计簿记归TestDummyEntity，渲染复用原版TextDisplay。
+
+
+第74轮：Wand.drawChain负责深度优先作用域，payChain负责递归付费和整次费用汇总；移除未使用的平铺draw/drawFrom路径。SpellAssembly.apply规范化本链配方，copy为同源复制体深拷贝荷载树。Trigger/DelayedTrigger不再继承父链修正；SpellChainScene覆盖嵌套、兄弟链、退款、复制荷载及机枪配方。

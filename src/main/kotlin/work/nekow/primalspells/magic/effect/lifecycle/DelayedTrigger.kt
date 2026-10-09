@@ -29,7 +29,6 @@ class DelayedTrigger(
         payload.clear()
 
         shots.forEach { shot ->
-            work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, shot)
             work.nekow.primalspells.magic.core.SpellAssembly.apply(shot, modifiers)
             shot.caster = caster
             shot.wand = wand

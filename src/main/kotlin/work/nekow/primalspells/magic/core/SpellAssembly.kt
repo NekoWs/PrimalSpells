@@ -11,7 +11,7 @@ object SpellAssembly {
 
     /** 注入独立effect并保存id计数，供视觉和后代继承使用。 */
     fun apply(shot: Projectile, modifiers: List<Modifier>) {
-        modifiers.forEach { modifier ->
+        modifiers.sortedBy { it.id }.forEach { modifier ->
             shot.modifierOrder += modifier.id
             shot.modifiers[modifier.id] = (shot.modifiers[modifier.id] ?: 0) + 1
             shot.effects += modifier.effects()
@@ -20,13 +20,31 @@ object SpellAssembly {
 
     fun inheritable(shot: Projectile): Map<String, Int> = shot.modifiers.filterKeys { it !in generators }
 
-    /** 保留抽牌顺序；加法伤害与乘法伤害不能交换次序。 */
+    /** 保存规范化配方，卡牌排列不改变同一链的效果结算。 */
     fun inheritableOrder(shot: Projectile): List<String> = shot.modifierOrder.filter { it !in generators }
 
-    /** 复制/集束/定时发射/触发荷载继承非生成型修饰器，避免子弹自我繁殖的无穷递归。 */
+    /** 同源复制体继承非生成型修饰器；独立触发荷载不调用此入口。 */
     fun inherit(parent: Projectile, child: Projectile) {
         val mods = inheritableOrder(parent).map { MagicManager.create(it) as Modifier }
         apply(child, mods)
+    }
+
+    /** 同源复制保留独立荷载树；不共享可变实例，也不重新抽牌或扣蓝。 */
+    fun copy(parent: Projectile): Projectile = parent.clone().also { child ->
+        inherit(parent, child)
+        copyPayload(parent, child)
+    }
+
+    private fun copyPayload(parent: Magic, child: Magic) {
+        if (parent !is TriggerSpell || child !is TriggerSpell) return
+        parent.payload.forEach { card ->
+            val copied = card.clone()
+            if (card is Projectile && copied is Projectile) {
+                apply(copied, card.modifierOrder.map { MagicManager.create(it) as Modifier })
+            }
+            copyPayload(card, copied)
+            child.payload += copied
+        }
     }
 
     /** 子弹按当前速度发射，抵消基础speed及速度卡的重复乘法，再交由SETUP正常装配。 */

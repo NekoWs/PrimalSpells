@@ -52,7 +52,7 @@ class ExplosionProjectile : Modifier() {
                 val perp = genRandomPerpendicular(forward)
 
                 // 重建投射物并继承非生成型修饰配方
-                val bullet = projectile.clone().also { work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, it) }
+                val bullet = work.nekow.primalspells.magic.core.SpellAssembly.copy(projectile)
                 bullet.caster = caster
                 bullet.wand = wand
                 bullet.position = Vector3f(status.pos)

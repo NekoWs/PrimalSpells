@@ -80,7 +80,67 @@ object SpellChainScene {
                     w.load();w.status.mana=1000.0
                     val ok=w.spell(source)
                     MagicManager.tick()
-                    record(t,"paid-machinegun-recipe-ready-next-tick",ok && w.status.delay==0.0 && w.status.recharge==0.0 && MagicManager.projectiles.any { it.id=="trigger_fireball" } && MagicManager.projectiles.any { it.id=="chainsaw" },"cast=$ok delay=${w.status.delay} recharge=${w.status.recharge}")
+                    record(t,"paid-machinegun-recipe-ready-next-tick",ok && w.status.delay==0.0 && w.status.recharge==0.0 && MagicManager.projectiles.any { it.id=="trigger_fireball" } && MagicManager.projectiles.none { it.id=="chainsaw" },"cast=$ok delay=${w.status.delay} recharge=${w.status.recharge}")
+                    val carrier=MagicManager.projectiles.filterIsInstance<TriggerFireball>().single()
+                    record(t,"machinegun-parent-does-not-scatter",carrier.modifiers.keys==setOf("double_cast") && carrier.payload.map{it.id}==listOf("omnidirectional_scatter","chainsaw") && carrier.delay==0 && carrier.recharge==0,"mods=${carrier.modifiers} payload=${carrier.payload.map{it.id}}")
+                    record(t,"machinegun-mana-charged-once",w.status.mana==992.0,"mana=${w.status.mana}")
+                    carrier.hitBlock(carrier.status.pos,Vector3f(0f,0f,-1f));MagicManager.tick()
+                    val saw=MagicManager.projectiles.single{it.id=="chainsaw"}
+                    record(t,"machinegun-only-payload-scatters",saw.modifiers.keys==setOf("omnidirectional_scatter") && carrier.payload.isEmpty(),"mods=${saw.modifiers}")
+                    // 同一链的尾部修正也要覆盖先抽到的投射物；内层修正不得穿过链边界。
+                    fun castCards(ids:List<String>,budget:Int=1,mana:Double=1000.0):Pair<Wand,List<Projectile>> {
+                        MagicManager.projectiles.forEach{it.alive=false};MagicManager.tick()
+                        val wand=Wand("scope-${ids.joinToString("-")}")
+                        wand.cast=budget;wand.delayTickCount=10.0;wand.rechargeTickCount=20.0
+                        wand.magics += ids.map{MagicManager.create(it)!!};wand.load();wand.status.mana=mana
+                        wand.spell(source);MagicManager.tick()
+                        return wand to MagicManager.projectiles.toList()
+                    }
+                    val (nestedW,nestedShots)=castCards(listOf("damage_boost","trigger_fireball","speed_boost","delayed_cast","freeze_charge","fireball"))
+                    val outer=nestedShots.single() as TriggerFireball
+                    val middle=outer.payload.filterIsInstance<DelayedCastProjectile>().single()
+                    val inner=middle.payload.filterIsInstance<Projectile>().single()
+                    record(t,"nested-chain-boundaries",outer.modifiers.keys==setOf("damage_boost") && outer.payload.filterIsInstance<Modifier>().map{it.id}==listOf("speed_boost") && middle.payload.filterIsInstance<Modifier>().map{it.id}==listOf("freeze_charge"),"root=${outer.modifiers} middle=${outer.payload.map{it.id}} inner=${middle.payload.map{it.id}}")
+                    record(t,"nested-fees-once",nestedW.status.mana==1000.0-listOf("damage_boost","trigger_fireball","speed_boost","delayed_cast","freeze_charge","fireball").sumOf{MagicManager.create(it)!!.mana} && outer.delay==0 && middle.delay==0,"mana=${nestedW.status.mana} delay=${nestedW.status.delay}")
+                    val copied=SpellAssembly.copy(outer) as TriggerFireball
+                    val copiedMiddle=copied.payload.filterIsInstance<DelayedCastProjectile>().single()
+                    record(t,"copies-own-independent-payload-tree",copied.payload!==outer.payload && copiedMiddle!==middle && copiedMiddle.payload!==middle.payload && copiedMiddle.payload.zip(middle.payload).all{(a,b)->a!==b},"copy=${copied.payload.map{it.id}}")
+                    outer.hitBlock(outer.status.pos,Vector3f(0f,0f,1f));MagicManager.tick()
+                    record(t,"trigger-child-does-not-inherit-parent",middle.modifiers.keys==setOf("speed_boost") && middle.status.damage==0.0,"mods=${middle.modifiers}")
+                    middle.expire();MagicManager.tick()
+                    record(t,"delayed-child-does-not-inherit-parent",inner.modifiers.keys==setOf("freeze_charge") && inner.status.damage==3.75 && middle.payload.isEmpty(),"mods=${inner.modifiers} damage=${inner.status.damage}")
+                    record(t,"releasing-original-keeps-copy-payload",copiedMiddle.payload.size==2 && copied.payload.size==2,"copy=${copiedMiddle.payload.size}")
+                    val (_,siblings)=castCards(listOf("double_cast","fireball","damage_boost","fireball"))
+                    record(t,"late-modifier-applies-to-entire-chain",siblings.size==2 && siblings.all{it.status.damage==8.0},"damage=${siblings.map{it.status.damage}}")
+                    val (_,parentAndSibling)=castCards(listOf("double_cast","trigger_fireball","omnidirectional_scatter","chainsaw","damage_boost","fireball"))
+                    record(t,"payload-does-not-steal-parent-sibling-budget",parentAndSibling.size==2 && parentAndSibling.all{it.modifiers.keys==setOf("double_cast","damage_boost")} && parentAndSibling.filterIsInstance<TriggerFireball>().single().payload.map{it.id}==listOf("omnidirectional_scatter","chainsaw"),"shots=${parentAndSibling.map{it.id to it.modifiers}}")
+                    val (_,quantumShots)=castCards(listOf("quantum_entanglement","damage_boost","trigger_fireball","omnidirectional_scatter","chainsaw"))
+                    val quantumCarriers=quantumShots.filterIsInstance<TriggerFireball>()
+                    record(t,"quantum-copies-retain-isolated-payload",quantumCarriers.size==3 && quantumCarriers.all{it.payload.map{card->card.id}==listOf("omnidirectional_scatter","chainsaw") && "omnidirectional_scatter" !in it.modifiers} && quantumCarriers.map{System.identityHashCode(it.payload[1])}.distinct().size==3,"copies=${quantumCarriers.map{it.modifiers to it.payload.map{card->card.id}}}")
+                    val (_,multicastPayload)=castCards(listOf("damage_boost","trigger_fireball","double_cast","fireball","speed_boost","fireball"))
+                    val multicastCarrier=multicastPayload.single() as TriggerFireball
+                    val childShots=multicastCarrier.payload.filterIsInstance<Projectile>()
+                    multicastCarrier.hitBlock(multicastCarrier.status.pos,Vector3f(0f,0f,1f));MagicManager.tick()
+                    record(t,"payload-multicast-shares-only-local-modifiers",childShots.size==2 && childShots.all{it.modifiers.keys==setOf("double_cast","speed_boost") && it.status.damage==5.0 && abs(it.status.velocity.length()-1.6f)<1e-5},"children=${childShots.map{it.modifiers to it.status.damage}}")
+                    val (_,twoTriggers)=castCards(listOf("double_cast","trigger_fireball","freeze_charge","fireball","trigger_fireball","damage_boost","fireball"))
+                    val carriers=twoTriggers.filterIsInstance<TriggerFireball>()
+                    record(t,"sibling-payloads-are-independent",carriers.size==2 && carriers.all{it.modifiers.keys==setOf("double_cast")} && carriers.map{it.payload.filterIsInstance<Modifier>().map{card->card.id}}==listOf(listOf("freeze_charge"),listOf("damage_boost")),"carriers=${carriers.map{it.payload.map{card->card.id}}}")
+                    val (refund,refundShots)=castCards(listOf("damage_boost","mana_injection","fireball"),mana=0.0)
+                    record(t,"same-chain-refund-funds-unordered-modifiers",refundShots.size==1 && refundShots.single().status.damage==8.0 && refund.status.mana==22.0,"mana=${refund.status.mana} shots=${refundShots.size}")
+                    val (poor,poorShots)=castCards(listOf("trigger_fireball","chainsaw"),mana=5.0)
+                    record(t,"unpaid-payload-does-not-reset-delay",poor.status.delay==10.0 && (poorShots.single() as TriggerFireball).payload.isEmpty() && poor.status.mana==0.0,"delay=${poor.status.delay} mana=${poor.status.mana}")
+                    val (_,emptyShots)=castCards(listOf("trigger_fireball"),budget=2)
+                    record(t,"empty-payload-never-wraps-into-itself",emptyShots.size==1 && (emptyShots.single() as TriggerFireball).payload.isEmpty(),"shots=${emptyShots.size}")
+                    val (resetFirst,_)=castCards(listOf("chainsaw","fireball"),budget=2)
+                    val (resetLast,_)=castCards(listOf("fireball","chainsaw"),budget=2)
+                    record(t,"chainsaw-reset-independent-of-order",resetFirst.status.delay==0.0 && resetLast.status.delay==0.0,"first=${resetFirst.status.delay} last=${resetLast.status.delay}")
+                    val recipes=listOf(listOf("damage_boost","volatile","damage_boost"),listOf("volatile","damage_boost","damage_boost"),listOf("damage_boost","damage_boost","volatile"))
+                    val values=recipes.map{mods ->
+                        val p=shot("fireball",Vec3(-8.0,floor+5.0,0.0),mods)
+                        val result=p.status.damage to p.status.explosionDamage
+                        p.alive=false;p.die();result
+                    }
+                    record(t,"modifier-order-independent-composition",values.distinct().size==1 && values.first()==(11.0 to 24.0),"values=$values")
                     val reduced=Wand("scatter-delay");reduced.delayTickCount=10.0;reduced.rechargeTickCount=20.0
                     reduced.innate += listOf("omnidirectional_scatter","fireball").map { MagicManager.create(it)!! }
                     reduced.load();reduced.status.mana=1000.0

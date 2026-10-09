@@ -128,7 +128,7 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 
 `interface TriggerSpell { val triggerCast: Int; val payload: ArrayList<Magic> }`。
 
-触发法术在 `Wand.castHand` → `loadPayload()` 阶段**额外抽牌**（预算 = `triggerCast`，这张法术自身也按 `cast` 计入预算），把抽到的法术克隆后填进 `payload`；抽到触发法术时会**递归**填充它自己的 payload，于是形成 `触发A( 触发B( 火球 ) )` 这样的链。
+触发法术在 `Wand.drawChain()` 中按 `triggerCast` 预算深度优先抽取一条独立荷载链，然后才继续父链预算。每张抽到的牌按 `remaining += magic.cast - 1` 影响所属链的预算；嵌套触发牌先抽自己的荷载。每条链的修正统一作用于本链全部投射物，与修正牌在链内的位置无关；父子链不相互继承修正。
 
 命中时由 `Trigger.onHit`（寿命到期当刻由 `DelayedTrigger.onExpire`）把 payload 里的投射物就地施放，并把 payload 内的修饰器效果注入这些投射物；**释放后立即清空 payload**（一次性）——payload 持有的是同一批实例，重复释放会让效果被反复注入、叠加。
 
@@ -157,20 +157,18 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 Wand.spell(caster)                      wand/Wand.kt
    ├─ status.delay > 0 或 status.recharge > 0 → 直接失败（status.failedReason 记录原因）
    ├─ 清零 delay / recharge
-   ├─ draw(cast)                        按预算从 drawPile 抽牌进 hand
-   └─ castHand(caster, hand)
-        ├─ 摘出 Modifier → consumeMana → 累加 status.recharge/delay
-        ├─ for 每个 Projectile：
-        │    ├─ consumeMana（不足则跳过）
-        │    ├─ projectile.clone()（= 工厂新建实例）
-        │    ├─ 若是 TriggerSpell → loadPayload() 递归抽牌填 payload
-        │    ├─ p.effects += 所有有效 Modifier 的 effects()（克隆）
-        │    ├─ p.caster / p.wand / p.position(眼睛位置 −0.1Y) / p.velocity(视线方向)
-        │    ├─ p.spell()   → 内建 4 effect + 修饰器 effect 全部 onActive
-        │    ├─ 累加 p.recharge/delay，写 status.lastDelay/lastRecharge
-        │    └─ MagicManager.add(p)   ← 进入待添加队列
-        └─ discard() → hand → discardPile；抽牌堆空则 reloadIfNeeded()
-                            （回洗并附加 recharge，见 Wand.reloadIfNeeded）
+   ├─ drawChain(cast)                  逐牌克隆；遇触发牌先递归预留完整荷载
+   └─ castHand(caster, chain)
+        ├─ payChain：每条链独立收集修正、付费，递归处理可支付载体的荷载
+        │    └─ 费用归整次施法结算，每张牌一次；不写入父投射物delay/recharge
+        ├─ for 根链每个有效 Projectile：
+        │    ├─ SpellAssembly.apply(p, 根链修正)，按规范配方注入独立effects
+        │    ├─ p.caster / p.wand / p.position(杖首) / p.velocity(准星方向)
+        │    ├─ p.spell() → 按阶段激活；荷载尚未施放
+        │    └─ MagicManager.add(p) ← 进入待添加队列
+        ├─ 汇总冷却；任意成功付费链锯清零整次施放延迟，与牌序无关
+        └─ discard() → 全部抽到的原始牌进入弃牌堆；最后才允许回洗
+                            （回洗并附加recharge，见 Wand.reloadIfNeeded）
    │
 同 tick 稍后：MagicManager.tick() → projectiles.addAll(pendingAdd)
 ```
@@ -178,7 +176,7 @@ Wand.spell(caster)                      wand/Wand.kt
 **牌堆语义**（`wand/Wand.kt`）：
 
 - `drawPile`/`hand`/`discardPile` 三个列表，`loadedMagics = innate + magics` 是回洗来源；`load()` 重建牌堆（装卸法术、读档后都必须调用）。
-- 抽牌预算从 `Wand.cast` 起算，每抽一张牌 `remaining += magic.cast - 1`：`cast > 1` 是「多抽」（如 `DoubleCast.cast = 2`），`cast = 0`（投射物默认）**立即耗尽预算**——这正是「抽到一张投射物就停」的机制。
+- 抽牌预算从 `Wand.cast` 起算，每抽一张牌 `remaining += magic.cast - 1`：`cast > 1` 是「多抽」（如 `DoubleCast.cast = 2`），`cast = 0`（投射物默认）消耗一个预算；预算为1时抽到投射物即结束本链。触发牌的荷载拥有独立预算，不占父链剩余投射物名额。
 - 回洗（`reloadIfNeeded`）发生在抽牌堆空且有弃牌堆时：重置牌堆并给 `status.recharge += recharge`。
 - 失败原因写进 `status.failedReason`（如 `"Mana(120.0) < 200.0"`），供 HUD/调试查看。
 
@@ -281,9 +279,9 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 1. **执行顺序由 `EffectPhase` 决定，不再看插入顺序**。`onActive` 按 `SETUP → MODIFIER → …` 升序，`onTick` 按 `MODIFIER → GUIDANCE → MOTION → OVERRIDE → VISUAL` 升序；同阶段内保持注入顺序。普通改速留在默认阶段；需要碰撞的轨道在GUIDANCE写目标速度，由Move推进并扫掠。普通轨道不能覆盖位置绕开命中；连锁魔弹的离散跃迁是显式例外，在OVERRIDE自行检查落点并分派命中，故能越过薄墙。
 2. **`Magic.clone()` 是「从注册表新建实例」**，不继承任何运行期状态（当前速度、被修饰器改过的伤害/爆炸参数都不继承）。`id` 未注册直接抛异常——所以**法术 id 不能随便改**。
 3. **`Modifier.effects()` 返回的是浅拷贝**：多枚子弹各自拿一份克隆，但克隆内部的引用字段仍可能指向同一对象，别用可变字段存跨实例状态。
-4. **修饰器效果只在 `castHand` 时注入一次**：`Modifier` 自身不进 `MagicManager.projectiles`，不参与 tick。
-5. **修饰器之间没有先后顺序**：所有抽到的修饰器都作用在同一枚投射物上（例如「火球 + 伤害增强 + 穿刺」= 基础 + 增强 − 惩罚）。修饰器效果只允许**可交换**运算：累加、累乘、乘零；禁止钳制（`coerceAtLeast`）与「重设绝对值」（如 `normalize().mul(绝对速度)`）。同类叠加用 `stackScale`/`isStackPrimary`。写法要求见 `magic/core/Modifier.kt`。
-6. **`status` 是所有 effect 共享的可变状态**：同阶段内的写入顺序就是注入顺序（抽牌顺序），但这只保证「确定性」，任何效果都不应依赖它。
+4. **修饰器效果在所属链首次发射时注入一次**（根链由castHand，荷载链由Trigger/DelayedTrigger）：`Modifier` 自身不进 `MagicManager.projectiles`，不参与 tick。
+5. **同一法术链的修饰器没有牌序语义**：本链统一收集修正并作用于本链全部投射物，触发荷载是独立链。优先使用同类可交换运算；加法与倍率混用按SpellAssembly规范配方统一结算，不能让玩家牌序改变结果。乘零也必须在对应加值之后，避免被重新加回。禁止按卡牌顺序钳制或重设绝对速度；同类叠加用stackScale/isStackPrimary。写法要求见magic/core/Modifier.kt。
+6. **`status` 是所有 effect 共享的可变状态**：同阶段内按注入顺序执行；SpellAssembly将本链修正按id规范化装配，卡牌排列不改变结果。当前伤害加值先于冰冻倍率、易爆倍率；移除爆炸乘零在伤害加值之后。效果不能以玩家牌序为隐式契约。
 7. **命中回调每个 tick 都会触发**（投射物停在实体体内时）：穿刺玩法依赖这一点，`Move` 刻意不去重。
 8. **触发法术 payload 是一次性的**：释放即清空，穿刺的实体命中只结算本体伤害，荷载保留至方块命中；释放后不会重复。
 9. **公共侧不引用客户端类**：S→C 包一律经 `network/ClientPayloadSink` 转发（见 §6）。
@@ -297,9 +295,9 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 | 项 | 说明 | 位置 |
 |---|---|---|
-| 穿刺 = 伤害 −8，可能为负 → 不结算伤害 | 加减法，与顺序无关；「穿刺后打不出伤害」是定价的预期结果 | `magic/modifier/Piercing.kt` |
+| 穿刺不扣直接伤害，开启自伤并无视能量护盾 | 只改变所属链投射物；独立触发荷载不自动继承穿刺 | `magic/modifier/Piercing.kt` |
 | 爆炸**不破坏方块** | 预期行为（`explosionLevel` / `destroyBlocks` 死代码已删除） | `magic/effect/lifecycle/Explosion.kt` |
-| `Magic.recharge` / `Magic.delay` 是有效字段 | `Wand.castHand` 与 `loadPayload` 会读取它们累加冷却 | `magic/core/Magic.kt`、`wand/Wand.kt` |
+| `Magic.recharge` / `Magic.delay` 是有效字段 | `Wand.payChain`读取成功付费牌的字段，向整次施法事务汇总冷却 | `magic/core/Magic.kt`、`wand/Wand.kt` |
 | 小包没有右键界面 | 编辑与法杖一致：滚轮选槽 + 物品对上物品装卸 | `item/SpellPouchItem.kt` |
 | 蛇形与往复运动可叠加 | 蛇形只施加方向**旋转增量**，不再覆写方向 | `magic/modifier/Serpentine.kt` |
 | 区域场**会影响魔法投射物** | 黑洞把范围内投射物吸向中心、重力场给投射物持续的向下力；**区域弹自身除外**（否则会被自己往下压/吸住）。这是刻意的：黑洞就该「把飞进来的法术吸掉」 | `magic/effect/lifecycle/AreaFieldEffect.kt` |
@@ -549,3 +547,13 @@ Tracking在GUIDANCE阶段旋转当前速度指向锁定生物的碰撞箱中心�
 负delay既抵扣本次卡牌累计delay，也降低法杖基础delay下限；正delay仍沿用与法杖基础下限取大的口径。链锯在抽牌位置清零，后置正delay仍可追加。全向散射只在激活阶段旋转初速，全空间均匀随机，不在飞行中不断重抽方向。
 
 持续光束先按真实球壳入射点从近到远测试护盾，再用同一个截点绘制、伤害及水晶反应；不改变静态束源的位置和朝向。穿刺仍绕过护盾。起点在生物碰撞箱内也参与束伤害，保证自伤和近距离判定。
+
+
+## 第74轮：独立法术链作用域（覆盖旧轮次的荷载继承与链锯牌序约定）
+
+- 一次施法由根链与任意深度荷载链组成；触发牌先深度优先预留完整荷载，再继续同层多重施放。
+- 每条链统一收集修正，只作用本链投射物。命中触发与延迟触发均不继承载体修正；父链、荷载、兄弟荷载相互隔离。
+- 修正按规范id顺序装配，含重复卡；抽牌位置不再决定加法/乘法组合结果。相同链内返还法力先于正费用修正支付，避免退款卡排列决定修正是否可用。
+- 法力、施放延迟与充能属于整次施法事务：仅成功付费的牌结算一次，荷载费用不修改载体字段；未付费载体的荷载不扣蓝。成功付费链锯（含荷载）清零整次施放延迟，与牌序无关；负充能在末尾回洗后钳制为0。
+- `双重施放 → 触发火球 → 全向散射 → 链锯`只直接发射触发弹，其荷载为`全向散射 → 链锯`。触发弹保持瞄准方向，荷载链锯独立散射；耗蓝8、抵扣23t充能，可每刻发射。
+- 弹跳复制、量子纠缠、定时爆炸投射是同源复制，仍继承非生成型本链修正，并深拷贝未消费荷载树。复制不再抽牌/扣蓝；每份荷载独立消费，禁止共享实例或把外层修正灌进荷载。

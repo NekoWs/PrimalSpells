@@ -70,13 +70,13 @@ PrimalSpells/
 |---|---|---|
 | **Magic** | 法术基类：`id`、`mana`、`delay`、`recharge`、`effects`、`lore`、生命周期钩子 | `magic/core/Magic.kt` |
 | **Projectile** | 特殊法术：不是 MC 实体，而是服务端 Kotlin 对象，靠每 tick 的 effect 驱动位置与命中 | `magic/projectile/Projectile.kt` |
-| **Modifier**（原 `Revise`） | 修饰器：施法时把自身携带的 effect 注入到本次施法的投射物上，或改动参数（伤害/速度/弹跳…） | `magic/core/Modifier.kt`、`magic/modifier/` |
+| **Modifier**（原 `Revise`） | 修饰器：施法时把自身携带的 effect 统一注入到所属法术链的全部投射物上，或改动参数（伤害/速度/弹跳…） | `magic/core/Modifier.kt`、`magic/modifier/` |
 | **Effect** | 挂在投射物上的可组合行为：几何（`Move`/`Velocity`…）、时机与结算（`Hurt`/`Explosion`/`Trigger`…）、表现（`Trajectory`） | `magic/effect/` |
 | **MagicStatus** | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 | `magic/core/MagicStatus.kt` |
 | **EffectPhase** | 效果执行阶段（SETUP/MODIFIER/GUIDANCE/MOTION/OVERRIDE/VISUAL），决定效果谁先跑 | `magic/core/EffectPhase.kt` |
 | **Wand** | 法杖运行时对象：牌堆（`drawPile`/`hand`/`discardPile`）、法力与冷却、NBT 序列化 | `wand/Wand.kt` |
 | **牌堆 / 抽牌** | 施法时按 `cast` 预算从 `drawPile` 抽牌进 `hand`，结算后进 `discardPile`；抽牌堆空时回洗并附加 `recharge` | `wand/Wand.kt` |
-| **TriggerSpell** | 触发法术：会额外抽牌组成 `payload`，命中时触发 payload 内法术 | `magic/core/TriggerSpell.kt` |
+| **TriggerSpell** | 触发法术：递归抽取独立法术链组成 `payload`，命中或到期时释放；父子链修正隔离 | `magic/core/TriggerSpell.kt` |
 | **wandId / pouchId** | 物品数据组件里的唯一标识（UUID 字符串），用于把物品栈关联到服务端的 `Wand` 实例或小包内容 | `item/component/WandID.kt` |
 | **HUD** | 法杖数值条（法力/冷却） | `client/hud/` |
 

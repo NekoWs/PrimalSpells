@@ -15,7 +15,7 @@ import work.nekow.primalspells.magic.effect.visual.DelayedCastFx
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand
 
-/** 第64轮：牌序决定链锯清零范围，真实移动载体的视觉爆开与荷载出生严格同刻。 */
+/** 链锯整次清零、链内修正无牌序差异，真实移动载体的视觉爆开与荷载出生严格同刻。 */
 object SpellTimingScenes {
     fun scene(): Scene {
         val name = "spell_timing"
@@ -70,13 +70,13 @@ object SpellTimingScenes {
                     checks+=Check(name,t,"chainsaw-clears-wand-and-shot-delay",last.status.delay==0.0 && last.status.recharge==0.0,"delay=${last.status.delay} recharge=${last.status.recharge}")
                     val first=wand(listOf("double_cast","chainsaw","fireball"))
                     first.spell(ctx.player)
-                    checks+=Check(name,t,"cards-after-chainsaw-add-delay",first.status.delay==1.0,"delay=${first.status.delay}")
+                    checks+=Check(name,t,"chainsaw-reset-independent-of-card-order",first.status.delay==0.0,"delay=${first.status.delay}")
                     val poor=wand(listOf("chainsaw"),mana=0.0)
                     poor.spell(ctx.player)
                     checks+=Check(name,t,"unpaid-chainsaw-does-not-reset",poor.status.delay==9.0,"delay=${poor.status.delay}")
                     val nested=wand(listOf("trigger_fireball","chainsaw"))
                     nested.spell(ctx.player)
-                    checks+=Check(name,t,"payload-chainsaw-does-not-clear-parent",nested.status.delay==9.0,"delay=${nested.status.delay}")
+                    checks+=Check(name,t,"paid-payload-chainsaw-clears-wand-delay",nested.status.delay==0.0,"delay=${nested.status.delay}")
                     gun=wand(listOf("double_cast","fireball","chainsaw"))
                 }
                 if (t in 55..74) { consecutive=consecutive && gun!!.spell(ctx.player);shots++;gun!!.tick() }
@@ -107,7 +107,7 @@ object SpellTimingScenes {
                     Check(name,t,"moving-delay-actually-moves",carriers[1].status.pos.z>5f,"pos=${carriers[1].status.pos}"))
                 47 -> checks.toList()
                 76 -> listOf(Check(name,t,"chainsaw-machinegun-every-tick",consecutive && shots==20 && gun!!.status.delay==0.0 && gun!!.status.recharge==0.0,"shots=$shots delay=${gun!!.status.delay} recharge=${gun!!.status.recharge}"))
-                105 -> listOf(Check(name,t,"chainsaw-real-hit-with-damage-modifier",sawHit && ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,AABB.ofSize(sawTarget!!.position(),4.0,6.0,4.0)).any { it.amount==5.0 },"damageNumbersAtTarget"))
+                105 -> listOf(Check(name,t,"chainsaw-real-hit-with-damage-modifier",sawHit && sawTarget!!.totalDamage==5.0,"hit=$sawHit actualDamage=${sawTarget!!.totalDamage}"))
                 127 -> listOf(Check(name,t,"extended-fast-chainsaw-keeps-cutting",longSaw!!.effects.filterIsInstance<work.nekow.primalspells.magic.effect.visual.ChainsawFx>().single().cutsEmitted==4 && longSaw!!.status.pos.z>1f,"cuts=${longSaw!!.effects.filterIsInstance<work.nekow.primalspells.magic.effect.visual.ChainsawFx>().single().cutsEmitted} z=${longSaw!!.status.pos.z}"))
                 149 -> listOf(Check(name,t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}"),
                     Check(name,t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))

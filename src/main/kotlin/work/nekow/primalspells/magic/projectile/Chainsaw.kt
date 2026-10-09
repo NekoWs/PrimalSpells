@@ -5,7 +5,7 @@ import work.nekow.primalspells.magic.effect.lifecycle.Hurt
 import work.nekow.primalspells.magic.effect.visual.ChainsawFx
 import work.nekow.primalspells.util.Lore
 
-/** 廉价的近距切割脉冲；在抽牌顺序中的当前位置清除施放延迟，缩短3刻充能。 */
+/** 廉价的近距切割脉冲；成功付费即清除整次施放延迟，缩短3刻充能。 */
 class Chainsaw : Projectile() {
     override val id = "chainsaw"
     override val bodyColor = Color.ofInt(255, 230, 139)

@@ -18,7 +18,7 @@ abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
     /** 独立的施法配方；只保存id计数，不保存共享effect实例。 */
     val modifiers = linkedMapOf<String, Int>()
-    /** 原始抽牌顺序，用于后代重放不可交换的修饰。 */
+    /** 规范化修正配方，用于同源复制体重建独立效果；不表示牌序。 */
     val modifierOrder = arrayListOf<String>()
     /** 扩散/聚爆同时缩放弹体碰撞、光束宽度和场半径。 */
     var areaScale: Double = 1.0

@@ -21,7 +21,7 @@ abstract class Magic {
     var delay: Int = 0
     /** 增加充能时间 **/
     var recharge: Int = 0
-    /** 本张投射物结算时归零本次施放延迟；后续投射物仍可追加延迟。 */
+    /** 本张投射物成功付费时归零整次施放延迟，含触发荷载；与牌序无关。 */
     open val resetsCastDelay: Boolean = false
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()

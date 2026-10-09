@@ -60,7 +60,7 @@ class BounceDuplicate : Modifier() {
                 val level = caster.level() as? ServerLevel ?: return
 
                 // 重建投射物并继承非生成型修饰配方
-                val clone = projectile.clone().also { work.nekow.primalspells.magic.core.SpellAssembly.inherit(projectile, it) }
+                val clone = work.nekow.primalspells.magic.core.SpellAssembly.copy(projectile)
 
                 // 设置复制体的施法者和法杖（继承原投射物）
                 clone.caster = caster

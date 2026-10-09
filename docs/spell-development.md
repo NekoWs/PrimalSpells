@@ -267,7 +267,7 @@ import work.nekow.primalspells.magic.effect.lifecycle.Trigger
 class IceTrigger : Projectile(), TriggerSpell {
     override val id = "ice_trigger"
     override var triggerCast = 1                       // payload 的抽牌预算
-    override var payload = arrayListOf<Magic>()         // 由 Wand.loadPayload 填充
+    override var payload = arrayListOf<Magic>()         // 由 Wand.drawChain 递归填充
 
     init {
         mana = 5.0
@@ -430,3 +430,10 @@ concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→�
 ## 第72轮PD使用口径
 
 1.0.16允许ParticleBatch.trackAll与sizeCurve共用；位置与寿命外观分别由PD管理，不必改成固定终点move规避冻结。空间变量可持续setVariableInterpolated(...,1)，重定向与输入快照顺序已修复。有限糖指令收尾用scaleTo(...).retire()等客户端回报，不按服务端ticks+2提前销毁。表达式与独立变量缓动暂不支持同样的完成生命周期，接入前查pd-api-requests第72轮，不能用伪造有限指令冒充完成信号。
+
+
+## 第74轮：法术链开发契约
+
+触发法术只声明triggerCast和payload，由Wand.drawChain先深度优先抽取荷载，再继续父链。不要在施放或命中阶段重新抽牌。每条链的Modifier统一作用本链所有投射物，与本链内卡牌排列无关；SpellAssembly.apply按id规范化配方，伤害加值在倍率前结算。Trigger与DelayedTrigger只装配payload内修正，禁止对独立荷载调用SpellAssembly.inherit。
+
+同源复制请调用SpellAssembly.copy：重建非生成型外层修正，并递归深拷贝未消费荷载树；不复制运行中effects，不共享payload，不额外扣蓝。链锯清零与delay/recharge费用由Wand整次事务结算，禁止把荷载费用累加进父投射物字段。

@@ -171,7 +171,7 @@ object SpellQualityScenes {
                         val targets=(0 until count).map { ctx.spawnDummy(-10.0+it*gap,floor+1.0,5.0) }
                         val p=probe("chain_bolt",mods,targets.first().boundingBox.center.toVector3f())
                         while(p.alive && p.status.age<minOf(p.maxAge,limit)) { p.tick();p.status.age++ }
-                        val result=ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,AABB.ofSize(Vec3.ZERO,100.0,200.0,100.0)).size
+                        val result=(targets.sumOf { it.totalDamage } / p.status.damage).toInt()
                         p.alive=false;p.die();targets.forEach { it.discard() };return result
                     }
                     val short=arcCount(emptyList(),2.8,8);val long=arcCount(listOf("extended_lifetime"),2.8,8)
@@ -213,7 +213,7 @@ object SpellQualityScenes {
                 if(t==59) {
                     copyHit=copies.any { it.status.hitTargets>0 }
                     val target=quantumTarget
-                    copyDamage=target!=null && ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DamageNumber::class.java,target.boundingBox.inflate(4.0)).isNotEmpty()
+                    copyDamage=target!=null && target.totalDamage>0.0
                     quantumTarget?.discard();MagicManager.projectiles.forEach { it.alive=false }
                 }
                 if(t==75 || t==83) { val p=probe("laser",pos=Vector3f(-3f,floor+3f,-1f));MagicManager.add(p) }
@@ -222,7 +222,7 @@ object SpellQualityScenes {
                 if(t==116) MagicManager.projectiles.forEach { it.alive=false }
                 if(t==140) {
                     val w=Wand("tick-cadence");w.delayTickCount=7.0;w.rechargeTickCount=0.0
-                    w.innate+=MagicManager.create("laser")!!;w.load();w.status.mana=w.mana
+                    w.innate+=MagicManager.create("fireball")!!;w.load();w.status.mana=w.mana
                     val intervals=ArrayList<Int>();var last=0
                     for(step in 0..35) { if(w.spell(ctx.player)) { if(step>0)intervals+=step-last;last=step };w.tick() }
                     record("integer-repeat-cadence",intervals.isNotEmpty() && intervals.all { it==7 },"intervals=$intervals")
@@ -271,7 +271,7 @@ object SpellQualityScenes {
                     p.caster = ctx.player; p.wand = Wand("ordered-probe")
                     p.position = Vector3f(0f, floor+3f, 0f); p.velocity = Vector3f(0f, 0f, 1f); p.spell()
                 }
-                matrixOk = copy.modifierOrder == ordered.modifierOrder && copy.status.damage == 11.0 && ordered.status.damage == 11.0 && copy.status.explosionDamage == 21.0 && ordered.status.explosionDamage == 21.0
+                matrixOk = copy.modifierOrder == ordered.modifierOrder && copy.status.damage == 11.0 && ordered.status.damage == 11.0 && copy.status.explosionDamage == 24.0 && ordered.status.explosionDamage == 24.0
                 for (id in shots) for (mod in modifiers) {
                     val p = MagicManager.create(id) as Projectile
                     SpellAssembly.apply(p, listOf(MagicManager.create(mod) as Modifier))

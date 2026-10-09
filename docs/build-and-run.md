@@ -492,3 +492,17 @@ spell_chain新增400刻时间线：穿刺实体伤害/方块荷载、真实付�
 WandCastingScenes恢复已有有限清理后，t154主手退场、t208副手退场、t219粒子归零均通过。有限expression施法迸发已接入客户端完成；变量完成接线仍受PD缺陷阻塞。总体报告仍会因这条PD回归与本机已有5行OSHI异常标为失败，不能宣称全量PASS。画廊在`build/capture/out/index.html`，原生检查在各场meta.tsv，汇总summary.tsv。
 
 最终画面/媒体门禁：七条玩法场景全部PASS，pd_api只有已登记的变量回报断言失败，其余可见性、连续退场、零残留及媒体生成通过。
+
+
+## 第74轮：独立法术链作用域验收（2026-10-09）
+
+执行`gradlew.bat build --console=plain`成功。最终后台录制命令：`pwsh tools/capture/capture.ps1 -SkipBuild -Scene spell_chain,spell_resonance,spell_mechanics,spell_timing,expansion_combinations,wand_casting -TimeoutSec 600`，日志`build/capture-turn74-complete.log`。
+
+六场1490帧、零丢帧，147/147项游戏内检查通过（spell_chain 76、expansion_combinations 6、spell_resonance 12、spell_mechanics 25、spell_timing 12、wand_casting 16）。作用域覆盖：真实付费四卡机枪、只散射链锯荷载、载体原有delay/recharge不被荷载改写、三层触发/延迟链、同层尾部修正与多重施放、兄弟荷载隔离、量子复制独立荷载、退款卡、未付费荷载不清零、空荷载不抽自身、加值/倍率的三种排列、荷载链锯及前后牌序一致、连续20次每刻施放。已有穿刺方块触发、护盾截束、追踪、自伤、统计跳字、十秒重置与零残留检查保持通过。
+
+配方矩阵、无人机NBT继承与跨法术反应继续通过。旧测试中的伤害证明改读假人真实totalDamage，避免5刻跳字批量窗口边界导致偶发误判；跳字显示与合并次数仍由spell_chain独立检查。电弧基础4次命中、延寿覆盖全部8个测试目标；基础7刻间隔改用不减冷却的火花弹验证。首轮捕获的旧断言失败不作为最终证据。
+
+本轮不接入PD新能力，未运行pd_api场景，不能据此关闭既有PD变量完成回报问题。总体运行日志仍有本机既有5行OSHI异常（用户手动重启后待复验），不关闭日志门禁。真实断言见`build/capture/out/<scene>/meta.tsv`，汇总`build/capture/out/summary.tsv`，画廊`build/capture/out/index.html`。
+
+
+最终媒体生成全部完成，五条场景的原生/像素/媒体门禁全部PASS。spell_mechanics的25项原生检查、可见性、空场与零残留均通过，但混合特效全局退场门禁FAIL：峰值出现在第11帧，50%→5%跨度14帧，超过该旧场景3帧瞬退阈值。同一场景前两轮该像素门禁通过；未放宽门禁，波动问题登记issues/open。最终总体FAIL包含这一像素门禁及上述5行OSHI，不能宣称所有报告PASS。配方/独立实例矩阵本轮为522组合。

@@ -112,6 +112,7 @@ class Wand(var id: String) {
         drawPile.clear()
         hand.clear()
         discardPile.clear()
+        discarded.clear()
         drawPile.addAll(loadedMagics)
     }
 
@@ -155,10 +156,10 @@ class Wand(var id: String) {
         }
         status.delay = 0.0
         status.recharge = 0.0
-        draw(cast)
-        val result = castHand(caster, hand)
-        // 通常以法杖delay为完整刻下限；成功施放链锯时允许清零，后置卡仍可追加delay。
-        status.delay = (if (result.resetDelay) status.delay else max(status.delay,
+        val chain = drawChain(cast)
+        val result = castHand(caster, chain)
+        // 冷却属于整次抽牌事务；荷载只贡献卡牌费用，不改写父投射物的参数。
+        status.delay = (if (result.resetDelay) 0.0 else max(status.delay,
             (delayTicks() + result.delayReduction).coerceAtLeast(0.0))).coerceAtLeast(0.0)
         status.recharge = status.recharge.coerceAtLeast(0.0)
         status.lastDelay = status.delay
@@ -170,39 +171,68 @@ class Wand(var id: String) {
     private data class CastResult(val resetDelay: Boolean, val delayReduction: Double)
 
     /**
-     * 执行手牌：先将所有 [Modifier] 的法术效果提取出来（消耗法力、累加 delay/recharge），
-     * 再依次施放每个 [Projectile]，如果有 [TriggerSpell] 则额外抽牌组装 payload。
-     *
-     * @param caster 施法者实体
-     * @param hand   当前手牌列表（本方法负责清空）
+     * 深度优先抽取一条链：触发牌先预留完整荷载，再继续父链预算。
+     * 本轮手牌不回洗；荷载不从弃牌堆绕回，避免抽到自身。
      */
-    private fun castHand(caster: Entity, hand: ArrayList<Magic>): CastResult {
-        var delayReset = false
-        var delayReduction = 0.0
-        val magics = arrayListOf<Magic>()
-        magics += hand
+    private fun drawChain(budget: Int, wrapping: Boolean = true): ArrayList<Magic> {
+        var remaining = budget
+        val chain = arrayListOf<Magic>()
+        while (remaining > 0) {
+            val pile = when {
+                drawPile.isNotEmpty() -> drawPile
+                wrapping && discardPile.isNotEmpty() -> discardPile
+                else -> break
+            }
+            val card = pile.removeFirst()
+            hand += card
+            val instance = card.clone()
+            chain += instance
+            remaining += card.cast - 1
+            if (instance is TriggerSpell) instance.payload += drawChain(instance.triggerCast, false)
+        }
+        return chain
+    }
 
-        val revises = magics.filterIsInstance<Modifier>().toList()
-        revises.forEach { magics.remove(it) }
-        val validRevises = revises.filter {
-            if (consumeMana(it)) {
-                status.recharge += it.recharge
-                status.delay += it.delay
-                delayReduction += min(0.0, it.delay.toDouble())
-                true
-            } else {
-                false
+    /** 同一链先收集修正，荷载递归独立付费；每张被接受的牌只结算一次费用。 */
+    private fun payChain(chain: List<Magic>, result: MutableCastResult): ArrayList<Magic> {
+        val paid = arrayListOf<Magic>()
+        for (modifier in chain.filterIsInstance<Modifier>().sortedWith(compareBy<Modifier> { it.mana >= 0.0 }.thenBy { it.id })) {
+            if (consumeMana(modifier)) { paid += modifier; result.account(modifier) }
+        }
+        for (shot in chain.filterIsInstance<Projectile>()) {
+            if (!consumeMana(shot)) continue
+            paid += shot
+            result.account(shot)
+            if (shot is TriggerSpell) {
+                val payload = payChain(shot.payload.toList(), result)
+                shot.payload.clear()
+                shot.payload += payload
             }
         }
+        return paid
+    }
 
+    private class MutableCastResult {
+        var resetDelay = false
+        var delay = 0.0
+        var recharge = 0.0
+        var delayReduction = 0.0
+        fun account(card: Magic) {
+            delay += card.delay
+            recharge += card.recharge
+            delayReduction += min(0.0, card.delay.toDouble())
+            resetDelay = resetDelay || card.resetsCastDelay
+        }
+    }
+
+    /** 各链的修正只装配到本链投射物；荷载留到触发时独立装配。 */
+    private fun castHand(caster: Entity, chain: List<Magic>): CastResult {
+        val result = MutableCastResult()
+        val paid = payChain(chain, result)
+        val modifiers = paid.filterIsInstance<Modifier>()
         var castVisualPlayed = false
-        for (projectile in magics.filterIsInstance<Projectile>()) {
-            if (!consumeMana(projectile)) continue
-            val p = projectile.clone()
-            if (p is TriggerSpell) {
-                loadPayload(p)
-            }
-            work.nekow.primalspells.magic.core.SpellAssembly.apply(p, validRevises)
+        for (p in paid.filterIsInstance<Projectile>()) {
+            work.nekow.primalspells.magic.core.SpellAssembly.apply(p, modifiers)
             p.caster = caster
             p.wand = this
             p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toVector3f()
@@ -214,20 +244,13 @@ class Wand(var id: String) {
                 work.nekow.primalspells.magic.effect.visual.WandCastingFx.cast(caster, this)
                 castVisualPlayed = true
             }
-            status.recharge += p.recharge
-            delayReduction += min(0.0, p.delay.toDouble())
-            if (p.resetsCastDelay) { status.delay = 0.0; delayReset = true }
-            status.delay += p.delay
-
-            status.lastDelay = status.delay
-            status.lastRecharge = status.recharge
             MagicManager.add(p)
         }
-
-        // 手牌在 payload 抽取完成后统一丢弃：过早 discard 会触发 reload，
-        // 导致触发法术（TriggerSpell）重新抽到刚施放的牌（含自身）。
+        status.delay = result.delay
+        status.recharge = result.recharge
+        // 全部链完成后才允许回洗，避免同次施法重复抽取刚支付的牌。
         discard()
-        return CastResult(delayReset, delayReduction)
+        return CastResult(result.resetDelay, result.delayReduction)
     }
 
     /**
@@ -238,23 +261,6 @@ class Wand(var id: String) {
             "${magic::class.simpleName.toString()}[${magic.effects.joinToString(",") { it::class.simpleName.toString() }}]"
         if (p !is TriggerSpell) return toString(p)
         return "${toString(p)}(${p.payload.map { renderTriggers(it) }.joinToString(separator = " + ") { it }})"
-    }
-
-    private fun loadPayload(projectile: Projectile): Projectile {
-        if (projectile !is TriggerSpell) return projectile
-        val magics = draw(projectile.triggerCast, false)
-        magics.forEach {
-            val p = it.clone()
-            if (consumeMana(p)) {
-                projectile.payload += if (p is Projectile && p is TriggerSpell) {
-                    loadPayload(p)
-                } else { p }
-                projectile.recharge += p.recharge
-                projectile.delay += p.delay
-            }
-        }
-        discard(magics)
-        return projectile
     }
 
     /**
@@ -287,17 +293,6 @@ class Wand(var id: String) {
         return true
     }
 
-    /**
-     * 丢弃指定列表中的法术
-     *
-     * @param magics 法术列表
-     */
-    private fun discard(magics: List<Magic>) {
-        magics.forEach {
-            if (hand.remove(it)) discarded += it
-        }
-    }
-
     private fun discard() {
         discardPile += hand
         discardPile += discarded
@@ -306,43 +301,6 @@ class Wand(var id: String) {
         // 弃牌堆会无界膨胀（并随 restorePiles 一起写进存档）。
         discarded.clear()
         reloadIfNeeded()
-    }
-
-    /**
-     * 从指定牌堆中抽牌，直到预算耗尽或牌堆为空。
-     * 每张法术的 [Magic.cast] 会影响剩余预算（正数增加可抽范围，负数或 0 减少）。
-     *
-     * @param budget 可抽牌的预算值
-     * @param pile   要从中抽取的牌堆
-     * @return Pair(剩余预算, 抽到的法术列表)
-     */
-    fun drawFrom(budget: Int, pile: ArrayList<Magic>): Pair<Int, ArrayList<Magic>> {
-        var remaining = budget
-        val result = arrayListOf<Magic>()
-        while (remaining > 0 && pile.isNotEmpty()) {
-            val magic = pile.removeFirst()
-            result += magic
-            remaining += magic.cast - 1
-        }
-        return Pair(remaining, result)
-    }
-
-    /**
-     * 从抽牌堆抽牌，若预算仍有剩余且允许循环，则从弃牌堆继续抽取。
-     *
-     * @param budget   可抽牌的预算值
-     * @param wrapping 是否在抽牌堆耗尽后循环弃牌堆
-     */
-    fun draw(budget: Int, wrapping: Boolean = true): ArrayList<Magic> {
-        val res = arrayListOf<Magic>()
-        val (remaining, result) = drawFrom(budget, drawPile)
-        res += result
-        if (wrapping && remaining > 0) {
-            val pile = drawFrom(remaining, discardPile)
-            res += pile.second
-        }
-        hand += res
-        return res
     }
 
     private fun reloadIfNeeded() {

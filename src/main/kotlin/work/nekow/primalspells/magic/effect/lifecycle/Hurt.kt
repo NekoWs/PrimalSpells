@@ -20,7 +20,7 @@ class Hurt(private val amount: Double = 0.0) : BaseEffect(), DirectDamage {
     override val damageStrength: Double get() = if (amount > 0.0) amount else status.damage
     override fun onHitEntity(target: Entity) {
         val dmg = if (amount > 0.0) amount else status.damage
-        if (dmg <= 0.0) return
+        if (dmg <= 0.0 && projectile.damageType != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) return
         val level = target.level() as? ServerLevel ?: return
 
         SpellDamage.hit(level, target, projectile, dmg)

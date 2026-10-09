@@ -18,13 +18,21 @@ object SpellImpact {
     fun hurt(level: ServerLevel, target: Entity, caster: Entity, damage: Double, direction: Vec3,
              blast: Boolean = false, knockback: Boolean = true,
              type: work.nekow.primalspells.magic.core.SpellDamageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE): Boolean {
-        if (damage <= 0.0 || !target.isAlive) return false
+        if (!damage.isFinite() || !target.isAlive) return false
+        if (type == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && damage > 0.0) {
+            val living = target as? LivingEntity ?: return false
+            val before = living.health
+            living.heal(damage.toFloat())
+            return living.health > before
+        }
+        val settled = if (type == work.nekow.primalspells.magic.core.SpellDamageType.HEALING) -damage else damage
+        if (settled <= 0.0) return false
         val source = ModDamageTypes.sourceOrNull(level, caster, type) ?: return false
         val invul = target.invulnerableTime
         target.invulnerableTime = 0
-        val accepted = try { target.hurtServer(level, source, damage.toFloat()) }
+        val accepted = try { target.hurtServer(level, source, settled.toFloat()) }
             finally { target.invulnerableTime = invul }
-        if (accepted && knockback) {
+        if (accepted && knockback && type != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) {
             val resistance = if (target is LivingEntity) target.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) else 0.0
             val power = strength(damage, blast) * (1.0 - resistance).coerceIn(0.0, 1.0)
             val heading = if (direction.lengthSqr() > 1e-8) direction.normalize() else Vec3(0.0, 1.0, 0.0)

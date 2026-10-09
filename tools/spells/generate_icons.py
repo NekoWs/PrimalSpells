@@ -14,7 +14,8 @@ MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','exte
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
              'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter')
-IDS = PROJECTILES + MODIFIERS
+NEW_IDS = ('divide_two', 'divide_three', 'divide_five', 'divide_ten', 'cast_all', 'add_trigger', 'add_timer', 'add_expiration', 'triple_cast', 'quadruple_cast', 'quintuple_cast', 'reduce_recharge', 'sawblade', 'healing_bolt', 'torch')
+IDS = PROJECTILES + MODIFIERS + NEW_IDS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
 ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
 
@@ -179,6 +180,32 @@ def icon(name):
     elif name=='freeze_charge':
         for a,b in (((16,6),(16,26)),((7,11),(25,21)),((7,21),(25,11))):line((a,b),BLUE)
         line(((12,8),(16,12),(20,8)),WHITE,1);line(((12,24),(16,20),(20,24)),WHITE,1);box(16,16,WHITE,1)
+    elif name in ('triple_cast','quadruple_cast','quintuple_cast','cast_all'):
+        count={'triple_cast':3,'quadruple_cast':4,'quintuple_cast':5,'cast_all':6}[name]
+        for j in range(count):
+            x=5+j*3;d.rectangle((x,7+j%2,x+6,23+j%2),fill=DARK_BLUE,outline=WHITE)
+        if name=='cast_all': arrow((8,26),(25,26),YELLOW,1)
+    elif name.startswith('divide_'):
+        count={'divide_two':2,'divide_three':3,'divide_five':5,'divide_ten':10}[name]
+        box(9,16,PURPLE,3);line(((12,16),(16,16)),WHITE,1)
+        for j in range(min(count,5)):
+            y=7+j*4;line(((16,16),(21,y)),BLUE,1);box(24,y,WHITE,1)
+        if count==10:line(((27,6),(27,25)),YELLOW,1)
+    elif name.startswith('add_'):
+        box(11,16,ORANGE,4);plus(22,10,BLUE)
+        if name=='add_timer':
+            d.ellipse((17,17,27,27),outline=WHITE);line(((22,19),(22,22),(25,22)),WHITE,1)
+        elif name=='add_expiration':line(((19,20),(25,26)),RED);line(((25,20),(19,26)),RED)
+        else: arrow((18,23),(26,23),WHITE,1)
+    elif name=='reduce_recharge':
+        orbit();arrow((9,15),(23,15),BLUE);line(((9,21),(23,21)),WHITE,2)
+    elif name=='sawblade':
+        d.ellipse((8,8,24,24),fill='#52626e',outline=WHITE,width=2)
+        for x,y in ((16,6),(25,10),(26,18),(21,26),(11,26),(6,18),(7,10)):box(x,y,WHITE,1)
+        box(16,16,DARK_BLUE,2)
+    elif name=='healing_bolt':plus(16,16,'#7cffa0');arrow((5,24),(11,20),WHITE,1)
+    elif name=='torch':
+        line(((14,20),(11,27)),WHITE,3);flame(18,13)
     else:raise ValueError('No glyph: '+name)
     return im.resize((64,64),Image.Resampling.NEAREST)
 
@@ -198,7 +225,7 @@ def main():
     # 验收图不进入游戏资源；中文名称与原生16px栏位同时展示。
     labels=json.loads((OUT.parents[1]/'lang/zh_cn.json').read_text(encoding='utf-8'))
     font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',13)
-    sheet=Image.new('RGB',(8*136,6*120),'#192330'); d=ImageDraw.Draw(sheet)
+    sheet=Image.new('RGB',(8*136,((len(IDS)+7)//8)*120),'#192330'); d=ImageDraw.Draw(sheet)
     for i,name in enumerate(IDS):
         x,y=(i%8)*136,(i//8)*120
         im=icon(name);sheet.paste(im,(x+36,y+8),im)

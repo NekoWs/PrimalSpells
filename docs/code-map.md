@@ -348,3 +348,12 @@ client/capture/PdApiScene.kt为前置运行时回归；magic/effect/visual/Pixel
 
 
 第75轮：SpellTimingScenes.machinegun注册machinegun_visual场景，80刻连续真实机枪、切痕方向变化、粒子驻留量、一格追踪内外边界与零残留。ChainsawFx绘制随机单弧；Trajectory和SpellResonance减少高频弹重复碎屑；Homing基础半径1格。
+
+## 第76轮新增导航
+
+- `magic/core/DrawAction.kt`、`AppendedPayload.kt`：控制展开树与独立追加荷载。
+- `magic/action/`：divide_two/three/five/ten、cast_all、add_trigger/timer/expiration。
+- `magic/modifier/ReduceRecharge.kt`、`TripleCast.kt`、`QuadrupleCast.kt`、`QuintupleCast.kt`、`Torch.kt`：充能缩短、多重抽牌、环绕火种。
+- `magic/projectile/Sawblade.kt`、`HealingBolt.kt`：帧伤锯片、正负治疗弹。
+- `magic/effect/visual/SawbladeFx.kt`、`magic/effect/lifecycle/AppendedTrigger.kt`：实色旋转锯盘与三种追加时机。
+- `client/capture/NewSpellScene.kt`：复制/付费/作用域/定时/失效/治疗/逐刻切割实机回归。

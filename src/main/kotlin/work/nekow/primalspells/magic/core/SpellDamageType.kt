@@ -15,7 +15,8 @@ enum class SpellDamageType(val id: String, val color: Int) {
     ICE("ice", 0x8BE4FF),
     ELECTRICITY("electricity", 0xD5BCFF),
     ENERGY("energy", 0x6EF4EA),
-    GRAVITY("gravity", 0xBB87E8);
+    GRAVITY("gravity", 0xBB87E8),
+    HEALING("healing", 0x7CFFA0);
 
     val key: ResourceKey<DamageType> = ResourceKey.create(Registries.DAMAGE_TYPE,
         Identifier.fromNamespaceAndPath("primalspells", id))

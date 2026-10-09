@@ -17,6 +17,9 @@ import work.nekow.primalspells.magic.projectile.immobile.BlackHoleProjectile
 import work.nekow.primalspells.magic.projectile.TriggerFireball
 import work.nekow.primalspells.magic.projectile.TeleportProjectile
 import work.nekow.primalspells.magic.modifier.*
+import work.nekow.primalspells.magic.action.*
+import work.nekow.primalspells.magic.projectile.Sawblade
+import work.nekow.primalspells.magic.projectile.HealingBolt
 import work.nekow.primalspells.magic.projectile.DormantCrystal
 import work.nekow.primalspells.magic.projectile.ChainBolt
 import work.nekow.primalspells.magic.projectile.PlasmaBeamProjectile
@@ -65,6 +68,22 @@ object MagicManager {
 
     init {
         register { Fireball() }
+        register { DivideTwo() }
+        register { DivideThree() }
+        register { DivideFive() }
+        register { DivideTen() }
+        register { CastAll() }
+        register { AddTrigger() }
+        register { AddTimer() }
+        register { AddExpiration() }
+        register { TripleCast() }
+        register { QuadrupleCast() }
+        register { QuintupleCast() }
+        register { ReduceRecharge() }
+        register { Torch() }
+        register { Sawblade() }
+        register { HealingBolt() }
+
         register { DroneBolt() }
         register { TriggerFireball() }
         register { DelayedCastProjectile() }

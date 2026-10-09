@@ -151,6 +151,7 @@ SCENES["pd_api"] = {"length": 120, "title": "PD跟踪曲线 / 静止受光 / 帧
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
+SCENES["new_spells"] = {"length": 180, "title": "复制抽牌 / 追加条件 / 正负治疗 / 锯片与火种", "metric": "white", "quiet": (0, 6), "decay": "instant"}
 SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}
 SCENES["explosion"]["decay"] = "collapse"
@@ -420,6 +421,13 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
 
+    if scene == "new_spells":
+        tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        blades = [white_spell_mask(tick_frames[t])[340:450, 700:850] for t in (80, 90)]
+        counts = [int(a.sum()) for a in blades]
+        result["asserts"].append(("锯片本体持续可见且旋转移动", min(counts) >= 50 and int((blades[0] != blades[1]).sum()) >= 20,
+            f"独立锯片覆盖={counts}，图形变化={int((blades[0] != blades[1]).sum())}像素"))
+
     if scene == "pd_api":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
         # 固定机位下只框住右侧track方片，排除左侧受光片和中间编排/变量夹具。
@@ -505,7 +513,23 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
                 (r >= 220) & (g >= 230) & (b >= 245) & ((b-r) > 12))
             return int(mask.sum())
 
+        def triangle_pixels(tick):
+            # 只看法阵的青绿色，排除拿起法杖时同样进入ROI的银色模型与白/蓝冷却条。
+            a = np.asarray(Image.open(ticks[tick]).convert("RGB"), dtype=np.int16)[460:700, 320:960]
+            r, g, b = a[..., 0], a[..., 1], a[..., 2]
+            return int(((r < 170) & (g >= 190) & (b >= 210)).sum())
+        entry_mask = [triangle_pixels(t) for t in range(8, 17)]
+        result["asserts"].append(("法阵首次入场无完整形态闪现", max(entry_mask[:3]) <= max(entry_mask) * .10 and entry_mask[-1] > entry_mask[3],
+            f"入场8–16刻覆盖={entry_mask}，首3刻≤最终10%并持续展开"))
+
+        switch = [triangle_pixels(t) for t in range(94, 113)]
+        jump = max(max(0, switch[i+1]-switch[i]) for i in range(len(switch)-1))
+        result["asserts"].append(("切杖时旧法阵退场与新法阵入场无闪亮尖峰", jump <= max(switch)*.40 and max(switch) <= max(switch[0],switch[-1])*1.35,
+            f"切杖94–112刻覆盖={switch}，最大单帧增加={jump/max(1,max(switch)):.1%}"))
         for label, charge in [("施法恢复白色内边", False), ("回洗聚能蓝色外边", True)]:
+            hidden = [cooldown_pixels(t, charge, entry=True) for t in range(28, 32)]
+            result["asserts"].append((label + "出生时无完整形态闪现", hidden[0] <= max(hidden) * .25 and hidden[-1] > hidden[0],
+                f"施法当刻起覆盖={hidden}，首帧≤展开峰值25%"))
             entry = [cooldown_pixels(t, charge, entry=True) for t in range(29, 32)]
             first = max(entry)
             seq = [cooldown_pixels(t, charge) for t in (range(65, 73) if charge else range(45, 52))]

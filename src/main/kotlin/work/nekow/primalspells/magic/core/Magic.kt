@@ -136,6 +136,12 @@ abstract class Magic {
     open fun initLore() {
         val base = arrayListOf<LoreEntry>()
         base += LoreEntry(Lore.DESCRIPTION, emptyArray())
+        base += LoreEntry(Lore.CATEGORY, arrayOf(net.minecraft.network.chat.Component.translatable("category.primalspells." + when {
+            needInventory -> "passive"
+            this is DrawAction -> "other"
+            this is Modifier -> "modifier"
+            else -> "projectile"
+        })))
         base += LoreEntry(Lore.BR, emptyArray())
         base += LoreEntry(Lore.MANA, arrayOf(Lore.formatDouble(mana)))
         if (delay != 0) base += LoreEntry(Lore.DELAY, arrayOf(delay.toString()))

@@ -18,6 +18,8 @@ abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
     /** 独立的施法配方；只保存id计数，不保存共享effect实例。 */
     val modifiers = linkedMapOf<String, Int>()
+    /** 追加触发拥有独立、一次性的荷载树。 */
+    val addedTriggers = arrayListOf<work.nekow.primalspells.magic.core.AppendedPayload>()
     /** 规范化修正配方，用于同源复制体重建独立效果；不表示牌序。 */
     val modifierOrder = arrayListOf<String>()
     /** 扩散/聚爆同时缩放弹体碰撞、光束宽度和场半径。 */
@@ -53,6 +55,7 @@ abstract class Projectile: Magic() {
     override fun tick() {
         shieldReflectionPoint = null
         shieldedImpactTargets.clear()
+        damagedThisTick.clear()
         super.tick()
     }
 
@@ -72,6 +75,10 @@ abstract class Projectile: Magic() {
         caster.push(impulse.x, impulse.y, impulse.z)
         caster.hurtMarked = true
     }
+
+    /** 持续切割同一实体每刻最多结算一次，避免扫掠子步放大帧伤。 */
+    var damageOncePerTick = false
+    val damagedThisTick = hashSetOf<java.util.UUID>()
 
     var maxAge: Int = 0
     var alive: Boolean = true
@@ -117,6 +124,7 @@ abstract class Projectile: Magic() {
             else caster.lookAngle
         work.nekow.primalspells.magic.core.SpellAssembly.prepare(this)
         effects += work.nekow.primalspells.magic.effect.lifecycle.SpellResonance()
+        if (addedTriggers.isNotEmpty()) effects += work.nekow.primalspells.magic.effect.lifecycle.AppendedTrigger()
         effects += Position(position)
         effects += Velocity(Vector3f(velocity).mul(speed * LAUNCH_SPEED_SCALE))
         effects += Move(
@@ -145,7 +153,7 @@ abstract class Projectile: Magic() {
     /** 返回true表示被护盾反射，调用方必须放弃当前的入射路径，不分派实体命中。 */
     fun hitEntity(entity: Entity): Boolean {
         val level = entity.level() as? net.minecraft.server.level.ServerLevel
-        if (entity is net.minecraft.world.entity.LivingEntity && level != null &&
+        if (!(damageType == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && status.damage > 0) && entity is net.minecraft.world.entity.LivingEntity && level != null &&
             work.nekow.primalspells.magic.core.ShieldGuard.absorbProjectile(level, entity, this)) return true
         val offset = Vector3f(status.pos).sub(entity.position().toVector3f())
         val direction = currentDirection()

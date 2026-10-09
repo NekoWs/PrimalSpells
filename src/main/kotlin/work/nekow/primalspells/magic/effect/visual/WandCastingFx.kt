@@ -95,10 +95,11 @@ object WandCastingFx {
 
         private fun group(count: Int, size: Float, code: String): ParticleGroup {
             val manager = ParticleManager.of(level)
+            // 出生包保持隐藏，表达式第一帧直接给出尺寸/颜色，避免包间露出完整图形。
             val group = manager.createGroup(player.position())
             repeat(count) {
-                group.add(manager.create().position(player.position()).color(Color.ofInt(85, 218, 226))
-                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size, size).glowing(true).additive(false))
+                group.add(manager.create().position(player.position()).color(Color.ofInt(85, 218, 226).withAlpha(0f))
+                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size, size).glowing(true).lightLevel(0).additive(false))
                     .lifetime(-1).spawn())
             }
             group.setVariable("clockOffset", elapsed)
@@ -241,7 +242,7 @@ object WandCastingFx {
         val manager = ParticleManager.of(caster.level())
         val group = manager.createGroup(center)
         repeat(24) { i ->
-            group.add(manager.create().position(center).color(Color.ofInt(195, 253, 240))
+            group.add(manager.create().position(center).color(Color.ofInt(195, 253, 240).withAlpha(0f))
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<6) 0.1875f else 0.125f, 0.125f)
                     .glowing(true).additive(false)).lifetime(-1).spawn())
         }

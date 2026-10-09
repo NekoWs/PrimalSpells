@@ -437,3 +437,15 @@ concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→�
 触发法术只声明triggerCast和payload，由Wand.drawChain先深度优先抽取荷载，再继续父链。不要在施放或命中阶段重新抽牌。每条链的Modifier统一作用本链所有投射物，与本链内卡牌排列无关；SpellAssembly.apply按id规范化配方，伤害加值在倍率前结算。Trigger与DelayedTrigger只装配payload内修正，禁止对独立荷载调用SpellAssembly.inherit。
 
 同源复制请调用SpellAssembly.copy：重建非生成型外层修正，并递归深拷贝未消费荷载树；不复制运行中effects，不共享payload，不额外扣蓝。链锯清零与delay/recharge费用由Wand整次事务结算，禁止把荷载费用累加进父投射物字段。
+
+## 第76轮：其他类控制卡、治疗与常驻光源
+
+新增15张卡，总计62张：20投射物、34修正/被动、8抽牌控制。控制卡在magic/action，继承DrawAction而非Modifier；在Wand预抽阶段展开，不能在命中时重新抽牌。新增控制种类需要同步drawChain、payChain、SpellAssembly.copyCard及NewSpellScene；复制后方单卡不能误写成复制后方整个链。复制修正N份仍只继续抽一次；实体卡只进hand一次，复制实例各自付费。
+
+追加条件挂在Projectile.addedTriggers，AppendedTrigger统一释放；原生TriggerSpell.payload不被覆盖。追加荷载内的修正不作用父链，父链修正不作用荷载。同源复制必须保留独立addedTriggers树。
+
+新治疗伤害渠道必须经过SpellDamage/SpellImpact，不要先将负治疗钳制为0，也不要用原版负hurt值冒充治疗。正治疗允许穿过护盾，负治疗由独立伤害源处理；其它渠道仍拒绝非正伤害。持续切割设置damageOncePerTick，按实体UUID去重，仅本刻有效。
+
+火把使用PD的glowing/lightLevel及实体getter编排，只有首张被动卡生成火种，放下/卸载进入3t收尾、4t有限销毁。不得另写光照引擎。法阵出生颜色透明，表达式接管后直接输出实色，避免出生包早于表达式包的完整粒子闪现；三角形免光照但不额外充当动态光源。
+
+玩法参考：[Noita追加系列](https://noita.wiki.gg/wiki/Expert_Guide%3A_Add_Trigger_Series)、[Divide By](https://noita.wiki.gg/wiki/Divide_by_ten)。本项目数值统一20刻/秒，不照搬Noita的60帧单位。

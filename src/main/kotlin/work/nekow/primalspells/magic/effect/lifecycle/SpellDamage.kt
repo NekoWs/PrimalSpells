@@ -11,10 +11,11 @@ import net.minecraft.world.phys.Vec3
 object SpellDamage {
     /** 返回实际伤害是否被目标接受；被盾挡下时不施加冰冻。 */
     fun hit(level: ServerLevel, target: Entity, shot: Projectile, amount: Double, knockback: Boolean = true): Boolean {
-        if (amount <= 0 || !target.isAlive || !shot.canHarm(target)) return false
+        if ((amount <= 0 && shot.damageType != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) || !target.isAlive || !shot.canHarm(target)) return false
         if (target.uuid in shot.shieldedImpactTargets) return false
-        if (target is LivingEntity && ShieldGuard.absorbProjectile(level, target, shot)) return false
-        val bonus = if (target is LivingEntity && amount >= 4.0 && FrozenStatus.isFrozen(target)) 2.0 else 0.0
+        if (!(shot.damageType == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && amount > 0) && target is LivingEntity && ShieldGuard.absorbProjectile(level, target, shot)) return false
+        if (shot.damageOncePerTick && !shot.damagedThisTick.add(target.uuid)) return false
+        val bonus = if (shot.damageType != work.nekow.primalspells.magic.core.SpellDamageType.HEALING && target is LivingEntity && amount >= 4.0 && FrozenStatus.isFrozen(target)) 2.0 else 0.0
         val direction = if (shot.status.velocity.lengthSquared() > 1e-8f) Vec3(shot.status.velocity) else shot.launchDirection
         val accepted = SpellImpact.hurt(level, target, shot.caster, amount + bonus, direction, knockback = knockback, type = shot.damageType)
         if (accepted && target is LivingEntity) {

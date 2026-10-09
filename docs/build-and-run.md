@@ -520,3 +520,12 @@ WandCastingScenes恢复已有有限清理后，t154主手退场、t208副手退�
 
 
 最终补充：链锯刃面使用修正后的status.velocity，而非固定原始launchDirection，确保全向散射/追踪后视觉平面与实际运动一致。针对这一视觉改动重跑machinegun_visual，日志`build/capture-turn75-final.log`：170帧、零丢帧、6/6检查通过，80次480伤害、47种方向、峰值96；短退场95%→5%跨3帧、单帧最大下降32.8%、归零前2.7%，可见性/空场/零残留/媒体全部PASS。前一批六场回归证据完整保存在`build/capture/turn75-regression`，最新机枪帧/视频保存在`build/capture/out/machinegun_visual`。最终总体仅剩既有OSHI异常；旧混合场景问题留在上一批回归报告中，未关闭。
+
+## 第76轮实机证据
+
+- 最终 `gradlew.bat build --console=plain` 成功；15张新卡的物品/模型/中英词条/64px实色图标与全部JSON资源校验通过。
+- 五场回归 `new_spells,spell_chain,wand_casting,wand_casting_first_person,spell_resonance`：1340帧、0丢帧、147/147原生检查通过；其中配方矩阵680种组合。产物保留在`build/capture/turn76-regression`，日志`build/capture-turn76-final.log`。
+- 新场景补测后最终 `new_spells`：180帧、0丢帧、34/34机制断言、所有画面/媒体判据通过；覆盖全量施放多余预算不绕回旧弃牌、复制单卡/修正/嵌套控制、费用不足、追加修正免费、复制荷载独立、命中/定时/失效条件、穿刺实体命中不释放、正负5HP治疗与锯片逐刻去重。日志`build/capture-turn76-clean.log`，产物`build/capture/out/new_spells`。
+- 法阵专用青绿色ROI排除拿起时进入画面的银色模型；8–16刻覆盖`[0,2,0,102,212,562,823,1376,2095]`，初始没有完整图形闪现。切杖时单帧最大增量28.3%，无闪亮尖峰；白/蓝两种冷却提示首帧为0，随后展开。重新装配证据`build/capture-turn76-metrics-final.log`。
+- 锯片画面独立ROI框住实际投影（x700–850/y340–450），80/90刻持续可见且变化，不能以其它特效粒子代替本体可见性。测试木桩在展示结束时清理，防止统计板污染尾帧及后续场景。
+- 总报告仍因本机既有OSHI/Perflib的5条系统异常失败；本轮所有场景断言、像素/媒体判据通过，不关闭日志门禁、不宣称总体全绿。未改系统配置或重启电脑。

@@ -67,7 +67,7 @@ object ShieldGuard {
     /** 按本刻真实相邻子步测试球壳，早于本体命中和视觉阶段。 */
     fun interceptSegment(level: ServerLevel, entity: LivingEntity, projectile: Projectile,
                          from: org.joml.Vector3f, to: org.joml.Vector3f): Boolean =
-        withShield(entity) { shield, wand ->
+        !(projectile.damageType == SpellDamageType.HEALING && projectile.status.damage > 0) && withShield(entity) { shield, wand ->
             shield.absorbProjectile(level, wand, entity, projectile, from, to)
         }.also { if (it) projectile.shieldedImpactTargets += entity.uuid }
 
@@ -77,7 +77,7 @@ object ShieldGuard {
      * @return true = 已格挡（调用方应跳过伤害），投射物已被护盾反射
      */
     fun absorbProjectile(level: ServerLevel, entity: LivingEntity, projectile: Projectile): Boolean =
-        withShield(entity) { shield, wand ->
+        !(projectile.damageType == SpellDamageType.HEALING && projectile.status.damage > 0) && withShield(entity) { shield, wand ->
             shield.absorbProjectile(level, wand, entity, projectile)
         }.also { if (it) projectile.shieldedImpactTargets += entity.uuid }
 

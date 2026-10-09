@@ -782,3 +782,9 @@ PixelVfx.retire/shatter用scaleTo(...).retire()替换服务端ticks+2掐表销�
 变量缓动接入后实机发现：结束当帧移除变量账本，但上报还要再等50ms，导致纯变量表达式组漏报；重定向还会被旧fallback触发。不能把服务端兜底当客户端完成。WandCastingFx与PlasmaBeam保留原有有限清理（presence8t/12t、冷却7t、光束presence6t/8t），第73轮请求见issues/pd-api-requests。没有本侧回调协议或粒子播放器。
 
 护盾截束先在服务端算好正式截点，阻挡当刻端点用setVariableLive发布，其余连续移动保持1刻空间缓动。新束源和主束共用实际起点，退场都由PD表达式与变量驱动，有限定时只负责已有资源回收。
+
+## 第76轮：隐藏出生与实体火种
+
+无需升级1.0.17。WandCastingFx粒子出生包使用Color.withAlpha(0f)，表达式第一帧输出a=1与入口尺寸；不是把初始尺寸设0后再乘尺寸曲线，避免永久零尺寸。三角形的glowing仍为true（实色免光照），lightLevel=0（避免所有成员出生点瞬时点亮玩家）。冷却提示和施法短迸发使用同一隐藏出生语义。
+
+SawbladeFx与Torch复用实体getter/热更变量编排，透明出生，表达式接管外观。火种中心成员lightLevel=14，其余装饰为0，实际世界动态光照由PD负责。变量完成信号第73轮已知缺陷未变化，收尾继续有限destroyAfter，不使用不可靠的变量完成回报。

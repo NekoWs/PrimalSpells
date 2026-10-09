@@ -33,16 +33,29 @@ object SpellAssembly {
     fun copy(parent: Projectile): Projectile = parent.clone().also { child ->
         inherit(parent, child)
         copyPayload(parent, child)
+        copyAppended(parent, child)
+    }
+
+    /** 深拷贝尚未发射的抽牌树，不继承运行时状态。 */
+    fun copyCard(card: Magic): Magic = card.clone().also { copied ->
+        // 追加系列的免费修正属于准备态费用，复制后仍然免费。
+        copied.mana = card.mana
+        copyPayload(card, copied)
+        if (card is DrawAction && copied is DrawAction) copied.expanded += card.expanded.map(::copyCard)
+        if (card is Projectile && copied is Projectile) copyAppended(card, copied)
+    }
+
+    private fun copyAppended(parent: Projectile, child: Projectile) {
+        parent.addedTriggers.forEach { child.addedTriggers += AppendedPayload(it.kind, ArrayList(it.cards.map(::copyCard))) }
     }
 
     private fun copyPayload(parent: Magic, child: Magic) {
         if (parent !is TriggerSpell || child !is TriggerSpell) return
         parent.payload.forEach { card ->
-            val copied = card.clone()
+            val copied = copyCard(card)
             if (card is Projectile && copied is Projectile) {
                 apply(copied, card.modifierOrder.map { MagicManager.create(it) as Modifier })
             }
-            copyPayload(card, copied)
             child.payload += copied
         }
     }

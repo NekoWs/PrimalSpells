@@ -176,19 +176,69 @@ class Wand(var id: String) {
      */
     private fun drawChain(budget: Int, wrapping: Boolean = true): ArrayList<Magic> {
         var remaining = budget
+        var allowWrap = wrapping
         val chain = arrayListOf<Magic>()
-        while (remaining > 0) {
+        fun take(): Magic? {
             val pile = when {
                 drawPile.isNotEmpty() -> drawPile
-                wrapping && discardPile.isNotEmpty() -> discardPile
-                else -> break
+                allowWrap && discardPile.isNotEmpty() -> discardPile
+                else -> return null
             }
-            val card = pile.removeFirst()
-            hand += card
-            val instance = card.clone()
+            return pile.removeFirst().also { hand += it }.clone()
+        }
+        fun shots(cards: List<Magic>): List<Projectile> = cards.flatMap {
+            when (it) {
+                is Projectile -> listOf(it)
+                is work.nekow.primalspells.magic.core.DrawAction -> shots(it.expanded)
+                else -> emptyList()
+            }
+        }
+        fun prepare(card: Magic): Int {
+            val action = card as? work.nekow.primalspells.magic.core.DrawAction
+            if (action == null) {
+                if (card is TriggerSpell) card.payload += drawChain(card.triggerCast, false)
+                return card.cast - 1
+            }
+            when (action.kind) {
+                work.nekow.primalspells.magic.core.DrawAction.Kind.ALL -> {
+                    // 只抽当前剩余牌；耗尽后剩余多重施放预算也不能绕回旧弃牌。
+                    allowWrap = false
+                    action.expanded += drawChain(Int.MAX_VALUE, false)
+                    return -1
+                }
+                work.nekow.primalspells.magic.core.DrawAction.Kind.DIVIDE -> {
+                    val next = take() ?: return -1
+                    val cost = prepare(next)
+                    repeat(action.copies) { action.expanded += work.nekow.primalspells.magic.core.SpellAssembly.copyCard(next) }
+                    // 复制修正只复制效果，不把它的继续抽牌重复N次。
+                    return cost
+                }
+                else -> {
+                    val carrier = drawChain(1, false)
+                    val targets = shots(carrier)
+                    if (targets.isNotEmpty()) {
+                        val payload = drawChain(1, false)
+                        targets.forEach { it.addedTriggers += work.nekow.primalspells.magic.core.AppendedPayload(
+                            action.kind, ArrayList(payload.map(work.nekow.primalspells.magic.core.SpellAssembly::copyCard))) }
+                        // Noita追加系列：寻找载体途中经过的普通修正免费，抽牌控制仍付费。
+                        fun waive(cards: List<Magic>) {
+                            cards.forEach { card -> when(card) {
+                                is Modifier -> card.mana = 0.0
+                                is work.nekow.primalspells.magic.core.DrawAction -> waive(card.expanded)
+                                else -> Unit
+                            } }
+                        }
+                        waive(carrier)
+                    }
+                    action.expanded += carrier
+                    return -1
+                }
+            }
+        }
+        while (remaining > 0) {
+            val instance = take() ?: break
             chain += instance
-            remaining += card.cast - 1
-            if (instance is TriggerSpell) instance.payload += drawChain(instance.triggerCast, false)
+            remaining += prepare(instance)
         }
         return chain
     }
@@ -196,10 +246,21 @@ class Wand(var id: String) {
     /** 同一链先收集修正，荷载递归独立付费；每张被接受的牌只结算一次费用。 */
     private fun payChain(chain: List<Magic>, result: MutableCastResult): ArrayList<Magic> {
         val paid = arrayListOf<Magic>()
-        for (modifier in chain.filterIsInstance<Modifier>().sortedWith(compareBy<Modifier> { it.mana >= 0.0 }.thenBy { it.id })) {
+        fun expand(cards: List<Magic>): List<Magic> {
+            // 同层普通回蓝修正先结算，放在控制牌前后均能支付该控制牌。
+            val refunds = cards.filterIsInstance<Modifier>().filter { it.mana < 0.0 }.sortedBy { it.id }
+            refunds.forEach { if (consumeMana(it)) { paid += it; result.account(it) } }
+            return cards.filter { it !in refunds }.flatMap { card ->
+                if (card is work.nekow.primalspells.magic.core.DrawAction) {
+                    if (consumeMana(card)) { result.account(card); expand(card.expanded) } else emptyList()
+                } else listOf(card)
+            }
+        }
+        val expanded = expand(chain)
+        for (modifier in expanded.filterIsInstance<Modifier>().sortedWith(compareBy<Modifier> { it.mana >= 0.0 }.thenBy { it.id })) {
             if (consumeMana(modifier)) { paid += modifier; result.account(modifier) }
         }
-        for (shot in chain.filterIsInstance<Projectile>()) {
+        for (shot in expanded.filterIsInstance<Projectile>()) {
             if (!consumeMana(shot)) continue
             paid += shot
             result.account(shot)
@@ -207,6 +268,10 @@ class Wand(var id: String) {
                 val payload = payChain(shot.payload.toList(), result)
                 shot.payload.clear()
                 shot.payload += payload
+            }
+            shot.addedTriggers.forEach { trigger ->
+                val payload = payChain(trigger.cards.toList(), result)
+                trigger.cards.clear(); trigger.cards += payload
             }
         }
         return paid

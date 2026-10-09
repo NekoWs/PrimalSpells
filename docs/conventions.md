@@ -359,3 +359,7 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 | `client/capture/SpellChainScene.kt` | 束壳截点、穿刺荷载、强追踪、机枪配方、伤害合并与十秒归零 |
 
 没有移动原有类；伤害跳字仍在entity/DamageNumber，统计簿记归TestDummyEntity，渲染复用原版TextDisplay。
+
+## 第76轮结构增补
+
+新增magic/action包，承载【其他】抽牌控制卡（DivideTwo/Three/Five/Ten、CastAll、AddTrigger/Timer/Expiration），依赖magic/core.DrawAction。核心抽牌模型DrawAction/AppendedPayload放magic/core，生命周期实现AppendedTrigger放magic/effect/lifecycle；SawbladeFx放visual，Sawblade/HealingBolt放projectile，被动Torch与ReduceRecharge、多重施放放modifier。没有移动旧文件；这是第1–2节包落位规则的增补。控制卡不能当Modifier注入投射物效果。

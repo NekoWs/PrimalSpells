@@ -7,7 +7,7 @@ function Get-CaptureFailure {
     if ($crash) { return @{ Reason='客户端生成崩溃报告'; CrashReport=$crash.FullName } }
     $logPath = Join-Path $Workspace 'run/capture/logs/latest.log'
     if (Test-Path -LiteralPath $logPath) {
-        $fatal = Select-String -LiteralPath $logPath -Pattern '/FATAL\]|CaptureDriver.*(failed|失败)' | Select-Object -Last 1
+        $fatal = Select-String -LiteralPath $logPath -Pattern '/FATAL\]|CaptureDriver.*(failed|失败)|\[Capture\] (scene .+|screenshot|write frame).*FAILED(?: at tick \d+)?:' | Select-Object -Last 1
         if ($fatal) { return @{ Reason=$fatal.Line; CrashReport=$null } }
     }
     return $null

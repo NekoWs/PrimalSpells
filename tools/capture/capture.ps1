@@ -57,7 +57,7 @@ Remove-Item -LiteralPath (Join-Path $root 'build/capture/failure.json') -ErrorAc
 #    ⚠️ 超时护栏：客户端崩溃/卡死时不会自己退出，必须由这里兜底杀掉（否则流水线会一直挂着）。
 Write-Host "[capture] ./gradlew runCapture -Pcapture=$Scene ...（超时 $TimeoutSec 秒）"
 $gradle = Start-Process -FilePath ".\gradlew.bat" `
-    -ArgumentList @("runCapture", "--console=plain", "-Pcapture=$Scene") `
+    -ArgumentList @("runCapture", "--no-daemon", "--console=plain", "-Pcapture=$Scene") `
     -NoNewWindow -PassThru -RedirectStandardOutput "build/capture/gradle.log" -RedirectStandardError "build/capture/gradle.stderr.log"
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
 while (-not $gradle.WaitForExit(1000)) {

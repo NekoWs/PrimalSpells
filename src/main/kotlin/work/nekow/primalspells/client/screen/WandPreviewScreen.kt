@@ -8,10 +8,10 @@ import work.nekow.primalspells.network.WandPreviewPayload
 import work.nekow.primalspells.wand.WandPreview
 
 /** V打开的只读抽牌树；定期向服务端刷新，滚轮浏览，不在客户端解析法术。 */
-class WandPreviewScreen(private val wandId: String, private val parent: Screen?) : Screen(Component.translatable("preview.primalspells.title")) {
+class WandPreviewScreen(private val wandId: String, private val parent: Screen?, initial: WandPreview? = null) : Screen(Component.translatable("preview.primalspells.title")) {
     private var age = 0
     private var scroll = 0
-    var preview: WandPreview? = null
+    var preview: WandPreview? = initial
         private set
     override fun init() { ClientPacketDistributor.sendToServer(WandPreviewPayload(wandId)) }
     override fun tick() { if (++age % 10 == 0) ClientPacketDistributor.sendToServer(WandPreviewPayload(wandId)) }

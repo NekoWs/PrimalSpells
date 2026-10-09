@@ -461,3 +461,8 @@ SawbladeFx为104片实色方粒组成的双面厚齿钢盘、暗盘身、蓝轴�
 mana_injection显示名改为“额外法术”，id保留兼容。所有负mana退款与普通付费统一走Wand.consumeMana，当前MP不能超过本杖上限，返蓝溢出不留存；旧运行值与读档同样纠正。命中回蓝的既有2MP联动仍受本杖上限限制。
 
 HUD准心不再绘制充能菱框/进度条，只呈现紫白命中十字、红色击杀斜十字、外围像素受击弧。真正接受的伤害才通知玩家；治疗不产生命中标记。连续命中延长结束时间，不反复重播入场。原有三块拖动布局保留，focus配置键现代表准心反馈，不迁移或丢弃已有位置。
+
+
+## 第83轮生活卡与获取接入
+
+新增法术除物品/图标/双语资源外，还应进入数据包loot_profiles的散卡或成品配方，使全部注册法术有实际来源。当前65种均可获取。生活法术示例在immobile/UtilityPulse与SurveyPulse/ItemPull/FeatherWard；逐目标发integration.SpellEvents.UtilityAction，再调用原版受权限约束的入口，不用生活卡绕过拾取事件或修改世界方块。整合接口、动态获取池及存档兼容见design/pack-integration，定位见design/world-utility。

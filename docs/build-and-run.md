@@ -608,3 +608,16 @@ diagnostics.ps1是可独立验证的只读诊断辅助。PowerShell语法解析�
 `gradlew.bat build --console=plain`成功。foundations录制210/210帧、零丢帧，21/21真实断言通过：只读预览、独立荷载/复制控制、费用双冷却与真实出手一致、实际双向网络、创造菜单槽映射、取出/装入/替换回交、非法数量与伪造ID拒绝。证据在build/capture/out/foundations，日志build/capture-turn83-editor-final.log；早期只读版与spell_chain的76/76回归保存在build/capture/turn83-preview。已查看原版灰色面板/槽位实机帧；资源包覆盖路径见design/spell-preview。
 
 本机既有5条OSHI异常仍使总体报告失败，未过滤日志或降低判据。中途启动崩溃由双向包客户端处理器未单独注册引起，已接RegisterClientPayloadHandlersEvent并经后续多次真实启动复验。
+
+
+## 第83轮补充：整合与探索验收
+
+`gradlew.bat build --console=plain`成功且无Kotlin编译警告。245份游戏/例包JSON及新法术贴图、双语键、设计链接校验通过。progression录制240/240帧、零丢帧、26/26真实断言通过，证据在build/capture/turn83-all-passed/progression，日志build/capture-turn83-final.log。覆盖原子资源快照、未知法术拒绝、非玩家取消不扣费/真实施法、取消/修改真实伤害、冻结进退事件、拾取拥有者/延迟/墙体/权限、缓降、显踪、真实合成、真实村庄定位、四流派、精英原杖和散卡、退让/掩体及收场归零。
+
+同场通过真正启用/禁用新数据包验证自定义命名空间池与等级覆盖：新杖法力变1234，已有80法力杖及其存档仍80，禁用后恢复默认。测试包只写在录制存档，录制清理时删除，不进入玩家存档或正式模组资源。
+
+旧exploration 19/19与spell_chain 76/76回归、零丢帧，保存于build/capture/turn83-progression-first；其中progression当时两项失败为夹具预期问题（漏计成品配方来源、未剥离僵尸护甲），已修正并经上述26/26复验。没有降低实际伤害/权限断言阈值。四流派实机帧已检查，名称颜色与真实装备可辨；美术仍复用唤魔者。
+
+脚本另以--no-daemon启动独立运行树，避免共用Gradle daemon使超时/崩溃清理漏掉本次游戏；识别Capture日志中的场景、截图、写帧FAILED。build/verify/capture-diagnostics-v2通过正反例与PowerShell语法校验，OSHI普通ERROR及failed=0不误报为致命驱动错误。总体报告仍被既有5条OSHI异常判失败，不过滤异常，不自动重启电脑。
+
+最终悬浮编辑复验foundations 260/260帧、零丢帧、27/27断言通过，证据build/capture/out/foundations，日志build/capture-turn83-editor-verified.log。新增生存光标装卸、真实标题拖动及打开完整预览；完整预览沿用最近服务端结果再刷新，消除节流造成的空白等待。与上述progression 26、exploration 19、spell_chain 76合计148项原生检查通过。独立Gradle启动树已实机验证；诊断夹具另覆盖实际“screenshot FAILED at tick N:”格式。

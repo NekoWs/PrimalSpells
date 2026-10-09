@@ -1,0 +1,49 @@
+{
+  "min_tier": 3,
+  "max_tier": 4,
+  "cards": [
+    "trigger_fireball",
+    "add_trigger",
+    "add_timer",
+    "add_expiration",
+    "triple_cast",
+    "omnidirectional_scatter",
+    "mana_injection",
+    "healing_bolt",
+    "laser",
+    "delayed_cast",
+    "gravity",
+    "gravity_field",
+    "long_distance_cast",
+    "teleport",
+    "dormant_crystal",
+    "crystal_detonation"
+  ],
+  "loadouts": [
+    [
+      "trigger_fireball",
+      "small_explosion"
+    ],
+    [
+      "fireball",
+      "homing",
+      "freeze_charge"
+    ]
+  ],
+  "elite_loadouts": [
+    [
+      "trigger_fireball",
+      "freeze_charge",
+      "fireball"
+    ]
+  ],
+  "structure_tag": "primalspells:spell_sites/arcane",
+  "spawn_weight": 35,
+  "elite_chance": 0.15,
+  "wand_chance": 0.4,
+  "charged_chance": 0.125,
+  "card_count": 2,
+  "dimensions": [
+    "minecraft:overworld"
+  ]
+}

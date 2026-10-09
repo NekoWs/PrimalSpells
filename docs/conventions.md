@@ -381,3 +381,10 @@ HUD状态/绘制/配置放`client/hud/{WandHudRenderer,WandHudPainter,HudLayout}
 ## 第83轮预览与编辑落位
 
 只读结果放`wand/WandPreview.kt`，解析仍归Wand。网络放`network/{WandPreviewPayload,EditWandPayload}.kt`，完整预览在`client/screen/WandPreviewScreen.kt`，原容器悬浮窗在`client/input/WandEditorOverlay.kt`，实机夹具在`client/capture/FoundationScene.kt`。GUI可覆盖贴图放assets/primalspells/textures/gui/sprites/wand_editor，不修改原id/NBT；协议1.2.0。录制诊断辅助放tools/capture/diagnostics.ps1。没有旧→新类迁移。
+
+
+## 第83轮整合与探索落位
+
+新增`integration/`公共服务端领域，放`PackRules.kt`（原子资源重载）、`SpellApi.kt`（v1施法入口）、`SpellEvents.kt`（NeoForge事件）。注册仍只在PrimalSpells/registry；不向公共包引用client。敌人流派/战术放`entity/MageSchool.kt`，罗盘放`item/SpellCompassItem.kt`。生活法术放`magic/projectile/immobile/{UtilityPulse,SurveyPulse,ItemPull,FeatherWard}.kt`；同名文件承载同名类。`client/capture/ProgressionScene.kt`只在显式开发录制加载。
+
+数据资源放`data/<namespace>/primalspells/{loot_profiles,wand_tiers}`，目录层级含命名空间与资源前缀。例包放docs/examples/exploration-pack，设计与兼容契约见design/pack-integration、design/world-utility。SpellLootProfile从枚举改为数据类，旧六个访问名与byKey保留；无其他类迁移，不改法术/法杖/伤害ID与NBT键。

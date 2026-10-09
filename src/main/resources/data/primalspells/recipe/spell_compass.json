@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:compass",
+    "minecraft:amethyst_shard",
+    "minecraft:paper"
+  ],
+  "result": {
+    "id": "primalspells:spell_compass",
+    "count": 1
+  }
+}

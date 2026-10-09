@@ -1,0 +1,48 @@
+{
+  "min_tier": 1,
+  "max_tier": 2,
+  "cards": [
+    "fireball",
+    "speed_boost",
+    "bounce",
+    "double_cast",
+    "torch",
+    "extended_lifetime",
+    "damage_boost",
+    "drone_bolt",
+    "gradual_accelerate",
+    "gradual_decelerate",
+    "random_path",
+    "reciprocate",
+    "sine_wave",
+    "survey_pulse",
+    "item_pull",
+    "feather_ward"
+  ],
+  "loadouts": [
+    [
+      "fireball",
+      "bounce"
+    ],
+    [
+      "fireball",
+      "speed_boost"
+    ]
+  ],
+  "elite_loadouts": [
+    [
+      "double_cast",
+      "fireball",
+      "fireball"
+    ]
+  ],
+  "structure_tag": "primalspells:spell_sites/ruins",
+  "spawn_weight": 35,
+  "elite_chance": 0.15,
+  "wand_chance": 0.4,
+  "charged_chance": 0.125,
+  "card_count": 2,
+  "dimensions": [
+    "minecraft:overworld"
+  ]
+}

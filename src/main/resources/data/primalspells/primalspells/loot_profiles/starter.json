@@ -1,0 +1,25 @@
+{
+  "min_tier": 1,
+  "max_tier": 1,
+  "cards": [
+    "fireball",
+    "torch",
+    "bounce",
+    "item_pull"
+  ],
+  "loadouts": [
+    [
+      "fireball"
+    ]
+  ],
+  "elite_loadouts": [],
+  "structure_tag": "primalspells:spell_sites/starter",
+  "spawn_weight": 0,
+  "elite_chance": 0,
+  "wand_chance": 1,
+  "charged_chance": 0,
+  "card_count": 1,
+  "dimensions": [
+    "minecraft:overworld"
+  ]
+}

@@ -49,6 +49,7 @@ class ModItems {
                         output.accept(wandStack(tier, WandVariant.NORMAL))
                         output.accept(wandStack(tier, WandVariant.CHARGED))
                     }
+                    output.accept(SPELL_COMPASS)
                     output.accept(SPELL_POUCH)
                     output.accept(TEST_DUMMY)
                     // 同类沿注册顺序排列，避免HashMap导致每种法术散落在不同位置。
@@ -65,6 +66,8 @@ class ModItems {
                 }
                 .build()
         }
+
+        val SPELL_COMPASS = ITEMS.registerItem("spell_compass") { props -> work.nekow.primalspells.item.SpellCompassItem(props.stacksTo(1)) }
 
         val WAND_ID = COMPONENTS.register("wand_id") { _ -> TYPE }
 

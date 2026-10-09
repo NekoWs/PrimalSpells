@@ -14,8 +14,9 @@ object SpellcasterSpawns {
     @SubscribeEvent
     fun potential(event: LevelEvent.PotentialSpawns) {
         val level = event.level as? ServerLevel ?: return
-        if (event.mobCategory != MobCategory.MONSTER || SpellLootProfile.at(level, event.pos) == null) return
+        if (event.mobCategory != MobCategory.MONSTER) return
+        val profile = SpellLootProfile.at(level, event.pos) ?: return
         if (event.spawnerDataList.any { it.value().type() == ModEntities.ROGUE_MAGE.get() }) return
-        event.addSpawnerData(Weighted(MobSpawnSettings.SpawnerData(ModEntities.ROGUE_MAGE.get(), 1, 1), 35))
+        event.addSpawnerData(Weighted(MobSpawnSettings.SpawnerData(ModEntities.ROGUE_MAGE.get(), 1, 1), profile.spawnWeight))
     }
 }

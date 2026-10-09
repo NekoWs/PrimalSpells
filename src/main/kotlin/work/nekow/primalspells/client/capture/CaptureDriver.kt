@@ -268,7 +268,7 @@ object CaptureDriver {
             true,
             WorldDataConfiguration.DEFAULT,
         )
-        val options = WorldOptions(SEED, false, false)
+        val options = WorldOptions(SEED, scenes.any { it.name == "progression" }, false)
         mc.createWorldOpenFlows().createFreshLevel(
             LEVEL_ID,
             settings,

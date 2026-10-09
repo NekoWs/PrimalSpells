@@ -47,6 +47,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         // 测试指令：/primalspells shielddummy [cards|clear]（详见类注释）
         NeoForge.EVENT_BUS.register(ShieldDummyCommand)
         NeoForge.EVENT_BUS.register(WandCommand)
+        NeoForge.EVENT_BUS.register(work.nekow.primalspells.integration.PackRules)
         NeoForge.EVENT_BUS.register(MagicManager)
         NeoForge.EVENT_BUS.register(WandManager)
         NeoForge.EVENT_BUS.register(work.nekow.primalspells.event.SpellcasterSpawns)

@@ -1,0 +1,41 @@
+{
+  "min_tier": 5,
+  "max_tier": 6,
+  "cards": [
+    "concentrated_light",
+    "black_hole",
+    "divide_two",
+    "divide_three",
+    "divide_five",
+    "divide_ten",
+    "cast_all",
+    "quintuple_cast",
+    "quantum_entanglement",
+    "bounce_duplicate"
+  ],
+  "loadouts": [
+    [
+      "concentrated_light"
+    ],
+    [
+      "trigger_fireball",
+      "large_explosion"
+    ]
+  ],
+  "elite_loadouts": [
+    [
+      "concentrated_light",
+      "energy_shield"
+    ]
+  ],
+  "structure_tag": "primalspells:spell_sites/relic",
+  "spawn_weight": 35,
+  "elite_chance": 0.15,
+  "wand_chance": 0.4,
+  "charged_chance": 0.125,
+  "card_count": 2,
+  "dimensions": [
+    "minecraft:overworld",
+    "minecraft:the_end"
+  ]
+}

@@ -29,6 +29,8 @@ import work.nekow.primalspells.loot.SpellLootProfile
 /** 遗迹中的敌对持杖者；使用玩家同一套抽牌/法力/冷却，死亡掉落原手持法杖。 */
 class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Monster(type, level) {
     val charging: Boolean get() = entityData.get(CHARGING)
+    val elite get() = persistentData.getBooleanOr("primalspells:elite", false)
+    val school get() = MageSchool.of(this)
     var successfulCasts = 0
         private set
 
@@ -57,10 +59,23 @@ class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Mon
     }
 
     /** 服务端出生配置：手持真实地点配方，死亡经原版装备掉落完整保留。 */
-    fun equip(profile: SpellLootProfile) {
-        setItemSlot(EquipmentSlot.MAINHAND, SpellLoot.wand(profile, random))
+    fun equip(profile: SpellLootProfile, elite: Boolean = random.nextDouble() < profile.eliteChance) {
+        persistentData.putString("primalspells:loot_profile", profile.key)
+        persistentData.putBoolean("primalspells:elite", elite)
+        setItemSlot(EquipmentSlot.MAINHAND, SpellLoot.wand(profile, random, elite))
+        customName = net.minecraft.network.chat.Component.translatable(if (elite) "entity.primalspells.elite_mage" else "entity.primalspells.school_mage",
+            net.minecraft.network.chat.Component.translatable("mage.primalspells.${school.name.lowercase()}")).withStyle(school.color)
+        isCustomNameVisible = true
         // 由原版装备掉落路径保证只掉一次，并完整保留组件及wandId。
         setGuaranteedDrop(EquipmentSlot.MAINHAND)
+    }
+
+    override fun dropCustomDeathLoot(level: ServerLevel, source: DamageSource, killedByPlayer: Boolean) {
+        super.dropCustomDeathLoot(level, source, killedByPlayer)
+        if (elite) {
+            val profile = SpellLootProfile.byKey(persistentData.getStringOr("primalspells:loot_profile", "ruins")) ?: SpellLootProfile.RUINS
+            spawnAtLocation(level, net.minecraft.world.item.ItemStack(work.nekow.primalspells.registry.ModItems.spellItem(profile.cards[random.nextInt(profile.cards.size)])!!))
+        }
     }
 
     override fun aiStep() {
@@ -77,7 +92,7 @@ class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Mon
     /** AI进入可被伤害打断的准备阶段，并同步持杖姿态。 */
     fun prepareCast() {
         entityData.set(CHARGING, true)
-        playSound(SoundEvents.EVOKER_PREPARE_ATTACK, 0.65f, 1.1f)
+        playSound(SoundEvents.EVOKER_PREPARE_ATTACK, 0.65f, 0.85f + school.ordinal * 0.12f)
     }
 
     /** AI失去视线、受伤或停止时解除准备姿态。 */

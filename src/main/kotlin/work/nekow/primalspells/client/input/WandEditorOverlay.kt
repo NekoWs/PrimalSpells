@@ -63,6 +63,10 @@ object WandEditorOverlay {
                 if (mx >= x + WIDTH - 18) clear() else { drag = true; grabX = mx - x; grabY = my - y }
                 return
             }
+            if (my in y + 63..y + 77) {
+                Minecraft.getInstance().gui.setScreen(work.nekow.primalspells.client.screen.WandPreviewScreen(id, screen, preview))
+                return
+            }
             val col = (mx - x - 8) / 18; val row = (my - y - 23) / 18
             if (mx >= x + 8 && mx < x + 8 + 18 * 9 && my >= y + 23 && my < y + 59) {
                 val selected = row * 9 + col
@@ -128,6 +132,7 @@ object WandEditorOverlay {
         val summary = if (p == null) Component.translatable("preview.primalspells.wait") else
             Component.translatable("preview.primalspells.summary", "%.0f".format(p.manaAfter), p.delay.toInt(), p.recharge.toInt(), p.shots)
         g.text(font, summary, x + 8, y + 65, 0xFF383838.toInt(), false)
+        g.text(font, "↗", x + WIDTH - 16, y + 65, 0xFF553388.toInt(), false)
         val lines = p?.rows.orEmpty()
         scroll = scroll.coerceIn(0, (lines.size - 4).coerceAtLeast(0))
         g.enableScissor(x + 8, y + 78, x + WIDTH - 8, y + 127)

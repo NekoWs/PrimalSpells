@@ -35,6 +35,8 @@
 | [design/combat-pricing.md](design/combat-pricing.md) | **战斗数值口径**：攻击法术的伤害/施法间隔（对齐原版 DPS）、护盾的强度与抗性 | 改伤害、`delay`/`recharge`、护盾数值之前 |
 | [design/wand-tiers.md](design/wand-tiers.md) | **法杖数值口径**：六级等级曲线（法力/充能速度/施放延迟/充能时间/槽位/施放数）、蓄能型变体、完整刻与旧存档迁移、Alt 面板的展示路径 | 改法杖数值、加掉落/合成、调施法节奏之前 |
 
+第83轮新增设计：[整合包接口v1](design/pack-integration.md)、[非破坏性交互与寻法](design/world-utility.md)。可安装例包在[docs/examples/exploration-pack](examples/exploration-pack/pack.mcmeta)。
+
 ## 2. 技术栈与关键事实
 
 | 项 | 值 |

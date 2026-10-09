@@ -154,6 +154,8 @@ class Wand(var id: String) {
             status.failedReason.add("Recharge ${fmt(status.recharge)}/${fmt(rechargeTicks())}")
             return false
         }
+        if (net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.BeforeCast(caster, this)).isCanceled) return false
+        val manaBefore = status.mana
         status.delay = 0.0
         status.recharge = 0.0
         val chain = drawChain(cast)
@@ -165,6 +167,7 @@ class Wand(var id: String) {
         status.lastDelay = status.delay
         status.lastRecharge = status.recharge
         work.nekow.primalspells.magic.effect.visual.WandCastingFx.cooldownsChanged(caster, this)
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.AfterCast(caster, id, manaBefore, status.mana, status.delay, status.recharge))
         return true
     }
 

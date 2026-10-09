@@ -15,7 +15,8 @@ MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','exte
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
              'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter')
 NEW_IDS = ('divide_two', 'divide_three', 'divide_five', 'divide_ten', 'cast_all', 'add_trigger', 'add_timer', 'add_expiration', 'triple_cast', 'quadruple_cast', 'quintuple_cast', 'reduce_recharge', 'sawblade', 'healing_bolt', 'torch')
-IDS = PROJECTILES + MODIFIERS + NEW_IDS
+UTILITY_IDS = ('survey_pulse','item_pull','feather_ward')
+IDS = PROJECTILES + MODIFIERS + NEW_IDS + UTILITY_IDS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
 ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
 
@@ -206,6 +207,12 @@ def icon(name):
     elif name=='healing_bolt':plus(16,16,'#7cffa0');arrow((5,24),(11,20),WHITE,1)
     elif name=='torch':
         line(((14,20),(11,27)),WHITE,3);flame(18,13)
+    elif name=='survey_pulse':
+        d.ellipse((6,10,26,22),outline=BLUE,width=2);crystal(16,16,4);line(((16,5),(16,8)),WHITE,1)
+    elif name=='item_pull':
+        d.rectangle((12,13,22,24),fill=DARK_BLUE,outline=BLUE,width=2);arrow((6,8),(13,16),WHITE,1);arrow((26,7),(20,16),WHITE,1)
+    elif name=='feather_ward':
+        d.polygon(((8,25),(13,10),(24,6),(23,17),(8,25)),fill=BLUE);line(((8,25),(22,8)),WHITE,2)
     else:raise ValueError('No glyph: '+name)
     return im.resize((64,64),Image.Resampling.NEAREST)
 

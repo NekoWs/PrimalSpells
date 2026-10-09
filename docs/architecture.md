@@ -584,3 +584,12 @@ no_knockback会同时跳过原版受击方向通知。SpellImpact只在真实接
 ## 第83轮：只读预览与菜单编辑
 
 Wand.preview使用隔离的牌堆/卡牌副本直接调用drawChain/payChain/discard，不驱动世界钩子，不修改原杖。展开树按链分scope，费用与实际支付身份对应。客户端仅显示服务端结果；悬浮编辑依原容器菜单索引、拾取权限、wandId及光标散卡验证后调用原WandItem装卸。创造菜单槽映射到inventoryMenu，完整菜单同步携带权威光标；生存不接受客户端声明的散卡。协议1.2.0，不改存档键。
+
+
+## 第83轮：整合契约与探索扩展
+
+PackRules在资源prepare阶段完成校验，apply一次替换快照；停服恢复基础配置，不跨服务器保留外部包状态。SpellLoot、术士出生和WandStats.roll读取同一快照；已生成杖只读持久化数值，不因重载重掷。自定义池键带命名空间，旧六池别名保留；重叠结构按priority再按maxTier选择。
+
+SpellApi.cast限定服务端主线程，复用同一Wand.tick/spell。BeforeCast位于装备/冷却门禁后、抽牌前，可取消；AfterCast在事务结束后。SpellImpact提供可取消/改额的BeforeImpact与真实接受后的AfterImpact，冻结实际进入/结束发StatusChanged。生活卡每个目标先发UtilityAction，再走原版高亮/缓降/拾取，不改方块、不绕过拾取事件。
+
+术士elite/profile键由NeoForge实体持久数据保存，流派由实际杖牌推导。精英额外散卡走原版dropCustomDeathLoot与掉落事件，原手杖仍只掉一份。罗盘使用原版真实结构定位与LODESTONE_TRACKER保存目标，不写入法杖存档。细节见design/pack-integration和design/world-utility。

@@ -93,7 +93,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
             while (previewKey.consumeClick()) if (net.minecraft.client.Minecraft.getInstance().gui.screen() == null) openPreview()
         }
         NeoForge.EVENT_BUS.addListener<net.neoforged.neoforge.client.event.ScreenEvent.KeyPressed.Pre> {
-            if (it.keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_V && it.screen is net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>) { openPreview(); it.isCanceled = true }
+            if (previewKey.matches(it.keyEvent) && it.screen is net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>) { openPreview(); it.isCanceled = true }
         }
         ClientPayloadSink.hudImpact = { WandHudRenderer.impact(it.killed) }
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }

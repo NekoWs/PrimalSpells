@@ -19,13 +19,18 @@ object SpellImpact {
              blast: Boolean = false, knockback: Boolean = true,
              type: work.nekow.primalspells.magic.core.SpellDamageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE): Boolean {
         if (!damage.isFinite() || !target.isAlive) return false
-        if (type == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && damage > 0.0) {
+        val event = net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.BeforeImpact(caster, target, type, damage, direction))
+        val amount = event.amount
+        if (event.isCanceled || !amount.isFinite()) return false
+        if (type == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && amount > 0.0) {
             val living = target as? LivingEntity ?: return false
             val before = living.health
-            living.heal(damage.toFloat())
-            return living.health > before
+            living.heal(amount.toFloat())
+            val accepted = living.health > before
+            if (accepted) net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.AfterImpact(caster, target, type, amount))
+            return accepted
         }
-        val settled = if (type == work.nekow.primalspells.magic.core.SpellDamageType.HEALING) -damage else damage
+        val settled = if (type == work.nekow.primalspells.magic.core.SpellDamageType.HEALING) -amount else amount
         if (settled <= 0.0) return false
         val source = ModDamageTypes.sourceOrNull(level, caster, type) ?: return false
         val invul = target.invulnerableTime
@@ -45,12 +50,13 @@ object SpellImpact {
         }
         if (accepted && knockback && type != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) {
             val resistance = if (target is LivingEntity) target.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) else 0.0
-            val power = strength(damage, blast) * (1.0 - resistance).coerceIn(0.0, 1.0)
+            val power = strength(settled, blast) * (1.0 - resistance).coerceIn(0.0, 1.0)
             val heading = if (direction.lengthSqr() > 1e-8) direction.normalize() else Vec3(0.0, 1.0, 0.0)
             val push = if (blast) Vec3(heading.x, heading.y.coerceAtLeast(0.12), heading.z).normalize() else heading
             target.push(push.x * power, push.y * power, push.z * power)
             target.hurtMarked = true
         }
+        if (accepted) net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.AfterImpact(caster, target, type, amount))
         return accepted
     }
 }

@@ -60,7 +60,7 @@ object ExplorationScene {
                 }
                 if (t == 8) {
                     val pool = SpellLootProfile.entries.flatMap { it.cards + it.loadouts.flatten() }.toSet()
-                    record("all-62-spells-have-valid-reward-sources", pool == MagicManager.registry.keys, "pool=${pool.size} registry=${MagicManager.registry.size}")
+                    record("all-registered-spells-have-valid-reward-sources", pool == MagicManager.registry.keys, "pool=${pool.size} registry=${MagicManager.registry.size}")
                     val ids = hashSetOf<String>()
                     var valid = true
                     var charged = 0
@@ -128,7 +128,7 @@ object ExplorationScene {
                     ctx.player.health = 1000f
                     mage = ModEntities.ROGUE_MAGE.get().create(ctx.level, EntitySpawnReason.COMMAND)?.also {
                         it.setPos(0.0, floor + 1.0, 5.0)
-                        it.equip(SpellLootProfile.RUINS)
+                        it.equip(SpellLootProfile.RUINS, false)
                         it.target = ctx.player
                         ctx.level.addFreshEntity(it)
                         val wand = WandItem.getWand(it.mainHandItem)!!

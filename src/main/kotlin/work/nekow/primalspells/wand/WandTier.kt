@@ -159,15 +159,18 @@ data class WandStats(
 ) {
     companion object {
         /** 按等级 + 变体掷出一组数值（只有施放数是随机的）。 */
-        fun roll(tier: WandTier, variant: WandVariant, random: RandomSource): WandStats = WandStats(
-            tier = tier,
-            variant = variant,
-            maxMana = tier.maxMana * variant.manaMul,
-            manaPerTick = tier.manaPerTick / variant.chargeDiv,
-            delayTickCount = kotlin.math.ceil(tier.delayTickCount * variant.delayMul),
-            rechargeTickCount = kotlin.math.ceil(tier.rechargeTickCount * variant.delayMul),
-            size = tier.size,
-            cast = tier.rollCast(random),
-        )
+        fun roll(tier: WandTier, variant: WandVariant, random: RandomSource): WandStats {
+            val rule = work.nekow.primalspells.integration.PackRules.current.tiers[tier.level]
+            return WandStats(
+                tier = tier,
+                variant = variant,
+                maxMana = (rule?.mana ?: tier.maxMana) * variant.manaMul,
+                manaPerTick = (rule?.charge ?: tier.manaPerTick) / variant.chargeDiv,
+                delayTickCount = kotlin.math.ceil((rule?.delay?.toDouble() ?: tier.delayTickCount) * variant.delayMul),
+                rechargeTickCount = kotlin.math.ceil((rule?.recharge?.toDouble() ?: tier.rechargeTickCount) * variant.delayMul),
+                size = rule?.size ?: tier.size,
+                cast = rule?.casts?.let { it[random.nextInt(it.size)] } ?: tier.rollCast(random),
+            )
+        }
     }
 }

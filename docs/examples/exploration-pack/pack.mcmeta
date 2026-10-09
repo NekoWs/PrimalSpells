@@ -1,0 +1,13 @@
+{
+  "pack": {
+    "description": "PrimalSpells API v1 example: outpost school and new T1 stats",
+    "min_format": [
+      107,
+      1
+    ],
+    "max_format": [
+      107,
+      1
+    ]
+  }
+}

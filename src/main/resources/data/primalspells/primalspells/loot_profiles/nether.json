@@ -1,0 +1,46 @@
+{
+  "min_tier": 4,
+  "max_tier": 5,
+  "cards": [
+    "plasma_beam",
+    "volatile",
+    "large_explosion",
+    "diffusion",
+    "piercing",
+    "recoil_damper",
+    "quadruple_cast",
+    "bounce_explosion",
+    "explosion_projectile",
+    "explosion_remove",
+    "implosion"
+  ],
+  "loadouts": [
+    [
+      "trigger_fireball",
+      "small_explosion"
+    ],
+    [
+      "fireball",
+      "double_cast",
+      "fireball",
+      "speed_boost"
+    ]
+  ],
+  "elite_loadouts": [
+    [
+      "double_cast",
+      "fireball",
+      "fireball",
+      "speed_boost"
+    ]
+  ],
+  "structure_tag": "primalspells:spell_sites/nether",
+  "spawn_weight": 35,
+  "elite_chance": 0.15,
+  "wand_chance": 0.4,
+  "charged_chance": 0.125,
+  "card_count": 2,
+  "dimensions": [
+    "minecraft:the_nether"
+  ]
+}

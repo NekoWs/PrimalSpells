@@ -38,6 +38,7 @@ object FrozenStatus {
             it.addTransientModifier(AttributeModifier(FREEZE_ID, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL))
         }
         states[target.uuid] = State(target, level, level.gameTime + duration, group)
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.StatusChanged(target, "primalspells:frozen", true, duration))
     }
 
     /** 碎冰只消耗一次冻结；碎片动画由 PD 编排。 */
@@ -60,6 +61,7 @@ object FrozenStatus {
     private fun finish(id: java.util.UUID, shattered: Boolean) {
         val state = states.remove(id) ?: return
         immunity[id] = state.level to (state.level.gameTime + 40)
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.StatusChanged(state.target, "primalspells:frozen", false, 0))
         state.target.getAttribute(Attributes.MOVEMENT_SPEED)?.removeModifier(FREEZE_ID)
         work.nekow.primalspells.magic.effect.visual.PixelVfx.shatter(state.shell, 5)
         work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(state.level), state.target.boundingBox.center,

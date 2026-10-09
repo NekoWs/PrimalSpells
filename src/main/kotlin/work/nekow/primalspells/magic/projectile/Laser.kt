@@ -9,6 +9,7 @@ class Laser: Projectile() {
     override val bodyColor = Color.of(0.5f, 0.8f, 1f)
 
     init {
+        recoil = 0.015
         damageType = work.nekow.primalspells.magic.core.SpellDamageType.ENERGY
         mana = 10.0
         speed = 5f

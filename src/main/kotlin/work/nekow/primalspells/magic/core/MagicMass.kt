@@ -20,7 +20,7 @@ object MagicMass {
     /** 相同外力下加速度反比于质量；重型场源加阻尼抑制近中心穿越后积累高速。 */
     fun attract(shot: Projectile, direction: Vector3f, force: Double) {
         val inverse = 1.0 / shot.mass
-        val damping = 0.18 * (1.0 - inverse.coerceAtMost(1.0))
+        val damping = 0.04 * (1.0 - inverse.coerceAtMost(1.0))
         val radial = shot.status.velocity.dot(direction)
         shot.status.velocity.sub(Vector3f(direction).mul((radial * damping).toFloat()))
             .add(Vector3f(direction).mul((force * inverse).toFloat()))

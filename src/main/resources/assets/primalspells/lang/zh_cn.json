@@ -155,5 +155,13 @@
   "lore.primalspells.typed_damage": "%s：%s",
   "lore.primalspells.damage_type": "附加伤害：%s",
   "lore.primalspells.mass": "质量：%s",
-  "damage.primalspells.hit": "−%s %s"
+  "damage.primalspells.hit": "−%s %s",
+  "item.primalspells.concentrated_light": "汇聚之光",
+  "lore.primalspells.concentrated_light.desc": "在杖首蓄能20刻后射出远程高速强光，碰墙反弹一次。",
+  "item.primalspells.recoil_damper": "后坐力阻尼",
+  "lore.primalspells.recoil_damper.desc": "将施法后坐力降至四分之一；可叠加。",
+  "item.primalspells.recoil_boost": "反冲增幅",
+  "lore.primalspells.recoil_boost.desc": "施法后坐力增加0.35，可用于反冲推进。",
+  "lore.primalspells.recoil": "后坐力：%s",
+  "lore.primalspells.charge_time": "蓄能：%st"
 }

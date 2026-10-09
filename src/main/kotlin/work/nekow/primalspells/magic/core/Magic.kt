@@ -117,7 +117,7 @@ abstract class Magic {
      *
      * 顺序契约：玩法效果改速度/伤害 → 轨道导向 → `Move` 扫掠积分 → 位置覆盖 → 粒子表现。
      */
-    fun tick() {
+    open fun tick() {
         effects.sortedBy { it.phase.tickOrder }.forEach { it.onTick() }
     }
 

@@ -33,6 +33,33 @@ abstract class Projectile: Magic() {
     var damageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE
     var mass: Double = 1.0
         set(value) { field = work.nekow.primalspells.magic.core.MagicMass.valid(value) }
+    /** 后坐力基值、修正加值与倍率分开累积，避免修正牌顺序影响结果。 */
+    var recoil: Double = 0.0
+    var recoilBonus: Double = 0.0
+    var recoilMultiplier: Double = 1.0
+    var castFromWand: Boolean = false
+    var awaitingRelease: Boolean = false
+        protected set
+    private var recoilQueued = false
+    private var recoilApplied = false
+
+    fun queueCastRecoil() {
+        recoilQueued = true
+        if (!awaitingRelease) releaseCastRecoil()
+    }
+
+    /** 仅付费的直接施法排队；复制/触发子弹不会给持有者重复施加反冲。 */
+    fun releaseCastRecoil() {
+        if (!recoilQueued || recoilApplied || awaitingRelease || !caster.isAlive || caster.isSpectator) return
+        recoilApplied = true
+        val force = ((recoil + recoilBonus).coerceAtLeast(0.0) * recoilMultiplier).coerceIn(0.0, 2.0)
+        if (!force.isFinite() || force <= 0.0) return
+        val direction = if (status.velocity.lengthSquared() > 1e-8f) net.minecraft.world.phys.Vec3(status.velocity).normalize() else launchDirection
+        val impulse = direction.scale(-force / work.nekow.primalspells.magic.core.MagicMass.of(caster))
+        caster.push(impulse.x, impulse.y, impulse.z)
+        caster.hurtMarked = true
+    }
+
     var maxAge: Int = 0
     var alive: Boolean = true
 
@@ -155,6 +182,7 @@ abstract class Projectile: Magic() {
         lore += LoreEntry(Lore.MAX_AGE, arrayOf(maxAge.toString()))
         if (status.damage > 0) lore += LoreEntry(Lore.TYPED_DAMAGE, arrayOf(damageType.text, Lore.formatDouble(status.damage)))
         lore(Lore.MASS, Lore.formatDouble(mass))
+        if (recoil > 0) lore(Lore.RECOIL, Lore.formatDouble(recoil))
         if (effects.any { it is work.nekow.primalspells.magic.effect.lifecycle.Explosion || it is work.nekow.primalspells.magic.effect.lifecycle.CrystalReaction })
             lore(Lore.DAMAGE_TYPE, work.nekow.primalspells.magic.core.SpellDamageType.EXPLOSION.text)
         if (selfDamage || effects.any { it is work.nekow.primalspells.magic.effect.lifecycle.Explosion }) lore(Lore.SELF_DAMAGE)

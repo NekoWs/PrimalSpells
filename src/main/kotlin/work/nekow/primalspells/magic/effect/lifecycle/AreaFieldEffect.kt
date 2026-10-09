@@ -86,6 +86,8 @@ abstract class AreaFieldEffect(
      */
     protected open fun applyProjectileForce(projectile: Projectile, dirToCenter: Vector3f, dist: Double) { }
 
+    protected open fun affectsEntity(entity: LivingEntity): Boolean = true
+
     /** 区域内生物结算的扩展点；读取最终场心与实体中心距离，例如黑洞暗核持续伤害。 */
     protected open fun affectEntity(level: ServerLevel, entity: LivingEntity, center: Vec3, dist: Double) { }
 
@@ -105,7 +107,7 @@ abstract class AreaFieldEffect(
 
         val aabb = AABB.ofSize(center, radius * projectile.areaScale * 2.0, radius * projectile.areaScale * 2.0, radius * projectile.areaScale * 2.0)
         val inRange = level.getEntitiesOfClass(LivingEntity::class.java, aabb) {
-            it.isAlive && it.boundingBox.center.distanceToSqr(center) <= radius * radius * projectile.areaScale * projectile.areaScale
+            it.isAlive && affectsEntity(it) && it.boundingBox.center.distanceToSqr(center) <= radius * radius * projectile.areaScale * projectile.areaScale
         }
 
         // 1) 先处理离开范围的生物：立刻撤销迟缓（不等效果自然到期）
@@ -130,7 +132,7 @@ abstract class AreaFieldEffect(
                 val dist = entity.boundingBox.center.distanceTo(center)
                 val dir = center.subtract(entity.boundingBox.center).normalize()
                 // 距离越近吸力越强（每 tick 施加一次，故强度按 tick 计）
-                entity.deltaMovement = entity.deltaMovement.scale(0.82).add(dir.scale(pullPerTick / ((dist + 0.5) * work.nekow.primalspells.magic.core.MagicMass.of(entity))))
+                entity.deltaMovement = entity.deltaMovement.scale(0.96).add(dir.scale(pullPerTick / ((dist + 0.5) * work.nekow.primalspells.magic.core.MagicMass.of(entity))))
                 entity.hurtMarked = true
             }
             affectEntity(level, entity, center, entity.boundingBox.center.distanceTo(center))
@@ -148,7 +150,7 @@ abstract class AreaFieldEffect(
         if (projectiles.isEmpty()) return
         val radiusSq = radius * radius * projectile.areaScale * projectile.areaScale
         for (p in projectiles) {
-            if (p === projectile || !p.alive || p.caster.level() !== fieldLevel) continue
+            if (p === projectile || !p.alive || p.awaitingRelease || p.caster.level() !== fieldLevel) continue
             val dx = center.x - p.status.pos.x.toDouble()
             val dy = center.y - p.status.pos.y.toDouble()
             val dz = center.z - p.status.pos.z.toDouble()

@@ -142,6 +142,8 @@ for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
 # 这两场包含真实爆炸/锯齿飞散，使用已有解体门禁（至少4帧），不能要求瞬间消失。
+SCENES["recoil_light"] = {"length": 220, "title": "后坐力 / 创造飞行豁免 / 蓄能强光", "metric": "warm", "fade_window": (70, 110), "quiet": (0, 8), "decay": "collapse"}
+SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 杖首蓄能与瞄准", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
@@ -361,7 +363,9 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     metric = spec.get("metric", "blue")
     blue_cover = [int(blue_mask(f).sum()) for f in frames] if metric not in ("wand", "warm", "orange") else []
     red_cover = [int(red_mask(f).sum()) for f in frames] if "breach" in spec or "breach_fade" in spec else []
-    warm_cover = [int(warm_mask(f).sum()) for f in frames] if metric == "warm" else []
+    # 第一人称蓄能取杖首上方，排除收杖后原版裸手的肤色；保留同样的可见性/退场门槛。
+    warm_roi = spec.get("warm_roi")
+    warm_cover = [int((warm_mask(f)[warm_roi[1]:warm_roi[3], warm_roi[0]:warm_roi[2]] if warm_roi else warm_mask(f)).sum()) for f in frames] if metric == "warm" else []
     orange_cover = [int(orange_mask(f).sum()) for f in frames] if metric == "orange" else []
     dark_cover = [int(dark_mask(f).sum()) for f in frames] if "dark_core" in spec else []
     # 标准判据（空场起飞 / 真的渲染 / 退场 / 静止窗口）用哪一个像素判据：默认蓝（冷色粒子），

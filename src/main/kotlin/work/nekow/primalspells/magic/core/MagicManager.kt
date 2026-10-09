@@ -3,6 +3,7 @@ package work.nekow.primalspells.magic.core
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
+import work.nekow.primalspells.magic.projectile.ConcentratedLight
 import work.nekow.primalspells.magic.projectile.Chainsaw
 import work.nekow.primalspells.magic.projectile.DroneSwarm
 import work.nekow.primalspells.magic.projectile.DelayedCastProjectile
@@ -76,6 +77,9 @@ object MagicManager {
         register { ExtendedLifetime() }
         register { Laser() }
         register { Chainsaw() }
+        register { ConcentratedLight() }
+        register { RecoilDamper() }
+        register { RecoilBoost() }
         register { Piercing() }
         register { BounceExplosion() }
         register { Homing() }

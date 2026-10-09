@@ -6,14 +6,14 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'src/main/resources/assets/primalspells/textures/item'
 MAGIC = ROOT / 'src/main/kotlin/work/nekow/primalspells/magic'
-PROJECTILES = ('fireball','drone_bolt','trigger_fireball','delayed_cast','drone_swarm','laser','chainsaw',
+PROJECTILES = ('fireball','drone_bolt','trigger_fireball','delayed_cast','drone_swarm','laser','chainsaw','concentrated_light',
                'small_explosion','large_explosion','gravity_field','black_hole','teleport',
                'dormant_crystal','crystal_detonation','chain_bolt','plasma_beam','repulsion_field')
 MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','extended_lifetime',
              'piercing','bounce_explosion','homing','bounce_duplicate','gradual_accelerate',
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
-             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge')
+             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost')
 IDS = PROJECTILES + MODIFIERS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
 ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
@@ -65,6 +65,20 @@ def icon(name):
     if name in ('fireball','trigger_fireball'):
         flame()
         if name=='trigger_fireball': plus(24,8,WHITE)
+    elif name=='concentrated_light':
+        for y in (10,16,22): arrow((7,y),(17,16),YELLOW)
+        line(((17,16),(26,16)),YELLOW,5)
+        line(((17,16),(26,16)),WHITE,2)
+        d.polygon(((13,16),(17,11),(21,16),(17,21)),fill=WHITE)
+    elif name in ('recoil_damper','recoil_boost'):
+        d.rectangle((17,9,23,22),fill=DARK_BLUE,outline=BLUE,width=2)
+        arrow((16,16),(6,16),YELLOW)
+        if name=='recoil_damper':
+            line(((8,10),(8,22)),PURPLE,3)
+            line(((12,10),(12,22)),WHITE,1)
+        else:
+            arrow((15,10),(6,10),ORANGE)
+            arrow((15,22),(6,22),ORANGE)
     elif name=='chainsaw':
         d.polygon(((8,22),(6,19),(9,15),(12,17),(14,14),(18,18),(14,23)),fill=ORANGE)
         d.polygon(((13,15),(20,7),(24,7),(25,11),(18,19)),fill='#768997')

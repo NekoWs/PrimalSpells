@@ -8,6 +8,7 @@ class SmallExplosion : Projectile() {
     override val id = "small_explosion"
 
     init {
+        recoil = 0.25
         mana = 40.0
         // 定价见 docs/design/combat-pricing.md §2：AoE 单体 8 DPS → 中心 12 伤害 / 30 tick（1.5 秒一发）。
         // AoE 能同时打多个目标，所以单体 DPS 刻意比单体弹（10）低一档。

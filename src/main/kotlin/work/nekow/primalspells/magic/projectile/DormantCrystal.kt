@@ -10,6 +10,7 @@ class DormantCrystal : Projectile() {
     override val id = "dormant_crystal"
     override val bodyColor = Color.ofInt(114, 216, 185)
     init {
+        recoil = 0.1
         mana = 20.0; delay = 30; maxAge = 600; speed = 0.55f
         status.explosionRadius = 3f; status.explosionDamage = 12.0
         effects += ConstantAcceleration(Vector3f(0f, -0.025f, 0f))

@@ -15,6 +15,7 @@ class TriggerFireball: Projectile(), TriggerSpell {
     override var payload = arrayListOf<Magic>()
 
     init {
+        recoil = 0.05
         mana = 5.0
         // 定价见 docs/design/combat-pricing.md §2：自身 4 伤害 / 6 tick —— 比火球低一档，
         // 因为荷载的牌会在 loadPayload 时把自己的 delay/recharge 累加到本弹上（Wand.kt）。

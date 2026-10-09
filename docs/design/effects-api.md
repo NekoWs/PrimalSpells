@@ -744,3 +744,7 @@ PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴
 爆炸长火星/压力碎片使用原生ParticleVisual.alignTo对齐飞行方向；广告牌下spin本来就不生效，不把无效的平面旋转当作已正确对齐，也不补写客户端朝向渲染器。
 
 第66轮检查发现锁定1.0.15-ALPHA BridgeParticle的光照缓存只按方块坐标失效，会留住动态光已合并结果。详见issues/pd-api-requests第66轮；已停止该接入点，不抖位置/重生粒子/自写光照绕过。尚未更新前置，也不宣称残留亮度修复。
+
+## 第67轮接线：汇聚之光
+
+ConcentratedLightFx只使用PD 1.0.15公开ParticleBatch.trackAll、spawnAll、实色SQUARE、sizeCurve及既有retireBatch接线。出生2刻接续、蓄能20刻、杖首片元收尾3刻、扫掠束12～14刻，首刻释放不再把蓄能组追踪到4.8格外。没有新增自制渲染/播放器/光照缓存或升级前置；第66轮已登记的PD发光缓存问题仍待上游修复，本轮没有新的API修改需求。

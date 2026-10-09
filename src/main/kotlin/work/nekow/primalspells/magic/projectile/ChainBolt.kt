@@ -9,6 +9,7 @@ class ChainBolt : Projectile() {
     override val id = "chain_bolt"
     override val bodyColor = Color.ofInt(120, 210, 255)
     init {
+        recoil = 0.08
         damageType = work.nekow.primalspells.magic.core.SpellDamageType.ELECTRICITY
         mana = 18.0; delay = 1; maxAge = 15; speed = 0.46875f; dragCoeff = 0f; hitRadius = 0.0; collisionEnabled = false
         status.damage = 4.0

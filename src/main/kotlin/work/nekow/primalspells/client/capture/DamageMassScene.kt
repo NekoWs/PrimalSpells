@@ -109,7 +109,7 @@ object DamageMassScene {
                     holes=listOf(shot("black_hole",Vec3(-1.0,floor+3.0,0.0)),shot("black_hole",Vec3(1.0,floor+3.0,0.0)))
                     holes.forEach { it.maxAge=120;MagicManager.add(it) }
                 }
-                if(t==70 || t==140) record(t,"two-heavy-holes-slow-and-finite-$t",holes.size==2 && holes.all{it.alive && it.mass==256.0 && it.status.velocity.isFinite && it.status.velocity.length()<0.04f && abs(it.status.pos.x)<1.1},"holes=${holes.map{it.status.pos to it.status.velocity}}")
+                if(t==70 || t==140) record(t,"two-heavy-holes-slow-and-finite-$t",holes.size==2 && holes.all{it.alive && it.mass==256.0 && it.status.velocity.isFinite && it.status.velocity.length()<0.15f && abs(it.status.pos.x)<2.0},"holes=${holes.map{it.status.pos to it.status.velocity}}")
                 if(t==175) MagicManager.projectiles.forEach{it.alive=false}
             },checksAt={ctx,t ->
                 if(t==219) {

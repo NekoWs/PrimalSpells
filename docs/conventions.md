@@ -35,7 +35,7 @@ src/main/kotlin/work/nekow/primalspells/
 │  │  ├─ DelayedCastProjectile.kt DroneSwarm.kt
 │  │  └─ immobile/              静止/定点类投射物
 │  │     ├─ SmallExplosion.kt LargeExplosion.kt GravityFieldProjectile.kt BlackHoleProjectile.kt
-│  ├─ modifier/                 修饰器实现（26 个）
+│  ├─ modifier/                 修饰器实现（28 个）
 │  └─ effect/                   特效（挂在投射物上的可组合行为）
 │     ├─ BaseEffect.kt          特效基类：六钩子 + phase + 同类叠加辅助（stackScale/isStackPrimary）
 │     ├─ geometry/              空间与运动：Position, Velocity, Move, Bounce, Tracking, ConstantAcceleration
@@ -335,3 +335,7 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 第65轮结构记录：伤害/推力结算新增`magic/effect/lifecycle/SpellImpact.kt`；常驻魔弹表现新增`magic/effect/visual/ChainBoltFx.kt`；真实生物验收新增`client/capture/CombatImpactScene.kt`。连锁魔弹从Trajectory改路由至ChainBoltFx；原版伤害标签位于`src/main/resources/data/minecraft/tags/damage_type/no_knockback.json`，不新建伤害注册表或客户端伤害分支。
 
 第66轮新增文件：`magic/core/{SpellDamageType,MagicMass}.kt`为跨效果共享的分类/惯性模型；实机回归放`client/capture/DamageMassScene.kt`。伤害注册仍只在`registry/ModDamageTypes.kt`；数据在`data/primalspells/damage_type/`，原版标签在`data/minecraft/tags/damage_type/`。无包迁移；PD光照缺陷只记录到issues，不增加mixin或光照实现。
+
+## 第67轮新增文件落位
+
+`magic/projectile/ConcentratedLight.kt`为蓄能投射物；`magic/effect/visual/ConcentratedLightFx.kt`为原生PD接线；`magic/modifier/{RecoilDamper,RecoilBoost}.kt`为后坐力数值卡；`client/capture/RecoilLightScene.kt`包含世界场及第一人称验收。三张卡按现有items/models/item/textures/item和语言键规则落位，图标仍由tools/spells/generate_icons.py生成。无旧→新迁移，当前18投射物+28修正=46卡。

@@ -8,6 +8,7 @@ class PlasmaBeamProjectile : Projectile() {
     override val id = "plasma_beam"
     override val bodyColor = Color.ofInt(76, 216, 255)
     init {
+        recoil = 0.15
         mass = 4.0
         damageType = work.nekow.primalspells.magic.core.SpellDamageType.ENERGY
         mana = 30.0; delay = 40; maxAge = 40; speed = 0f; dragCoeff = 0f

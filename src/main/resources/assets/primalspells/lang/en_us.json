@@ -155,5 +155,13 @@
   "lore.primalspells.typed_damage": "%s：%s",
   "lore.primalspells.damage_type": "Additional damage: %s",
   "lore.primalspells.mass": "Mass: %s",
-  "damage.primalspells.hit": "−%s %s"
+  "damage.primalspells.hit": "−%s %s",
+  "item.primalspells.concentrated_light": "Concentrated Light",
+  "lore.primalspells.concentrated_light.desc": "Charges for 20 ticks, then fires a fast, powerful long-range beam. Bounces once off a wall.",
+  "item.primalspells.recoil_damper": "Recoil Damper",
+  "lore.primalspells.recoil_damper.desc": "Multiplies cast recoil by 0.25. Stacks.",
+  "item.primalspells.recoil_boost": "Recoil Surge",
+  "lore.primalspells.recoil_boost.desc": "Adds 0.35 cast recoil. Can propel the caster backwards.",
+  "lore.primalspells.recoil": "Recoil: %s",
+  "lore.primalspells.charge_time": "Windup: %st"
 }

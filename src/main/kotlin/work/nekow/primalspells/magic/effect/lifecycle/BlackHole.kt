@@ -46,6 +46,9 @@ class BlackHole : AreaFieldEffect(
         work.nekow.primalspells.magic.core.MagicMass.attract(projectile, dirToCenter, PULL_PER_TICK / (dist + 0.5))
     }
 
+    override fun affectsEntity(entity: LivingEntity): Boolean =
+        entity !is net.minecraft.world.entity.player.Player || !(entity.isCreative && entity.abilities.flying)
+
     override fun affectEntity(level: ServerLevel, entity: LivingEntity, center: Vec3, dist: Double) {
         if (dist <= 1.15 * projectile.areaScale)
             SpellDamage.hit(level, entity, projectile, status.damage, knockback = false)

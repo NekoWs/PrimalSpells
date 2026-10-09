@@ -13,7 +13,7 @@ object SpellInteractions {
     fun tick(shots: List<Projectile>) {
         for (i in shots.indices) for (j in i + 1 until shots.size) {
             val a = shots[i]; val b = shots[j]
-            if (!a.alive || !b.alive || a.caster.level() !== b.caster.level()) continue
+            if (!a.alive || !b.alive || a.awaitingRelease || b.awaitingRelease || a.caster.level() !== b.caster.level()) continue
             val level = a.caster.level() as? ServerLevel ?: continue
             val pa = point(a); val pb = point(b)
             val crystalA = a.effects.filterIsInstance<CrystalReaction>().firstOrNull()
@@ -42,14 +42,14 @@ object SpellInteractions {
     }
     /** 光束沿实际截断线段也能给水晶充能，不能只检查束源位置。 */
     fun beam(shot: Projectile, from: Vec3, to: Vec3, shots: List<Projectile>) {
-        shots.filter { it !== shot && it.alive && it.caster.level() === shot.caster.level() }.forEach { other ->
+        shots.filter { it !== shot && it.alive && !it.awaitingRelease && it.caster.level() === shot.caster.level() }.forEach { other ->
             if (segmentDistance(point(other), from, to) <= 0.75)
                 other.effects.filterIsInstance<CrystalReaction>().forEach { it.charge(shot) }
         }
     }
     /** 爆炸冲击也对魔法弹施力，水晶触发由Explosion的统一通知入口处理。 */
     fun shock(level: ServerLevel, center: Vec3, radius: Double, damage: Double, shots: List<Projectile>) {
-        shots.filter { it.alive && it.caster.level() === level }.forEach { shot ->
+        shots.filter { it.alive && !it.awaitingRelease && it.caster.level() === level }.forEach { shot ->
             val d = point(shot).subtract(center); val dist = d.length()
             if (dist in 0.05..radius && shot.motionEnabled) {
                 val push = d.normalize().scale(SpellImpact.strength(damage * (1 - dist / radius), blast = true) / shot.mass)

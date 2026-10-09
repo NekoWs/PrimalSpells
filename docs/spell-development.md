@@ -405,3 +405,9 @@ class MyPassive : Modifier() {
 第65轮自伤/击退：Explosion/CrystalReaction及黑洞默认自伤，穿刺配方自动开启，读取Projectile.canHarm而非单独排除caster；Move需先离开施法者碰撞箱才允许返弹自伤。新直接伤害走SpellDamage.hit，新爆炸走Explosion.customExplode，二者共用SpellImpact.hurt处理真实受伤及推力；不要直接hurtServer后另加固定击退。暗核等吸引伤害用knockback=false避免反向推离。无伤害接受则无击退，原版击退由专用伤害tag禁用。
 
 第66轮：新伤害渠道在`magic/core/SpellDamageType.kt`添加枚举后，补ModDamageTypes通用注册对应数据包、no_knockback标签、中英名称与death.attack三变体；需要原版抗性的再加入原版伤害标签。直接命中设置Projectile.damageType，爆炸独立走EXPLOSION。FIRE目前是可用渠道，不自动点燃。质量通过Projectile.mass或实体NeoForgeData中的`primalspells:mass`配置；字段必须正且有限，无效数据安全回退。复制型法术仍按原法术模板和继承修饰配方重建，冰冻转换随配方重放；触发荷载保留自身法术类型。
+
+## 第67轮：蓄能投射物与后坐力
+
+新法术可配置Projectile.recoil；后坐力修正分别积累recoilBonus/recoilMultiplier，不在Modifier里直接push施法者。实际Wand施放统一queueCastRecoil；后代spell不能重复排队。需要延时射出的投射物使用awaitingRelease，真正释放后再releaseCastRecoil；不把法杖冷却和发射等待混为同一个计时器。蓄能动画持续跟随杖首，释放棱片在最后杖首坐标收尾，不能跟随首刻高速Move跳到光束前端。
+
+concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→中英语言→图标生成器→真实录制完整接入，18投射物+28修正=46张卡。汇聚之光既有一次反弹仍由Move/Projectile.hitBlock管理，可与弹跳、穿刺、速度、伤害、延寿等原配方联动。

@@ -62,7 +62,7 @@
 | `core/Magic.kt` | 法术基类：`id`/`mana`/`delay`/`recharge`/`effects`/`lore`、按阶段执行的 `spell`/`tick`/`die`、`clone()`（新建施法实例）、被动钩子 `onInventoryTick`/`onPassiveIdle`/`onUnloaded`（取下时清理）、运行期状态钩子 `saveRuntimeState`/`loadRuntimeState` |
 | `core/EffectPhase.kt` | 效果执行阶段：`SETUP` / `MODIFIER` / `GUIDANCE` / `MOTION` / `OVERRIDE` / `VISUAL` |
 | `core/MagicStatus.kt` | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 |
-| `core/MagicManager.kt` | 43 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
+| `core/MagicManager.kt` | 46 个法术的注册表（`init`）、投射物列表、每 tick 驱动、`create` |
 | `core/Modifier.kt` | 修饰器基类，`effects()` 返回克隆后的效果 |
 | `core/TriggerSpell.kt` | 触发法术接口（`triggerCast` + `payload`） |
 | `projectile/Projectile.kt` | 投射物基类：装配 4 个内建效果、命中/弹跳分派、`maxAge`/`maxHitTargets` 等字段 |
@@ -77,7 +77,7 @@
 | `projectile/immobile/LargeExplosion.kt` | `large_explosion`（半径 6 / 中心伤害 24 / 蓄力 18 tick） |
 | `projectile/immobile/GravityFieldProjectile.kt` | `gravity_field`（静止光环，200 tick） |
 | `projectile/immobile/BlackHoleProjectile.kt` | `black_hole`（静止引力场） |
-| `modifier/`（26 个，逐个见 §3） | 修饰器实现 |
+| `modifier/`（28 个，逐个见 §3） | 修饰器实现 |
 | `effect/BaseEffect.kt` | 六钩子契约 + `phase` + 同类叠加辅助（`stackCount`/`stackScale`/`isStackPrimary`） |
 | `effect/geometry/{Position,Velocity,Move,Bounce,Tracking,ConstantAcceleration}.kt` | 空间与运动（`Move` 是唯一的碰撞实现与唯一推进 `pos` 的地方） |
 | `effect/lifecycle/{Trigger,DelayedTrigger,Hurt,Explosion,AreaFieldEffect,BlackHole,GravityField}.kt` | 时机与结算（`AreaFieldEffect` 是区域场基类：生物迟缓/拉拽 + **投射物施力钩子** + PD 粒子视觉钩子） |
@@ -157,7 +157,7 @@
 ## 3. 法术 id ↔ 类 ↔ 资源对照
 
 > 资源三件套：`assets/primalspells/items/<id>.json`、`models/item/<id>.json`、`textures/item/<id>.png`；语言键 `item.primalspells.<id>` 与 `lore.primalspells.<id>.desc`。
-> 注册顺序与 `magic/core/MagicManager.kt` 的 `init` 一致（共 43 项：16 投射物 + 27 修饰器）。调试法术 `speed_getter` 已随死代码清理移除。
+> 注册顺序与 `magic/core/MagicManager.kt` 的 `init` 一致（共 46 项：18 投射物 + 28 修饰器）。调试法术 `speed_getter` 已随死代码清理移除。
 
 | id | 类 | 类型 | 文件 |
 |---|---|---|---|
@@ -173,6 +173,10 @@
 | `speed_boost` | `SpeedBoost` | 修饰器 | `magic/modifier/SpeedBoost.kt` |
 | `extended_lifetime` | `ExtendedLifetime` | 修饰器 | `magic/modifier/ExtendedLifetime.kt` |
 | `laser` | `Laser` | 投射物 | `magic/projectile/Laser.kt` |
+| `chainsaw` | `Chainsaw` | 投射物（清除施放延迟） | `magic/projectile/Chainsaw.kt` |
+| `concentrated_light` | `ConcentratedLight` | 投射物（20刻蓄能） | `magic/projectile/ConcentratedLight.kt` |
+| `recoil_damper` | `RecoilDamper` | 修饰器（反冲×0.25） | `magic/modifier/RecoilDamper.kt` |
+| `recoil_boost` | `RecoilBoost` | 修饰器（反冲+0.35） | `magic/modifier/RecoilBoost.kt` |
 | `piercing` | `Piercing` | 修饰器 | `magic/modifier/Piercing.kt` |
 | `bounce_explosion` | `BounceExplosion` | 修饰器 | `magic/modifier/BounceExplosion.kt` |
 | `homing` | `Homing` | 修饰器（注入 `Tracking`） | `magic/modifier/Homing.kt` |
@@ -301,3 +305,10 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 第65轮新增`magic/effect/lifecycle/SpellImpact.kt`（原版受伤/强度击退统一入口）、`magic/effect/visual/ChainBoltFx.kt`（分段魔弹常驻本体）、`client/capture/CombatImpactScene.kt`（原版生物击退/抗性、自伤、跃迁及暗核回归）。新增数据包`data/minecraft/tags/damage_type/no_knockback.json`只加入本模组projectile类型，禁用原版固定击退。没有新增/删除法术卡，仍43卡/442组合。
 
 第66轮：伤害分类→`magic/core/SpellDamageType.kt`；惯性质量/实体持久标签→`magic/core/MagicMass.kt`；多渠道安全注册→`registry/ModDamageTypes.kt`；真实原版受伤与质量/双黑洞回归→`client/capture/DamageMassScene.kt`。当前8份伤害数据包与原版4种语义标签+no_knockback；DamageNumber/TestDummy支持类型文字与颜色。
+
+## 第67轮：反冲与汇聚之光
+
+- `magic/projectile/Projectile.kt`：后坐力基值/加值/倍率、待释放状态及一次性付费反冲入口；`wand/Wand.kt`只为成功的直接施放排队。
+- `magic/projectile/ConcentratedLight.kt`：20刻蓄能、杖首跟随、释放时瞄准与高速一次反弹；`magic/effect/visual/ConcentratedLightFx.kt`：聚焦棱片、扫掠光束和余辉。
+- `magic/modifier/RecoilDamper.kt`（recoil_damper，后坐力阻尼）、`RecoilBoost.kt`（recoil_boost，反冲增幅）。
+- `client/capture/RecoilLightScene.kt`：recoil_light及concentrated_light_first_person两个真实运行时场景；当前46卡/504组合。

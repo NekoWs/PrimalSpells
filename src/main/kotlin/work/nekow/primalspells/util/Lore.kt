@@ -9,6 +9,8 @@ enum class Lore(val key: String) {
     DAMAGE("lore.primalspells.damage"),
     TYPED_DAMAGE("lore.primalspells.typed_damage"),
     DAMAGE_TYPE("lore.primalspells.damage_type"),
+    RECOIL("lore.primalspells.recoil"),
+    CHARGE_TIME("lore.primalspells.charge_time"),
     MASS("lore.primalspells.mass"),
     SELF_DAMAGE("lore.primalspells.self_damage"),
     SPEED("lore.primalspells.speed"),

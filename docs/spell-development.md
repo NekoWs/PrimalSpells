@@ -403,3 +403,5 @@ class MyPassive : Modifier() {
 第64轮新增投射物卡特性`resetsCastDelay`：只供链锯式实际施放的投射物在牌序当前位置清除此前施放延迟，普通Modifier不能用它改变可交换组合规则。触发载体只累加荷载数值，不继承该标记。自然寿命结算用onExpire，像水晶定时爆炸、延迟载体的释放视觉也接该钩子；onDie只承担收尾或明确的死亡结算。
 
 第65轮自伤/击退：Explosion/CrystalReaction及黑洞默认自伤，穿刺配方自动开启，读取Projectile.canHarm而非单独排除caster；Move需先离开施法者碰撞箱才允许返弹自伤。新直接伤害走SpellDamage.hit，新爆炸走Explosion.customExplode，二者共用SpellImpact.hurt处理真实受伤及推力；不要直接hurtServer后另加固定击退。暗核等吸引伤害用knockback=false避免反向推离。无伤害接受则无击退，原版击退由专用伤害tag禁用。
+
+第66轮：新伤害渠道在`magic/core/SpellDamageType.kt`添加枚举后，补ModDamageTypes通用注册对应数据包、no_knockback标签、中英名称与death.attack三变体；需要原版抗性的再加入原版伤害标签。直接命中设置Projectile.damageType，爆炸独立走EXPLOSION。FIRE目前是可用渠道，不自动点燃。质量通过Projectile.mass或实体NeoForgeData中的`primalspells:mass`配置；字段必须正且有限，无效数据安全回退。复制型法术仍按原法术模板和继承修饰配方重建，冰冻转换随配方重放；触发荷载保留自身法术类型。

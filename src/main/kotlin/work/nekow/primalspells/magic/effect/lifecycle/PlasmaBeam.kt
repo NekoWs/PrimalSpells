@@ -9,7 +9,7 @@ import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 
-/** 移动束源发出六格持续光束；最终位置求值、碰墙截断，每五 tick 结算且最多选四个目标。 */
+/** 移动束源发出六格持续光束；最终位置求值、碰墙截断，每 tick 结算且最多选四个目标。 */
 class PlasmaBeam : BaseEffect(), DirectDamage {
     override val phase = EffectPhase.VISUAL
     override val damageStrength: Double get() = status.damage
@@ -40,7 +40,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world), end,
                 Color.ofInt(120, 227, 255), 32, 0.12, 8, 0.006)
         }
-        if (status.age % 5 != 0 || start.distanceToSqr(end) < 1e-8) return
+        if (start.distanceToSqr(end) < 1e-8) return
         val candidates = world.getEntitiesOfClass(LivingEntity::class.java, AABB(start, end).inflate(0.25 * projectile.areaScale)) {
             it.isAlive && projectile.canHarm(it) && (it === caster || !caster.isAlliedTo(it)) &&
                 it.boundingBox.inflate(0.15 * projectile.areaScale).clip(start, end).isPresent

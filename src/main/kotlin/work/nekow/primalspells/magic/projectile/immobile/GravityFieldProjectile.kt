@@ -15,6 +15,7 @@ class GravityFieldProjectile : Projectile() {
     override val bodyColor = Color.of(0.5f, 0.4f, 1f)
 
     init {
+        mass = 32.0
         mana = 10.0
         delay = 0
         recharge = 0

@@ -16,9 +16,10 @@ object SpellImpact {
 
     /** 只对实际接受伤害的目标施加推力；保留原有速度，尊重击退抗性。direction为传播方向。 */
     fun hurt(level: ServerLevel, target: Entity, caster: Entity, damage: Double, direction: Vec3,
-             blast: Boolean = false, knockback: Boolean = true): Boolean {
+             blast: Boolean = false, knockback: Boolean = true,
+             type: work.nekow.primalspells.magic.core.SpellDamageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE): Boolean {
         if (damage <= 0.0 || !target.isAlive) return false
-        val source = ModDamageTypes.projectileSourceOrNull(level, caster) ?: return false
+        val source = ModDamageTypes.sourceOrNull(level, caster, type) ?: return false
         val invul = target.invulnerableTime
         target.invulnerableTime = 0
         val accepted = try { target.hurtServer(level, source, damage.toFloat()) }

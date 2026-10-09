@@ -11,6 +11,7 @@ class Chainsaw : Projectile() {
     override val bodyColor = Color.ofInt(255, 230, 139)
     override val resetsCastDelay = true
     init {
+        damageType = work.nekow.primalspells.magic.core.SpellDamageType.SLICE
         mana = 1.0
         recharge = -3
         maxAge = 1

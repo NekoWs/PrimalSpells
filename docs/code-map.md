@@ -299,3 +299,5 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 第64轮同时删除`magic/modifier/SphereOrbit.kt`及球形环绕所有资源、注册和生成器入口；新增`client/capture/CrystalLifecycleScene.kt`记录四向晶面、加速白闪、自然到期爆炸。
 
 第65轮新增`magic/effect/lifecycle/SpellImpact.kt`（原版受伤/强度击退统一入口）、`magic/effect/visual/ChainBoltFx.kt`（分段魔弹常驻本体）、`client/capture/CombatImpactScene.kt`（原版生物击退/抗性、自伤、跃迁及暗核回归）。新增数据包`data/minecraft/tags/damage_type/no_knockback.json`只加入本模组projectile类型，禁用原版固定击退。没有新增/删除法术卡，仍43卡/442组合。
+
+第66轮：伤害分类→`magic/core/SpellDamageType.kt`；惯性质量/实体持久标签→`magic/core/MagicMass.kt`；多渠道安全注册→`registry/ModDamageTypes.kt`；真实原版受伤与质量/双黑洞回归→`client/capture/DamageMassScene.kt`。当前8份伤害数据包与原版4种语义标签+no_knockback；DamageNumber/TestDummy支持类型文字与颜色。

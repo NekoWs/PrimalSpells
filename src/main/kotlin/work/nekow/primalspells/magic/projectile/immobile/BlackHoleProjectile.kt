@@ -15,6 +15,8 @@ class BlackHoleProjectile : Projectile() {
     override val bodyColor = Color.of(0.3f, 0f, 0.5f)
 
     init {
+        mass = 256.0
+        damageType = work.nekow.primalspells.magic.core.SpellDamageType.GRAVITY
         mana = 12.0
         delay = 0
         recharge = 0

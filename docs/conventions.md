@@ -333,3 +333,5 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 第64轮最终结构：删除`magic/modifier/SphereOrbit.kt`，新增`client/capture/CrystalLifecycleScene.kt`；当前17投射物+26修正共43卡。
 
 第65轮结构记录：伤害/推力结算新增`magic/effect/lifecycle/SpellImpact.kt`；常驻魔弹表现新增`magic/effect/visual/ChainBoltFx.kt`；真实生物验收新增`client/capture/CombatImpactScene.kt`。连锁魔弹从Trajectory改路由至ChainBoltFx；原版伤害标签位于`src/main/resources/data/minecraft/tags/damage_type/no_knockback.json`，不新建伤害注册表或客户端伤害分支。
+
+第66轮新增文件：`magic/core/{SpellDamageType,MagicMass}.kt`为跨效果共享的分类/惯性模型；实机回归放`client/capture/DamageMassScene.kt`。伤害注册仍只在`registry/ModDamageTypes.kt`；数据在`data/primalspells/damage_type/`，原版标签在`data/minecraft/tags/damage_type/`。无包迁移；PD光照缺陷只记录到issues，不增加mixin或光照实现。

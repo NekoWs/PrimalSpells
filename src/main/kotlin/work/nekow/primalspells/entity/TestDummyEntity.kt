@@ -55,7 +55,7 @@ class TestDummyEntity(
         if (isRemoved || !isAlive) return false
         if (amount <= 0) return false // 会让生命值增加的"伤害"（治疗）一律归零
         // 头顶跳出本次伤害量数字
-        spawnDamageNumber(level, position().add(0.0, bbHeight + 0.35, 0.0), amount.toDouble())
+        spawnDamageNumber(level, position().add(0.0, bbHeight + 0.35, 0.0), amount.toDouble(), work.nekow.primalspells.magic.core.SpellDamageType.fromMessageId(source.msgId))
         return true
     }
 

@@ -30,6 +30,9 @@ abstract class Projectile: Magic() {
     /** 投射物本体粒子的颜色（由各投射物子类覆盖）。 */
     open val bodyColor: Color = Color.WHITE
 
+    var damageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE
+    var mass: Double = 1.0
+        set(value) { field = work.nekow.primalspells.magic.core.MagicMass.valid(value) }
     var maxAge: Int = 0
     var alive: Boolean = true
 
@@ -150,7 +153,10 @@ abstract class Projectile: Magic() {
     override fun initLore() {
         super.initLore()
         lore += LoreEntry(Lore.MAX_AGE, arrayOf(maxAge.toString()))
-        if (status.damage > 0) lore += LoreEntry(Lore.DAMAGE, arrayOf(Lore.formatDouble(status.damage)))
+        if (status.damage > 0) lore += LoreEntry(Lore.TYPED_DAMAGE, arrayOf(damageType.text, Lore.formatDouble(status.damage)))
+        lore(Lore.MASS, Lore.formatDouble(mass))
+        if (effects.any { it is work.nekow.primalspells.magic.effect.lifecycle.Explosion || it is work.nekow.primalspells.magic.effect.lifecycle.CrystalReaction })
+            lore(Lore.DAMAGE_TYPE, work.nekow.primalspells.magic.core.SpellDamageType.EXPLOSION.text)
         if (selfDamage || effects.any { it is work.nekow.primalspells.magic.effect.lifecycle.Explosion }) lore(Lore.SELF_DAMAGE)
     }
 

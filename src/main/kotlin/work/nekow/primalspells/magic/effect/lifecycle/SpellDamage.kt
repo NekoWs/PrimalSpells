@@ -15,7 +15,7 @@ object SpellDamage {
         if (target is LivingEntity && ShieldGuard.absorbProjectile(level, target, shot)) return false
         val bonus = if (target is LivingEntity && amount >= 4.0 && FrozenStatus.isFrozen(target)) 2.0 else 0.0
         val direction = if (shot.status.velocity.lengthSquared() > 1e-8f) Vec3(shot.status.velocity) else shot.launchDirection
-        val accepted = SpellImpact.hurt(level, target, shot.caster, amount + bonus, direction, knockback = knockback)
+        val accepted = SpellImpact.hurt(level, target, shot.caster, amount + bonus, direction, knockback = knockback, type = shot.damageType)
         if (accepted && target is LivingEntity) {
             if (bonus > 0) FrozenStatus.shatter(target)
             if (shot.status.freezeTicks > 0) FrozenStatus.freeze(target, shot.status.freezeTicks)

@@ -1,4 +1,13 @@
 {
   "replace": false,
-  "values": ["primalspells:projectile"]
+  "values": [
+    "primalspells:projectile",
+    "primalspells:explosion",
+    "primalspells:fire",
+    "primalspells:slice",
+    "primalspells:ice",
+    "primalspells:electricity",
+    "primalspells:energy",
+    "primalspells:gravity"
+  ]
 }

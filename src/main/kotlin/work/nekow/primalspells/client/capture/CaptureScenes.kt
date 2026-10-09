@@ -916,7 +916,8 @@ object CaptureScenes {
             moveCamera = true,
             fov = 60,
             camera = { ctx, t ->
-                orbit(ctx, centerLift = EXPLOSION_CENTER_LIFT, radius = 12.0, lift = 3.0, degPerTick = 1.0, tick = t)
+                // 随机火舌最远约18格；机位在范围之外，避免掠过镜头被误判为退场硬切。
+                orbit(ctx, centerLift = EXPLOSION_CENTER_LIFT, radius = 20.0, lift = 3.0, degPerTick = 1.0, tick = t)
             },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)

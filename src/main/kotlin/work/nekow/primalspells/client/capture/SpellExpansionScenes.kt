@@ -134,7 +134,7 @@ object SpellExpansionScenes {
         val name = "expansion_plasma"
         var target: TestDummyEntity? = null
         var shieldWand: Wand? = null
-        return Scene(name, "等离子束：持续命中 / 墙面截断 / 延寿联动", 24, 145,
+        return Scene(name, "等离子束：持续命中 / 墙面截断 / 延寿联动", 24, 210,
             prepare = { ctx -> prepare(ctx); target = ctx.spawnDummy(0.0, ctx.floorBlockY(0, 0) + 1.0, 0.0) },
             camera = { ctx, _ -> Pose(6.0, ctx.floorBlockY(0, 0) + 3.8, -7.0, 41f, 10f) },
             tick = { ctx, t ->
@@ -162,10 +162,13 @@ object SpellExpansionScenes {
                 28 -> listOf(Check(name, t, "repeated-beam-damage", numbers(ctx).count { it == "-1.5" } >= 3, "damage=${numbers(ctx)}"))
                 53 -> listOf(Check(name, t, "extended-lifetime-keeps-beam-alive", MagicManager.projectiles.any { it.id == "plasma_beam" && it.alive && it.status.age > 40 }, "shots=${MagicManager.projectiles.size}"))
                 85 -> listOf(Check(name, t, "wall-blocks-damage", numbers(ctx).isEmpty(), "damage=${numbers(ctx)}"))
-                118 -> listOf(Check(name, t, "shield-blocks-repeated-beam-and-freeze", shieldWand!!.status.mana <= 990.0 &&
+                110 -> listOf(Check(name, t, "shield-blocks-initial-beam-and-freeze", shieldWand!!.status.mana <= 990.0 &&
                     numbers(ctx).isEmpty() && !FrozenStatus.isFrozen(target!!),
                     "mana=${shieldWand.status.mana} damage=${numbers(ctx)} frozen=${FrozenStatus.isFrozen(target!!)}"))
-                144 -> clean(name, t, ctx)
+                118 -> listOf(Check(name, t, "per-tick-beam-exhausts-shield-budget", shieldWand!!.status.mana <= 975.0 &&
+                    numbers(ctx).any { it == "-1.1" } && FrozenStatus.isFrozen(target!!),
+                    "mana=${shieldWand.status.mana} damage=${numbers(ctx)} frozen=${FrozenStatus.isFrozen(target!!)}"))
+                209 -> clean(name, t, ctx)
                 else -> emptyList()
             } })
     }

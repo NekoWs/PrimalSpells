@@ -66,7 +66,7 @@ SCENES = {
     # 护盾受击玻璃亮度远高于电弧；在独立电弧窗口内量渲染和渐隐，不混用护盾峰值。
     "expansion_arc": {"length": 150, "title": "分段跃迁 / 四次放电 / 护盾", "decay": "gradual", "quiet": (0, 8), "fade_window": (8, 64)},
     "expansion_combinations": {"length": 180, "title": "多重施放 / 触发水晶 / 环绕光束", "decay": "gradual", "quiet": (0, 8)},
-    "expansion_plasma": {"length": 145, "title": "持续光束 / 遮挡 / 寿命", "decay": "gradual", "quiet": (0, 8)},
+    "expansion_plasma": {"length": 210, "title": "持续光束 / 遮挡 / 寿命", "decay": "gradual", "quiet": (0, 8)},
     "expansion_utilities": {"length": 220, "title": "冰冻 / 远距 / 斥力", "decay": "gradual", "quiet": (0, 8)},
     # decay: gradual = 该效果**设计上**有退场动画（必须逐帧衰减）；instant = 设计上就是立刻消失；
     #        none    = 这一场有**两套互不相干的视觉系统**（玻璃板 + 爆炸烟）或收场不是蓝色像素，
@@ -142,6 +142,7 @@ for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
 # 这两场包含真实爆炸/锯齿飞散，使用已有解体门禁（至少4帧），不能要求瞬间消失。
+SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}

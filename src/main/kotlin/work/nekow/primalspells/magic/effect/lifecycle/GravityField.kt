@@ -155,7 +155,7 @@ class GravityField : AreaFieldEffect(
 
     /** 投射物：每 tick 附加向下的力（与 `gravity` 修正同一量级）。 */
     override fun applyProjectileForce(projectile: Projectile, dirToCenter: Vector3f, dist: Double) {
-        projectile.status.velocity.y -= GRAVITY_PER_TICK
+        projectile.status.velocity.y -= (GRAVITY_PER_TICK / projectile.mass).toFloat()
     }
 
     // ---------- 视觉构件 ----------

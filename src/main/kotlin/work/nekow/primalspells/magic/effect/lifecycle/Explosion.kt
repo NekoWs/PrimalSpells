@@ -125,7 +125,7 @@ class Explosion(
                 }
 
                 // 爆炸一律允许自伤，统一入口抑制原版固定击退，再按实际衰减伤害推离爆心。
-                val accepted = SpellImpact.hurt(level, entity, source, actualDamage, direction, blast = true)
+                val accepted = SpellImpact.hurt(level, entity, source, actualDamage, direction, blast = true, type = work.nekow.primalspells.magic.core.SpellDamageType.EXPLOSION)
                 if (accepted && frozen) FrozenStatus.shatter(entity)
                 if (accepted && entity is LivingEntity && shot != null && shot.status.freezeTicks > 0)
                     FrozenStatus.freeze(entity, shot.status.freezeTicks)

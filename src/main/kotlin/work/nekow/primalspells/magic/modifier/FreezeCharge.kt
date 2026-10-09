@@ -14,6 +14,7 @@ class FreezeCharge : Modifier() {
                 if (!isStackPrimary) return
                 status.damage *= 0.75
                 status.freezeTicks = 30
+                projectile.damageType = work.nekow.primalspells.magic.core.SpellDamageType.ICE
             }
         }
     }

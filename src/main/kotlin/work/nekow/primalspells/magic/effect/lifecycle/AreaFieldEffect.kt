@@ -130,7 +130,7 @@ abstract class AreaFieldEffect(
                 val dist = entity.boundingBox.center.distanceTo(center)
                 val dir = center.subtract(entity.boundingBox.center).normalize()
                 // 距离越近吸力越强（每 tick 施加一次，故强度按 tick 计）
-                entity.deltaMovement = entity.deltaMovement.scale(0.82).add(dir.scale(pullPerTick / (dist + 0.5)))
+                entity.deltaMovement = entity.deltaMovement.scale(0.82).add(dir.scale(pullPerTick / ((dist + 0.5) * work.nekow.primalspells.magic.core.MagicMass.of(entity))))
                 entity.hurtMarked = true
             }
             affectEntity(level, entity, center, entity.boundingBox.center.distanceTo(center))

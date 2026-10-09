@@ -742,3 +742,5 @@ PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴
 第65轮：分段魔弹常驻本体用ParticleBatch.trackAll，跃迁连接用已有PixelVfx.arc，到期retireBatch；爆炸用spawnAll、setVelocityAll、applyForceAll与sizeCurve组合体积火舌，0～2刻分批释放仍由现有Deferred调度。未新增自研渲染/曲线/集合引擎，未遇到新的PD API缺口；历史高刷组变量/尺寸缺口仍未闭环。
 
 爆炸长火星/压力碎片使用原生ParticleVisual.alignTo对齐飞行方向；广告牌下spin本来就不生效，不把无效的平面旋转当作已正确对齐，也不补写客户端朝向渲染器。
+
+第66轮检查发现锁定1.0.15-ALPHA BridgeParticle的光照缓存只按方块坐标失效，会留住动态光已合并结果。详见issues/pd-api-requests第66轮；已停止该接入点，不抖位置/重生粒子/自写光照绕过。尚未更新前置，也不宣称残留亮度修复。

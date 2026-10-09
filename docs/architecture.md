@@ -490,3 +490,9 @@ DelayedCastFx的锁印由原生PD批量trackAll跟随最终位置，不再提前
 SpellImpact是直接伤害和爆炸共用的唯一原版受伤/推力入口，临时绕过无敌帧但finally还原。数据包将primalspells:projectile加入minecraft:no_knockback，禁用原版固定推力；成功受伤才追加按强度计算的速度，尊重击退抗性。黑洞暗核伤害禁用向外推力，保留向心吸力；不改原版箭矢、近战和其它模组伤害类型。
 
 跃迁命中仍调用Projectile.hitEntity公共分派：载体基础maxHitTargets=0，寿命而非实体碰撞次数终结它；穿刺卡可改为-1并启用自伤/穿盾。爆炸、复制等onHit修正会在跃迁落点真实触发，不只播放一条装饰电流。
+
+## 第66轮：伤害渠道与惯性质量
+
+SpellDamageType定义8条独立伤害渠道，ModDamageTypes注册并安全解析对应数据包类型。Projectile.damageType为直接伤害类型；SpellDamage读该值，Explosion强制使用EXPLOSION，不把载体命中类型传给径向爆炸。冰冻附魔只转换直接伤害为ICE，碎冰奖励加入同次伤害；冻结控制不额外产生第二份伤害。原版is_projectile/is_explosion/is_fire/is_freezing标签参与各自抗性/免疫，8类均no_knockback以继续使用SpellImpact统一推力。
+
+Projectile.mass为惯性质量（默认1，黑洞256、重力场32、等离子束4），不是引力源强度；质量越大，同一力的加速度越小。实体用NeoForge持久数据`primalspells:mass`正数覆盖，未标注时当前碰撞箱体积/0.729，默认夹0.25～256。无效质量回退；有效显式质量夹0.05～100万。黑洞生物拉力、魔法弹引力、重力场弹体下压、斥力和爆炸对魔法弹冲击都读取目标质量。黑洞重弹只衰减径向速度，保留外部施加的切向移动，避免两个重黑洞互吸积累高速，也不破坏移动场源穿墙。

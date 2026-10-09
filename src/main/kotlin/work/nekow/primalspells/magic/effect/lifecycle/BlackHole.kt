@@ -10,7 +10,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.LivingEntity
 
 /**
- * 半径五格的黑洞：生物迟缓 I，按0.6/(距离+0.5)强拉向中心；暗核每5刻撕裂一次。
+ * 半径五格的黑洞：生物迟缓 I，按0.6/(距离+0.5)强拉向中心；暗核每刻撕裂一次。
  * 服务端结算由 AreaFieldEffect 驱动，暗核与星尘表现委托 BlackHoleFx。
  * 仅形成时近场轻触；视觉退场由 PD 组自行播放，不再重建三拍球壳。
  */
@@ -43,12 +43,11 @@ class BlackHole : AreaFieldEffect(
 
     /** 每 tick 对范围内投射物施加原有引力；与视觉盘的半径、转速无关。 */
     override fun applyProjectileForce(projectile: Projectile, dirToCenter: Vector3f, dist: Double) {
-        val strength = (PULL_PER_TICK / (dist + 0.5)).toFloat()
-        projectile.status.velocity.add(Vector3f(dirToCenter).mul(strength))
+        work.nekow.primalspells.magic.core.MagicMass.attract(projectile, dirToCenter, PULL_PER_TICK / (dist + 0.5))
     }
 
     override fun affectEntity(level: ServerLevel, entity: LivingEntity, center: Vec3, dist: Double) {
-        if (status.age % 5 == 0 && dist <= 1.15 * projectile.areaScale)
+        if (dist <= 1.15 * projectile.areaScale)
             SpellDamage.hit(level, entity, projectile, status.damage, knockback = false)
     }
 

@@ -52,7 +52,7 @@ object SpellInteractions {
         shots.filter { it.alive && it.caster.level() === level }.forEach { shot ->
             val d = point(shot).subtract(center); val dist = d.length()
             if (dist in 0.05..radius && shot.motionEnabled) {
-                val push = d.normalize().scale(SpellImpact.strength(damage * (1 - dist / radius), blast = true))
+                val push = d.normalize().scale(SpellImpact.strength(damage * (1 - dist / radius), blast = true) / shot.mass)
                 shot.status.velocity.add(push.x.toFloat(), push.y.toFloat(), push.z.toFloat())
             }
         }

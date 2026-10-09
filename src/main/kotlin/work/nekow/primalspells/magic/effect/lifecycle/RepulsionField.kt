@@ -46,7 +46,7 @@ class RepulsionField : BaseEffect() {
             if (p === projectile || !p.alive || !p.motionEnabled || p.caster.level() !== world) continue
             val offset = Vec3(p.status.pos.x.toDouble(), p.status.pos.y.toDouble(), p.status.pos.z.toDouble()).subtract(center)
             if (offset.lengthSqr() !in 1e-6..(16.0 * projectile.areaScale * projectile.areaScale)) continue
-            val push = offset.normalize().scale(0.12 * kotlin.math.sqrt(1 + projectile.storedEnergy))
+            val push = offset.normalize().scale(0.12 * kotlin.math.sqrt(1 + projectile.storedEnergy) / p.mass)
             p.status.velocity.add(push.x.toFloat(), push.y.toFloat(), push.z.toFloat())
             if (p.status.velocity.length() > 4f) p.status.velocity.normalize().mul(4f)
         }
@@ -54,7 +54,7 @@ class RepulsionField : BaseEffect() {
             AABB.ofSize(center, 8.0 * projectile.areaScale, 8.0 * projectile.areaScale, 8.0 * projectile.areaScale)) { it.isAlive }) {
             val offset = p.position().subtract(center)
             if (offset.lengthSqr() !in 1e-6..(16.0 * projectile.areaScale * projectile.areaScale)) continue
-            val velocity = p.deltaMovement.add(offset.normalize().scale(0.12 * kotlin.math.sqrt(1 + projectile.storedEnergy)))
+            val velocity = p.deltaMovement.add(offset.normalize().scale(0.12 * kotlin.math.sqrt(1 + projectile.storedEnergy) / work.nekow.primalspells.magic.core.MagicMass.of(p)))
             p.deltaMovement = if (velocity.length() > 4.0) velocity.normalize().scale(4.0) else velocity
             p.hurtMarked = true
         }

@@ -445,6 +445,16 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             f"四角红色覆盖={corners}，水平/竖直中心线红色={cardinal}"))
         result["asserts"].append(("真实受击方向弧可见", right >= 10 and left == 0 and front >= 10,
             f"右/左/前向红色覆盖={right}/{left}/{front}"))
+        # 前半程描出笔画，后半程径向移走，验证实际像素而不是只读取动画参数。
+        radii = []
+        for t in (61, 62, 64):
+            ys, xs = np.where(feedback_mask(t, red=True)[300:420, 580:700])
+            radii.append(int(np.max(np.maximum(np.abs(xs - 60), np.abs(ys - 60)))) if len(xs) else 0)
+        result["asserts"].append(("击杀从中心画出并向外散开", 0 < radii[0] < radii[1] < radii[2], f"斜十字半径={radii}"))
+        protected = [int((feedback_mask(t) | feedback_mask(t, red=True))[336:384, 616:664].sum())
+                     for t in range(56, 70)]
+        result["asserts"].append(("命中和击杀与原版准星留空", max(protected) == 0,
+            f"准星外围保护区最大彩色像素={max(protected)}"))
 
     if scene == "new_spells":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}

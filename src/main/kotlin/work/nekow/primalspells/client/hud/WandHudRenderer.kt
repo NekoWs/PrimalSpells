@@ -43,8 +43,9 @@ object WandHudRenderer {
         if (now >= hitUntil) hitAt = now
         hitUntil = now + 6
         if (killed) {
-            if (now >= killUntil) killAt = now
-            killUntil = now + 10
+            if (now >= killUntil) { killAt = now; killUntil = now + 10 }
+            // 已散开的笔画继续离场；不能延长结束时间把它们瞬间拉回中心。
+            else if (killUntil - now >= 6) killUntil = now + 10
         }
     }
     /** 退出世界时清缓存与动画，不清本机布局。 */
@@ -97,7 +98,9 @@ object WandHudRenderer {
             delay, recharge, progress(delay, s.lastDelay), progress(recharge, s.lastRecharge),
             manaBlocked = s.manaBlocked, presence = presence, delayAlpha = delayAlpha, rechargeAlpha = rechargeAlpha,
             hit = if (settings.hitFeedback) pulse(hitAt, hitUntil) else 0.0,
-            killAlpha = if (settings.hitFeedback) pulse(killAt, killUntil) else 0.0,
+            killAlpha = if (settings.hitFeedback) min((now - killAt) / 0.6, (killUntil - now) / 6).coerceIn(0.0, 1.0) else 0.0,
+            killDraw = ((now - killAt) / 2).coerceIn(0.0, 1.0),
+            killSpread = (1 - (killUntil - now) / 6).coerceIn(0.0, 1.0),
             hurtAngle = if (settings.damageDirection && player != null) Math.toRadians(player.hurtDir.toDouble() - 180) else null,
             hurtAlpha = hurtAlpha,
         ).also { lastFrame = it }

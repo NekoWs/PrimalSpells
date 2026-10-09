@@ -32,6 +32,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "diagnostics.ps1")
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $root
 Write-Host "[capture] 仓库根目录：$root"
@@ -40,34 +41,39 @@ Write-Host "[capture] 仓库根目录：$root"
 if (-not $SkipBuild) {
     Write-Host "[capture] ./gradlew build ..."
     & .\gradlew.bat build --console=plain
-    if ($LASTEXITCODE -ne 0) { throw "[capture] 构建失败，先修构建再看画面" }
+    if ($LASTEXITCODE -ne 0) { Write-CaptureFailure $root @{ Reason="构建失败（退出码$LASTEXITCODE）"; CrashReport=$null }; exit 1 }
 }
 
 # 2) 清场：录制世界每次重建成固定种子，输出目录清空（避免新旧帧混在一起）
-Remove-Item -Recurse -Force "run/capture" -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force "run/capture" | Out-Null
-Remove-Item -Recurse -Force "build/capture/out" -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force "build/capture/out" | Out-Null
+foreach ($relative in @('run/capture','build/capture/out')) {
+    $target = [IO.Path]::GetFullPath((Join-Path $root $relative))
+    if (-not $target.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw "清理路径越界：$target" }
+    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+    New-Item -ItemType Directory -Path $target -Force | Out-Null
+}
+Remove-Item -LiteralPath (Join-Path $root 'build/capture/failure.json') -ErrorAction SilentlyContinue
 
 # 3) 真客户端录制（驱动会在录完后自己退出）
 #    ⚠️ 超时护栏：客户端崩溃/卡死时不会自己退出，必须由这里兜底杀掉（否则流水线会一直挂着）。
 Write-Host "[capture] ./gradlew runCapture -Pcapture=$Scene ...（超时 $TimeoutSec 秒）"
 $gradle = Start-Process -FilePath ".\gradlew.bat" `
     -ArgumentList @("runCapture", "--console=plain", "-Pcapture=$Scene") `
-    -NoNewWindow -PassThru -RedirectStandardOutput "build/capture/gradle.log"
-if (-not $gradle.WaitForExit($TimeoutSec * 1000)) {
-    Write-Host "[capture] 超过 $TimeoutSec 秒仍未退出 → 杀掉游戏进程（看 run/capture/logs/latest.log 的异常）" -ForegroundColor Red
-    Get-CimInstance Win32_Process -Filter "Name like '%java%'" |
-        Where-Object { $_.CommandLine -match 'bootstraplauncher|devlaunch|net\.minecraft' } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    Stop-Process -Id $gradle.Id -Force -ErrorAction SilentlyContinue
-    if (Test-Path "run/capture/logs/latest.log") {
-        Select-String -Path "run/capture/logs/latest.log" -Pattern "Exception|Caused by" |
-            Select-Object -First 8 | ForEach-Object { Write-Host ("    " + $_.Line) }
+    -NoNewWindow -PassThru -RedirectStandardOutput "build/capture/gradle.log" -RedirectStandardError "build/capture/gradle.stderr.log"
+$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
+while (-not $gradle.WaitForExit(1000)) {
+    $failure = Get-CaptureFailure $root
+    if (-not $failure -and [DateTime]::UtcNow -ge $deadline) { $failure = @{ Reason="录制超过$TimeoutSec 秒"; CrashReport=$null } }
+    if ($failure) {
+        Write-CaptureFailure $root $failure
+        # 只结束本次启动的Gradle及其子进程，不扫描/终止其它MC实例。
+        try { $gradle.Kill($true) } catch { Write-Host "[capture] 启动器已结束：$($_.Exception.Message)" }
+        exit 1
     }
-    exit 1
 }
-if ($gradle.ExitCode -ne 0) { throw "[capture] runCapture 失败，见 build/capture/gradle.log" }
+$gradle.Refresh()
+$failure = Get-CaptureFailure $root
+if (-not $failure -and $gradle.ExitCode -ne 0) { $failure = @{ Reason="runCapture退出码$($gradle.ExitCode)"; CrashReport=$null } }
+if ($failure) { Write-CaptureFailure $root $failure; exit 1 }
 
 # 4) 客户端日志（装配脚本用它查异常/ERROR）
 $log = "run/capture/logs/latest.log"

@@ -1,6 +1,10 @@
 @file:Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 package work.nekow.primalspells.client.capture
 
+import net.minecraft.client.Minecraft
+import work.nekow.particledrawing.core.client.ClientParticleEngine
+import work.nekow.particledrawing.lighting.DynamicLightManager
+import java.util.concurrent.ConcurrentHashMap
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
@@ -16,6 +20,7 @@ object NewSpellScene {
     fun scene(): Scene {
         val name="new_spells"
         val checks=linkedMapOf<Int,MutableList<Check>>()
+        val lights=ConcurrentHashMap<String,Double>()
         var source: work.nekow.primalspells.entity.TestDummyEntity?=null
         var torch: Torch?=null
         var timer: Projectile?=null
@@ -147,8 +152,22 @@ object NewSpellScene {
                     record("saw-bounces-and-self-harms",p.alive && p.status.bounces==b-1 && p.selfDamage,"bounces=${p.status.bounces} self=${p.selfDamage}")
                     val w=Wand("torch-idle");torch=MagicManager.create("torch") as Torch;w.magics+=torch!!;w.load();w.tick(source!!,ctx.level)
                 }
-                if(t==100){torch?.onUnloaded();saw?.alive=false;MagicManager.projectiles.forEach{it.alive=false};source?.discard()}
+                if(t in listOf(95,110)) Minecraft.getInstance().execute {
+                    val engine=ClientParticleEngine.instance() ?: return@execute
+                    DynamicLightManager.renderDynamicLights(engine)
+                    val emitters=engine.getGlowingParticles().filter { it.lightLevel()>0 }
+                    lights["emitters$t"]=emitters.size.toDouble()
+                    if(t==95) emitters.singleOrNull()?.let { p ->
+                        val x=p.interpolatedX(1f);val y=p.interpolatedY(1f);val z=p.interpolatedZ(1f)
+                        lights["worldLight"]=DynamicLightManager.getDynamicLightLevel(x,y,z)
+                        lights["worldLightmap"]=DynamicLightManager.getLightmapWithDynamicLight(0,x,y,z).toDouble()
+                    }
+                }
+                if(t==100){torch?.onUnloaded();saw?.alive=false;MagicManager.projectiles.forEach{it.alive=false}}
+                if(t==112) source?.discard()
                 if(t==179){
+                    record("torch-registers-one-world-light",lights["emitters95"]==1.0 && (lights["worldLight"]?:0.0)>10.0 && (lights["worldLightmap"]?:0.0)>0.0,"samples=$lights")
+                    record("torch-world-light-retires",lights["emitters110"]==0.0,"samples=$lights")
                     record("projectiles-cleaned",MagicManager.projectiles.isEmpty(),"shots=${MagicManager.projectiles.size}")
                     record("pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                     source?.discard()

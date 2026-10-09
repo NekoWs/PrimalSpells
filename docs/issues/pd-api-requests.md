@@ -17,7 +17,7 @@
 
 ---
 
-**当前未决：1 条。**
+**当前未决：2 条。**
 
 ---
 
@@ -30,6 +30,20 @@
 - 期望：保存已完成变量的最终账本端点直到上报（重定向更新/失效旧端点），或在完成那帧记录待上报终点；旧fallback用版本/令牌取消，只有最后有效登记可触发。onAnimationComplete真正由客户端完成时调用，有限expression和变量混合亦需覆盖。
 - 临时处理：沿用上个已验证版本的有限清理，不自写回调、客户端播放器或伪造有限指令。WandCastingFx原有presence8t+12t清理与冷却表达式7t清理保留；等离子presence6t+8t清理保留。原生有限expression施法迸发可正常使用expression(code,5).retire。
 - 验收：上述重定向在相对67～77以内收到客户端回调，不能在相对78旧兜底时伪装完成；无客户端只按最后登记t99兜底。主/副手法阵分别在t154/t208清空；切维、登出无残留。
+
+---
+
+## 第77轮：表达式首次接管必须初始化外观插值两端（2026-10-09）
+
+- 状态：未决；锁定PD 1.0.17-ALPHA。停止本模组三角形/冷却条出生闪烁接入，不在本侧加延迟遮罩、替代渲染或修改PD内部字段。
+- 目标模型：切杖时法阵由零尺寸连续展开；出生包不可见，第一份表达式输出从正确的零尺寸开始，之后正常逐帧插值。
+- 根因：ClientParticleEngine.applyProgramFrame在firstTakeover或snap时只对syncPosition传瞬移标志；syncColor/syncScale仍保留BridgeParticle构造时的prevA/prevScale。出生透明、完整基础尺寸随后输出a=1/sc=0时，中间渲染帧会同时有正透明度和残余的大尺寸，形成一闪后缩回。第76轮出生透明的改动只修复表达式接管之前的可见性，未修复这个子帧窗口。
+- 复现：BridgeParticle(Color.TRANSPARENT,scale=5)后同帧syncColor(1,1,1,1)、syncScale(0)，extract在partialTick=0.25/0.5/0.75仍提交可见面积；开发场景pd_api新增first-program-frame-does-not-flash断言。原生提取回归只收集输出，不注册渲染器或提交顶点。
+- 实机证据：pd_api的partialTick=0.25/0.5/0.75可见半尺寸分别0.375/0.25/0.125；对应断言失败，普通后续尺寸插值仍通过。
+- 期望API：首次表达式帧与显式snap对位置、宽高、颜色/透明度原子同步当前值和上一帧值；例如syncAppearance(...,snap:Boolean)，由applyProgramFrame(firstTakeover||snap)调用。后续帧保留原生插值，基础scale保持不变，不能要求调用方用scale=0出生（表达式sc乘baseScale，会永久为零）。服务端无额外逐刻补丁。
+- 影响面：magic/effect/visual/WandCastingFx及冷却提示，以及其他出生隐藏后由expression控制尺寸的组。
+- 验收：首次sc=0的所有子帧都无面积；首次sc>0时两端都是首个表达式状态，不能从默认出生状态倒缩；后续尺寸/颜色插值、重定向与显式snap均有覆盖。切主副手和两个不同法杖均无闪现。
+- 临时降级：保留当前透明出生接线；该缺陷未修复，等待PD提供上述语义后接回并实机复验。
 
 ---
 

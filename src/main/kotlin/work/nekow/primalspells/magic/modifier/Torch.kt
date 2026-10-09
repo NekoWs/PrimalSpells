@@ -14,6 +14,8 @@ class Torch : Modifier() {
         val pm = wand.status.particleManager ?: return
         val g = pm.createGroup(caster.position())
         repeat(5) { i -> g.add(pm.create().position(caster.position()).color(Color.TRANSPARENT)
+            // 发光索引由Builder标志登记，visual仅描述片元外观。
+            .glowing(true).lightLevel(if(i==0)14 else 0)
             .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.15625f,0.15625f)
                 .glowing(true).lightLevel(if(i==0)14 else 0)).lifetime(-1).spawn()) }
         g.setVariable("presence",1.0).defineEntity("holder",caster.uuid).expression("""

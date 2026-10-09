@@ -86,6 +86,17 @@ object PdApiScene {
                 }
                 if (t in 13..35) variable?.setVariableInterpolated("px", ((t-12)*0.04).toString(), 1)
                 if (t == 18) Minecraft.getInstance().execute {
+                    val world=Minecraft.getInstance().level ?: return@execute
+                    // 复现applyProgramFrame首次接管的调用顺序；只观察原生桥接输出，不替换渲染。
+                    val birth=BridgeParticle(UUID.randomUUID(),world,0.0,0.0,0.0,Color.TRANSPARENT,5f,true)
+                    birth.syncColor(1f,1f,1f,1f)
+                    birth.syncScale(0f)
+                    for(part in listOf(0.25f,0.5f,0.75f)) {
+                        val capture=LightSample()
+                        birth.extract(capture,Minecraft.getInstance().gameRenderer.mainCamera(),part)
+                        samples["birthVisible$part"]=capture.visibleSize.toDouble()
+                    }
+                    birth.remove()
                     interpolation?.let { p ->
                         p.syncScale(3f)
                         val v = (0..4).map { p.getQuadSize(it/4f) }
@@ -121,6 +132,7 @@ object PdApiScene {
                 val s = samples
                 listOf(
                     Check(name,t,"tracked-position-continues-during-life-curve", s.keys.containsAll(listOf("track10","track24","track65")) && s["track24"]!!>s["track10"]!! && s["track65"]!!>s["track24"]!!, "samples=$s"),
+                    Check(name,t,"first-program-frame-does-not-flash",listOf(0.25f,0.5f,0.75f).all { s["birthVisible$it"]==0.0 },"samples=$s"),
                     Check(name,t,"native-size-interpolates-subframes",s["subframeInterpolation"]==1.0,"samples=$s"),
                     Check(name,t,"repeated-variable-target-converges", (s["variableX"] ?: 0.0)>0.75,"samples=$s"),
                     Check(name,t,"stationary-particle-dark-bright-dark", s.keys.containsAll(listOf("dark","lit","moved","relit","removed")) && s["lit"]!!>s["dark"]!! && s["relit"]!!>s["dark"]!! && s["moved"]==s["dark"] && s["removed"]==s["dark"],"samples=$s"),
@@ -135,10 +147,12 @@ object PdApiScene {
     /** 仅接收原版extract的光照输出，不提交顶点或注册替代渲染器。 */
     private class LightSample : QuadParticleRenderState() {
         var light = -1
+        var visibleSize = 0f
         override fun add(layer: SingleQuadParticle.Layer, x: Float, y: Float, z: Float,
                          xRot: Float, yRot: Float, zRot: Float, wRot: Float, scale: Float,
                          u0: Float, u1: Float, v0: Float, v1: Float, color: Int, lightCoords: Int) {
             light = lightCoords
+            visibleSize = if((color ushr 24)>0) scale else 0f
         }
     }
     private fun pmCount(ctx: CaptureDriver.SceneCtx) = ParticleManager.of(ctx.level).getEngine().particleCount()

@@ -788,3 +788,10 @@ PixelVfx.retire/shatter用scaleTo(...).retire()替换服务端ticks+2掐表销�
 无需升级1.0.17。WandCastingFx粒子出生包使用Color.withAlpha(0f)，表达式第一帧输出a=1与入口尺寸；不是把初始尺寸设0后再乘尺寸曲线，避免永久零尺寸。三角形的glowing仍为true（实色免光照），lightLevel=0（避免所有成员出生点瞬时点亮玩家）。冷却提示和施法短迸发使用同一隐藏出生语义。
 
 SawbladeFx与Torch复用实体getter/热更变量编排，透明出生，表达式接管外观。火种中心成员lightLevel=14，其余装饰为0，实际世界动态光照由PD负责。变量完成信号第73轮已知缺陷未变化，收尾继续有限destroyAfter，不使用不可靠的变量完成回报。
+
+
+## 第77轮：光源登记与首次外观插值
+
+真实动态光源必须由ParticleHandle.Builder.glowing/lightLevel登记；ParticleVisual的同名字段不能代替Builder标志。Torch现有接线补齐这两项，只有核心发出14级光照。
+
+透明出生不能保证首次expression接管无闪烁：1.0.17-ALPHA的applyProgramFrame只snap位置，BridgeParticle仍从出生尺寸/颜色插值。该接入点按§0停止，详见[第77轮PD需求](../issues/pd-api-requests.md)。不以延迟遮罩、零baseScale补偿或本侧渲染实现绕过。

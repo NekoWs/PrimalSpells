@@ -8,10 +8,9 @@ import kotlin.math.*
 data class WandHudFrame(
     val mana: Double, val maxMana: Double, val delay: Double = 0.0, val recharge: Double = 0.0,
     val delayProgress: Double = 1.0, val rechargeProgress: Double = 1.0,
-    val equip: Double = 0.0, val equipProgress: Double = 1.0,
     val manaBlocked: Boolean = false, val presence: Double = 1.0,
-    val delayAlpha: Double = 0.0, val rechargeAlpha: Double = 0.0, val focusAlpha: Double = 0.0,
-    val hit: Double = 0.0, val kills: Int = 0, val killAlpha: Double = 0.0,
+    val delayAlpha: Double = 0.0, val rechargeAlpha: Double = 0.0,
+    val hit: Double = 0.0, val killAlpha: Double = 0.0,
     val hurtAngle: Double? = null, val hurtAlpha: Double = 0.0,
 )
 
@@ -30,7 +29,7 @@ object WandHudPainter {
         when (element) {
             HudElement.MANA -> mana(g, frame, time)
             HudElement.COOLDOWN -> cooldown(g, frame)
-            HudElement.FOCUS -> focus(g, frame, time)
+            HudElement.FOCUS -> feedback(g, frame)
         }
         g.pose().popMatrix()
     }
@@ -96,36 +95,50 @@ object WandHudPainter {
         bar(g, 18, 17, 54, f.rechargeProgress, PURPLE, ra, 6)
         number(g, ceil(f.recharge).toInt().toString(), 77, 17, PURPLE, ra)
     }
-    private fun focus(g: GuiGraphicsExtractor, f: WandHudFrame, t: Double) {
-        val a = f.focusAlpha * f.presence
-        val progress = if (f.equip > 0) f.equipProgress else f.rechargeProgress
-        val radius = (18 + 3 * (1 - progress)).roundToInt()
-        // 四段开放菱框与中心空白；不遮住真正的原版准星。
-        for (side in 0..3) for (i in 2 until radius - 2) {
-            val x = when (side) { 0 -> i; 1 -> radius - i; 2 -> -i; else -> i - radius }
-            val y = when (side) { 0 -> i - radius; 1 -> i; 2 -> radius - i; else -> -i }
-            rect(g, 45 + x, 29 + y, 1, 1, PURPLE, a * 0.7)
+    private fun feedback(g: GuiGraphicsExtractor, f: WandHudFrame) {
+        val cx = 45; val cy = 29
+        val kill = f.killAlpha * f.presence
+        val hit = f.hit * f.presence * (1 - f.killAlpha)
+        // 紫色外棱和白色内刃组成魔法十字；中心留空，不覆盖目标。
+        if (hit > 0.003) {
+            val reach = (10 + 3 * (1 - f.hit)).roundToInt()
+            for (sign in listOf(-1, 1)) for (d in 4..reach) {
+                rect(g, cx + sign * d - 1, cy - 1, 3, 3, PURPLE, hit * 0.75)
+                rect(g, cx - 1, cy + sign * d - 1, 3, 3, PURPLE, hit * 0.75)
+                rect(g, cx + sign * d, cy, 1, 1, WHITE, hit)
+                rect(g, cx, cy + sign * d, 1, 1, WHITE, hit)
+            }
+            for (sign in listOf(-1, 1)) {
+                diamond(g, cx + sign * (reach + 3), cy, 1, PURPLE, hit, true)
+                diamond(g, cx, cy + sign * (reach + 3), 1, PURPLE, hit, true)
+            }
         }
-        for (side in 0..3) {
-            val angle = side * PI / 2
-            val x = 45 + (cos(angle) * (radius + 4)).roundToInt()
-            val y = 29 + (sin(angle) * (radius + 4)).roundToInt()
-            diamond(g, x, y, 2, if ((floor(t / 2).toInt() and 3) == side) WHITE else PURPLE, a, true)
+        // 击杀只显示红色斜十字，不显示数字或连杀计数。
+        if (kill > 0.003) for (layer in 0..2) for (sx in listOf(-1, 1)) for (sy in listOf(-1, 1)) for (d in 4..11) {
+            // 先统一描边，再画红色和亮心，避免后续像素的暗边覆盖相邻红色笔画。
+            when (layer) {
+                0 -> rect(g, cx + sx * d - 1, cy + sy * d - 1, 3, 3, 0xFF581A35.toInt(), kill)
+                1 -> rect(g, cx + sx * d, cy + sy * d, 2, 2, 0xFFFF4B64.toInt(), kill)
+                2 -> if (d < 7) rect(g, cx + sx * d, cy + sy * d, 1, 1, 0xFFFFB1BA.toInt(), kill)
+            }
         }
-        if (a > 0.003) { bar(g, 22, 56, 46, progress, PURPLE, a, 8)
-            number(g, ceil(if (f.equip > 0) f.equip else f.recharge).toInt().toString(), 72, 56, PURPLE, a) }
-        // 命中是有限角点重音，连续命中不叠加爆闪或覆盖准星。
-        for (dx in listOf(-1, 1)) for (dy in listOf(-1, 1)) {
-            val d = (7 + (1 - f.hit) * 3).roundToInt()
-            rect(g, 45 + dx * d, 29 + dy * d, 2, 2, WHITE, f.hit * f.presence)
-        }
-        if (f.killAlpha > 0) {
-            diamond(g, 66, 15, 3, 0xFFFFDB88.toInt(), f.killAlpha, true)
-            number(g, if (f.kills > 99) "99+" else "+${f.kills}", 72, 11, 0xFFFFDB88.toInt(), f.killAlpha * f.presence)
-        }
-        f.hurtAngle?.let { angle ->
-            val x = 45 + (cos(angle) * 31).roundToInt(); val y = 29 + (sin(angle) * 27).roundToInt()
-            diamond(g, x, y, 3, 0xFFFF6979.toInt(), f.hurtAlpha * f.presence, true)
+        // 受击弧位于外圈；折线缺口与晶齿保留像素魔法感。
+        val hurt = f.hurtAlpha * f.presence
+        if (hurt > 0.003) {
+            val angles = f.hurtAngle?.let { listOf(it) } ?: listOf(-PI / 2, 0.0, PI / 2, PI)
+            for (angle in angles) {
+                for (i in -7..7) {
+                    if (i == -3 || i == 3) continue
+                    val a = angle + i * 0.047
+                    val radius = 24 + 2 * (1 - f.hurtAlpha)
+                    val x = cx + (cos(a) * radius).roundToInt()
+                    val y = cy + (sin(a) * radius).roundToInt()
+                    rect(g, x - 1, y - 1, 3, 3, 0xFF581A35.toInt(), hurt)
+                    rect(g, x, y, 2, 2, 0xFFFF4B64.toInt(), hurt)
+                }
+                val x = cx + (cos(angle) * 22).roundToInt(); val y = cy + (sin(angle) * 22).roundToInt()
+                diamond(g, x, y, 2, 0xFFFFA5B4.toInt(), hurt, true)
+            }
         }
     }
 }

@@ -3,7 +3,7 @@ package work.nekow.primalspells.magic.modifier
 import work.nekow.primalspells.magic.core.Modifier
 
 /**
- * 注入玛那修正 —— 施放时返还 30 法力而非消耗法力。
+ * 额外法术修正 —— 施放时返还最多30法力，不超过本杖上限。
  *
  * 本质：将法力消耗设为负数，实现施法时恢复法力。
  */

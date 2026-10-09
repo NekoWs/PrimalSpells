@@ -573,3 +573,9 @@ payChain先处理当前结构层的普通回蓝修正，再支付控制卡，通
 获取领域`loot/`通过现有`ModItems.wandStack`和`WandManager.createWand`创建真实等级杖，配方写入同一Wand.magics及物品槽位组件。GLM只追加箱子奖励；结构自然生成只追加刷怪候选，不覆盖原有列表，地点由真实结构piece标签决定。
 
 RogueMageEntity手持真实WandItem，每刻调用Wand.tick(this)维护被动与持有者；攻击AI只负责准备、朝向、视线、移动和调用Wand.spell(this)。不复制法术结算器，不伪造直接伤害。死亡掉落原手持ItemStack，wandId与运行时/存档实例保持同一身份。敌人注册仅公共侧；模型、举杖动作和实际装备提取仅客户端。范围、获取概率及限制见[design/acquisition.md](design/acquisition.md)。
+
+## 第81轮：返蓝上限与准心反馈
+
+负mana费用表示返还法力，必须经过Wand.consumeMana，返还后立即限制到本杖0～最大法力，不得把溢出累积成额外法力池。付费前和Wand.tick、fromTag也修正旧版本的超额值。额外法术保持注册id mana_injection和-30费用，只有显示名由注入玛那改为额外法术，不改旧存档、资源或修正联动键。
+
+no_knockback会同时跳过原版受击方向通知。SpellImpact只在真实接受伤害后给ServerPlayer补indicateDamage，方向为传播方向的反向，水平向量为0时使用施法者相对位置；不为反馈另加击退或伤害。正治疗不走此分支。界面具体语义见design/hud.md。

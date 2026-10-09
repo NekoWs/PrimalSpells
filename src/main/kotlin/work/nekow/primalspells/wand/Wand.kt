@@ -335,12 +335,18 @@ class Wand(var id: String) {
      * @return true 如果法力足够并已扣除
      */
     fun consumeMana(magic: Magic): Boolean {
+        clampMana()
         if (status.mana < magic.mana) {
             status.failedReason += "Mana(${status.mana}) < ${magic.mana}"
             return false
         }
-        status.mana -= magic.mana
+        status.mana = (status.mana - magic.mana).coerceIn(0.0, mana.coerceAtLeast(0.0))
         return true
+    }
+
+    /** 恢复旧版本超额法力，并使付费/回蓝遵守同一法力池上限。 */
+    private fun clampMana() {
+        status.mana = (status.mana.takeIf { it.isFinite() } ?: 0.0).coerceIn(0.0, mana.coerceAtLeast(0.0))
     }
 
     /**
@@ -352,6 +358,7 @@ class Wand(var id: String) {
      * @return true = 已扣除；false = 法力不足，**什么都没扣**
      */
     fun spendMana(amount: Double): Boolean {
+        clampMana()
         if (amount <= 0.0) return true
         if (status.mana < amount) return false
         status.mana -= amount
@@ -394,6 +401,7 @@ class Wand(var id: String) {
      * EntityEquipment.tick），因此按游戏 tick 去重，保证被动每 tick 只驱动一次。
      */
     fun tick(caster: Entity? = null, level: ServerLevel? = null) {
+        clampMana()
         if (caster != null) {
             // 显式被动驱动也是持有证据：盔甲架等实体不一定触发物品inventoryTick。
             WandManager.markHeld(WandID(id), caster.uuid, caster.level().gameTime)
@@ -583,6 +591,7 @@ class Wand(var id: String) {
             wand.cast = tag.getIntOr("cast", 1)
             wand.size = tag.getIntOr("size", 9)
             wand.status.mana = tag.getDoubleOr("status_mana", 0.0)
+            wand.clampMana()
             wand.status.delay = kotlin.math.ceil(tag.getDoubleOr("status_delay", 0.0).coerceAtLeast(0.0))
             wand.status.recharge = kotlin.math.ceil(tag.getDoubleOr("status_recharge", 0.0).coerceAtLeast(0.0))
             tag.getListOrEmpty("innate").forEach {

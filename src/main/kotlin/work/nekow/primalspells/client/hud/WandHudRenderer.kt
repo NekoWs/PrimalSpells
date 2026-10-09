@@ -23,12 +23,13 @@ object WandHudRenderer {
     private var presence = 0.0
     private var delayAlpha = 0.0
     private var rechargeAlpha = 0.0
-    private var focusAlpha = 0.0
+    private var hurtAlpha = 0.0
     private var displayedMana = 0.0
     private var lastFrame: WandHudFrame? = null
     private var hitAt = -1000.0
     private var killAt = -1000.0
-    private var killCount = 0
+    private var hitUntil = -1000.0
+    private var killUntil = -1000.0
 
     /** tooltip与录制检查共用的服务端快照。 */
     fun getStats(wandId: String) = statsMap[wandId]
@@ -38,14 +39,19 @@ object WandHudRenderer {
     fun putStats(payload: SyncWandStatsPayload) { statsMap[payload.wandId] = payload; received[payload.wandId] = clock() }
     /** 真正接受的法术伤害回报；每刻多次命中合并成一个有限标记。 */
     fun impact(killed: Boolean) {
-        val now = clock(); hitAt = now
-        if (killed) { killCount = if (now - killAt < 20) killCount + 1 else 1; killAt = now }
+        val now = clock()
+        if (now >= hitUntil) hitAt = now
+        hitUntil = now + 6
+        if (killed) {
+            if (now >= killUntil) killAt = now
+            killUntil = now + 10
+        }
     }
     /** 退出世界时清缓存与动画，不清本机布局。 */
     fun clear() {
         statsMap.clear(); received.clear(); identity = null; lastTime = Double.NaN; lastFrame = null
-        presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; focusAlpha = 0.0
-        hitAt = -1000.0; killAt = -1000.0; killCount = 0
+        presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; hurtAlpha = 0.0
+        hitAt = -1000.0; killAt = -1000.0; hitUntil = -1000.0; killUntil = -1000.0
     }
     private fun clock(): Double {
         val mc = Minecraft.getInstance()
@@ -64,7 +70,7 @@ object WandHudRenderer {
         var dt = if (lastTime.isFinite()) (now - lastTime).coerceIn(0.0, 4.0) else 0.0
         lastTime = now
         if (s != null && identity != s.wandId) {
-            identity = s.wandId; presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; focusAlpha = 0.0
+            identity = s.wandId; presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; hurtAlpha = 0.0
             displayedMana = s.currentMana
             dt = 0.0
         }
@@ -78,22 +84,22 @@ object WandHudRenderer {
         val elapsed = (now - (received[s.wandId] ?: now)).coerceIn(0.0, 20.0)
         val delay = max(0.0, s.currentDelay - elapsed)
         val recharge = max(0.0, s.currentRecharge - elapsed)
-        val equip = max(0.0, s.equipRemaining - elapsed)
         fun progress(left: Double, total: Double) = if (total > 0) (1 - left / total).coerceIn(0.0, 1.0) else 1.0
         delayAlpha = approach(delayAlpha, if (delay > 0) 1.0 else 0.0, if (delay > 0) 0.7 else 2.0)
         rechargeAlpha = approach(rechargeAlpha, if (recharge > 0) 1.0 else 0.0, if (recharge > 0) 0.7 else 2.0)
-        focusAlpha = approach(focusAlpha, if (equip > 0 || recharge > 0) 1.0 else 0.0, 1.2)
         displayedMana = approach(displayedMana, s.currentMana, 0.8)
         if (abs(displayedMana - s.currentMana) < 0.05) displayedMana = s.currentMana
         val settings = HudSettings.current
         val player = Minecraft.getInstance().player
-        return WandHudFrame(displayedMana, s.maxMana, delay, recharge, progress(delay, s.lastDelay), progress(recharge, s.lastRecharge),
-            equip, progress(equip, s.equipTotal.toDouble()), s.manaBlocked, presence,
-            delayAlpha, rechargeAlpha, focusAlpha,
-            if (settings.hitFeedback) (1 - (now - hitAt) / 5).coerceIn(0.0, 1.0) else 0.0,
-            killCount, if (settings.hitFeedback) ((24 - (now - killAt)) / 6).coerceIn(0.0, 1.0) else 0.0,
-            if (settings.damageDirection && player != null && player.hurtTime > 0) Math.toRadians(player.hurtDir.toDouble() - 180) else null,
-            (player?.hurtTime ?: 0) / 10.0,
+        hurtAlpha = approach(hurtAlpha, (player?.hurtTime ?: 0) / 10.0, 0.8)
+        fun pulse(start: Double, end: Double): Double = min((now - start) / 0.6, (end - now) / 2).coerceIn(0.0, 1.0)
+        return WandHudFrame(displayedMana.coerceIn(0.0, s.maxMana.coerceAtLeast(0.0)), s.maxMana,
+            delay, recharge, progress(delay, s.lastDelay), progress(recharge, s.lastRecharge),
+            manaBlocked = s.manaBlocked, presence = presence, delayAlpha = delayAlpha, rechargeAlpha = rechargeAlpha,
+            hit = if (settings.hitFeedback) pulse(hitAt, hitUntil) else 0.0,
+            killAlpha = if (settings.hitFeedback) pulse(killAt, killUntil) else 0.0,
+            hurtAngle = if (settings.damageDirection && player != null) Math.toRadians(player.hurtDir.toDouble() - 180) else null,
+            hurtAlpha = hurtAlpha,
         ).also { lastFrame = it }
     }
 

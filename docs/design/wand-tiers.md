@@ -22,6 +22,7 @@
 - `rechargeTickCount`：牌堆抽空后的充能时间，与手牌的`Magic.recharge`相加；两种倒计时独立。
 - 配置字段赋值时向上对齐完整刻；运行时`Status.delay/recharge`到0停止，不保留负余数。Double仅保留现有HUD比例与网络字段的格式，并不表示小数刻机制。
 - `charge`和`WandTier.manaPerTick`均是每刻回蓝，维护分支直接相加；有caster的被动分支不重复推进冷却/回蓝。
+- 当前MP始终限制在0～本杖最大法力。“额外法术”（原注入玛那，id仍为mana_injection）每张最多返还30MP；超出的部分不存储为溢出池。付费前、每刻维护与读档边界修正旧版本超额值。
 
 ## 3. 存档兼容
 

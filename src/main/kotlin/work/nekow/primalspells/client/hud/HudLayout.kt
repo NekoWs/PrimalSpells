@@ -26,7 +26,7 @@ data class HudLayout(
     val cooldown: HudPlacement = HudPlacement(),
     val focus: HudPlacement = HudPlacement(),
     var hitFeedback: Boolean = true,
-    var damageDirection: Boolean = false,
+    var damageDirection: Boolean = true,
 ) {
     fun placement(element: HudElement) = when (element) {
         HudElement.MANA -> mana; HudElement.COOLDOWN -> cooldown; HudElement.FOCUS -> focus
@@ -85,7 +85,7 @@ object HudSettings {
                 (number("scale") ?: 1.0).coerceIn(0.6, 2.5))
         }
         HudLayout(placement("mana"), placement("cooldown"), placement("focus"),
-            root.get("hitFeedback")?.asBoolean ?: true, root.get("damageDirection")?.asBoolean ?: false)
+            root.get("hitFeedback")?.asBoolean ?: true, root.get("damageDirection")?.asBoolean ?: true)
     }.getOrElse { logger.warn("无法读取HUD布局，采用默认布局并保留原文件：{}", file, it); HudLayout() }
 
     /** 成功落盘才替换当前配置；失败由编辑器显示，不静默丢掉用户布局。 */

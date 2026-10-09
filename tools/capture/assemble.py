@@ -425,6 +425,27 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
 
+    if scene == "magic_hud":
+        tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        def feedback_mask(t, red=False):
+            rgb = np.asarray(Image.open(tick_frames[t]).convert("RGB"), dtype=np.int16)
+            r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+            return ((r > 150) & (g < 145) & (b > 40) & (r - b > 60)) if red else ((r > 100) & (b > 170) & (b - r > 20) & (b - g > 35))
+        idle = [int(feedback_mask(t)[300:420, 580:700].sum()) for t in (24, 27, 39)]
+        hit = max(int(feedback_mask(t)[310:410, 590:690].sum()) for t in (56, 57, 58))
+        kill = feedback_mask(62, red=True)
+        corners = [int(kill[y:y+28, x:x+28].sum()) for y in (321, 371) for x in (601, 651)]
+        cardinal = int(kill[318:402, 638:643].sum()) + int(kill[358:363, 598:682].sum())
+        right = int(feedback_mask(70, red=True)[330:390, 696:734].sum())
+        left = int(feedback_mask(70, red=True)[330:390, 546:584].sum())
+        front = int(feedback_mask(77, red=True)[270:310, 610:670].sum())
+        result["asserts"].append(("准心不再重复显示充能菱框", max(idle) == 0, f"静止/充能窗口紫色像素={idle}"))
+        result["asserts"].append(("真实命中魔法十字可见", hit >= 50, f"中心紫色覆盖={hit}"))
+        result["asserts"].append(("真实击杀只有红色斜十字", min(corners) >= 10 and cardinal == 0,
+            f"四角红色覆盖={corners}，水平/竖直中心线红色={cardinal}"))
+        result["asserts"].append(("真实受击方向弧可见", right >= 10 and left == 0 and front >= 10,
+            f"右/左/前向红色覆盖={right}/{left}/{front}"))
+
     if scene == "new_spells":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
         blades = [white_spell_mask(tick_frames[t])[340:450, 700:850] for t in (80, 90)]

@@ -49,7 +49,7 @@ class HudEditorScreen(private val parent: Screen? = null) : Screen(Component.tra
         g.text(font, title, width / 2 - font.width(title) / 2, 8, -1)
         val help = Component.translatable("screen.primalspells.hud.help")
         g.text(font, help, width / 2 - font.width(help) / 2, 22, 0xFFC1B6DC.toInt())
-        val preview = WandHudFrame(68.0, 100.0, 7.0, 18.0, 0.55, 0.4, focusAlpha = 1.0,
+        val preview = WandHudFrame(68.0, 100.0, 7.0, 18.0, 0.55, 0.4,
             delayAlpha = 1.0, rechargeAlpha = 1.0, hit = if (draft.hitFeedback) 0.6 else 0.0,
             hurtAngle = if (draft.damageDirection) 0.0 else null, hurtAlpha = 0.8)
         for (element in HudElement.entries) {

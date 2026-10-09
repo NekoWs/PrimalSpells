@@ -32,6 +32,12 @@ object SpellImpact {
         target.invulnerableTime = 0
         val accepted = try { target.hurtServer(level, source, settled.toFloat()) }
             finally { target.invulnerableTime = invul }
+        // 法术禁用了原版击退，也跳过了它附带的方向通知；只补回通知，不叠加推力。
+        if (accepted && target is net.minecraft.server.level.ServerPlayer) {
+            val incoming = if (direction.horizontalDistanceSqr() > 1e-8) direction.scale(-1.0)
+                else caster.position().subtract(target.position())
+            target.indicateDamage(incoming.x, incoming.z)
+        }
         if (accepted && caster is net.minecraft.server.level.ServerPlayer && caster !== target &&
             type != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) {
             net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(caster,

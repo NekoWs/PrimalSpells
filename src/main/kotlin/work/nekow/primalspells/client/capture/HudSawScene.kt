@@ -35,6 +35,7 @@ object HudSawScene {
         var floor = 0
         var wand: Wand? = null
         var target: LivingEntity? = null
+        var attacker: work.nekow.primalspells.entity.TestDummyEntity? = null
         var oldLayout: HudLayout? = null
         fun record(t: Int, id: String, ok: Boolean, detail: String) {
             checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail))
@@ -45,11 +46,12 @@ object HudSawScene {
                 floor = ctx.floorBlockY(0, 0); ctx.buildStudio(0, 0, floor)
                 ctx.setup(false, 0.0, floor + 2.0, -7.0, 0f, 8f)
                 ctx.command("gamemode creative @a")
+                ctx.command("difficulty normal")
                 ctx.player.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY)
             }, camera = { _, _ -> Pose(0.0, floor + 2.0, -7.0, 0f, 8f) },
             clientTick = { mc, t ->
                 val width = mc.window.guiScaledWidth; val height = mc.window.guiScaledHeight
-                if (t == 0) { oldLayout = HudSettings.current.duplicate(); HudSettings.save(HudLayout()) }
+                if (t == 0) { oldLayout = HudSettings.current.duplicate(); HudSettings.save(HudLayout(damageDirection = true)) }
                 if (t == 3) {
                     val sample = SyncWandStatsPayload("fps-hud", 68.0, 100.0, 4.0, 12.0, 1, 8.0, 24.0, 0.0, 8.0, 24.0, 6)
                     fun run(step: Double): WandHudFrame {
@@ -59,10 +61,10 @@ object HudSawScene {
                     }
                     val slow = run(1.0); val fast = run(0.25)
                     record(t, "hud-animation-independent-of-frame-rate", abs(slow.presence - fast.presence) < 1e-6 &&
-                        abs(slow.focusAlpha - fast.focusAlpha) < 1e-6, "presence=${slow.presence}/${fast.presence}")
+                        abs(slow.rechargeAlpha - fast.rechargeAlpha) < 1e-6, "presence=${slow.presence}/${fast.presence}")
                     WandHudRenderer.clear()
                     val fresh = WandHudRenderer.frame(sample, 5.0)!!
-                    record(t, "first-frame-starts-hidden", fresh.presence == 0.0 && fresh.focusAlpha == 0.0, "presence=${fresh.presence}")
+                    record(t, "first-frame-starts-hidden", fresh.presence == 0.0 && fresh.rechargeAlpha == 0.0, "presence=${fresh.presence}")
                     val layout = HudLayout(); layout.move(HudElement.MANA, -100.0, 99999.0, width, height)
                     layout.mana.scale = 2.5
                     record(t, "layout-clamps-after-resize-and-scale", listOf(320 to 180, 640 to 360, 2560 to 1440).all { (w, h) ->
@@ -81,7 +83,13 @@ object HudSawScene {
                 if (t == 57 || t == 62) {
                     val f = WandHudRenderer.snapshot()
                     record(t, "accepted-damage-reaches-hud-$t", f != null && if (t == 57) f.hit > 0 else
-                        f.kills == 1 && f.killAlpha > 0, "frame=$f")
+                        f.killAlpha > 0, "frame=$f")
+                }
+                if (t == 70 || t == 77) {
+                    val f = WandHudRenderer.snapshot()
+                    val expected = if (t == 70) 0.0 else -Math.PI / 2
+                    record(t, "real-incoming-direction-$t", f != null && f.hurtAlpha > 0 && f.hurtAngle != null &&
+                        abs(f.hurtAngle - expected) < 0.01, "frame=$f")
                 }
                 if (t == 94) {
                     val s = shared["id"]?.let { WandHudRenderer.getStats(it) }
@@ -128,6 +136,35 @@ object HudSawScene {
                 }
                 if (t == 130) oldLayout?.let { HudSettings.save(it) }
             }, tick = { ctx, t ->
+                if (t == 5) {
+                    val refund = MagicManager.create("mana_injection")!!
+                    val w = Wand("refund-cap").also { it.mana = 100.0; it.charge = 0.0 }
+                    w.status.mana = 99.0
+                    record(t, "refund-caps-near-full", w.consumeMana(refund) && w.status.mana == 100.0, "mana=${w.status.mana}")
+                    repeat(64) { w.consumeMana(refund) }
+                    record(t, "stacked-refunds-never-overflow", w.status.mana == 100.0, "mana=${w.status.mana}")
+                    w.status.mana = 0.0; w.consumeMana(refund)
+                    record(t, "refund-from-empty-keeps-thirty", w.status.mana == 30.0, "mana=${w.status.mana}")
+                    w.status.mana = 999.0; w.tick()
+                    record(t, "old-runtime-overflow-corrected", w.status.mana == 100.0, "mana=${w.status.mana}")
+                    val tag = w.saveTag(); tag.putDouble("status_mana", 999.0)
+                    record(t, "old-save-overflow-corrected", Wand.fromTag(tag).status.mana == 100.0, "saved=999 max=100")
+                    w.status.mana = 999.0
+                    record(t, "overflow-cannot-buy-expensive-spell", !w.spendMana(200.0) && w.status.mana == 100.0, "mana=${w.status.mana}")
+                    w.mana = 0.0; w.consumeMana(refund)
+                    record(t, "zero-capacity-refund-stays-zero", w.status.mana == 0.0, "mana=${w.status.mana}")
+                    for (ids in listOf(listOf("mana_injection", "fireball"),
+                        listOf("mana_injection", "mana_injection", "mana_injection", "fireball"),
+                        listOf("trigger_fireball", "mana_injection", "fireball"))) {
+                        val chain = Wand("refund-chain-$ids").also {
+                            it.mana = 35.0; it.status.mana = 35.0; it.charge = 0.0
+                            it.magics += ids.map { id -> MagicManager.create(id)!! }; it.load()
+                        }
+                        record(t, "real-chain-refund-cap-$ids", chain.spell(ctx.player) && chain.status.mana == 32.0,
+                            "mana=${chain.status.mana}")
+                        MagicManager.projectiles.forEach { it.alive = false }
+                    }
+                }
                 if (t == 10) {
                     val stack = ModItems.wandStack(WandTier.T2)
                     wand = WandManager[WandManager.createWand(stack)].also {
@@ -147,6 +184,14 @@ object HudSawScene {
                 if (t == 59) record(t, "real-kill-accepted", target?.let {
                     SpellImpact.hurt(ctx.level, it, ctx.player, 100.0, Vec3.ZERO) && !it.isAlive
                 } == true, "health=${target?.health}")
+                if (t == 67) {
+                    ctx.command("gamemode survival @a")
+                    attacker = ctx.spawnDummy(-12.0, floor + 1.0, -7.0)
+                    record(t, "real-damage-from-right", SpellImpact.hurt(ctx.level, ctx.player, attacker, 2.0,
+                        Vec3(1.0, 0.0, 0.0)), "health=${ctx.player.health} difficulty=${ctx.level.difficulty}")
+                }
+                if (t == 74) record(t, "real-damage-from-front", SpellImpact.hurt(ctx.level, ctx.player, attacker!!, 2.0,
+                    Vec3(0.0, 0.0, -1.0)), "health=${ctx.player.health}")
                 if (t == 80) {
                     val active = requireNotNull(wand)
                     active.status.delay = 0.0; active.status.recharge = 0.0; active.status.mana = 2.0
@@ -155,12 +200,13 @@ object HudSawScene {
                 if (t == 90) requireNotNull(wand).status.mana = 100.0
                 if (t == 130) {
                     target?.discard()
+                    attacker?.discard()
                     ctx.player.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY)
                     MagicManager.projectiles.forEach { it.alive = false }
                 }
                 if (t == 199) record(t, "hud-scene-cleans-world-effects", ParticleManager.of(ctx.level).getEngine().particleCount() == 0 &&
                     MagicManager.projectiles.isEmpty(), "particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
-            }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { _ -> target?.discard(); Minecraft.getInstance().execute {
+            }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> target?.discard(); attacker?.discard(); ctx.command("difficulty peaceful"); Minecraft.getInstance().execute {
                 Minecraft.getInstance().gui.setScreen(null); oldLayout?.let { HudSettings.save(it) }; WandHudRenderer.clear()
             } })
     }

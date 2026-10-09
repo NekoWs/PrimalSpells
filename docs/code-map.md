@@ -29,7 +29,7 @@
 | 改小包容量 / 内容 | `item/SpellPouchItem.kt`（`SLOT_COUNT` + 组件读写） | `client/tooltip/PouchTooltip.kt` |
 | 改小包/法杖的键鼠操作 | `item/SpellPouchItem.kt` / `item/WandItem.kt`（`overrideOtherStackedOnMe`） | `client/input/SpellSlotScrollHandler.kt` |
 | 改滚轮选槽（法杖/小包） | `client/input/SpellSlotScrollHandler.kt` | `network/SelectSpellSlotPayload.kt`、`registry/ModItems.kt`（选中槽组件） |
-| 改 HUD（法力/冷却/聚焦） | `client/hud/{WandHudRenderer,WandHudPainter,HudLayout}.kt` | `network/SyncWandStatsPayload.kt`、`design/hud.md` |
+| 改 HUD（法力/冷却/命中受击反馈） | `client/hud/{WandHudRenderer,WandHudPainter,HudLayout}.kt` | `network/SyncWandStatsPayload.kt`、`design/hud.md` |
 | 改 HUD 拖动/缩放设置 | `client/screen/HudEditorScreen.kt` | `client/PrimalSpellsClient.kt`（按键、模组配置入口） |
 | 改伤害 / 施法间隔 / 护盾强度与抗性 | [design/combat-pricing.md](design/combat-pricing.md)（口径表） | 各法术 `init` 里的 `status.damage`/`delay`/`recharge`、`EnergyShield` 的字段 |
 | 改 tooltip 文案/布局 | `client/tooltip/ClientTooltipHandler.kt`、`WandSpellTooltip.kt`、`PouchTooltip.kt` | `util/Lore.kt`（词条类型） |
@@ -138,7 +138,7 @@
 | `PrimalSpellsClient.kt` | 客户端 `@Mod(dist=CLIENT)`：安装 `ClientPayloadSink`、注册 tooltip 工厂/渲染器/输入、镜头冲击、登出清理缓存 |
 | `ScreenShakeClient.kt` | 镜头冲击（屏幕震动 + FOV 抽动）的客户端求值；受原版「受伤视角晃动」强度控制 |
 | `hud/WandHudRenderer.kt` | 数值缓存、按游戏时钟求值的入退场与命中反馈，退出世界清理 |
-| `hud/WandHudPainter.kt` | 青色法力、双冷却、开放聚焦菱框；正式HUD/预览共用 |
+| `hud/WandHudPainter.kt` | 青色法力、双冷却、命中十字/击杀红X/受击方向弧；正式HUD/预览共用 |
 | `hud/HudLayout.kt` | 组件边界、归一化位置/缩放与本机JSON配置 |
 | `screen/HudEditorScreen.kt` | H键/模组配置入口，原生拖动、滚轮/角柄缩放、保存/取消 |
 | `tooltip/ClientTooltipHandler.kt` | 组装 tooltip：法杖槽位网格/Alt 属性、小包网格、选中槽法术词条 |
@@ -192,7 +192,7 @@
 | `random_path` | `RandomPath` | 修饰器 | `magic/modifier/RandomPath.kt` |
 | `reciprocate` | `Reciprocate` | 修饰器 | `magic/modifier/Reciprocate.kt` |
 | `sine_wave` | `Serpentine` | 修饰器（正弦蛇形路径） | `magic/modifier/Serpentine.kt` |
-| `mana_injection` | `ManaInjection` | 修饰器（返还法力） | `magic/modifier/ManaInjection.kt` |
+| `mana_injection` | `ManaInjection` | 额外法术：返还最多30MP，受法杖上限限制 | `magic/modifier/ManaInjection.kt` |
 | `diffusion` | `Diffusion` | 修饰器 | `magic/modifier/Diffusion.kt` |
 | `implosion` | `Implosion` | 修饰器 | `magic/modifier/Implosion.kt` |
 | `volatile` | `Volatile` | 修饰器 | `magic/modifier/Volatile.kt` |

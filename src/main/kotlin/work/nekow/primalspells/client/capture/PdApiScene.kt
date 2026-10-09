@@ -64,7 +64,10 @@ object PdApiScene {
                         val world = Minecraft.getInstance().level ?: return@execute
                         // 同一静止桥接实例多次调用原生getLightCoords；不注入渲染器，也不替换PD缓存。
                         probe = BridgeParticle(UUID.randomUUID(), world, center.x, center.y, center.z, Color.ofInt(100,210,250), 5f, false)
-                        interpolation = BridgeParticle(UUID.randomUUID(), world, center.x, center.y, center.z, Color.ofInt(255,255,255), 1f, true)
+                        interpolation = BridgeParticle(UUID.randomUUID(), world, center.x, center.y, center.z, Color.ofInt(255,255,255), 1f, true).also {
+                            // 第一次同步现在按契约原子落地；t18测的是此后的正常插值。
+                            it.syncScale(1f, true)
+                        }
                     }
                 }
                 if (t in 9..68) tracked?.trackAll(listOf(Vec3(-1.5 + (t-8)*0.012, floor + 2.0, 1.0)))
@@ -87,10 +90,10 @@ object PdApiScene {
                 if (t in 13..35) variable?.setVariableInterpolated("px", ((t-12)*0.04).toString(), 1)
                 if (t == 18) Minecraft.getInstance().execute {
                     val world=Minecraft.getInstance().level ?: return@execute
-                    // 复现applyProgramFrame首次接管的调用顺序；只观察原生桥接输出，不替换渲染。
+                    // 复现1.0.20 applyProgramFrame首次接管的原子外观同步顺序；只观察原生桥接输出，不替换渲染。
                     val birth=BridgeParticle(UUID.randomUUID(),world,0.0,0.0,0.0,Color.TRANSPARENT,5f,true)
-                    birth.syncColor(1f,1f,1f,1f)
-                    birth.syncScale(0f)
+                    birth.syncColor(1f,1f,1f,1f,true)
+                    birth.syncScale(0f,true)
                     for(part in listOf(0.25f,0.5f,0.75f)) {
                         val capture=LightSample()
                         birth.extract(capture,Minecraft.getInstance().gameRenderer.mainCamera(),part)

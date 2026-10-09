@@ -16,7 +16,6 @@ import kotlin.math.sin
 /** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
     const val EQUIP_TICKS = 8
-    const val EXIT_TICKS = 12
     private const val GEM_FORWARD = 0.85
     private const val GEM_UP = 0.25
     private const val GEM_SIDE = 0.38
@@ -28,7 +27,6 @@ object WandCastingFx {
         val level = player.level()
         val started = level.gameTime
         val groups = ArrayList<ParticleGroup>()
-        var expires = Long.MAX_VALUE
         var lastDelay = -1.0
         var lastRecharge = -1.0
         private var delayFx: ParticleGroup? = null
@@ -152,9 +150,8 @@ object WandCastingFx {
         }
 
         fun retire() {
-            expires = level.gameTime + EXIT_TICKS
-            // PD1.0.17变量结束点被过早移除，完成上报仍缺失；保留既有有限清理，见第73轮API需求。
-            groups.forEach { it.setVariableInterpolated("presence", "0", 8, EasingType.LINEAR).destroyAfter(EXIT_TICKS) }
+            // PD1.0.20按客户端变量终点完成后回收；离线兜底由PD负责。
+            groups.forEach { it.setVariableInterpolated("presence", "0", 8, EasingType.LINEAR).retire() }
             retiring += this
         }
 
@@ -193,7 +190,7 @@ object WandCastingFx {
         retiring.removeAll {
             val invalid = !it.player.isAlive || it.player.level() !== it.level || server.playerList.getPlayer(it.player.uuid) !== it.player
             if (invalid) it.remove() else it.followPosition()
-            invalid || it.level.gameTime >= it.expires
+            invalid || it.groups.all { group -> group.size() == 0 }
         }
         val held = hashSetOf<UUID>()
         for (player in server.playerList.players) {

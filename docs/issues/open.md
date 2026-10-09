@@ -98,11 +98,6 @@ PD1.0.16已解决原第62/66/68轮缺口，源码和实机结论移入resolved�
 涉及`client/capture/SpellQualityScenes.kt`、`tools/capture/assemble.py`的spell_mechanics规则。待把混合场景按实际退场事件分ROI或分场景验证，并保留严格的独立退场判据；本轮不放宽阈值。证据：`build/capture-turn74-complete.log`及`build/capture/out/spell_mechanics`逐帧证据。
 
 
-## 第77轮：切杖法阵仍有出生子帧闪烁（PD待修复）
-
-第76轮透明出生没有完全解决三角形/冷却条闪现。PD首次expression接管仅初始化位置插值，尺寸和透明度仍从出生默认值插值；细节与验收见[pd-api-requests.md 第77轮](pd-api-requests.md)。停止该接入点，不用本侧隐藏延迟或替代渲染绕过。20fps整刻截图不足以排除此问题，新增原生extract子帧检查。
-
-
 ## 第77轮：new_spells混合场景退场门禁待细分
 
 第77轮火把真实光照接通后，new_spells全局白像素50%→5%跨度10帧超过旧3帧瞬退阈值；36项原生检查、末尾零粒子及末3帧零像素通过。该场景包含锯片、火种及多组独立生命周期，当前指标不能直接归因于火把卸载。需按实际退场事件分ROI或单独场景确认；本轮保留失败，不降低门槛。涉及client/capture/NewSpellScene.kt、tools/capture/assemble.py；证据build/capture-turn77.log。

@@ -127,9 +127,9 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()), Color.ofInt(102, 209, 247), 64, 0.14, 14)
     }
     override fun onDie() {
-        // PD变量完成回报仍缺失，保留既有8刻有限清理；不在本侧另写完成协议。
-        group?.setVariableInterpolated("presence", "0", 6, work.nekow.particledrawing.core.easing.EasingType.EASE_IN_OUT)?.destroyAfter(8)
-        source?.setVariableInterpolated("presence", "0", 6, work.nekow.particledrawing.core.easing.EasingType.EASE_IN_OUT)?.destroyAfter(8)
+        // 按PD客户端确认的变量终点回收，保留默认两刻桥接余量。
+        group?.setVariableInterpolated("presence", "0", 6, work.nekow.particledrawing.core.easing.EasingType.EASE_IN_OUT)?.retire()
+        source?.setVariableInterpolated("presence", "0", 6, work.nekow.particledrawing.core.easing.EasingType.EASE_IN_OUT)?.retire()
         source = null
         worldBurst()
         group = null

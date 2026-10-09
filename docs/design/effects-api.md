@@ -6,10 +6,10 @@
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第62轮已接入组缩放接续与移动锚点插值；未决需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
-（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.17-ALPHA`）。
+（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.20-ALPHA`）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
-**当前锁定版本：`1.0.17-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
+**当前锁定版本：`1.0.20-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
 `-sources.jar` 为准，不看旧版本记忆）。
 
 **触发条件**（满足任一即进入本政策）：
@@ -795,3 +795,8 @@ SawbladeFx与Torch复用实体getter/热更变量编排，透明出生，表达�
 真实动态光源必须由ParticleHandle.Builder.glowing/lightLevel登记；ParticleVisual的同名字段不能代替Builder标志。Torch现有接线补齐这两项，只有核心发出14级光照。
 
 透明出生不能保证首次expression接管无闪烁：1.0.17-ALPHA的applyProgramFrame只snap位置，BridgeParticle仍从出生尺寸/颜色插值。该接入点按§0停止，详见[第77轮PD需求](../issues/pd-api-requests.md)。不以延迟遮罩、零baseScale补偿或本侧渲染实现绕过。
+
+
+## 第78轮：PD 1.0.20接线
+
+首次接管与显式snap现在原子同步外观两端。原生Bridge夹具先初始化首份尺寸，再测试后续tick插值，不能再把出生后的第一次同步当作连续插值。法阵presence8刻、等离子束presence6刻改用retire默认2刻余量，由PD完成协议负责离线兜底；本侧不保留这些组的固定销毁倒计时。

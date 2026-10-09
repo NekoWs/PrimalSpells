@@ -2052,3 +2052,36 @@ ShieldBalanceScene真实Move测试4.8、24、64格/刻正入射及12格/刻斜�
 火把仅在ParticleVisual设置glowing/lightLevel，没有在ParticleHandle.Builder设置对应标志，未进入客户端动态光源索引。现在Builder显式glowing(true)，核心14级、其余片元0级，使用PD原生动态照明。退场仍使用原有变量收束，不新增照明实现。new_spells补充真实光源数量、光照采样/世界lightmap与卸载清理检查。
 
 第76轮“切杖闪烁已修复”的结论不成立：透明出生只解决接管前的可见性，PD接管后的外观子帧插值仍有缺陷。此问题重新登记open与PD需求，未宣称完成。
+
+
+## 附录B续：第78轮PD 1.0.20闭环（2026-10-09）
+
+第73轮变量完成账本/旧兜底与第77轮首次外观同步两条需求闭环。首次sc=0的0.25/0.5/0.75子帧可见尺寸均为0，正常后续尺寸插值通过；重定向完成相对终点约69刻，早于旧兜底78刻。法阵主/副手在t154/t208清空，等离子束生命周期与遮挡检查通过。主法阵和等离子恢复变量缓动后retire；依赖主JAR、sources及下限统一1.0.20-ALPHA。详见build-and-run第78轮。
+
+以下保存两条登记原文，其中“未决/等待”为历史状态：
+
+## 第73轮：变量完成终点丢失与重定向兜底过期（2026-10-09）
+
+- 状态：1.0.17-ALPHA实机确认，停止变量缓动完成回报接入；有限expression时长的客户端回报已通过。
+- 目标：主法阵presence归零、冷却提示及等离子束退场，在客户端确实完成并留足桥接余量后清理；缓动重定向不能沿用旧兜底提前完成。
+- 复现：PdApiScene在t50对presence缓动20t并登记回调/retire，t55重定向为24t。最后有效终点t79（相对beganAt=t12为67），实机回调却在相对78，即t90，正好等于第一次登记t50+20t缓动+20t兜底；不是客户端上报。重定向后的正确兜底应为t99（相对87）。WandCastingScenes放下主手t140后，t154仍有240粒子，直到旧服务端兜底到时才回收；副手t190后t219仍有240粒子。
+- 源码：ClientAnimationProgramManager.tick先取ledgerEnd，再applyVarEases；后者在now到达终点时立即移除ease。reportCompletionIfDue要求now>=ledgerEnd+50ms，当帧未到、下一帧终点已从账本消失，纯变量表达式组永远错过信号。ServerProgramCompletion.scheduleFallback的任务不带登记版本，重定向后旧任务仍直接移除最新entry并fire。
+- 期望：保存已完成变量的最终账本端点直到上报（重定向更新/失效旧端点），或在完成那帧记录待上报终点；旧fallback用版本/令牌取消，只有最后有效登记可触发。onAnimationComplete真正由客户端完成时调用，有限expression和变量混合亦需覆盖。
+- 临时处理：沿用上个已验证版本的有限清理，不自写回调、客户端播放器或伪造有限指令。WandCastingFx原有presence8t+12t清理与冷却表达式7t清理保留；等离子presence6t+8t清理保留。原生有限expression施法迸发可正常使用expression(code,5).retire。
+- 验收：上述重定向在相对67～77以内收到客户端回调，不能在相对78旧兜底时伪装完成；无客户端只按最后登记t99兜底。主/副手法阵分别在t154/t208清空；切维、登出无残留。
+
+---
+
+## 第77轮：表达式首次接管必须初始化外观插值两端（2026-10-09）
+
+- 状态：未决；锁定PD 1.0.17-ALPHA。停止本模组三角形/冷却条出生闪烁接入，不在本侧加延迟遮罩、替代渲染或修改PD内部字段。
+- 目标模型：切杖时法阵由零尺寸连续展开；出生包不可见，第一份表达式输出从正确的零尺寸开始，之后正常逐帧插值。
+- 根因：ClientParticleEngine.applyProgramFrame在firstTakeover或snap时只对syncPosition传瞬移标志；syncColor/syncScale仍保留BridgeParticle构造时的prevA/prevScale。出生透明、完整基础尺寸随后输出a=1/sc=0时，中间渲染帧会同时有正透明度和残余的大尺寸，形成一闪后缩回。第76轮出生透明的改动只修复表达式接管之前的可见性，未修复这个子帧窗口。
+- 复现：BridgeParticle(Color.TRANSPARENT,scale=5)后同帧syncColor(1,1,1,1)、syncScale(0)，extract在partialTick=0.25/0.5/0.75仍提交可见面积；开发场景pd_api新增first-program-frame-does-not-flash断言。原生提取回归只收集输出，不注册渲染器或提交顶点。
+- 实机证据：pd_api的partialTick=0.25/0.5/0.75可见半尺寸分别0.375/0.25/0.125；对应断言失败，普通后续尺寸插值仍通过。
+- 期望API：首次表达式帧与显式snap对位置、宽高、颜色/透明度原子同步当前值和上一帧值；例如syncAppearance(...,snap:Boolean)，由applyProgramFrame(firstTakeover||snap)调用。后续帧保留原生插值，基础scale保持不变，不能要求调用方用scale=0出生（表达式sc乘baseScale，会永久为零）。服务端无额外逐刻补丁。
+- 影响面：magic/effect/visual/WandCastingFx及冷却提示，以及其他出生隐藏后由expression控制尺寸的组。
+- 验收：首次sc=0的所有子帧都无面积；首次sc>0时两端都是首个表达式状态，不能从默认出生状态倒缩；后续尺寸/颜色插值、重定向与显式snap均有覆盖。切主副手和两个不同法杖均无闪现。
+- 临时降级：保留当前透明出生接线；该缺陷未修复，等待PD提供上述语义后接回并实机复验。
+
+---

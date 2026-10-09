@@ -313,7 +313,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 > 重力场改为经线/刻度波/双井环，固定结构淡出。当前模型、预算和验证见
 > [design/field-effects.md](design/field-effects.md)；下方注明轮次的旧接线记录保留供迁移追溯。
 
-- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.17-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
+- 依赖：`lib/particledrawing-${particledrawing_version}.jar`（当前 **1.0.20-ALPHA**；`compileOnly` + `localRuntime`，版本由 `gradle.properties` 驱动），`mods.toml` 声明 `required`、`AFTER`。
 - 集合类粒子（黑洞球壳、被吸入粒子、下落粒子）**成员簿记统一交给 PD 的 `ParticleBatch`**：
   `add`/`ensureSize`(补齐到 N、被上限拒了就下次再补)/`forEach`(读权威 pos/vel)/`removeIf`(按位置回收)/`clear`；
   本模组只算数值（位置、速度、颜色、寿命）。原自研的 `ParticleSwarm` 已在第 10 轮删除，见

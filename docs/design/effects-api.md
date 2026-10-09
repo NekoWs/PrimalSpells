@@ -738,3 +738,7 @@ PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴
 爆炸采用PD ParticleBatch的速度/力与逐片sizeCurve；创建按spawnAll公开256成员上限组织，运动更新仍交给PD原生自动拆包。shatter用moveAlongOffset抵消scaleTo的几何内缩并向外移动，片元缩小不改变“爆炸/碎裂的轮廓继续外扩”的语义。已经自由飞行的批次用逐片resize收尾，避免重新挂组缩回场心。
 
 第64轮：CrystalReaction的晶面顶点绕序改朝外，ParticleVisual.spin仍按公开API弧度/局部XYZ使用。PD单面正面朝局部+Z，不能用反向面或加一层反面粒子遮掩绕序错误。白闪使用现有ParticleGroup.recolor的一刻过渡，锁印用ParticleBatch.trackAll/逐片resize；未另写渲染、跟随、颜色插值引擎。
+
+第65轮：分段魔弹常驻本体用ParticleBatch.trackAll，跃迁连接用已有PixelVfx.arc，到期retireBatch；爆炸用spawnAll、setVelocityAll、applyForceAll与sizeCurve组合体积火舌，0～2刻分批释放仍由现有Deferred调度。未新增自研渲染/曲线/集合引擎，未遇到新的PD API缺口；历史高刷组变量/尺寸缺口仍未闭环。
+
+爆炸长火星/压力碎片使用原生ParticleVisual.alignTo对齐飞行方向；广告牌下spin本来就不生效，不把无效的平面旋转当作已正确对齐，也不补写客户端朝向渲染器。

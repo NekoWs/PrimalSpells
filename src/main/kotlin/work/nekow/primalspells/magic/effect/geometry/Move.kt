@@ -29,15 +29,14 @@ import work.nekow.primalspells.magic.effect.BaseEffect
  * @param dragCoeff     每 tick 阻尼系数：`v *= 1 / (1 + dragCoeff * |v|)`
  * @param hitRadius     实体碰撞半径；`0` 表示不做实体检测（但仍有方块碰撞）
  * @param throughBlocks 命中方块时不反弹、不消失（继续穿行）
- * @param selfDamage    是否把施法者本身也纳入可命中目标
  */
 class Move(
     val dragCoeff: Float = 0.01F,
     val hitRadius: Double = 0.0,
     val throughBlocks: Boolean = false,
-    val selfDamage: Boolean = false,
 ) : BaseEffect() {
     override val phase = EffectPhase.MOTION
+    private var leftCaster = false
 
     override fun onTick() {
         if (!projectile.alive || !projectile.motionEnabled) return
@@ -73,7 +72,7 @@ class Move(
                         min(status.pos.x, newPos.x).toDouble(), min(status.pos.y, newPos.y).toDouble(), min(status.pos.z, newPos.z).toDouble(),
                         max(status.pos.x, newPos.x).toDouble(), max(status.pos.y, newPos.y).toDouble(), max(status.pos.z, newPos.z).toDouble(),
                     ).inflate(hitRadius + ENTITY_SWEEP_MARGIN)
-                    level.getEntities(null, swept) { it != caster || selfDamage }
+                    level.getEntities(null, swept) { projectile.canHarm(it) }
                 } else {
                     emptyList()
                 }
@@ -82,12 +81,15 @@ class Move(
                 for (i in 1..steps) {
                     val t = min(i * stepSize, distance)
                     val checkPos = Vector3f(stepVec).mul(t).add(startPos)
+                    // 离开枪口所在的施法者碰撞箱后才允许返弹自伤，避免刚出手就撞自己。
+                    if (!caster.boundingBox.inflate(hitRadius).contains(Vec3(checkPos))) leftCaster = true
 
                     if (checkEntities) {
                         val px = checkPos.x.toDouble()
                         val py = checkPos.y.toDouble()
                         val pz = checkPos.z.toDouble()
                         for (entity in candidates) {
+                            if (entity === caster && !leftCaster) continue
                             // 同一检查点内也可能有重叠实体；首次命中停止后不能继续回调其它目标。
                             if (!projectile.alive || !projectile.motionEnabled) break
                             // 等价于「以检查点为中心、半边长 = hitRadius 的立方体与实体碰撞箱相交」

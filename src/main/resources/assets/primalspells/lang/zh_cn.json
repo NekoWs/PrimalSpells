@@ -59,7 +59,7 @@
   "lore.primalspells.gravity.desc": "使法术受重力影响。",
   "lore.primalspells.speed_boost.desc": "提升法术的初速度。",
   "lore.primalspells.extended_lifetime.desc": "延长法术存在时间",
-  "lore.primalspells.piercing.desc": "使法术可以穿透敌人",
+  "lore.primalspells.piercing.desc": "无限穿刺并允许自伤；返弹也可能命中施法者。",
   "lore.primalspells.bounce_explosion.desc": "使法术在每次弹跳时爆炸。",
   "lore.primalspells.homing.desc": "使法术追踪最近的实体。",
   "lore.primalspells.bounce_duplicate.desc": "使法术在每次弹跳时生成复制体。",
@@ -81,7 +81,7 @@
   "lore.primalspells.drone_swarm.desc": "在施法者周围召唤 5 架战斗无人机。",
   "lore.primalspells.drone_bolt.desc": "无人机发射的弱弹：伤害低，但会不断压制目标。",
   "lore.primalspells.gravity_field.desc": "生成一个持续减速范围内实体的力场。",
-  "lore.primalspells.black_hole.desc": "将实体拉向中心并施加减速效果。",
+  "lore.primalspells.black_hole.desc": "强力吸引周围实体和投射物；暗核每5刻造成4点伤害，也会伤害施法者。",
   "lore.primalspells.teleport.desc": "将施法者传送到命中或消亡的位置。",
   "lore.primalspells.quantum_entanglement.desc": "将下一个投射物复制为两份，环绕主投射物做正弦运动；任一死亡则全部死亡。",
   "lore.primalspells.energy_shield.desc": "被动：手持法杖时展开能量护盾，能挡下并反弹箭矢、火球这类原版投射物。抗性既是单发阈值、也是每20刻可承担的强度——20刻内累计超出预算就挡不住；预算内按「基础消耗 + 超出部分每点加价」扣法力。挡不住时受击方向碎裂并留下破口（破口时长随超出的强度增加）；爆炸则把波及到的片全部打碎。穿透法术无视护盾。",
@@ -108,7 +108,7 @@
   "item.primalspells.crystal_detonation": "水晶引爆",
   "lore.primalspells.crystal_detonation.desc": "激活施法点16格内属于你的休眠水晶，短暂预警后引爆。",
   "item.primalspells.chain_bolt": "连锁电弧",
-  "lore.primalspells.chain_bolt.desc": "首击后每刻导向下一目标；默认约4次命中，每跳范围3格。延寿增加跳跃机会，速度扩大范围。",
+  "lore.primalspells.chain_bolt.desc": "分段跃迁的魔弹，15刻内跃迁4次；无目标沿来向前跳，避开最近两次目标。速度扩大3格基础范围，延寿增加跃迁。",
   "item.primalspells.long_distance_cast": "远距施放",
   "lore.primalspells.long_distance_cast.desc": "将本次法术出生点前移6格，遇墙截断；叠加最多12格。",
   "item.primalspells.plasma_beam": "等离子束",
@@ -120,5 +120,6 @@
   "tooltip.primalspells.stabilizing_seal": "白色束印回位：施放间隔结束",
   "tooltip.primalspells.charging_crystal": "蓝色导晶充满：法术序列重整完毕",
   "item.primalspells.chainsaw": "链锯",
-  "lore.primalspells.chainsaw.desc": "短距切割；结算到这张牌时将施放延迟归零，充能时间减少3刻。放在双重施放末尾可构建连射法杖。"
+  "lore.primalspells.chainsaw.desc": "短距切割；结算到这张牌时将施放延迟归零，充能时间减少3刻。放在双重施放末尾可构建连射法杖。",
+  "lore.primalspells.self_damage": "自伤：会伤害施法者"
 }

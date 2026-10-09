@@ -63,5 +63,8 @@ object SpellAssembly {
         shot.hitRadius *= shot.areaScale
         if ("volatile" in shot.modifiers && shot.effects.none { it is work.nekow.primalspells.magic.effect.lifecycle.Explosion || it is work.nekow.primalspells.magic.effect.lifecycle.CrystalReaction })
             shot.effects += work.nekow.primalspells.magic.effect.lifecycle.Explosion(onHit = true, onDeath = true)
+        if ("piercing" in shot.modifiers || shot.effects.any {
+            it is work.nekow.primalspells.magic.effect.lifecycle.Explosion || it is work.nekow.primalspells.magic.effect.lifecycle.CrystalReaction
+        }) shot.selfDamage = true
     }
 }

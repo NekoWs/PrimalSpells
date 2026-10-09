@@ -64,7 +64,7 @@ SCENES = {
     "spell_resonance": {"length": 320, "title": "法术联动 / 配方矩阵 / 晶体与护盾弹", "decay": "gradual", "quiet": (0, 8)},
     "expansion_crystals": {"length": 140, "title": "水晶粘附 / 连锁引爆 / 归属", "decay": "gradual", "quiet": (0, 8)},
     # 护盾受击玻璃亮度远高于电弧；在独立电弧窗口内量渲染和渐隐，不混用护盾峰值。
-    "expansion_arc": {"length": 150, "title": "电弧衰减 / 去重 / 护盾", "decay": "gradual", "quiet": (0, 8), "fade_window": (8, 64)},
+    "expansion_arc": {"length": 150, "title": "分段跃迁 / 四次放电 / 护盾", "decay": "gradual", "quiet": (0, 8), "fade_window": (8, 64)},
     "expansion_combinations": {"length": 180, "title": "多重施放 / 触发水晶 / 环绕光束", "decay": "gradual", "quiet": (0, 8)},
     "expansion_plasma": {"length": 145, "title": "持续光束 / 遮挡 / 寿命", "decay": "gradual", "quiet": (0, 8)},
     "expansion_utilities": {"length": 220, "title": "冰冻 / 远距 / 斥力", "decay": "gradual", "quiet": (0, 8)},
@@ -142,6 +142,7 @@ for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
 # 这两场包含真实爆炸/锯齿飞散，使用已有解体门禁（至少4帧），不能要求瞬间消失。
+SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}

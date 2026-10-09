@@ -59,7 +59,7 @@
   "lore.primalspells.gravity.desc": "Makes the spell affected by gravity.",
   "lore.primalspells.speed_boost.desc": "Increases the spell's initial velocity.",
   "lore.primalspells.extended_lifetime.desc": "Extends the spell's lifetime.",
-  "lore.primalspells.piercing.desc": "Allows the spell to pierce through enemies.",
+  "lore.primalspells.piercing.desc": "Unlimited piercing and self damage; returning projectiles can hit their caster.",
   "lore.primalspells.bounce_explosion.desc": "Causes the spell to explode on each bounce.",
   "lore.primalspells.homing.desc": "Causes the spell to track the nearest entity.",
   "lore.primalspells.bounce_duplicate.desc": "Duplicates the spell on each bounce.",
@@ -81,7 +81,7 @@
   "lore.primalspells.drone_swarm.desc": "Summons 5 combat drones around the caster.",
   "lore.primalspells.drone_bolt.desc": "The weak bolt drones fire: low damage, but constant pressure.",
   "lore.primalspells.gravity_field.desc": "Creates a field that slows entities within its radius.",
-  "lore.primalspells.black_hole.desc": "Sucks entities toward its center and applies slowness.",
+  "lore.primalspells.black_hole.desc": "Strongly pulls entities and projectiles inward. The core deals 4 damage every 5 ticks, including to its caster.",
   "lore.primalspells.teleport.desc": "Teleports the caster to where it hits or expires.",
   "lore.primalspells.quantum_entanglement.desc": "Duplicates the next projectile into two copies that orbit the main one with a sine motion; when any dies, all die.",
   "lore.primalspells.energy_shield.desc": "Passive: while the wand is held, an energy shield stays deployed and deflects vanilla projectiles such as arrows and fireballs. Resistance is both the per-hit threshold and the strength it can bear per 20 ticks - stack past that budget within 20 ticks and the hit lands; inside the budget it costs base mana plus extra per point over. A stopped hit shatters in that direction and leaves a breach (longer the harder it was hit); an explosion shatters every panel it reaches. Piercing spells ignore the shield.",
@@ -108,7 +108,7 @@
   "item.primalspells.crystal_detonation": "Crystal Detonation",
   "lore.primalspells.crystal_detonation.desc": "Arms your dormant crystals within 16 blocks of the cast point, with a brief warning.",
   "item.primalspells.chain_bolt": "Chain Bolt",
-  "lore.primalspells.chain_bolt.desc": "Jumps once per tick after impact. About 4 hits within 3 blocks per hop; lifetime adds hops and speed expands range.",
+  "lore.primalspells.chain_bolt.desc": "A drifting bolt that jumps 4 times in 15 ticks. Seeks within 3 blocks, avoids its last two targets, or jumps forward. Speed extends reach; lifetime adds jumps.",
   "item.primalspells.long_distance_cast": "Long-Distance Cast",
   "lore.primalspells.long_distance_cast.desc": "Moves the cast origin forward 6 blocks, stopping at walls. Stacking is capped at 12 blocks.",
   "item.primalspells.plasma_beam": "Plasma Beam",
@@ -120,5 +120,6 @@
   "tooltip.primalspells.stabilizing_seal": "White seals close: casting interval recovered",
   "tooltip.primalspells.charging_crystal": "Blue conduits fill: spell sequence recharged",
   "item.primalspells.chainsaw": "Chainsaw",
-  "lore.primalspells.chainsaw.desc": "Short-range cutting pulse. Resets cast delay at this card; reduces recharge by 3 ticks. Place last in a multicast for rapid fire."
+  "lore.primalspells.chainsaw.desc": "Short-range cutting pulse. Resets cast delay at this card; reduces recharge by 3 ticks. Place last in a multicast for rapid fire.",
+  "lore.primalspells.self_damage": "Self damage: can harm the caster"
 }

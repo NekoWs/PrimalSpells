@@ -142,10 +142,10 @@ effects += Trajectory(color)           // 拖尾（头部菱形即本体标记�
 | `MODIFIER`（默认） | SETUP 之后 | 位置积分**之前** | 修饰器注入的效果（改速度/伤害/爆炸参数），以及 `Hurt`、`Trigger`、`Explosion` 等 |
 | `GUIDANCE` | 修正之后 | 积分之前 | `SelfOrbit`、`QuantumEntanglement.OrbitEffect` —— 计算轨道目标速度，由Move扫掠 |
 | `MOTION` | — | 中间 | `Move` —— 每 tick **唯一**推进 `status.pos` |
-| `OVERRIDE` | — | 积分**之后** | `ChainArc` —— 命中后停飞，逐跳定位导电锚 |
+| `OVERRIDE` | — | 积分**之后** | `ChainArc` —— 慢漂移后的离散跃迁、落点检查与命中分派 |
 | `VISUAL` | — | 最后 | `Trajectory`、`AreaFieldEffect`、束源/斥力场 —— 读本 tick 的最终位置 |
 
-一句话规则：**普通改速用默认阶段，轨道导向用 `GUIDANCE` 并交给Move扫掠，停飞后的锚定位用 `OVERRIDE`，读最终位置用 `VISUAL`。**
+一句话规则：**普通改速用默认阶段，轨道导向用 `GUIDANCE` 并交给Move扫掠，离散跃迁等最终定位用 `OVERRIDE`，读最终位置用 `VISUAL`。**
 
 ## 3. 一次施法的完整流程
 
@@ -201,7 +201,7 @@ for p in projectiles:
                              ├─ MODIFIER：修饰器注入的效果（改速度/伤害）
                              ├─ GUIDANCE：周身环绕/量子复制体的目标速度
                              ├─ MOTION  ：Move 阻尼 → 子步进碰撞 → 命中回调 → status.pos 推进
-                             ├─ OVERRIDE：连锁电弧命中后更新导电锚
+                             ├─ OVERRIDE：连锁魔弹分段跃迁并检查落点
                              └─ VISUAL  ：Trajectory 读最终位置发粒子
     status.age++
     if status.age >= maxAge && alive: expire(); alive = false
@@ -278,7 +278,7 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 8. 关键不变量与陷阱（改代码前必读）
 
-1. **执行顺序由 `EffectPhase` 决定，不再看插入顺序**。`onActive` 按 `SETUP → MODIFIER → …` 升序，`onTick` 按 `MODIFIER → GUIDANCE → MOTION → OVERRIDE → VISUAL` 升序；同阶段内保持注入顺序。普通改速留在默认阶段；需要碰撞的轨道在GUIDANCE写目标速度，由Move推进并扫掠。停止自由飞行的导电锚等才在OVERRIDE写最终坐标，不能让轨道覆盖位置而绕开命中。
+1. **执行顺序由 `EffectPhase` 决定，不再看插入顺序**。`onActive` 按 `SETUP → MODIFIER → …` 升序，`onTick` 按 `MODIFIER → GUIDANCE → MOTION → OVERRIDE → VISUAL` 升序；同阶段内保持注入顺序。普通改速留在默认阶段；需要碰撞的轨道在GUIDANCE写目标速度，由Move推进并扫掠。普通轨道不能覆盖位置绕开命中；连锁魔弹的离散跃迁是显式例外，在OVERRIDE自行检查落点并分派命中，故能越过薄墙。
 2. **`Magic.clone()` 是「从注册表新建实例」**，不继承任何运行期状态（当前速度、被修饰器改过的伤害/爆炸参数都不继承）。`id` 未注册直接抛异常——所以**法术 id 不能随便改**。
 3. **`Modifier.effects()` 返回的是浅拷贝**：多枚子弹各自拿一份克隆，但克隆内部的引用字段仍可能指向同一对象，别用可变字段存跨实例状态。
 4. **修饰器效果只在 `castHand` 时注入一次**：`Modifier` 自身不进 `MagicManager.projectiles`，不参与 tick。
@@ -480,3 +480,13 @@ ChainBolt基础maxAge=4，实际初速0.75格/刻（字段0.46875×全局1.6倍�
 DelayedCastFx的锁印由原生PD批量trackAll跟随最终位置，不再提前向外飞散。MagicManager寿命到期调用onExpire时，视觉释放与DelayedTrigger荷载出生发生在同一服务端刻、同一最终位置；普通死亡只收尾，不冒充一次成功施放。
 
 第64轮追加：SphereOrbit彻底移除（旧NBT未知id保留原空槽，不移位）；SelfOrbit半径改`2+速度×0.5`、最大6。CrystalReaction在onExpire调用幂等detonate，预警时间取min(剩余寿命,引爆倒计时+1)，只在最后40刻闪白，半周期ceil(剩余刻/8)并限制1～5；onDie只做碎裂清理，不重复结算爆炸。
+
+## 第65轮：跃迁、强度击退与自伤
+
+连锁魔弹取消“先碰撞命中再停住连锁”：同一载体低速漂移，onTick在OVERRIDE执行离散跃迁，仅检查落点方块；经过的薄墙不阻断。基础15刻，在age=4/7/10/14跃迁；调度为ceil(跳序×10/3)，延寿后继续同一时间轴，不累积四舍五入误差、不重置age。每次按实体id取3格内目标，避开最近两次命中；无目标则沿当前来向前跳搜索半径×0.625，允许之后重访更早目标。每次命中仍4点，不再按跳数衰减。初速经数值修正后乘0.025慢漂移，搜索半径为当前漂移速度/0.025×4×areaScale，运动修正/外力继续联动。
+
+自伤以Projectile.selfDamage为统一运行时属性。Explosion/CrystalReaction默认危险，黑洞显式开启，穿刺在prepare/onActive开启；Move直接读取当前值，并要求普通弹先离开施法者碰撞箱才允许返弹命中自己，避免枪口重叠误伤。电弧、等离子束和共鸣脉冲也使用canHarm筛选。爆炸的统一入口总会纳入施法者，仍由护盾与创造/旁观等原规则判断能否受伤；不额外绕过原版无敌模式。子弹重放非生成型穿刺配方后自动具有同样自伤属性。
+
+SpellImpact是直接伤害和爆炸共用的唯一原版受伤/推力入口，临时绕过无敌帧但finally还原。数据包将primalspells:projectile加入minecraft:no_knockback，禁用原版固定推力；成功受伤才追加按强度计算的速度，尊重击退抗性。黑洞暗核伤害禁用向外推力，保留向心吸力；不改原版箭矢、近战和其它模组伤害类型。
+
+跃迁命中仍调用Projectile.hitEntity公共分派：载体基础maxHitTargets=0，寿命而非实体碰撞次数终结它；穿刺卡可改为-1并启用自伤/穿盾。爆炸、复制等onHit修正会在跃迁落点真实触发，不只播放一条装饰电流。

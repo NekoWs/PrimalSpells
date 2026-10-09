@@ -389,3 +389,13 @@ OSHI是Minecraft自带的操作系统/硬件信息库。此处异常发生在Cra
 总体报告仍FAIL：新客户端启动仍含既有OSHI/Perflib/JNA的5条异常，没有调整日志门禁或隐藏错误。用户尚待手动重启，法术验收通过不能作为系统计数器恢复的证明。
 
 新增两场的退场判据使用已有`collapse`门禁（50%→5%至少4帧），分别实测5/7帧；初版夹具误用“瞬间消失≤3帧”口径，已按晶体爆炸/锯齿飞散语义修正。最低可见性、空场、零残留和日志异常门禁未放宽。
+
+## 第65轮验收范围（2026-10-09）
+
+最终65f录制十场：black_hole_moving、explosion、expansion_crystals、expansion_arc、expansion_plasma、spell_resonance、spell_stability、spell_mechanics、crystal_lifecycle、combat_impact。1781帧、零丢帧，93/93项玩法检查通过。新增combat_impact的18项使用真正原版猪检查受伤/推力/抗性/自伤/暗核，另覆盖空场四跳、最近两次避让、薄墙相位、实心落点停止、延寿11跳和跃迁触发易爆修正。
+
+最终独立画廊`build/capture/final65/index.html`，报告`report.txt`，统计`summary.tsv`，逐场来源`runs.tsv`全部为65f；原日志`build/capture/final65f.log`。先前65a失败夹具及65b/c中间结果均不作为最终证据；最终长片元已改用PD alignTo径向对齐，保留原始PNG供检查。
+
+玩法门禁不因重构放宽：爆炸首拍1200～2200颗、所有场景原有像素最低覆盖/空场/退场/媒体/零PD残留规则保留。电弧四次伤害从旧逐跳衰减改为四次真实4点放电，与最终Noita机制一致。总体日志仍被既有OSHI的5条异常阻断，未把场景PASS写成系统环境恢复。
+
+65f十场视觉及媒体门禁全部通过，大爆炸暖色覆盖50%→5%跨4帧（原门槛≥4）。65d/e退场失败均不作为最终验收；最终只使用65f新客户端完整十场。开发录制setup清理邻近原版掉落物，防止伤害测试的猪肉污染后续空场；不清除或过滤粒子。构建通过；总体报告仍因既有5条OSHI异常FAIL。

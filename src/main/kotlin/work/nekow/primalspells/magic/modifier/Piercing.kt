@@ -26,6 +26,7 @@ class Piercing : Modifier() {
         effects += object : BaseEffect() {
             override fun onActive() {
                 projectile.maxHitTargets = -1
+                projectile.selfDamage = true
             }
         }
     }

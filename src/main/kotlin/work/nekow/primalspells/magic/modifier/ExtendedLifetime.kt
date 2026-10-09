@@ -9,11 +9,12 @@ class ExtendedLifetime : Modifier() {
 
     init {
         mana = 40.0
+        delay = 5
         effects += object: BaseEffect() {
             override fun onActive() {
-                projectile.maxAge += 200
+                projectile.maxAge += 25
             }
         }
-        lore(Lore.MAX_AGE, "+200")
+        lore(Lore.MAX_AGE, "+25")
     }
 }

@@ -297,3 +297,5 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 第64轮新增：`magic/projectile/Chainsaw.kt`为近距攻击投射物，`magic/effect/visual/ChainsawFx.kt`绘制短促锯齿白刃，`magic/effect/visual/DelayedCastFx.kt`替代延迟施法的通用拖尾；`client/capture/SpellTimingScenes.kt`覆盖链锯牌序、连续施放与移动延时载体同刻释放。注册表17投射物+26修正=43卡，配方矩阵442组合。
 
 第64轮同时删除`magic/modifier/SphereOrbit.kt`及球形环绕所有资源、注册和生成器入口；新增`client/capture/CrystalLifecycleScene.kt`记录四向晶面、加速白闪、自然到期爆炸。
+
+第65轮新增`magic/effect/lifecycle/SpellImpact.kt`（原版受伤/强度击退统一入口）、`magic/effect/visual/ChainBoltFx.kt`（分段魔弹常驻本体）、`client/capture/CombatImpactScene.kt`（原版生物击退/抗性、自伤、跃迁及暗核回归）。新增数据包`data/minecraft/tags/damage_type/no_knockback.json`只加入本模组projectile类型，禁用原版固定击退。没有新增/删除法术卡，仍43卡/442组合。

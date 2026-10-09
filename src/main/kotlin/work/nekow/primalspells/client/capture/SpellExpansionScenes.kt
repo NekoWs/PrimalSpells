@@ -121,7 +121,7 @@ object SpellExpansionScenes {
             }, checksAt = { ctx, t -> when (t) {
                 38 -> {
                     val values = numbers(ctx)
-                    listOf(Check(name, t, "four-distinct-decaying-hits", values.sorted() == listOf("-4", "-2.8", "-2.0", "-1.4").sorted(), "damage=$values"))
+                    listOf(Check(name, t, "four-chain-bolt-discharges", values.sorted() == listOf("-4", "-4", "-4", "-4").sorted(), "damage=$values"))
                 }
                 98 -> listOf(Check(name, t, "shield-charged-and-no-freeze", shieldWand!!.status.mana < 1000.0 && !FrozenStatus.isFrozen(targets.first()),
                     "mana=${shieldWand.status.mana} frozen=${FrozenStatus.isFrozen(targets.first())}"))

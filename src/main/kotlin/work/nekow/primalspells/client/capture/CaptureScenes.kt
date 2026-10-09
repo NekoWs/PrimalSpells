@@ -909,7 +909,7 @@ object CaptureScenes {
         var observedAge = -1
         Scene(
             name = name,
-            title = "爆炸：闪爆 / 喷射碎片 / 三向冲击圈 / 翻涌烟团",
+            title = "爆炸：白热前锋 / 体积火舌 / 压力碎片 / 翻涌烟团",
             warmupTicks = 24,
             lengthTicks = EXPLOSION_TICKS,
             thirdPerson = false,
@@ -937,7 +937,7 @@ object CaptureScenes {
                 val guard = holder ?: return@Scene
                 val floorY = ctx.floorBlockY(CX, CZ)
                 val bolt = MagicManager.create("large_explosion") as Projectile
-                // ⚠️ 施法者必须是**别人**：applyDamageAndKnockback 会排除 source 实体
+                // 保留摄影相机作为施法者；爆炸也可伤害来源本人，伤害观察目标单独放在爆心旁。
                 bolt.caster = ctx.player
                 bolt.wand = Wand("capture-explosion")
                 bolt.position = Vector3f(CX + 0.5f, floorY + 2.0f, CZ + 0.5f)

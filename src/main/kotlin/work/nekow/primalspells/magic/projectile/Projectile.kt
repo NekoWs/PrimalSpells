@@ -53,7 +53,14 @@ abstract class Projectile: Magic() {
     var speed: Float = 1f
     var hitRadius: Double = 0.0
     var throughBlocks: Boolean = false
+    /** 自伤是本次施法的实时属性，爆炸/黑洞及穿刺配方开启；所有伤害入口读取同一值。 */
     var selfDamage: Boolean = false
+        get() = field || effects.any {
+            it is work.nekow.primalspells.magic.effect.lifecycle.Explosion || it is work.nekow.primalspells.magic.effect.lifecycle.CrystalReaction
+        }
+
+    /** 自伤仅改变施法者豁免，创造/旁观无敌与护盾仍按各自原规则结算。 */
+    fun canHarm(target: Entity): Boolean = target !== caster || selfDamage
 
     override fun spell() {
         // 内建效果按阶段执行（见 EffectPhase）：
@@ -73,7 +80,6 @@ abstract class Projectile: Magic() {
             dragCoeff,
             hitRadius = hitRadius,
             throughBlocks = throughBlocks,
-            selfDamage = selfDamage,
         )
         // 本体标记交给 Trajectory 的头部白热菱形（`track`，逐渲染帧丝滑）：不再单独挂一个柔光点，
         // 否则同一个"本体位置"会有两套时钟（track vs 发射器锚点），相位差会看成闪烁。
@@ -145,6 +151,7 @@ abstract class Projectile: Magic() {
         super.initLore()
         lore += LoreEntry(Lore.MAX_AGE, arrayOf(maxAge.toString()))
         if (status.damage > 0) lore += LoreEntry(Lore.DAMAGE, arrayOf(Lore.formatDouble(status.damage)))
+        if (selfDamage || effects.any { it is work.nekow.primalspells.magic.effect.lifecycle.Explosion }) lore(Lore.SELF_DAMAGE)
     }
 
     override fun clone(): Projectile = super.clone() as Projectile

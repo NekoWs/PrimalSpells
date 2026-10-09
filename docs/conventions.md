@@ -23,7 +23,7 @@ src/main/kotlin/work/nekow/primalspells/
 ├─ magic/                       法术系统
 │  ├─ core/                     对象模型与调度
 │  │  ├─ Magic.kt               法术基类（mana/delay/recharge/effects/lore/生命周期钩子/新建实例）
-│  │  ├─ EffectPhase.kt         效果执行阶段（SETUP/MODIFIER/MOTION/OVERRIDE/VISUAL）
+│  │  ├─ EffectPhase.kt         效果执行阶段（SETUP/MODIFIER/GUIDANCE/MOTION/OVERRIDE/VISUAL）
 │  │  ├─ MagicStatus.kt         投射物运行时状态（pos/velocity/damage/age/bounces/爆炸参数）
 │  │  ├─ MagicManager.kt        法术 id 注册表、投射物列表、每 tick 驱动、创建法术实例
 │  │  ├─ ShieldGuard.kt         「命中/爆炸 → 护盾」接入缝：通用效果只问这一句，不认识具体法术
@@ -331,3 +331,5 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 第64轮结构记录：新增`magic/projectile/Chainsaw.kt`、`magic/effect/visual/{ChainsawFx,DelayedCastFx}.kt`、`client/capture/SpellTimingScenes.kt`。新增链锯卡资源与生成器图标，并移除SphereOrbit及资源，总计43卡。延迟施法从Trajectory路由到DelayedCastFx，通用共鸣不再添加飞散装饰。
 
 第64轮最终结构：删除`magic/modifier/SphereOrbit.kt`，新增`client/capture/CrystalLifecycleScene.kt`；当前17投射物+26修正共43卡。
+
+第65轮结构记录：伤害/推力结算新增`magic/effect/lifecycle/SpellImpact.kt`；常驻魔弹表现新增`magic/effect/visual/ChainBoltFx.kt`；真实生物验收新增`client/capture/CombatImpactScene.kt`。连锁魔弹从Trajectory改路由至ChainBoltFx；原版伤害标签位于`src/main/resources/data/minecraft/tags/damage_type/no_knockback.json`，不新建伤害注册表或客户端伤害分支。

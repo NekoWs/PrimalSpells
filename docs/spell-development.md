@@ -65,13 +65,13 @@ class IceShard : Projectile() {
 | `cast` | `0`（`Projectile` 覆写） | **抽牌预算**：投射物是 0 → 抽到即停止抽牌 |
 | `maxAge` | 0 | 寿命（tick） |
 | `maxBounces` | 0 | 可弹跳次数（`Bounce` 效果累加） |
-| `maxHitTargets` | 1 | 命中实体几次后死亡；`-1` = 无限穿透 |
+| `maxHitTargets` | 1 | 命中实体几次后死亡；`-1` = 穿刺且穿盾；`0` = 连锁载体不按命中次数死亡 |
 | `bounceScaler` | `(0.9, 0.9, 0.9)` | 每次弹跳的速度缩放（当前无 modifier 修改它） |
 | `dragCoeff` | 0.02 | 每 tick 阻尼系数：`v *= 1/(1 + dragCoeff*|v|)` |
 | `speed` | 1 | 初速倍率（格/tick） |
 | `hitRadius` | 0.0 | 实体碰撞半径，**0 = 不做实体检测** |
 | `throughBlocks` | false | true = 穿墙但不消失（会写 `status.atBlock`） |
-| `selfDamage` | false | 是否允许命中施法者 |
+| `selfDamage` | 普通弹false；爆炸/水晶/黑洞true | 是否允许命中施法者，穿刺也会开启；碰撞与直接伤害实时读取 |
 | `bodyColor` | `Color.WHITE` | 拖尾与头部的主色（传给 `Trajectory`） |
 | `status.damage` | 0.0 | 命中伤害 |
 | `status.explosionRadius` / `explosionDamage` | 2.0f / 5.0 | `Explosion` 效果使用（只做伤害与击退，不破坏方块） |
@@ -401,3 +401,5 @@ class MyPassive : Modifier() {
 不要用ModItems.MAGICS的HashMap迭代顺序展示法术，否则新增条目会让已有分类散乱。
 
 第64轮新增投射物卡特性`resetsCastDelay`：只供链锯式实际施放的投射物在牌序当前位置清除此前施放延迟，普通Modifier不能用它改变可交换组合规则。触发载体只累加荷载数值，不继承该标记。自然寿命结算用onExpire，像水晶定时爆炸、延迟载体的释放视觉也接该钩子；onDie只承担收尾或明确的死亡结算。
+
+第65轮自伤/击退：Explosion/CrystalReaction及黑洞默认自伤，穿刺配方自动开启，读取Projectile.canHarm而非单独排除caster；Move需先离开施法者碰撞箱才允许返弹自伤。新直接伤害走SpellDamage.hit，新爆炸走Explosion.customExplode，二者共用SpellImpact.hurt处理真实受伤及推力；不要直接hurtServer后另加固定击退。暗核等吸引伤害用knockback=false避免反向推离。无伤害接受则无击退，原版击退由专用伤害tag禁用。

@@ -10,8 +10,6 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.ShieldGuard
-import work.nekow.primalspells.registry.ModDamageTypes
-import kotlin.math.sqrt
 import work.nekow.primalspells.magic.effect.BaseEffect
 
 /**
@@ -65,7 +63,7 @@ class Explosion(
 
             CrystalReaction.notifyExplosion(serverLevel, Vec3(cx, cy, cz), radius.toDouble())
 
-            SpellInteractions.shock(serverLevel, Vec3(cx, cy, cz), radius.toDouble(), work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
+            SpellInteractions.shock(serverLevel, Vec3(cx, cy, cz), radius.toDouble(), damage, work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
 
             // 1. 播放自定爆炸音效
             serverLevel.playSound(
@@ -92,7 +90,7 @@ class Explosion(
          * 击退方向：从爆炸中心向外
          *
          * @param level  服务端世界
-         * @param source 爆炸来源（不会被伤害）
+         * @param source 爆炸来源（也可能受到自伤）
          * @param cx, cy, cz 爆炸中心
          * @param r      爆炸半径
          * @param damage 中心最大伤害
@@ -108,11 +106,9 @@ class Explosion(
             val center = Vec3(cx, cy, cz)
             val aabb = AABB.ofSize(center, r.toDouble() * 2.0, r.toDouble() * 2.0, r.toDouble() * 2.0)
 
-            level.getEntities(null, aabb) { it != source && it.isAlive }.forEach { entity ->
-                val dx = entity.x - cx
-                val dy = entity.y + entity.eyeHeight / 2.0 - cy  // 以实体中心为准
-                val dz = entity.z - cz
-                val dist = sqrt(dx * dx + dy * dy + dz * dz).toFloat()
+            level.getEntities(null, aabb) { it.isAlive }.forEach { entity ->
+                val direction = entity.boundingBox.center.subtract(center)
+                val dist = direction.length().toFloat()
                 if (dist > r) return@forEach
 
                 // 距离衰减伤害
@@ -128,30 +124,11 @@ class Explosion(
                     return@forEach
                 }
 
-                // 伤害（伤害类型缺失时跳过本次伤害，而不是崩服务器 tick）
-                if (actualDamage > 0.0) {
-                    val damageSource = ModDamageTypes.projectileSourceOrNull(level, source)
-                    if (damageSource != null) {
-                        val invul = entity.invulnerableTime
-                        entity.invulnerableTime = 0
-                        val accepted = entity.hurtServer(level, damageSource, actualDamage.toFloat())
-                        if (accepted && frozen) FrozenStatus.shatter(entity)
-                        if (accepted && entity is LivingEntity && shot != null && shot.status.freezeTicks > 0)
-                            FrozenStatus.freeze(entity, shot.status.freezeTicks)
-                        entity.invulnerableTime = invul
-                    }
-                }
-
-                // 击退：从中心向外, 力度与伤害成正比
-                if (dist > 0.01f) {
-                    val knockbackStrength = (falloff * 1.5).coerceAtMost(3.0)
-                    val kbX = dx / dist * knockbackStrength
-                    val kbZ = dz / dist * knockbackStrength
-                    val kbY = (dy / dist * knockbackStrength).coerceAtLeast(0.3)  // 最小向上击退
-
-                    entity.push(kbX, kbY, kbZ)
-                    entity.hurtMarked = true
-                }
+                // 爆炸一律允许自伤，统一入口抑制原版固定击退，再按实际衰减伤害推离爆心。
+                val accepted = SpellImpact.hurt(level, entity, source, actualDamage, direction, blast = true)
+                if (accepted && frozen) FrozenStatus.shatter(entity)
+                if (accepted && entity is LivingEntity && shot != null && shot.status.freezeTicks > 0)
+                    FrozenStatus.freeze(entity, shot.status.freezeTicks)
             }
         }
     }

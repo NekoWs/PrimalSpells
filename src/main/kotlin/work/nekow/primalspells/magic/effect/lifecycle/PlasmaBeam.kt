@@ -42,7 +42,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
         }
         if (status.age % 5 != 0 || start.distanceToSqr(end) < 1e-8) return
         val candidates = world.getEntitiesOfClass(LivingEntity::class.java, AABB(start, end).inflate(0.25 * projectile.areaScale)) {
-            it.isAlive && it !== caster && !caster.isAlliedTo(it) &&
+            it.isAlive && projectile.canHarm(it) && (it === caster || !caster.isAlliedTo(it)) &&
                 it.boundingBox.inflate(0.15 * projectile.areaScale).clip(start, end).isPresent
         }.sortedBy { it.boundingBox.center.distanceToSqr(start) }.take(if (projectile.maxHitTargets < 0) Int.MAX_VALUE else 4)
         val originalPos = org.joml.Vector3f(status.pos)

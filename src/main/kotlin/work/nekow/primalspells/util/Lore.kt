@@ -7,6 +7,7 @@ enum class Lore(val key: String) {
     DELAY("lore.primalspells.delay"),
     RECHARGE("lore.primalspells.recharge"),
     DAMAGE("lore.primalspells.damage"),
+    SELF_DAMAGE("lore.primalspells.self_damage"),
     SPEED("lore.primalspells.speed"),
     MAX_AGE("lore.primalspells.max_age"),
     RESISTANCE("lore.primalspells.resistance"),

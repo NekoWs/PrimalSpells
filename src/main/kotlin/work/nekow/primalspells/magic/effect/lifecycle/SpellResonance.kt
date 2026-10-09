@@ -47,7 +47,7 @@ class SpellResonance : BaseEffect() {
             && ("damage_boost" in projectile.modifiers || status.freezeTicks > 0)) {
             level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity::class.java,
                 net.minecraft.world.phys.AABB.ofSize(center, 3.0 * projectile.areaScale, 3.0 * projectile.areaScale, 3.0 * projectile.areaScale)) {
-                it !== caster && !caster.isAlliedTo(it)
+                projectile.canHarm(it) && (it === caster || !caster.isAlliedTo(it))
             }.forEach { SpellDamage.hit(level, it, projectile, status.damage.coerceAtLeast(1.0)) }
         }
     }

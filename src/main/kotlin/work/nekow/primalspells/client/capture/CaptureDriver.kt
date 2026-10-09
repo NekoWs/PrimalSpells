@@ -565,6 +565,9 @@ object CaptureDriver {
             command("gamemode ${if (spectator) "spectator" else "creative"}")
             player.connection.teleport(x, y, z, yaw, pitch)
             player.setNoGravity(true)
+            // 原版生物伤害夹具会掉落物品；换场时清掉道具，避免暖色像素判据把旧掉落物当作余烬。
+            level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity::class.java, player.boundingBox.inflate(64.0))
+                .forEach { it.discard() }
         }
 
         companion object {

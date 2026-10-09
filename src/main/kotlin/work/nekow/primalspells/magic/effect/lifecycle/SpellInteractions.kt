@@ -48,11 +48,11 @@ object SpellInteractions {
         }
     }
     /** 爆炸冲击也对魔法弹施力，水晶触发由Explosion的统一通知入口处理。 */
-    fun shock(level: ServerLevel, center: Vec3, radius: Double, shots: List<Projectile>) {
+    fun shock(level: ServerLevel, center: Vec3, radius: Double, damage: Double, shots: List<Projectile>) {
         shots.filter { it.alive && it.caster.level() === level }.forEach { shot ->
             val d = point(shot).subtract(center); val dist = d.length()
             if (dist in 0.05..radius && shot.motionEnabled) {
-                val push = d.normalize().scale((1 - dist / radius) * 0.85)
+                val push = d.normalize().scale(SpellImpact.strength(damage * (1 - dist / radius), blast = true))
                 shot.status.velocity.add(push.x.toFloat(), push.y.toFloat(), push.z.toFloat())
             }
         }

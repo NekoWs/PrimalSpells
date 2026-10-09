@@ -7,6 +7,7 @@ import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.MobCategory
 import net.neoforged.neoforge.registries.DeferredRegister
 import work.nekow.primalspells.PrimalSpells
+import work.nekow.primalspells.entity.RogueMageEntity
 import work.nekow.primalspells.entity.DroneEntity
 import work.nekow.primalspells.entity.TestDummyEntity
 
@@ -36,6 +37,11 @@ object ModEntities {
             .clientTrackingRange(10)
             .updateInterval(3)
             .build(key("test_dummy"))
+    }
+
+    val ROGUE_MAGE = ENTITY_TYPES.register("rogue_mage") { _ ->
+        EntityType.Builder.of(::RogueMageEntity, MobCategory.MONSTER)
+            .sized(0.6f, 1.95f).clientTrackingRange(10).updateInterval(3).build(key("rogue_mage"))
     }
 
     /** 便捷方法：创建实体类型的 ResourceKey */

@@ -49,6 +49,8 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.register(WandCommand)
         NeoForge.EVENT_BUS.register(MagicManager)
         NeoForge.EVENT_BUS.register(WandManager)
+        NeoForge.EVENT_BUS.register(work.nekow.primalspells.event.SpellcasterSpawns)
+        work.nekow.primalspells.registry.ModLoot.SERIALIZERS.register(bus)
         ModItems.COMPONENTS.register(bus)
         ModItems.ITEMS.register(bus)
         ModItems.TABS.register(bus)
@@ -57,8 +59,16 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
 
         // 注册实体属性
         bus.addListener<EntityAttributeCreationEvent> { event ->
+            event.put(ModEntities.ROGUE_MAGE.get(), work.nekow.primalspells.entity.RogueMageEntity.createAttributes().build())
             event.put(ModEntities.DRONE.get(), DroneEntity.createAttributes().build())
             event.put(ModEntities.TEST_DUMMY.get(), TestDummyEntity.createAttributes().build())
+        }
+
+        bus.addListener<net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent> { event ->
+            event.register(ModEntities.ROGUE_MAGE.get(), net.minecraft.world.entity.SpawnPlacementTypes.ON_GROUND,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                work.nekow.primalspells.entity.RogueMageEntity::canSpawn,
+                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE)
         }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->

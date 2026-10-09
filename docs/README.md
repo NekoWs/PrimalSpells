@@ -11,6 +11,8 @@
 
 | 文档 | 内容 | 什么时候读 |
 |---|---|---|
+| [todo.md](todo.md) | 已确认的开发方向：法术链预览、整合接口、红石与非破坏性交互 | 规划后续工作 |
+| [design/acquisition.md](design/acquisition.md) | 结构战利品、游荡术士与夺杖规则 | 修改获取方式或敌人 |
 | [architecture.md](architecture.md) | 分层架构、法术对象模型、牌堆与施法流程、投射物生命周期、持久化、网络、客户端 | **第一次接触本项目**；要改核心机制、排查「为什么没生效」 |
 | [code-map.md](code-map.md) | 逐包逐文件的代码导航 + 「我要改 X → 去哪个文件」 | 知道要改什么、但不知道文件在哪 |
 | [spell-development.md](spell-development.md) | 新增投射物 / 修饰器 / 特效 / 物品 / 资源 / 语言键的完整步骤与注册点 | 要添加或修改法术内容 |

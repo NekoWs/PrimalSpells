@@ -204,5 +204,11 @@
   "lore.primalspells.reduce_recharge.desc": "施放延迟 -3t，充能时间 -7t。",
   "lore.primalspells.sawblade.desc": "旋转锯片每刻切割，反弹8次；会伤害施法者。",
   "lore.primalspells.healing_bolt.desc": "命中回复5HP。治疗伤害为负时扣除对应生命。",
-  "lore.primalspells.torch.desc": "手持时火种围绕玩家，照亮周围。"
+  "lore.primalspells.torch.desc": "手持时火种围绕玩家，照亮周围。",
+  "entity.primalspells.rogue_mage": "游荡术士",
+  "book.primalspells.exploration.title": "寻法手记",
+  "book.primalspells.exploration.1": "这根法杖已经装好火花弹。\n\n长按右键施法。将法术卡放到杖上可以装入；滚轮选择槽位，再用空光标右键取出法术。\n\n带上食物、盾牌和退路。",
+  "book.primalspells.exploration.2": "遗迹与矿井\n\n废弃矿井、沙漠和丛林神庙中留有基础法术和低阶法杖。\n\n掠夺者前哨站偏向追踪、防御和切割；村庄神殿能找到入门法杖。",
+  "book.primalspells.exploration.3": "深入寻法\n\n林地府邸与要塞保存触发、定时和治疗法术。\n\n下界堡垒与堡垒遗迹偏向爆炸与光束；远古城市和末地城能找到复制、黑洞与汇聚之光。",
+  "book.primalspells.exploration.4": "游荡术士\n\n部分遗迹中有持杖敌人。听到蓄力声后利用掩体，或攻击打断准备。\n\n击败后可夺取它刚才使用的整根法杖，拆下法术改装。战斗魔法不会炸毁方块。"
 }

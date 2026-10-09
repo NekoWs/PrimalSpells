@@ -18,6 +18,7 @@ import work.nekow.primalspells.client.hud.WandHudRenderer
 import work.nekow.primalspells.client.input.ClientContainerDragHandler
 import work.nekow.primalspells.client.input.SpellSlotScrollHandler
 import work.nekow.primalspells.client.render.DroneEntityModel
+import work.nekow.primalspells.client.render.RogueMageRenderer
 import work.nekow.primalspells.client.render.DroneEntityRenderer
 import work.nekow.primalspells.client.render.ParticleTextures
 import work.nekow.primalspells.client.render.WandHandPose
@@ -107,6 +108,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         }
 
         bus.addListener<EntityRenderersEvent.RegisterRenderers> { event ->
+            event.registerEntityRenderer(ModEntities.ROGUE_MAGE.get(), ::RogueMageRenderer)
             event.registerEntityRenderer(ModEntities.DRONE.get(), ::DroneEntityRenderer)
             // 测试木桩直接复用原版盔甲架渲染器（TestDummyEntity 是 ArmorStand 子类，
             // 泛型不匹配，运行时安全，需显式转换）

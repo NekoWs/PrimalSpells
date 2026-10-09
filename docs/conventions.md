@@ -18,7 +18,8 @@ src/main/kotlin/work/nekow/primalspells/
 ├─ PrimalSpells.kt              模组主入口（@Mod，公共侧）：注册一切 + 注册网络包（不引用客户端类）
 ├─ registry/                    所有注册表与数据组件（唯一允许写 DeferredRegister 的地方）
 │  ├─ ModItems.kt               物品、数据组件（WAND_ID/WAND_SPELLS/POUCH_ID/POUCH_SELECTED_SLOT/…）、创造模式标签、法术物品工厂
-│  ├─ ModEntities.kt            实体类型（drone / test_dummy）
+│  ├─ ModEntities.kt            实体类型（drone / test_dummy / rogue_mage 等）
+│  ├─ ModLoot.kt                全局战利品修改器codec注册
 │  └─ ModDamageTypes.kt         伤害类型 + `projectileSourceOrNull()`（数据包缺失时安全降级）
 ├─ magic/                       法术系统
 │  ├─ core/                     对象模型与调度
@@ -51,7 +52,8 @@ src/main/kotlin/work/nekow/primalspells/
 │  ├─ SpellPouchItem.kt         法术小包：16 格内容 + 选中槽，装卸逻辑与法杖一致
 │  ├─ TestDummyItem.kt          测试木桩放置
 │  └─ component/ WandID.kt      数据组件值类型（wand_id 与 pouch_id 共用）
-├─ entity/                      自定义实体与 AI 目标：Drone(+3 Goal)/TestDummy/DamageNumber
+├─ loot/                        获取领域：SpellLootProfile地点池、SpellLoot成品工厂、ExplorationLootModifier箱子追加
+├─ entity/                      自定义实体与 AI 目标：Drone(+3 Goal)/TestDummy/DamageNumber/RogueMage(+AttackGoal)
 ├─ network/                     payload 定义与客户端分发点
 │  ├─ SyncWandStatsPayload.kt / ScreenShakePayload.kt    S→C
 │  ├─ SelectSpellSlotPayload.kt                           C→S（法杖/小包共用的选槽同步）
@@ -89,11 +91,14 @@ tools/capture/                                   实机录制流水线（PowerSh
 5. **是不是事件处理器？** 公共侧 → `event/`；纯客户端事件 → `client/` 对应子包（例如滚轮选槽在 `client/input/`），并在 `PrimalSpellsClient` 里注册。
 6. **都不是？** → 无状态纯函数放 `util/`；有状态的服务端系统放它所属的领域包（如 `wand/`）。
 
+第79轮新增获取领域：地点卡池、成品奖励创建和GLM实现放`loot/`；GLM的DeferredRegister仍只在`registry/ModLoot.kt`。自然生成事件在`event/SpellcasterSpawns.kt`，敌人及AI在`entity/`，渲染在`client/render/`，不把整套获取机制塞进物品或通用util。
+
 **依赖方向**（不要制造反向依赖）：
 
 ```
 client/*        ──→ registry/ item/ entity/ network/ util/ magic/(只读数据)
 event/ registry/ PrimalSpells ──→ magic/ wand/ item/ entity/ network/ util/
+loot/*          ──→ registry/ item/ magic/core/ wand/ （服务端获取领域）
 magic/core      ──→ magic/effect, util/            （core 不依赖具体 projectile）
 magic/projectile──→ magic/core, magic/effect, util/
 magic/modifier  ──→ magic/core, magic/effect
@@ -133,7 +138,7 @@ magic/modifier  ──→ magic/core, magic/effect
 
 ## 5. 服务端 / 客户端分离
 
-- 公共侧代码（`registry/ magic/ wand/ item/ entity/ network/ event/ util/`）**不允许 import `client/` 下的任何类**，也不允许引用 `net.minecraft.client.*`。
+- 公共侧代码（`registry/ magic/ wand/ loot/ item/ entity/ network/ event/ util/`）**不允许 import `client/` 下的任何类**，也不允许引用 `net.minecraft.client.*`。
 - 客户端代码只能由 `client/` 内的类或 `PrimalSpellsClient`（`@Mod(dist = Dist.CLIENT)`）加载。
 - 纯客户端事件（`ScreenEvent`、渲染事件）注册在 `PrimalSpellsClient`，不要挂在公共入口上——公共入口在专用服务器上也会加载。
 - **S→C 包的公共侧处理器不能直接调用客户端类**：用 `network/ClientPayloadSink` 的可空回调中转，
@@ -363,3 +368,7 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 ## 第76轮结构增补
 
 新增magic/action包，承载【其他】抽牌控制卡（DivideTwo/Three/Five/Ten、CastAll、AddTrigger/Timer/Expiration），依赖magic/core.DrawAction。核心抽牌模型DrawAction/AppendedPayload放magic/core，生命周期实现AppendedTrigger放magic/effect/lifecycle；SawbladeFx放visual，Sawblade/HealingBolt放projectile，被动Torch与ReduceRecharge、多重施放放modifier。没有移动旧文件；这是第1–2节包落位规则的增补。控制卡不能当Modifier注入投射物效果。
+
+## 第79轮结构增补
+
+新增`loot/`领域及`registry/ModLoot.kt`、`event/SpellcasterSpawns.kt`、`entity/RogueMageEntity.kt`/`RogueMageAttackGoal.kt`、`client/render/RogueMageRenderer.kt`、`client/capture/ExplorationScene.kt`。GLM条件在`data/primalspells/loot_modifiers/`，结构标签在`data/primalspells/tags/worldgen/structure/spell_sites/`；手记复用原版书本组件，不新增书本物品注册。无旧→新类迁移、无存档键变更、无新增PD替代实现。

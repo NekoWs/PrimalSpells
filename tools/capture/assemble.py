@@ -151,6 +151,8 @@ SCENES["pd_api"] = {"length": 120, "title": "PD跟踪曲线 / 静止受光 / 帧
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
+# 此场景验证完整战斗与夺杖流程，多个独立生命周期不适用单一峰值退场跨度。
+SCENES["exploration"] = {"length": 240, "title": "结构战利品 / 游荡术士 / 实际持杖掉落", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "本场包含多次独立施法；玩法断言检查战斗收场粒子/投射物归零，并保留尾帧无残留判据"}
 SCENES["new_spells"] = {"length": 180, "title": "复制抽牌 / 追加条件 / 正负治疗 / 锯片与火种", "metric": "white", "quiet": (0, 6), "decay": "instant"}
 SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}
@@ -493,7 +495,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         # 这一场的退场由专属判据负责（spec 里必须有对应断言，见 `breach_fade`）
         result["asserts"].append(
             ("退场判定交由专属判据", "breach_fade" in spec or "quiet" in spec,
-             "本场的收场不是蓝色像素（见「破口逐步收缩并收干净」/「退场无残留」）"),
+             spec.get("decay_reason", "本场的收场不是蓝色像素（见「破口逐步收缩并收干净」/「退场无残留」）")),
         )
     else:
         # 这类效果的退场**设计上**就是立刻清理（没有退场动画）：只要求别拖泥带水

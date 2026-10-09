@@ -565,3 +565,9 @@ DrawAction是【其他】类卡，与Modifier分开。drawChain在手牌事务�
 payChain先处理当前结构层的普通回蓝修正，再支付控制卡，通过后才递归展开；展开内容合入所属法术链。未支付的控制卡整段不施放。支付投射物时递归处理原生payload及addedTriggers荷载；荷载费用计入同一Wand事务，效果仍与父链隔离。
 
 追加系列先抽取一个载体链，再预留一条独立荷载，保存为AppendedPayload(kind,cards)。20t定时在OVERRIDE读取本刻真实末位置；提前命中同样释放。命中触发遵守穿刺实体命中不触发规则，失效触发仅在寿命到期/销毁时释放。每次释放前清空，expire与die相邻调用也不会重复。SpellAssembly.copyCard/copyAppended深拷贝这些准备态树，运行时effects、status及消费状态不共享。
+
+## 第79轮：获取与非玩家施法
+
+获取领域`loot/`通过现有`ModItems.wandStack`和`WandManager.createWand`创建真实等级杖，配方写入同一Wand.magics及物品槽位组件。GLM只追加箱子奖励；结构自然生成只追加刷怪候选，不覆盖原有列表，地点由真实结构piece标签决定。
+
+RogueMageEntity手持真实WandItem，每刻调用Wand.tick(this)维护被动与持有者；攻击AI只负责准备、朝向、视线、移动和调用Wand.spell(this)。不复制法术结算器，不伪造直接伤害。死亡掉落原手持ItemStack，wandId与运行时/存档实例保持同一身份。敌人注册仅公共侧；模型、举杖动作和实际装备提取仅客户端。范围、获取概率及限制见[design/acquisition.md](design/acquisition.md)。

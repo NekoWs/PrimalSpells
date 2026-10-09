@@ -357,3 +357,19 @@ client/capture/PdApiScene.kt为前置运行时回归；magic/effect/visual/Pixel
 - `magic/projectile/Sawblade.kt`、`HealingBolt.kt`：帧伤锯片、正负治疗弹。
 - `magic/effect/visual/SawbladeFx.kt`、`magic/effect/lifecycle/AppendedTrigger.kt`：实色旋转锯盘与三种追加时机。
 - `client/capture/NewSpellScene.kt`：复制/付费/作用域/定时/失效/治疗/逐刻切割实机回归。
+
+## 第79轮获取方式导航
+
+| 修改目标 | 入口 |
+|---|---|
+| 地点散卡池、法杖等级、术士配方 | `loot/SpellLootProfile.kt` |
+| 成品法杖唯一ID/装配/蓄能型、入门手记 | `loot/SpellLoot.kt` |
+| 箱子追加奖励、GLM codec | `loot/ExplorationLootModifier.kt`、`registry/ModLoot.kt` |
+| 对应哪些箱子/结构 | `data/primalspells/loot_modifiers/*.json`、`tags/worldgen/structure/spell_sites/*.json` |
+| 结构内追加刷怪候选、保留原版列表 | `event/SpellcasterSpawns.kt` |
+| 术士装备、属性、打断、死亡夺杖 | `entity/RogueMageEntity.kt` |
+| 视线、20t准备、点射、恢复、寻路 | `entity/RogueMageAttackGoal.kt` |
+| 原版模型与实际持杖渲染 | `client/render/RogueMageRenderer.kt` |
+| 六类原生箱子/144根成品/结构候选/生存实战回归 | `client/capture/ExplorationScene.kt`（场景`exploration`） |
+
+主入口注册公共事件、GLM、实体属性和生成条件；客户端入口单独注册渲染器。规则见[design/acquisition.md](design/acquisition.md)，后续预览/接口/红石见[todo.md](todo.md)。本轮新增文件，没有类迁移或持久化键变更。

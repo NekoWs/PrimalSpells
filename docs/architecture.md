@@ -514,3 +514,8 @@ ConcentratedLight在创建时保存launchDirection，经修正的速度在onSpel
 Projectile.shieldedImpactTargets保存本次已被ShieldGuard拦下的实体UUID，SpellDamage和同载体Explosion都读取它。Projectile.tick开始清空，onDie不清空，避免一次命中后的死亡爆炸第二次击穿；只保护同一个载体的同次命中，不给目标全局无敌、不阻止其它法术/旁人受伤。复制体不继承该运行时集合。
 
 TestDummyEntity在knockback之外覆盖push(x,y,z)，并设原版KNOCKBACK_RESISTANCE=1，法术SpellImpact的直接推力也不能移动靶子。原有伤害显示/装备/攻击行为保留。
+
+
+## 第69轮：纯视觉发射反冲
+
+汇聚之光不再调用releaseCastRecoil，基础recoil归零；付费施法排队不会在释放时推施法者，反冲增幅也不会为本法术触发实际推力。20刻蓄能、世界部署点/方向和5次反弹不变。反冲只在ConcentratedLightFx的镜阵上表现。

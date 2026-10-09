@@ -14,6 +14,7 @@ class ConcentratedLightFx : BaseEffect() {
     private var manager: ParticleManager? = null
     private var charge: ParticleBatch? = null
     private var previous = Vec3.ZERO
+    private var chargeRest = emptyList<Vec3>()
     private fun point() = Vec3(status.pos)
     private fun points(progress: Double = (status.age.toDouble()/ConcentratedLight.CHARGE_TICKS).coerceIn(0.0,1.0)): List<Vec3> {
         val forward = projectile.launchDirection
@@ -51,16 +52,16 @@ class ConcentratedLightFx : BaseEffect() {
                     .glowing(true).additive(false))
                 .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(3,1,EasingType.EASE_OUT))
         }))
-            val targets = points(1.0)
-            batch.handles().forEachIndexed { i, handle -> handle.move(targets[i], ConcentratedLight.CHARGE_TICKS, EasingType.EASE_IN) }
+            chargeRest = points(1.0)
+            batch.handles().forEachIndexed { i, handle -> handle.move(chargeRest[i], ConcentratedLight.CHARGE_TICKS, EasingType.EASE_IN) }
         }
     }
     override fun onTick() {
         val pm=manager ?: return
         if(projectile.awaitingRelease) { previous=point();return }
         if(charge!=null) {
-            // 蓄能棱片在最后的枪口位置熄灭，不跟着首刻高速位移跳到光束前端。
-            PixelVfx.retireBatch(pm,charge,previous,4);charge=null
+            // 阵体留在部署点承受反冲：先后退张开，再回弹熄灭，不追着高速光束移动。
+            releaseRecoil(pm, charge!!);charge=null
             releaseFlash(pm)
         }
         val end=point();val distance=previous.distanceTo(end)
@@ -86,6 +87,23 @@ class ConcentratedLightFx : BaseEffect() {
         manager?.let { PixelVfx.retireBatch(it,charge,point(),4) };charge=null
     }
 
+    private fun releaseRecoil(pm: ParticleManager, batch: ParticleBatch) {
+        val origin = previous
+        val forward = projectile.launchDirection
+        val handles = batch.handles().toList()
+        handles.forEachIndexed { i, handle ->
+            val rest = chargeRest[i]
+            val offset = rest.subtract(origin)
+            val radial = offset.subtract(forward.scale(offset.dot(forward)))
+            handle.move(rest.add(forward.scale(-0.12)).add(radial.scale(0.8)), 2, EasingType.EASE_OUT)
+        }
+        // Deferred只编排两拍；位置、接续和尺寸求值均由PD完成。
+        work.nekow.primalspells.util.Deferred.after(pm.level, 1) {
+            handles.forEachIndexed { i, handle -> handle.move(chargeRest[i], 4, EasingType.EASE_OUT) }
+            PixelVfx.retireBatch(pm, batch, origin, 4)
+        }
+    }
+
     private fun releaseFlash(pm: ParticleManager) {
         val forward=Vec3(status.velocity).normalize()
         val side=forward.cross(Vec3(0.0,1.0,0.0)).let{if(it.lengthSqr()<1e-8)Vec3(1.0,0.0,0.0)else it.normalize()}
@@ -94,12 +112,12 @@ class ConcentratedLightFx : BaseEffect() {
         val specs=(0 until 16).map { i ->
             val angle=i*PI/8
             val radial=side.scale(cos(angle)).add(up.scale(sin(angle)))
-            // 沿射线释放，避免通用爆散的向上漂移把近景片元快速甩出视野。
-            velocities+=forward.scale(0.065).add(radial.scale(0.012))
-            val life=12+i%4
+            // 短促的反向金色排光，与向前的白光脊形成发射反冲。
+            velocities+=forward.scale(-0.025).add(radial.scale(0.018))
+            val life=8+i%4
             ParticleSpawnSpec().position(previous.add(radial.scale(0.1)))
                 .color(if(i%4==0)Color.ofInt(255,253,233)else Color.ofInt(255,214,112))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.125f,0.125f).glowing(true).additive(false))
+                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f,0.0625f).glowing(true).additive(false))
                 .lifetime(life).sizeCurve(CurveKey.at(0,0),CurveKey.at(1,1),CurveKey.at(3,1),CurveKey.at(life,0,EasingType.EASE_IN_OUT))
         }
         ParticleBatch(pm).also{it.addAll(pm.spawnAll(specs));it.setVelocityAll(velocities)}

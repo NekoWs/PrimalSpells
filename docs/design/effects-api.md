@@ -752,3 +752,8 @@ ConcentratedLightFx只使用PD 1.0.15公开ParticleBatch.trackAll、spawnAll、�
 ## 第68轮：固定聚光阵
 
 66枚菱形镜框/光矛/外棱片使用原生ParticleHandle.move及sizeCurve（一次性20刻合拢，不逐刻重定向），出生3刻、结束4刻；出生点和轴向均固定，不再依赖实体跟随。护盾去除冗余面心ring接线，保留已有原生碎片速度/寿命。没有升级PD；新增trackAll与sizeCurve冲突需求见issues/pd-api-requests第68轮；既有光照缓存与高刷组变量问题保持未决。
+
+
+## 第69轮：纯视觉发射反冲
+
+沿用原生ParticleHandle.move一次性两拍接续与既有resize收尾；Deferred只调度第2刻回弹，不承担粒子插值或渲染。没有使用track+sizeCurve、不升级前置、无新增API需求；第68轮曲线冻结需求仍待PD修复。

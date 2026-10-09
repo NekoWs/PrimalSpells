@@ -153,6 +153,8 @@ SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 # 此场景验证完整战斗与夺杖流程，多个独立生命周期不适用单一峰值退场跨度。
 SCENES["exploration"] = {"length": 240, "title": "结构战利品 / 游荡术士 / 实际持杖掉落", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "本场包含多次独立施法；玩法断言检查战斗收场粒子/投射物归零，并保留尾帧无残留判据"}
+SCENES["magic_hud"] = {"length": 200, "title": "魔法HUD / 双冷却 / 原生拖动缩放保存", "metric": "blue", "quiet": (0, 6), "decay": "none", "decay_reason": "HUD状态切换与编辑器预览各有独立生命周期；原生输入/配置断言与最终空场检查共同验收"}
+SCENES["sawblade_falling"] = {"length": 130, "title": "锯齿钢盘 / 下坠反弹 / 金属碎散", "metric": "white", "quiet": (0, 6), "short_exit": True, "fade_window": (65, 85), "decay": "collapse"}
 SCENES["new_spells"] = {"length": 180, "title": "复制抽牌 / 追加条件 / 正负治疗 / 锯片与火种", "metric": "white", "quiet": (0, 6), "decay": "instant"}
 SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}

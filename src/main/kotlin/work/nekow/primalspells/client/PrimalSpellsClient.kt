@@ -52,7 +52,22 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
     private var builtinsReady = false
 
     init {
+        val hudCategory = net.minecraft.client.KeyMapping.Category(Identifier.fromNamespaceAndPath(PrimalSpells.MODID, "hud"))
+        val editHud = net.minecraft.client.KeyMapping("key.primalspells.hud_editor", org.lwjgl.glfw.GLFW.GLFW_KEY_H, hudCategory)
+        bus.addListener<net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent> { event ->
+            event.registerCategory(hudCategory); event.register(editHud)
+        }
+        container.registerExtensionPoint(net.neoforged.neoforge.client.gui.IConfigScreenFactory::class.java,
+            java.util.function.Supplier { net.neoforged.neoforge.client.gui.IConfigScreenFactory { _, parent ->
+                work.nekow.primalspells.client.screen.HudEditorScreen(parent)
+            } })
+        NeoForge.EVENT_BUS.addListener<ClientTickEvent.Post> {
+            val mc = net.minecraft.client.Minecraft.getInstance()
+            while (editHud.consumeClick()) if (mc.gui.screen() == null && mc.player != null)
+                mc.gui.setScreen(work.nekow.primalspells.client.screen.HudEditorScreen())
+        }
         // 1. 网络包的客户端处理器
+        ClientPayloadSink.hudImpact = { WandHudRenderer.impact(it.killed) }
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
         ClientPayloadSink.wandCast = { WandModelProperty.flash(it.wandId) }
         ClientPayloadSink.screenShake = { ScreenShakeClient.onShake(it) }

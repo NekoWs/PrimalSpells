@@ -29,7 +29,8 @@
 | 改小包容量 / 内容 | `item/SpellPouchItem.kt`（`SLOT_COUNT` + 组件读写） | `client/tooltip/PouchTooltip.kt` |
 | 改小包/法杖的键鼠操作 | `item/SpellPouchItem.kt` / `item/WandItem.kt`（`overrideOtherStackedOnMe`） | `client/input/SpellSlotScrollHandler.kt` |
 | 改滚轮选槽（法杖/小包） | `client/input/SpellSlotScrollHandler.kt` | `network/SelectSpellSlotPayload.kt`、`registry/ModItems.kt`（选中槽组件） |
-| 改 HUD（法力/冷却条） | `client/hud/WandHudRenderer.kt` | `network/SyncWandStatsPayload.kt` |
+| 改 HUD（法力/冷却/聚焦） | `client/hud/{WandHudRenderer,WandHudPainter,HudLayout}.kt` | `network/SyncWandStatsPayload.kt`、`design/hud.md` |
+| 改 HUD 拖动/缩放设置 | `client/screen/HudEditorScreen.kt` | `client/PrimalSpellsClient.kt`（按键、模组配置入口） |
 | 改伤害 / 施法间隔 / 护盾强度与抗性 | [design/combat-pricing.md](design/combat-pricing.md)（口径表） | 各法术 `init` 里的 `status.damage`/`delay`/`recharge`、`EnergyShield` 的字段 |
 | 改 tooltip 文案/布局 | `client/tooltip/ClientTooltipHandler.kt`、`WandSpellTooltip.kt`、`PouchTooltip.kt` | `util/Lore.kt`（词条类型） |
 | 改 Ctrl+左键拖拽交换 | `client/input/ClientContainerDragHandler.kt` | `mixin/AbstractContainerScreenInvokerMixin.java` |
@@ -108,6 +109,7 @@
 | 文件 | 内容 |
 |---|---|
 | `network/SyncWandStatsPayload.kt` | S→C：法杖数值（HUD / tooltip） |
+| `network/HudImpactPayload.kt` | S→C：实际接受的法术命中/击杀，发给玩家施法者 |
 | `network/SelectSpellSlotPayload.kt` | C→S：选中的法术槽位（法杖/小包共用，含 `send()`） |
 | `network/ClientPayloadSink.kt` | 公共侧→客户端的可空回调；由 `PrimalSpellsClient` 安装，保证公共入口不引用客户端类 |
 | `event/WandEventHandler.kt` | 公共侧：右键拦截（不与方块/实体交互但可施法）、登录补发同步、登出清理施法记录 |
@@ -123,6 +125,7 @@
 |---|---|
 | `client/capture/CaptureDriver.kt` | 录制驱动：状态机（建世界 → 布景 → 机位 → 施法 → 每 tick 抓帧 → 断言 → 自动退出）；只在开发环境 + 系统属性下注册 |
 | `client/capture/CaptureScenes.kt` | 场景表（黑洞 / 重力场 / 能量盾）：相机轨迹、时长、施法动作、断言 |
+| `client/capture/HudSawScene.kt` | 原生HUD网络/编辑器输入/保存取消与锯片重力/真实地面反弹 |
 | `tools/capture/capture.ps1` | 一条命令：构建 → 录制 → 合成 → 判定 |
 | `tools/capture/assemble.py` | 帧 → mp4/gif/拼图/画廊 + 判定（帧数/丢帧/覆盖曲线/退场渐变）；失败非零退出 |
 
@@ -134,7 +137,10 @@
 |---|---|
 | `PrimalSpellsClient.kt` | 客户端 `@Mod(dist=CLIENT)`：安装 `ClientPayloadSink`、注册 tooltip 工厂/渲染器/输入、镜头冲击、登出清理缓存 |
 | `ScreenShakeClient.kt` | 镜头冲击（屏幕震动 + FOV 抽动）的客户端求值；受原版「受伤视角晃动」强度控制 |
-| `hud/WandHudRenderer.kt` | 准星下法力/延迟/充能条（`@EventBusSubscriber(CLIENT)`，含 `clear()`） |
+| `hud/WandHudRenderer.kt` | 数值缓存、按游戏时钟求值的入退场与命中反馈，退出世界清理 |
+| `hud/WandHudPainter.kt` | 青色法力、双冷却、开放聚焦菱框；正式HUD/预览共用 |
+| `hud/HudLayout.kt` | 组件边界、归一化位置/缩放与本机JSON配置 |
+| `screen/HudEditorScreen.kt` | H键/模组配置入口，原生拖动、滚轮/角柄缩放、保存/取消 |
 | `tooltip/ClientTooltipHandler.kt` | 组装 tooltip：法杖槽位网格/Alt 属性、小包网格、选中槽法术词条 |
 | `tooltip/WandSpellTooltip.kt` | 法杖 9 列槽位 tooltip 组件（+`ClientWandSpellTooltip`，选中槽高亮） |
 | `tooltip/PouchTooltip.kt` | 小包 8 列槽位 tooltip 组件（+`ClientPouchTooltip`，选中槽高亮） |

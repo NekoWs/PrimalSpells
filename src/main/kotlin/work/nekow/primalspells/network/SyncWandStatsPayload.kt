@@ -33,6 +33,9 @@ data class SyncWandStatsPayload(
     val wandDelayTicks: Double,
     val wandRechargeTicks: Double,
     val size: Int,
+    val equipRemaining: Int = 0,
+    val equipTotal: Int = 8,
+    val manaBlocked: Boolean = false,
 ) : CustomPacketPayload {
 
     companion object {
@@ -53,7 +56,10 @@ data class SyncWandStatsPayload(
                     buf.readDouble(),
                     buf.readDouble(),
                     buf.readDouble(),
-                    buf.readVarInt()
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readBoolean()
                 )
                 override fun encode(buf: RegistryFriendlyByteBuf, p: SyncWandStatsPayload) {
                     buf.writeUtf(p.wandId)
@@ -68,6 +74,9 @@ data class SyncWandStatsPayload(
                     buf.writeDouble(p.wandDelayTicks)
                     buf.writeDouble(p.wandRechargeTicks)
                     buf.writeVarInt(p.size)
+                    buf.writeVarInt(p.equipRemaining)
+                    buf.writeVarInt(p.equipTotal)
+                    buf.writeBoolean(p.manaBlocked)
                 }
             }
     }

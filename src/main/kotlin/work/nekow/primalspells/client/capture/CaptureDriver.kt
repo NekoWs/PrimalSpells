@@ -148,7 +148,7 @@ object CaptureDriver {
         NeoForge.EVENT_BUS.addListener<ClientTickEvent.Post> { onClientTick() }
         NeoForge.EVENT_BUS.addListener<RenderFrameEvent.Post> { onRenderFrame() }
         // MC的隐藏HUD同时隐藏第一人称物品；模型场景只取消GUI绘制，保留真正的持物渲染。
-        NeoForge.EVENT_BUS.addListener<RenderGuiEvent.Pre> { if (scene?.showHands == true) it.isCanceled = true }
+        NeoForge.EVENT_BUS.addListener<RenderGuiEvent.Pre> { if (scene?.showHands == true && scene?.showHud != true) it.isCanceled = true }
         log("install: value=$wanted out=${outRoot.absolutePath} scenes=${scenes.map { it.name }}")
         if (scenes.isEmpty()) abortRequested = true
     }
@@ -195,7 +195,7 @@ object CaptureDriver {
             return
         }
         // 加载界面 / 暂停菜单期间不推进（加载中 screen 非空）
-        if (mc.gui.screen() != null) return
+        if (mc.gui.screen() != null && scene?.allowScreen != true) return
 
         val current = scene
         if (current == null) {
@@ -313,7 +313,7 @@ object CaptureDriver {
         sceneLog.appendLine("warmupTicks\t${next.warmupTicks}")
         sceneLog.appendLine("thirdPerson\t${next.thirdPerson}")
         sceneLog.appendLine("showHands\t${next.showHands}")
-        if (mc.gui.hud.isHidden() == next.showHands) mc.gui.hud.toggle()
+        if (mc.gui.hud.isHidden() == (next.showHands || next.showHud)) mc.gui.hud.toggle()
         mc.options.fov().set(next.fov)
         mc.options.cameraType = if (next.thirdPersonFront) CameraType.THIRD_PERSON_FRONT
             else if (next.thirdPerson) CameraType.THIRD_PERSON_BACK else CameraType.FIRST_PERSON
@@ -326,6 +326,7 @@ object CaptureDriver {
     private fun stepScene(mc: Minecraft, current: Scene) {
         val server = mc.singleplayerServer ?: return
         val t = tickInScene
+        if (t >= 0 && t < current.lengthTicks) current.clientTick(mc, t)
         // 收尾**延后一 tick**：最后一帧要在下一个渲染帧才抓得到，
         // 若在本 tick 立刻 captureArmed=false，末尾的 tick 就永远录不到（少一帧）
         if (t >= current.lengthTicks) {

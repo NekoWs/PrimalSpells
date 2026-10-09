@@ -106,7 +106,12 @@ class WandItem(properties: Properties) : Item(properties.component(
                 wand.charge,
                 wand.delayTickCount,
                 wand.rechargeTickCount,
-                wand.size
+                wand.size,
+                work.nekow.primalspells.magic.effect.visual.WandCastingFx.equipRemaining(player, wand),
+                work.nekow.primalspells.magic.effect.visual.WandCastingFx.EQUIP_TICKS,
+                // 失败原因保留到下次尝试，但法力恢复后不足提示必须自行解除。
+                wand.status.failedReason.any { it.startsWith("Mana(") &&
+                    wand.status.mana < (it.substringAfter(" < ").toDoubleOrNull() ?: 0.0) }
             ))
         }
 
@@ -114,7 +119,7 @@ class WandItem(properties: Properties) : Item(properties.component(
          * 需要时把法杖数值同步给客户端（Alt 面板与 HUD 的数据来源）。
          *
          * 两种时机：
-         * 1. **正在施法的那根**（`lastCastWand`）：每 tick 同步，HUD 的法力/冷却进度条要实时；
+         * 1. **手持或最近施法的杖**：每 tick 同步，HUD 的拿起/法力/冷却进度要实时；
          * 2. **背包里的其它杖**：按 [STAT_SYNC_INTERVAL] 节流同步 —— 这样**刚拿到手、还没施法过**的杖
          *    也立刻有数值可看。
          *
@@ -123,7 +128,9 @@ class WandItem(properties: Properties) : Item(properties.component(
          */
         private fun syncStatsIfNeeded(stack: ItemStack, player: ServerPlayer, gameTime: Long) {
             val wandId = stack.get(ModItems.WAND_ID)?.wandId ?: return
-            val casting = lastCastWand[player.uuid]?.wandId == wandId
+            val casting = lastCastWand[player.uuid]?.wandId == wandId ||
+                player.mainHandItem.get(ModItems.WAND_ID)?.wandId == wandId ||
+                player.offhandItem.get(ModItems.WAND_ID)?.wandId == wandId
             val bucket = lastStatSync.getOrPut(player.uuid) { hashMapOf() }
             val synced = bucket[wandId]
             if (!casting && synced != null && gameTime - synced < STAT_SYNC_INTERVAL) return

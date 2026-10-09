@@ -61,7 +61,8 @@ src/main/kotlin/work/nekow/primalspells/
 ├─ event/                       公共侧事件处理器：WandEventHandler（右键屏蔽、登录同步、登出清理）、ShieldDummyCommand（测试指令 `/primalspells shielddummy`）、WandCommand（`/primalspells wand <等级>`，见 build-and-run.md §9）
 ├─ client/                      仅在客户端加载（Dist.CLIENT）的代码
 │  ├─ PrimalSpellsClient.kt     客户端入口：安装 ClientPayloadSink、注册渲染器/tooltip/输入、登出清缓存
-│  ├─ hud/                      WandHudRenderer
+│  ├─ hud/                      WandHudRenderer、WandHudPainter、HudLayout（含HudSettings本机配置）
+│  ├─ screen/                   HudEditorScreen（可视化位置/缩放设置）
 │  ├─ tooltip/                  ClientTooltipHandler, WandSpellTooltip/ClientWandSpellTooltip,
 │  │                           PouchTooltip/ClientPouchTooltip, SpellSlotTracker
 │  ├─ input/                    SpellSlotScrollHandler（滚轮选槽，法杖/小包共用）, ClientContainerDragHandler（Ctrl+左键拖拽交换）
@@ -372,3 +373,7 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 ## 第79轮结构增补
 
 新增`loot/`领域及`registry/ModLoot.kt`、`event/SpellcasterSpawns.kt`、`entity/RogueMageEntity.kt`/`RogueMageAttackGoal.kt`、`client/render/RogueMageRenderer.kt`、`client/capture/ExplorationScene.kt`。GLM条件在`data/primalspells/loot_modifiers/`，结构标签在`data/primalspells/tags/worldgen/structure/spell_sites/`；手记复用原版书本组件，不新增书本物品注册。无旧→新类迁移、无存档键变更、无新增PD替代实现。
+
+## 第80轮新增文件落位
+
+HUD状态/绘制/配置放`client/hud/{WandHudRenderer,WandHudPainter,HudLayout}.kt`；原生Screen放`client/screen/HudEditorScreen.kt`，H键及模组配置工厂由PrimalSpellsClient注册。`network/HudImpactPayload.kt`经ClientPayloadSink接线，公共伤害入口不引用客户端。实机夹具放`client/capture/HudSawScene.kt`。无旧→新类迁移、无SavedData键变更；本机布局JSON不塞进服务端法杖NBT。

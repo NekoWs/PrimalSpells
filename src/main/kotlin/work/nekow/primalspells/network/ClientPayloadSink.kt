@@ -10,6 +10,8 @@ package work.nekow.primalspells.network
  * 在专用服务器上它们保持 `null`，处理器什么也不做。
  */
 object ClientPayloadSink {
+    /** 真实法术命中反馈。 */
+    var hudImpact: ((HudImpactPayload) -> Unit)? = null
     /** 成功施法后的晶体模型点亮。 */
     var wandCast: ((WandCastPayload) -> Unit)? = null
 

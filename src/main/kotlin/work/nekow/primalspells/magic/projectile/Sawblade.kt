@@ -12,6 +12,7 @@ class Sawblade : Projectile() {
         damageOncePerTick = true; status.damage = 12.0; selfDamage = true; maxBounces = 8; maxHitTargets = 0
         bounceScaler = org.joml.Vector3f(1f); speed = 0.65f; dragCoeff = 0f; hitRadius = 0.42
         effects += work.nekow.primalspells.magic.effect.visual.SawbladeFx()
+        effects += work.nekow.primalspells.magic.effect.geometry.ConstantAcceleration(org.joml.Vector3f(0f, -0.035f, 0f))
         effects += Hurt()
     }
 }

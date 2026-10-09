@@ -202,7 +202,7 @@
   "lore.primalspells.quadruple_cast.desc": "Draws 4 spell chains at once.",
   "lore.primalspells.quintuple_cast.desc": "Draws 5 spell chains at once.",
   "lore.primalspells.reduce_recharge.desc": "Cast delay -3t; recharge time -7t.",
-  "lore.primalspells.sawblade.desc": "A spinning saw deals cutting damage each tick, bounces 8 times, and can hurt its caster.",
+  "lore.primalspells.sawblade.desc": "A falling steel disc cuts every tick and bounces 8 times. Can hurt its caster.",
   "lore.primalspells.healing_bolt.desc": "Heals 5 HP on hit. Negative healing damage removes health.",
   "lore.primalspells.torch.desc": "An orbiting ember illuminates your surroundings while held.",
   "entity.primalspells.rogue_mage": "Rogue Mage",
@@ -210,5 +210,18 @@
   "book.primalspells.exploration.1": "This wand is loaded with Spark Bolt.\nHold right-click to cast.\nPlace spell cards onto the wand; scroll to select a slot and right-click with an empty cursor to remove a card.\nBring supplies and a way out.",
   "book.primalspells.exploration.2": "Ruins and Mines\nMineshafts and desert/jungle temples hold basic spells and early wands.\nOutposts favor homing, defense and cutting.\nVillage temples provide a starter wand.",
   "book.primalspells.exploration.3": "Deeper Expeditions\nMansions and strongholds hold triggers, timers and healing.\nFortresses and bastions favor explosions and beams.\nAncient and End cities hold division, black holes and concentrated light.",
-  "book.primalspells.exploration.4": "Rogue Mages\nSome ruins harbor wand users. Take cover when they prepare to cast, or hit them to interrupt.\nClaim their actual wand on defeat and rebuild it.\nCombat spells do not destroy blocks."
+  "book.primalspells.exploration.4": "Rogue Mages\nSome ruins harbor wand users. Take cover when they prepare to cast, or hit them to interrupt.\nClaim their actual wand on defeat and rebuild it.\nCombat spells do not destroy blocks.",
+  "key.category.primalspells.hud": "Primal Spells",
+  "key.primalspells.hud_editor": "Edit magic HUD",
+  "hud.primalspells.mana": "Mana",
+  "hud.primalspells.cooldown": "Cooldowns",
+  "hud.primalspells.focus": "Reticle rune",
+  "screen.primalspells.hud.title": "Magic HUD layout",
+  "screen.primalspells.hud.help": "Drag to move · Scroll / corner to scale · Arrow keys to nudge",
+  "screen.primalspells.hud.reset": "Reset layout",
+  "screen.primalspells.hud.save": "Save layout",
+  "screen.primalspells.hud.hits": "Hit / kill feedback",
+  "screen.primalspells.hud.direction": "Damage direction",
+  "screen.primalspells.hud.selected": "%s · %s%% · Preview values",
+  "screen.primalspells.hud.save_failed": "Could not save. Check config folder permissions."
 }

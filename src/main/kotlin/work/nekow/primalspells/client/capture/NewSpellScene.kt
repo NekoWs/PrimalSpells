@@ -140,7 +140,8 @@ object NewSpellScene {
                     MagicManager.projectiles.forEach{it.alive=false}
                     val p=MagicManager.create("sawblade") as Projectile
                     p.caster=source!!;p.wand=Wand("saw-frame");p.wand.status.particleManager=ParticleManager.of(ctx.level)
-                    p.position=Vector3f(-2f,ctx.floorBlockY(0,0)+3f,0f);p.velocity=Vector3f(0f,0f,0.05f)
+                    // 摄影机正对盘面；下坠和侧面厚度另由sawblade_falling连续录制。
+                    p.position=Vector3f(-2f,ctx.floorBlockY(0,0)+3f,0f);p.velocity=Vector3f(0.05f,0f,0f)
                     p.spell();MagicManager.add(p);saw=p
                     val target=ctx.spawnDummy(6.0,ctx.floorBlockY(0,0)+1.0,0.0)
                     val before=target.totalDamage

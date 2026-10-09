@@ -217,6 +217,13 @@ object WandCastingFx {
         return state(player, wand).ready
     }
 
+    /** HUD只读实际拿起会话；背包内其它法杖不创建表现会话。 */
+    fun equipRemaining(player: ServerPlayer, wand: Wand): Int {
+        if (!player.isAlive || selected(player) !== wand) return 0
+        val held = state(player, wand)
+        return (EQUIP_TICKS - (held.level.gameTime - held.started)).coerceIn(0, EQUIP_TICKS.toLong()).toInt()
+    }
+
     /** 模型宝石位于视线右上方，施法和迸发共用同一相机正交基；副手/左惯用手镜像。 */
     fun origin(caster: Entity, wand: Wand): Vec3 {
         val player = caster as? ServerPlayer

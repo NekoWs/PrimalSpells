@@ -72,7 +72,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
-            val registrar = event.registrar("1.0.0")
+            val registrar = event.registrar("1.1.0")
 
             // S→C：交给客户端安装的处理器（服务端上为 null）
             registrar.playToClient(
@@ -83,6 +83,10 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
             }
             registrar.playToClient(WandCastPayload.ID, WandCastPayload.STREAM_CODEC) { payload, _ ->
                 ClientPayloadSink.wandCast?.invoke(payload)
+            }
+            registrar.playToClient(work.nekow.primalspells.network.HudImpactPayload.ID,
+                work.nekow.primalspells.network.HudImpactPayload.STREAM_CODEC) { payload, _ ->
+                ClientPayloadSink.hudImpact?.invoke(payload)
             }
             // 镜头冲击：特效重音那一拍的一条 8 字节包，逐帧偏移在客户端本地算
             registrar.playToClient(

@@ -449,3 +449,9 @@ concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→�
 火把使用PD的glowing/lightLevel及实体getter编排，只有首张被动卡生成火种，放下/卸载进入3t收尾、4t有限销毁。不得另写光照引擎。法阵出生颜色透明，表达式接管后直接输出实色，避免出生包早于表达式包的完整粒子闪现；三角形免光照但不额外充当动态光源。
 
 玩法参考：[Noita追加系列](https://noita.wiki.gg/wiki/Expert_Guide%3A_Add_Trigger_Series)、[Divide By](https://noita.wiki.gg/wiki/Divide_by_ten)。本项目数值统一20刻/秒，不照搬Noita的60帧单位。
+
+## 第80轮：锯片自然下坠与金属盘
+
+Sawblade内建ConstantAcceleration(0,-0.035,0)，每刻运动积分前施加下坠；不通过覆盖位置绕过Move碰撞，仍可受速度/重力等修正叠加。原25MP、8t施放/5t充能、100t寿命、12点逐刻切割、自伤和8次反弹规则不变。
+
+SawbladeFx为104片实色方粒组成的双面厚齿钢盘、暗盘身、蓝轴和金色辐条，随水平运动方向保持竖直盘面并旋转。位置使用PD ParticleBatch.trackAll原生子帧插值，出生1.5t尺寸起落；碰撞每3刻最多3片火星。失效后单片继承少量运动、向外飞散并下坠，8t线性收细，10t清理，不整体缩回中心。末段连续性按独立sawblade_falling场景验证，不拿多生命周期混合峰值推导退场。

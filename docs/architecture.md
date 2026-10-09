@@ -238,11 +238,12 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 ## 6. 网络
 
-注册集中在 `PrimalSpells.kt` 的 `RegisterPayloadHandlersEvent`（`event.registrar("1.0.0")`）。payload 定义在 `network/`。
+注册集中在 `PrimalSpells.kt` 的 `RegisterPayloadHandlersEvent`（`event.registrar("1.1.0")`）。payload 定义在 `network/`。第80轮增加拿起/不足字段，客户端和服务端需同步升级。
 
 | payload | 方向 | 关键字段 | 处理 |
 |---|---|---|---|
-| `SyncWandStatsPayload` | S→C | wandId、当前/上限法力、当前/上次 delay、recharge、cast、charge | 经 `ClientPayloadSink.wandStats` → `client/hud/WandHudRenderer.putStats` |
+| `SyncWandStatsPayload` | S→C | wandId、当前/上限法力、当前/上次 delay、recharge、cast、charge、equipRemaining/equipTotal、manaBlocked | 经 `ClientPayloadSink.wandStats` → `client/hud/WandHudRenderer.putStats` |
+| `HudImpactPayload` | S→C | killed | 实际接受的非治疗/非自伤命中，经ClientPayloadSink转给HUD角点/击杀计数 |
 | `ScreenShakePayload` | S→C | amplitude(0..1)、ticks | 经 `ClientPayloadSink.screenShake` → `client/ScreenShakeClient`：**只发重音那一拍**（8 字节），逐帧偏移/衰减在客户端本地算（见 §9 第 9 条） |
 | `SelectSpellSlotPayload` | C→S | targetId、slot、pouch | 遍历背包：`pouch=false` 按 `wand_id` 匹配并写 `WAND_SELECTED_SLOT`；`pouch=true` 按 `pouch_id` 匹配并写 `POUCH_SELECTED_SLOT` |
 
@@ -256,7 +257,8 @@ POUCH_ID / SPELL_POUCH_CONTENTS / POUCH_SELECTED_SLOT（小包）
 
 | 子包 | 内容 | 触发方式 |
 |---|---|---|
-| `client/hud/` | `WandHudRenderer`（法力/冷却条） | 消费 S→C payload，缓存按 `wandId`，登出清空 |
+| `client/hud/` | `WandHudRenderer`、`WandHudPainter`、`HudLayout` | 数值动画与本机布局；退出世界清动画，不清布局，详见design/hud.md |
+| `client/screen/` | `HudEditorScreen` | 原版Screen拖动缩放；H键和IConfigScreenFactory入口 |
 | `client/tooltip/` | `ClientTooltipHandler`（组装词条）、`WandSpellTooltip`/`PouchTooltip`（自定义 tooltip 组件，都高亮选中槽）、`SpellSlotTracker`（法杖与小包共用的「预览槽位」缓存） | `RenderTooltipEvent.GatherComponents` + 组件工厂 |
 | `client/input/` | `SpellSlotScrollHandler`（滚轮选槽：法杖与小包共用，发 `SelectSpellSlotPayload`）、`ClientContainerDragHandler`（Ctrl+左键拖拽交换，复用原版 `slotClicked(PICKUP)` 协议） | `ScreenEvent`，注册在 `PrimalSpellsClient` |
 | `client/render/` | `DroneEntityModel`/`DroneEntityRenderer`（立方体/球体调试实体已随死代码清理删除） | `EntityRenderersEvent` |

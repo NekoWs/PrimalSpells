@@ -1,147 +1,110 @@
 package work.nekow.primalspells.client.hud
 
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.fml.common.EventBusSubscriber
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers
 import work.nekow.primalspells.PrimalSpells
-import work.nekow.primalspells.registry.ModItems
+import work.nekow.primalspells.client.screen.HudEditorScreen
+import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.network.SyncWandStatsPayload
-import kotlin.math.roundToInt
+import work.nekow.primalspells.registry.ModItems
+import kotlin.math.*
 
+/** 客户端数值缓存与按游戏时间求值的HUD动画；帧率不影响缓动速度。 */
 @EventBusSubscriber(modid = PrimalSpells.MODID, value = [Dist.CLIENT])
 object WandHudRenderer {
+    @JvmField val statsMap: MutableMap<String, SyncWandStatsPayload> = hashMapOf()
+    private val received = hashMapOf<String, Double>()
+    private var identity: String? = null
+    private var lastTime = Double.NaN
+    private var presence = 0.0
+    private var delayAlpha = 0.0
+    private var rechargeAlpha = 0.0
+    private var focusAlpha = 0.0
+    private var displayedMana = 0.0
+    private var lastFrame: WandHudFrame? = null
+    private var hitAt = -1000.0
+    private var killAt = -1000.0
+    private var killCount = 0
 
-    @JvmField
-    val statsMap: MutableMap<String, SyncWandStatsPayload> = hashMapOf()
-
-    fun getStats(wandId: String): SyncWandStatsPayload? = statsMap[wandId]
-
-    fun putStats(payload: SyncWandStatsPayload) {
-        statsMap[payload.wandId] = payload
+    /** tooltip与录制检查共用的服务端快照。 */
+    fun getStats(wandId: String) = statsMap[wandId]
+    /** 最近实际绘制的状态；开发录制用它确认真实伤害通知已经到达HUD。 */
+    fun snapshot(): WandHudFrame? = lastFrame
+    /** 网络入口记录本地接收时间，冷却子帧外推不会依赖包发送频率。 */
+    fun putStats(payload: SyncWandStatsPayload) { statsMap[payload.wandId] = payload; received[payload.wandId] = clock() }
+    /** 真正接受的法术伤害回报；每刻多次命中合并成一个有限标记。 */
+    fun impact(killed: Boolean) {
+        val now = clock(); hitAt = now
+        if (killed) { killCount = if (now - killAt < 20) killCount + 1 else 1; killAt = now }
     }
-
-    /** 退出世界/断线时清空按 wandId 缓存的数值与插值状态（缓存只增不减会长期占用内存）。 */
+    /** 退出世界时清缓存与动画，不清本机布局。 */
     fun clear() {
-        statsMap.clear()
-        lastGameTime = 0
-        delayPersistTicks = 0
-        rechargePersistTicks = 0
-        manaPersistTicks = 0
-        displayDelayProgress = 0f
-        displayRechargeProgress = 0f
-        displayManaProgress = 1f
+        statsMap.clear(); received.clear(); identity = null; lastTime = Double.NaN; lastFrame = null
+        presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; focusAlpha = 0.0
+        hitAt = -1000.0; killAt = -1000.0; killCount = 0
     }
-
-    private fun getHeldWandStats(): SyncWandStatsPayload? {
+    private fun clock(): Double {
+        val mc = Minecraft.getInstance()
+        return (mc.level?.gameTime ?: 0).toDouble() + mc.deltaTracker.getGameTimeDeltaPartialTick(false)
+    }
+    private fun held(): SyncWandStatsPayload? {
         val player = Minecraft.getInstance().player ?: return null
-        for (hand in listOf(player.mainHandItem, player.offhandItem)) {
-            val wandId = hand.get(ModItems.WAND_ID)?.wandId ?: continue
-            return statsMap[wandId]
-        }
-        return null
+        val hands = if (player.isUsingItem) listOf(player.useItem, player.mainHandItem, player.offhandItem)
+            else listOf(player.mainHandItem, player.offhandItem)
+        val stack = hands.firstOrNull { it.item is WandItem } ?: return null
+        return stack.get(ModItems.WAND_ID)?.wandId?.let { statsMap[it] }
     }
 
-    private var lastGameTime: Long = 0
-    private var delayPersistTicks: Int = 0
-    private var rechargePersistTicks: Int = 0
-    private var manaPersistTicks: Int = 0
+    /** 给定时钟的一帧状态，供真实绘制与帧率无关的回归检查使用。 */
+    fun frame(s: SyncWandStatsPayload?, now: Double): WandHudFrame? {
+        var dt = if (lastTime.isFinite()) (now - lastTime).coerceIn(0.0, 4.0) else 0.0
+        lastTime = now
+        if (s != null && identity != s.wandId) {
+            identity = s.wandId; presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; focusAlpha = 0.0
+            displayedMana = s.currentMana
+            dt = 0.0
+        }
+        fun approach(value: Double, target: Double, ticks: Double) = value + (target - value) * (1 - exp(-dt / ticks))
+        presence = approach(presence, if (s != null) 1.0 else 0.0, 1.3)
+        if (s == null) {
+            val previous = lastFrame ?: return null
+            if (presence < 0.01) { identity = null; lastFrame = null; return null }
+            return previous.copy(presence = presence).also { lastFrame = it }
+        }
+        val elapsed = (now - (received[s.wandId] ?: now)).coerceIn(0.0, 20.0)
+        val delay = max(0.0, s.currentDelay - elapsed)
+        val recharge = max(0.0, s.currentRecharge - elapsed)
+        val equip = max(0.0, s.equipRemaining - elapsed)
+        fun progress(left: Double, total: Double) = if (total > 0) (1 - left / total).coerceIn(0.0, 1.0) else 1.0
+        delayAlpha = approach(delayAlpha, if (delay > 0) 1.0 else 0.0, if (delay > 0) 0.7 else 2.0)
+        rechargeAlpha = approach(rechargeAlpha, if (recharge > 0) 1.0 else 0.0, if (recharge > 0) 0.7 else 2.0)
+        focusAlpha = approach(focusAlpha, if (equip > 0 || recharge > 0) 1.0 else 0.0, 1.2)
+        displayedMana = approach(displayedMana, s.currentMana, 0.8)
+        if (abs(displayedMana - s.currentMana) < 0.05) displayedMana = s.currentMana
+        val settings = HudSettings.current
+        val player = Minecraft.getInstance().player
+        return WandHudFrame(displayedMana, s.maxMana, delay, recharge, progress(delay, s.lastDelay), progress(recharge, s.lastRecharge),
+            equip, progress(equip, s.equipTotal.toDouble()), s.manaBlocked, presence,
+            delayAlpha, rechargeAlpha, focusAlpha,
+            if (settings.hitFeedback) (1 - (now - hitAt) / 5).coerceIn(0.0, 1.0) else 0.0,
+            killCount, if (settings.hitFeedback) ((24 - (now - killAt)) / 6).coerceIn(0.0, 1.0) else 0.0,
+            if (settings.damageDirection && player != null && player.hurtTime > 0) Math.toRadians(player.hurtDir.toDouble() - 180) else null,
+            (player?.hurtTime ?: 0) / 10.0,
+        ).also { lastFrame = it }
+    }
 
-    private var displayDelayProgress: Float = 0f
-    private var displayRechargeProgress: Float = 0f
-    private var displayManaProgress: Float = 1f
-
-    private const val HOLD_DURATION: Int = 10
-    private const val FADE_DURATION: Int = 5
-    private const val SMOOTH_FACTOR: Float = 0.25f
-
-    @JvmStatic
-    @SubscribeEvent
+    @JvmStatic @SubscribeEvent
     fun onRenderHud(event: RenderGuiLayerEvent.Post) {
         if (event.name != VanillaGuiLayers.CROSSHAIR) return
-        val s = getHeldWandStats() ?: return
-
-        val gameTime = Minecraft.getInstance().level?.gameTime ?: 0
-        if (gameTime != lastGameTime) {
-            lastGameTime = gameTime
-            if (delayPersistTicks > 0) delayPersistTicks--
-            if (rechargePersistTicks > 0) rechargePersistTicks--
-            if (manaPersistTicks > 0) manaPersistTicks--
-        }
-
-        val resetTarget = HOLD_DURATION + FADE_DURATION
-        if (s.currentDelay > 0) delayPersistTicks = resetTarget
-        if (s.currentRecharge > 0) rechargePersistTicks = resetTarget
-        if (s.maxMana > 0 && s.currentMana < s.maxMana) manaPersistTicks = resetTarget
-
-        val targetDelay = if (s.currentDelay > 0.0) {
-            1f - (s.currentDelay / s.lastDelay).coerceIn(0.0, 1.0).toFloat()
-        } else 1f
-        val targetRecharge = if (s.currentRecharge > 0.0) {
-            1f - (s.currentRecharge / s.lastRecharge).coerceIn(0.0, 1.0).toFloat()
-        } else 1f
-        val targetMana = if (s.maxMana > 0) (s.currentMana / s.maxMana).toFloat() else 1f
-
-        displayDelayProgress += (targetDelay - displayDelayProgress) * SMOOTH_FACTOR
-        displayRechargeProgress += (targetRecharge - displayRechargeProgress) * SMOOTH_FACTOR
-        displayManaProgress += (targetMana - displayManaProgress) * SMOOTH_FACTOR
-
-        val showMana = s.maxMana > 0 && manaPersistTicks > 0
-        val showDelay = s.currentDelay > 0 || delayPersistTicks > 0
-        val showRecharge = s.currentRecharge > 0 || rechargePersistTicks > 0
-        if (!showMana && !showDelay && !showRecharge) return
-
-        val g = event.guiGraphics
-        val window = Minecraft.getInstance().window
-        val cx = window.guiScaledWidth / 2
-        val cy = window.guiScaledHeight / 2 + 12
-        val bw = 22
-        val bh = 2
-        val gap = 1
-
-        if (showMana) {
-            val alpha = fadeAlpha(s.currentMana < s.maxMana, manaPersistTicks)
-            drawBar(g, cx - bw / 2, cy, bw, bh,
-                displayManaProgress,
-                alphaColor(0xFF_33_99_FF.toInt(), alpha), alpha)
-        }
-        val yOff = cy + bh + gap
-        // 冷却只有一行：**真正卡住施法的是剩余比例更大的那条**
-        // （施法要求 delay 与 recharge 都归零，所以充能时间比施放延迟长时，条必须显示充能那一条）。
-        // ⚠️ 第 28 轮修：修前是 `if (showDelay) … else if (showRecharge)` —— delay 一活跃，
-        // 更长的充能时间就永远显示不出来。
-        val delayRemaining = if (s.lastDelay > 0.0) (s.currentDelay / s.lastDelay).coerceIn(0.0, 1.0) else 0.0
-        val rechargeRemaining =
-            if (s.lastRecharge > 0.0) (s.currentRecharge / s.lastRecharge).coerceIn(0.0, 1.0) else 0.0
-        val drawRecharge = showRecharge && (rechargeRemaining > delayRemaining || !showDelay)
-        if (drawRecharge) {
-            val alpha = fadeAlpha(s.currentRecharge > 0, rechargePersistTicks)
-            drawBar(g, cx - bw / 2, yOff, bw, bh, displayRechargeProgress,
-                alphaColor(0xFF_33_55_CC.toInt(), alpha), alpha)
-        } else if (showDelay) {
-            val alpha = fadeAlpha(s.currentDelay > 0, delayPersistTicks)
-            drawBar(g, cx - bw / 2, yOff, bw, bh, displayDelayProgress,
-                alphaColor(0xFF_FF_AA_00.toInt(), alpha), alpha)
-        }
-    }
-
-    private fun fadeAlpha(active: Boolean, persistTicks: Int): Float = when {
-        active -> 1f
-        persistTicks > FADE_DURATION -> 1f
-        else -> (persistTicks.toFloat() / FADE_DURATION).coerceIn(0f, 1f)
-    }
-
-    private fun alphaColor(baseColor: Int, alpha: Float): Int {
-        val a = (alpha * 0xFF).toInt().coerceIn(0, 255)
-        return (a shl 24) or (baseColor and 0x00FFFFFF)
-    }
-
-    private fun drawBar(g: GuiGraphicsExtractor, x: Int, y: Int, w: Int, h: Int, r: Float, color: Int, alpha: Float = 1f) {
-        val fill = (w * r.coerceIn(0f, 1f)).roundToInt()
-        g.fill(x, y, x + w, y + h, alphaColor(0x40_44_44_44.toInt(), alpha))
-        if (fill > 0) g.fill(x, y, x + fill, y + h, color)
+        val mc = Minecraft.getInstance()
+        if (mc.gui.screen() is HudEditorScreen || mc.player?.isSpectator == true) return
+        val now = clock(); val frame = frame(held(), now) ?: return
+        val layout = HudSettings.current
+        for (element in HudElement.entries) WandHudPainter.drawElement(event.guiGraphics, element,
+            layout.box(element, mc.window.guiScaledWidth, mc.window.guiScaledHeight), frame, now)
     }
 }

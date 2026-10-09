@@ -143,7 +143,8 @@ for _scene, _spec in SCENES.items():
         _spec["decay"] = "collapse"
 # 这两场包含真实爆炸/锯齿飞散，使用已有解体门禁（至少4帧），不能要求瞬间消失。
 SCENES["recoil_light"] = {"length": 220, "title": "后坐力 / 创造飞行豁免 / 蓄能强光", "metric": "warm", "fade_window": (70, 110), "quiet": (0, 8), "decay": "collapse"}
-SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 杖首蓄能与瞄准", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
+SCENES["shield_balance"] = {"length": 250, "title": "单卡与八卡护盾 / 破盾当次保护 / 靶子固定", "metric": "blue", "fade_window": (138, 225), "quiet": (0, 8), "decay": "collapse"}
+SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 原地聚光阵与锁定方向", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}

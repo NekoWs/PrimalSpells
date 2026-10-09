@@ -15,35 +15,52 @@ class ConcentratedLightFx : BaseEffect() {
     private var charge: ParticleBatch? = null
     private var previous = Vec3.ZERO
     private fun point() = Vec3(status.pos)
-    private fun points(): List<Vec3> {
-        val forward = if (projectile.castFromWand) caster.lookAngle else projectile.launchDirection
+    private fun points(progress: Double = (status.age.toDouble()/ConcentratedLight.CHARGE_TICKS).coerceIn(0.0,1.0)): List<Vec3> {
+        val forward = projectile.launchDirection
         val side = forward.cross(Vec3(0.0,1.0,0.0)).let { if(it.lengthSqr()<1e-8) Vec3(1.0,0.0,0.0) else it.normalize() }
         val up = side.cross(forward).normalize()
-        val progress = (status.age.toDouble()/ConcentratedLight.CHARGE_TICKS).coerceIn(0.0,1.0)
         val center = point()
-        return listOf(center) + (0 until 16).map { i ->
-            val arm = i/4;val row = i%4
-            val angle = arm*PI/2 + progress*0.35
-            val radius = (0.30 - progress*0.24) + row*0.03
-            center.add(side.scale(cos(angle)*radius)).add(up.scale(sin(angle)*radius))
-                .add(forward.scale((row-1.5)*0.06*(1-progress)))
+        fun local(x:Double,y:Double,z:Double)=center.add(side.scale(x * 0.5)).add(up.scale(y * 0.5)).add(forward.scale(z * 0.5))
+        val out=arrayListOf(center)
+        // 两层方晶镜阵相向合拢；双菱框和轴向光矛直接指示已锁定的发射方向。
+        for(layer in 0..1) {
+            val radius=if(layer==0)0.52-progress*0.36 else 0.37-progress*0.25
+            val depth=(if(layer==0)-1 else 1)*(0.36-progress*0.25)
+            val angle=(if(layer==0)1 else -1)*progress*0.18
+            val corners=listOf(0.0 to radius,radius to 0.0,0.0 to -radius,-radius to 0.0)
+            for(edge in 0..3)for(i in 0..4) {
+                val a=corners[edge];val b=corners[(edge+1)%4];val t=(i+0.5)/5
+                val x=a.first+(b.first-a.first)*t;val y=a.second+(b.second-a.second)*t
+                out+=local(x*cos(angle)-y*sin(angle),x*sin(angle)+y*cos(angle),depth)
+            }
         }
+        for(i in 0..8)out+=local(0.0,0.0,-0.12+i*(0.025+progress*0.055))
+        for(arm in 0..3)for(row in 0..3) {
+            val angle=arm*PI/2+PI/4
+            val radius=0.48-progress*0.30+row*0.04
+            out+=local(cos(angle)*radius,sin(angle)*radius,-0.12-row*0.04*(1-progress))
+        }
+        return out
     }
+
     override fun onActive() {
         val pm = ParticleManager.of(caster.level());manager=pm;previous=point()
         charge = ParticleBatch(pm).also { batch -> batch.addAll(pm.spawnAll(points().mapIndexed { i,p ->
-            ParticleSpawnSpec().position(p).color(if(i==0 || i%4==0) Color.ofInt(255,250,220) else Color.ofInt(246,193,66))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.1875f else 0.09375f,if(i==0) 0.1875f else 0.09375f)
+            ParticleSpawnSpec().position(p).color(if(i==0 || i in 41..49 || i%5==0) Color.ofInt(255,250,220) else Color.ofInt(246,193,66))
+                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.125f else 0.0625f,if(i==0) 0.125f else 0.0625f)
                     .glowing(true).additive(false))
-                .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(2,1,EasingType.EASE_OUT))
-        })) }
+                .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(3,1,EasingType.EASE_OUT))
+        }))
+            val targets = points(1.0)
+            batch.handles().forEachIndexed { i, handle -> handle.move(targets[i], ConcentratedLight.CHARGE_TICKS, EasingType.EASE_IN) }
+        }
     }
     override fun onTick() {
         val pm=manager ?: return
-        if(projectile.awaitingRelease) { charge?.trackAll(points());previous=point();return }
+        if(projectile.awaitingRelease) { previous=point();return }
         if(charge!=null) {
             // 蓄能棱片在最后的枪口位置熄灭，不跟着首刻高速位移跳到光束前端。
-            PixelVfx.retireBatch(pm,charge,previous,3);charge=null
+            PixelVfx.retireBatch(pm,charge,previous,4);charge=null
             releaseFlash(pm)
         }
         val end=point();val distance=previous.distanceTo(end)
@@ -66,7 +83,7 @@ class ConcentratedLightFx : BaseEffect() {
         previous=end
     }
     override fun onDie() {
-        manager?.let { PixelVfx.retireBatch(it,charge,point(),3) };charge=null
+        manager?.let { PixelVfx.retireBatch(it,charge,point(),4) };charge=null
     }
 
     private fun releaseFlash(pm: ParticleManager) {

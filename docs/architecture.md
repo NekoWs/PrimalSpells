@@ -504,3 +504,13 @@ Projectile.mass为惯性质量（默认1，黑洞256、重力场32、等离子�
 ConcentratedLight在onSpell保存经修正的发射速度，停止Move；awaitingRelease期间只更新自身蓄能视觉，暂停其它逐刻效果，直接施法每刻跟随当前杖首。age=20当刻重新取准星方向，恢复速度/运动、播放宝石亮态并施加已排队反冲，随后接原有effect阶段和Move扫掠。寿命仍由MagicManager计数，80刻含20刻蓄能+60刻飞行，延寿增加飞行窗口；荷载/复制体在世界出生点蓄能并沿原来向释放。施法者死亡/换维度取消蓄能，不发射。蓄能体不参与其它法术的受力/连锁反应，避免未出手就被移动或引爆；释放后恢复原有联动。
 
 黑洞affectsEntity排除Player.isCreative且abilities.flying的实体；创造落地仍被吸引，飞行豁免也不刷新迟缓或暗核命中，旧迟缓按离场规则清理。质量F/m不变；生物每刻速度保留96%，重型投射物只对径向速度施加最多4%阻尼。
+
+## 第68轮：固定聚光阵与一次命中护盾上下文
+
+ConcentratedLight在创建时保存launchDirection，经修正的速度在onSpell保存；awaitingRelease期间只播放原地聚焦动画，不更新杖首坐标、不读玩家当前lookAngle。age=20沿launchDirection释放；普通修正从释放后继续原流水线，默认maxBounces=5。远处聚光阵发射不再次在当前持有者杖首播放闪光，避免误导发射位置。
+
+护盾窗口预算随同杖卡数立方增加，所有记账仍仅由primaryShield维护。resolveIncoming超预算/付不起MP时开破口并返回一次有效ShellHit，阻止破盾当次伤害；absorbExplosion同样在开破口后返回已抵扣。已存在破口、穿刺和内部来源的绕过保持不变。
+
+Projectile.shieldedImpactTargets保存本次已被ShieldGuard拦下的实体UUID，SpellDamage和同载体Explosion都读取它。Projectile.tick开始清空，onDie不清空，避免一次命中后的死亡爆炸第二次击穿；只保护同一个载体的同次命中，不给目标全局无敌、不阻止其它法术/旁人受伤。复制体不继承该运行时集合。
+
+TestDummyEntity在knockback之外覆盖push(x,y,z)，并设原版KNOCKBACK_RESISTANCE=1，法术SpellImpact的直接推力也不能移动靶子。原有伤害显示/装备/攻击行为保留。

@@ -34,53 +34,15 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * 能量护盾（修饰器）：**常驻展开、平时不可见、受击才现形**的玻璃护盾。
+ * 手持法杖的常驻玻璃护盾：平时不可见，受击面板显形/碎裂，破口跟随持有者。
  *
- * 定价口径全文见 [docs/design/combat-pricing.md] §3–§4；这里只记实现口径。
- *
- * ## 玩法（第 26 轮重做：耐久 → 强度 vs 抗性 + 法力）
- *
- * - 只要法杖上装着护盾卡，护盾就是**展开的**：没有耐久、没有破盾冻结、没有回复，
- *   因此也**没有持续状态**（HUD 条已随之删除）。
- * - 每次「格挡真的发生」按强度结算，**两道关**（第 39 轮起）：
- *   1. **窗口预算**：`R = 基础抗性 + 每张卡抗性`，**最近 1 秒（[BUDGET_WINDOW_TICKS] tick）内
- *      已经承担的强度 + 本次 > 预算（[SKELETON_DPS] × [SKELETONS_HELD] = 2 个小白的每秒输出）]** 就直接挡不住
- *      —— 用户口径「护盾防的是 DPS 而不是单次伤害，抗性改为在一段时间内可以承担的强度大小」；
- *   2. **法力**：预算内才轮到 `强度 ≤ R` 只付「基础反弹 MP」、`强度 > R` 付
- *      `基础反弹 + (强度 - R) × 每点额外`（超出部分封顶 2 × R，第 35 轮）。
- * - **挡不住 = 破口**（预算爆掉或法力不够）：这一发照常命中持有者，破口区在 [breachTicksFor] 算出的
- *   时长内不挡任何东西，并常驻显示淡红色轮廓（**这道红轮廓跟着持有者走**，第 40 轮口径）。
- *   破口区**就是碎裂的那一片**：投射物是「受击面板 + 相邻一圈」（**定向破口**），
- *   爆炸则是**所有被波及到的面板**（见下）。
- * - **破口时长按"超出抗性多少"定**（第 40 轮）：`1 秒 + 超出每点 6 tick`，封顶 3 秒。
- * - **原版投射物也算**（第 40 轮）：箭矢/三叉戟/火球/雪球/药水… 走同一套判定，挡下即**反弹**回去。
- * - **爆炸按影响范围选片**（第 39 轮）：面心到爆心 ≤ 爆炸半径的面板**全部**入选 ——
- *   半径 6 的核弹摆在壳外 3 格时 32 片全被波及（于是整罩碎裂）；抵扣成功时这些片**全亮一下玻璃**，
- *   挡不住时它们**全碎**（朝爆点的片白热、背对爆点的片暗一档）。
- * - **只有「从外侧穿过壳面」才算格挡**：判据是这一 tick 的位移线段与**球壳**求交、且起点在壳外。
- *   因此在壳内生成的法术（贴脸施法、壳内释放的荷载）**不会被误判成挡下**，
- *   单 tick 位移再大（`laser` 是 5 格）也不会漏过——两条都是既有缺陷，第 26 轮一并修掉。
- * - **穿透（`maxHitTargets < 0`）完全无视护盾**：不结算、不出玻璃、不出破口。
- * - **爆炸**（独立爆炸点，不走投射物）：中心在壳内侧 → 护盾不触发（壳挡不住已经发生在自己内部的事）；
- *   在壳外侧 → `强度 = 衰减后伤害 × 半径`，抵扣成功则**只替持有者吃**（伤害与击退），
- *   世界其他部分照常。入口是 [absorbExplosion]（由 `ShieldGuard` 在 `Explosion` 结算前调用）。
- * - 摔落/中毒/虚空这类**没有投射物**的伤害护盾不响应 —— 既有口径，不是缺口。
- *
- * ## 视觉（延续第 23 轮「受击处展开玻璃」，第 26 轮换掉整罩两段演出）
- *
- * - **格挡成功**：受击方向那一块面板展开一块**发光蓝玻璃**（实色蓝色亮边 + 稀疏蓝色方屑，魔法光采用全亮，
- *   约 0.35 秒淡出）—— 第 41 轮按实机反馈从"冷白"改成蓝色，为的是在亮场景里也看得见；
- * - **打穿**：破口区那一片**碎裂**（向外飘散 + 淡出），随后是持续整个破口期的**淡红轮廓**；
- * - 旧的「整罩一闪而碎」「护盾恢复闪一下」两段演出随耐久模型一起删除。
- *
- * 玻璃**画在生成处就不再动**（第 36 轮口径：判定跟人、碎片盖章），淡出结束由 PD 自行销毁
- * （`destroyAfter`），所以本实例此后不再被 tick（法杖被收起/回收）也不留孤儿粒子。
- *
- * ## PD 分组（第 39 轮，open.md §1.9.2）
- *
- * PD 的组是 arm / 演出的单位：一块面板一个组 = 一次爆炸打 32 条 `armed` 日志。所以 [spawnGlassPanels]
- * **按飘散位移分组** —— 位移相同的面板共用一个组（格挡玻璃、破口轮廓、爆炸碎裂都只占 1 个组），
- * 只有「投射物打穿、每片沿自己法线向外」那种一片一方向，才不得不一片一组。
+ * 只由第一张卡结算；抗性=4+6×张数，20刻滚动承伤预算=6×张数³。
+ * 预算内按基础MP及超抗性部分扣蓝；超预算/付不起蓝时结构破裂，仍抵消当次攻击，
+ * 之后该方向在20～60刻内失防。8张卡预算3072，通常先耗尽法力。
+ * 壳内爆炸、壳内生成的投射物和穿刺仍绕过护盾。
+ * 原版投射物与法术共用进入判定，成功格挡（含破盾当次）均沿壳面反射。
+ * 表现仅有面板晶格、裂纹、独立外飞碎片及破口轮廓，没有额外圆环。
+ * 规则见docs/design/combat-pricing.md第68轮。
  */
 class EnergyShield : Modifier() {
     override val id = "energy_shield"
@@ -89,7 +51,7 @@ class EnergyShield : Modifier() {
     var baseResistance: Double = 4.0
 
     /** 每张护盾卡额外提供的抗性（多张卡 = 更能扛连续低强度攻击） */
-    var resistancePerCard: Double = 2.0
+    var resistancePerCard: Double = 6.0
 
     /** 基础反弹消耗（MP）：每一次成功格挡都要付 */
     var baseBounceCost: Double = 5.0
@@ -174,25 +136,15 @@ class EnergyShield : Modifier() {
     /**
      * 最近 [BUDGET_WINDOW_TICKS] tick 内**已经承担**的强度（只在内存：1 秒的瞬时状态，不进存档）。
      *
-     * 只由**主卡**记账（只有主卡结算格挡），所以「多张卡」的影响全部走 [resistance]，不在这里。
+     * 只由**主卡**记账（只有主卡结算格挡），多张卡同时提高 [resistance] 和 [strengthBudget]。
      */
     private val recentStrength = ArrayDeque<UsedStrength>()
 
-    /**
-     * 本杖**一个窗口（1 秒）内能承担的强度总量**。
-     *
-     * 第 41 轮起直接按**原版骷髅（"小白"）的 DPS** 定，而不是"抗性的倍数"：
-     * `预算 = 小白的每秒输出 × 要扛住几个小白`（[SKELETON_DPS] × [SKELETONS_HELD] = **6**）。
-     * 口径来源：骷髅 1.0 攻速 + 20 tick 拉弓 ⇒ **2 秒一箭**、箭伤 `ceil(3.0 × ~2.2) ≈ 6`
-     * ⇒ 一个小白 ≈ **3 强度/秒**。于是 6 = **扛得住 2 个小白、第 3 个就把预算打爆**
-     * （3 个小白的箭间隔 13 tick，两发就落在同一个 20 tick 窗口里 ⇒ 12 > 6 ⇒ 破口）。
-     *
-     * 这是「抗性」之外的第二个身份：抗性是**单发阈值**（一发小白箭的强度正好就是 6，所以单发只付基础 5 MP），
-     * 预算是**每秒承受量**（超出它直接挡不住）。
-     *
-     * 公开只读：录制流水线靠它断言「预算而非法力」那一段（同 [breached]）。
-     */
-    fun strengthBudget(): Double = SKELETON_DPS * SKELETONS_HELD
+    /** 每20刻滚动预算随卡数立方增长，消除旧固定6点预算对多卡抗性的硬性截断。 */
+    fun strengthBudget(): Double {
+        val cards = wand.loadedMagics.count { it is EnergyShield }.coerceAtLeast(1).toDouble()
+        return SKELETON_DPS * SKELETONS_HELD * cards * cards * cards
+    }
 
     /** 窗口内已承担的强度总量（顺带把到期项丢掉，所以这个表不会只增不减）。 */
     private fun usedStrength(gameTime: Long): Double {
@@ -205,19 +157,7 @@ class EnergyShield : Modifier() {
         return sum
     }
 
-    /**
-     * 一次格挡的**资金结算**：先查窗口预算、再查法力 —— 两个入口（投射物 / 爆炸）共用。
-     *
-     * 顺序与副作用都是刻意的（第 39 轮用户口径「护盾防的是 DPS 而不是单次伤害」）：
-     * 1. `已承担 + 本次 > 预算` → 挡不住，**并把窗口记账清零**（这一发连法力都不花）；
-     * 2. 预算内再看法力：付不起 [bounceCost] 同样挡不住（既有口径：法力不够 = 挡不住）；
-     * 3. 都过了才记账 + 扣法力。
-     *
-     * 破口期间不需要在这里排除：破口一开就是 [breachTicksFor] 算出的时长（1~3 秒），
-     * 那段时间整个格挡判定根本走不到这里。
-     *
-     * @return true = 这一发挡得住（已记账、已扣法力）
-     */
+    /** 先查滚动预算，再扣MP；失败清除过载记账，调用方开破口并抵消当次攻击。 */
     private fun payForBlock(gameTime: Long, strength: Double): Boolean {
         if (usedStrength(gameTime) + strength > strengthBudget()) {
             recentStrength.clear()
@@ -276,12 +216,7 @@ class EnergyShield : Modifier() {
         return baseBounceCost + over * extraCostPerPoint
     }
 
-    /**
-     * 每 tick 维护护盾：只做主卡的格挡结算（见 [primaryShield]）。
-     *
-     * 判定顺序刻意是「先算强度、再看预算与法力」（[payForBlock]）——预算爆掉或付不起都不是"少扣一点"，
-     * 而是这一发**整个挡不住**（用户口径：MP 不足则无法抵挡；第 39 轮起再加一条"窗口内承担不下"）。
-     */
+    /** 每刻只由主卡维护进入判定、短期记账与破口到期。 */
     override fun onInventoryTick() {
         if (primaryShield() !== this) return
 
@@ -336,7 +271,7 @@ class EnergyShield : Modifier() {
      * 对**一枚投射物**做一次格挡判定 —— 两个入口共用：tick 末尾的全场扫（[onInventoryTick]）
      * 与命中兜底（[absorbProjectile]）。
      *
-     * @return true = 这一发被格挡（已扣 MP、已反射、已出玻璃板）；false = 不归护盾管，或挡不住（已开破口）
+     * @return true = 这一发被格挡（已扣 MP、已反射、已出玻璃板）；false = 不归护盾管或已从破口穿过
      */
     private fun tryBlock(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: Projectile): Boolean {
         // 光束的束源不碰撞实体，但射线命中仍声明 DirectDamage，并传入真实命中线段。
@@ -365,7 +300,7 @@ class EnergyShield : Modifier() {
      * 强度取自 [vanillaStrength] 的档位表，反弹要用原版的 `deltaMovement` + 归属（[reflectVanilla]）。
      * 所以「打上来的箭会被弹回去、还可能打回射手」是同一个口径的自然结果。
      *
-     * @return true = 已格挡（调用方应取消这次命中）；false = 不归护盾管 / 挡不住
+     * @return true = 已格挡（调用方应取消这次命中）；false = 不归护盾管 / 已从破口穿过
      */
     private fun tryBlockVanilla(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: VanillaProjectile): Boolean {
         val strength = vanillaStrength(p) ?: return false           // 钓钩、末影之眼…护盾不管
@@ -431,7 +366,7 @@ class EnergyShield : Modifier() {
      *
      * @param identity [seenOutside] 的身份键：自家法术没有实例 UUID 用 `identityHashCode`，
      *   原版投射物直接用实体网络 id（两套 id 的取值域几乎不重叠，撞了就最坏误挡一次）
-     * @return 挡下时的壳面进入点与法线；null = 不归护盾管，或挡不住（已开破口）
+     * @return 挡下时的壳面进入点与法线；null = 不归护盾管或已从破口穿过
      */
     private fun resolveIncoming(
         level: ServerLevel,
@@ -467,9 +402,9 @@ class EnergyShield : Modifier() {
         if (panelIndex in breachPanels) return null            // 破口方向：直接放行（连 MP 都不花）
 
         if (!payForBlock(level.gameTime, strength)) {
-            // 挡不住（窗口预算爆掉 / 法力不够）：弹照常飞（一行都不改），护盾这边付出破口
+            // 护盾耗尽自身结构抵消破盾这一发；后续同方向攻击才从破口穿过。
             openBreach(level, holder, breachArea(panelIndex), strength)
-            return null
+            return ShellHit(hitPoint, normal)
         }
 
         // 挡下了：受击那块面板亮一下（玻璃是"盖章"式的，不跟人 —— 见第 36 轮口径）
@@ -488,7 +423,7 @@ class EnergyShield : Modifier() {
      * **替持有者吃掉一次爆炸**（`ShieldGuard` 在 `Explosion` 结算伤害前调用）。
      *
      * @param falloffDamage 这颗爆炸**在持有者处**的衰减后伤害（`Explosion` 已算好）
-     * @return true = 已抵扣（调用方跳过伤害与击退）；false = 不触发 / 挡不住
+     * @return true = 已抵扣（调用方跳过伤害与击退）；false = 不触发 / 已从破口穿过
      */
     fun absorbExplosion(
         level: ServerLevel,
@@ -518,7 +453,7 @@ class EnergyShield : Modifier() {
         val panels = blastPanels(toBlast, radius)
         if (!payForBlock(level.gameTime, strength)) {
             openBlastBreach(level, holder, panels, toBlast, strength)
-            return false
+            return true
         }
         // 挡下了：波及到的片**全部出玻璃**（这就是「护盾遇到爆炸」看得见的那一下）
         spawnGlassPanels(
@@ -837,8 +772,6 @@ class EnergyShield : Modifier() {
                     } else group?.add(handle)
                 }
                 if (withFill) {
-                    work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, center.add(panel.center),
-                        normal, 0.18, edgeColor, 8, 2.4f)
                     // 晶格裂纹从受击面心向边角扩展，短命白线有明确冲击方向。
                     for (end in panel.ring.filterIndexed { i, _ -> i % 12 == 0 })
                         work.nekow.primalspells.magic.effect.visual.PixelVfx.arc(manager, center.add(panel.center),
@@ -875,7 +808,7 @@ class EnergyShield : Modifier() {
         super.initLore()
         lore(Lore.RESISTANCE, Lore.formatDouble(baseResistance))
         lore(Lore.RESISTANCE_PER_CARD, Lore.formatDouble(resistancePerCard))
-        // 窗口预算 = 2 个小白的每秒输出（第 41 轮按小白 DPS 定的锚）：护盾真正的"防 DPS"刻度
+        // 物品提示显示单卡锚点；多卡运行时由strengthBudget按张数立方计算。
         lore(Lore.RESISTANCE_BUDGET, Lore.formatDouble(SKELETON_DPS * SKELETONS_HELD))
         lore(Lore.BOUNCE_COST, Lore.formatDouble(baseBounceCost))
         lore(Lore.EXTRA_COST, Lore.formatDouble(extraCostPerPoint))

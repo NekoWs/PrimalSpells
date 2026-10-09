@@ -124,6 +124,9 @@ class TestDummyEntity(
     /** 木桩不受击退，保持原地便于连续测试（5 参数版会委托到此版） */
     override fun knockback(power: Double, xd: Double, zd: Double, source: DamageSource, damage: Float, comesFromEffect: Boolean) {}
 
+    /** 法术和爆炸直接push，不经过原版knockback；靶子仍只记录伤害，不接受推力。 */
+    override fun push(x: Double, y: Double, z: Double) {}
+
     /** 空手右键：回收木桩（掉落木桩物品 + 全部装备）；否则保持盔甲架穿戴行为 */
     override fun interact(player: Player, hand: InteractionHand, location: Vec3): InteractionResult {
         if (!player.getItemInHand(hand).isEmpty) {
@@ -156,5 +159,6 @@ class TestDummyEntity(
         /** 血量为 int 上限 */
         fun createAttributes(): AttributeSupplier.Builder =
             ArmorStand.createAttributes().add(Attributes.MAX_HEALTH, Int.MAX_VALUE.toDouble())
+                .add(Attributes.KNOCKBACK_RESISTANCE, 1.0)
     }
 }

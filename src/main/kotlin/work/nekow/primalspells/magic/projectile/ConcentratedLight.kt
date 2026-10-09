@@ -1,14 +1,11 @@
 package work.nekow.primalspells.magic.projectile
 
-import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.core.SpellDamageType
 import work.nekow.primalspells.magic.effect.lifecycle.Hurt
 import work.nekow.primalspells.magic.effect.visual.ConcentratedLightFx
-import work.nekow.primalspells.magic.effect.visual.WandCastingFx
 import work.nekow.primalspells.util.Lore
-import work.nekow.primalspells.wand.WandAim
 
 /** 蓄能时只更新光学棱片；释放后所有修正与碰撞仍走原投射物流水线。 */
 class ConcentratedLight : Projectile() {
@@ -23,7 +20,7 @@ class ConcentratedLight : Projectile() {
     init {
         mana = 90.0; delay = 70; recharge = 20; maxAge = 80
         speed = 3f; dragCoeff = 0f; hitRadius = 0.15
-        maxBounces = 1; bounceScaler.set(1f,1f,1f)
+        maxBounces = 5; bounceScaler.set(1f,1f,1f)
         recoil = 0.7; mass = 2.0; status.damage = 36.0
         damageType = SpellDamageType.ENERGY
         awaitingRelease = true
@@ -41,15 +38,11 @@ class ConcentratedLight : Projectile() {
     override fun tick() {
         if (awaitingRelease) {
             if (!caster.isAlive || caster.level() !== world) { alive = false; return }
-            if (castFromWand) {
-                val origin = WandCastingFx.origin(caster, wand)
-                status.pos.set(origin.x.toFloat(),origin.y.toFloat(),origin.z.toFloat())
-            }
             if (status.age < CHARGE_TICKS) { visuals.onTick(); return }
-            val direction = if (castFromWand) WandAim.direction(caster,Vec3(status.pos)) else launchDirection
+            // 出手即锁定世界坐标与方向；玩家走动/转身不再操纵已部署的聚光阵。
+            val direction = launchDirection
             status.velocity.set(direction.x.toFloat(),direction.y.toFloat(),direction.z.toFloat()).mul(launchSpeed)
             awaitingRelease = false; motionEnabled = true; releasedAtAge = status.age
-            if (castFromWand) WandCastingFx.cast(caster, wand)
             releaseCastRecoil()
         }
         super.tick()

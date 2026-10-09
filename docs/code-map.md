@@ -312,3 +312,7 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 - `magic/projectile/ConcentratedLight.kt`：20刻蓄能、杖首跟随、释放时瞄准与高速一次反弹；`magic/effect/visual/ConcentratedLightFx.kt`：聚焦棱片、扫掠光束和余辉。
 - `magic/modifier/RecoilDamper.kt`（recoil_damper，后坐力阻尼）、`RecoilBoost.kt`（recoil_boost，反冲增幅）。
 - `client/capture/RecoilLightScene.kt`：recoil_light及concentrated_light_first_person两个真实运行时场景；当前46卡/504组合。
+
+## 第68轮：固定聚光与多卡防御
+
+`projectile/ConcentratedLight.kt`锁定出生点/方向并默认5次反弹；`effect/visual/ConcentratedLightFx.kt`双菱形镜阵/轴向光矛。`modifier/EnergyShield.kt`多卡立方窗口预算与破盾当次吸收；`core/ShieldGuard.kt`、`projectile/Projectile.kt`、`effect/lifecycle/{SpellDamage,Explosion}.kt`共享当次拦截目标，避免同次复合伤害再次穿破口。`entity/TestDummyEntity.kt`禁止直接push；实机对照见`client/capture/ShieldBalanceScene.kt`，方向/原地/5次真实墙反弹见RecoilLightScene。

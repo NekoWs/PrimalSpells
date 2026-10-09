@@ -107,6 +107,7 @@ class Explosion(
             val aabb = AABB.ofSize(center, r.toDouble() * 2.0, r.toDouble() * 2.0, r.toDouble() * 2.0)
 
             level.getEntities(null, aabb) { it.isAlive }.forEach { entity ->
+                if (shot != null && entity.uuid in shot.shieldedImpactTargets) return@forEach
                 val direction = entity.boundingBox.center.subtract(center)
                 val dist = direction.length().toFloat()
                 if (dist > r) return@forEach

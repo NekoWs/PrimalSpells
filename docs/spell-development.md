@@ -411,3 +411,5 @@ class MyPassive : Modifier() {
 新法术可配置Projectile.recoil；后坐力修正分别积累recoilBonus/recoilMultiplier，不在Modifier里直接push施法者。实际Wand施放统一queueCastRecoil；后代spell不能重复排队。需要延时射出的投射物使用awaitingRelease，真正释放后再releaseCastRecoil；不把法杖冷却和发射等待混为同一个计时器。蓄能动画持续跟随杖首，释放棱片在最后杖首坐标收尾，不能跟随首刻高速Move跳到光束前端。
 
 concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→中英语言→图标生成器→真实录制完整接入，18投射物+28修正=46张卡。汇聚之光既有一次反弹仍由Move/Projectile.hitBlock管理，可与弹跳、穿刺、速度、伤害、延寿等原配方联动。
+
+第68轮：需要固定部署的蓄能法术只用出生时的launchDirection与status.pos，不能在蓄能tick重新取玩家lookAngle/杖首。护盾拦截属于整次命中语义：新直接/爆炸伤害应遵守Projectile.shieldedImpactTargets，禁止对刚开破口的同次已拦截目标再次结算；新的一枚投射物不共享该集合。护盾只对主卡记账，增加卡数同时影响抗性和滚动预算，不能再引入固定全局窗口上限。

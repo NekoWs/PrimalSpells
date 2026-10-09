@@ -339,3 +339,7 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 ## 第67轮新增文件落位
 
 `magic/projectile/ConcentratedLight.kt`为蓄能投射物；`magic/effect/visual/ConcentratedLightFx.kt`为原生PD接线；`magic/modifier/{RecoilDamper,RecoilBoost}.kt`为后坐力数值卡；`client/capture/RecoilLightScene.kt`包含世界场及第一人称验收。三张卡按现有items/models/item/textures/item和语言键规则落位，图标仍由tools/spells/generate_icons.py生成。无旧→新迁移，当前18投射物+28修正=46卡。
+
+## 第68轮落位
+
+新增`client/capture/ShieldBalanceScene.kt`用于原版生物受伤/法力/预算与左右双靶对照；聚光阵与护盾仍修改各自原有视觉/法术文件，无包迁移、无新法术卡、无渲染器或PD替代实现。已拦截命中上下文放Projectile，不放全局目标无敌表。

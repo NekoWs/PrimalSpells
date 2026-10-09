@@ -748,3 +748,7 @@ PixelVfx只生成实色几何：晶面方粒通过billboard(false)/三轴spin贴
 ## 第67轮接线：汇聚之光
 
 ConcentratedLightFx只使用PD 1.0.15公开ParticleBatch.trackAll、spawnAll、实色SQUARE、sizeCurve及既有retireBatch接线。出生2刻接续、蓄能20刻、杖首片元收尾3刻、扫掠束12～14刻，首刻释放不再把蓄能组追踪到4.8格外。没有新增自制渲染/播放器/光照缓存或升级前置；第66轮已登记的PD发光缓存问题仍待上游修复，本轮没有新的API修改需求。
+
+## 第68轮：固定聚光阵
+
+66枚菱形镜框/光矛/外棱片使用原生ParticleHandle.move及sizeCurve（一次性20刻合拢，不逐刻重定向），出生3刻、结束4刻；出生点和轴向均固定，不再依赖实体跟随。护盾去除冗余面心ring接线，保留已有原生碎片速度/寿命。没有升级PD；新增trackAll与sizeCurve冲突需求见issues/pd-api-requests第68轮；既有光照缓存与高刷组变量问题保持未决。

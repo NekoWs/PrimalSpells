@@ -56,7 +56,7 @@ object ShieldGuard {
     fun absorbProjectile(level: ServerLevel, entity: LivingEntity, projectile: Projectile): Boolean =
         withShield(entity) { shield, wand ->
             shield.absorbProjectile(level, wand, entity, projectile)
-        }
+        }.also { if (it) projectile.shieldedImpactTargets += entity.uuid }
 
     /**
      * 尝试让 [entity] 手上的护盾**防御/反弹一枚原版投射物**（第 40 轮；入口是 `ProjectileImpactEvent`）。

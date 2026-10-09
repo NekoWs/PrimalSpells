@@ -515,9 +515,9 @@ object CaptureScenes {
                         // 法力 4 < 基础 5 MP：预算之内也付不起 ⇒ 打穿。
                         // 「破口出现了」本身就是**命中兜底**跑到了的证据（扫场看不见这一发）
                         Check(
-                            name, t, "no-mana-breach",
+                            name, t, "no-mana-breaking-hit-protected",
                             s != null && s.breached && w != null &&
-                                w.status.mana >= SHIELD_LOW_MANA - 0.5 && damageNumbers(ctx, holder) > 0,
+                                w.status.mana >= SHIELD_LOW_MANA - 0.5 && damageNumbers(ctx, holder) == 0,
                             "breached=${s?.breached} mana=${w?.status?.mana} 伤害数字=${damageNumbers(ctx, holder)}",
                         ),
                         // 破口区 = 受击面板 + 相邻一圈 ⇒ 7 片（五边形受击时 6 片）

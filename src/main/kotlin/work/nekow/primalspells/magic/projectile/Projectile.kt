@@ -42,6 +42,13 @@ abstract class Projectile: Magic() {
         protected set
     private var recoilQueued = false
     private var recoilApplied = false
+    /** 本次命中的护盾已抵消对象；同一次命中的爆炸/死亡荷载不能再次穿过刚开的破口伤害它。 */
+    val shieldedImpactTargets = hashSetOf<java.util.UUID>()
+
+    override fun tick() {
+        shieldedImpactTargets.clear()
+        super.tick()
+    }
 
     fun queueCastRecoil() {
         recoilQueued = true

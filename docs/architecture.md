@@ -535,3 +535,8 @@ Move宽相位另查询持盾LivingEntity，扩大到球壳而非只看本体；�
 Projectile.shieldReflectionPoint记录本刻精确球壳接点，Projectile.tick清空；ConcentratedLightFx把白光脊/金侧线接到该点而非推出壳外0.05格后的安全位置，下一刻也从此点续接。成员簿记/插值仍由PD原生完成，本侧仅提供真实路径端点。
 
 WandItem为所有法杖提供原版USE_EFFECTS=UseEffects(canSprint=true,interactVibrations=true,speedMultiplier=1)，保留startUsingItem与onUseTick连发，不用mixin改玩家输入。
+
+
+## 第72轮：PD外观与完成信号
+
+PD1.0.16负责track位置与寿命外观分离、原生尺寸/颜色帧间插值、变量目标重定向和静止光照缓存刷新。普通有限编排退场由客户端完成信号驱动清理，服务端兜底属于PD；本侧仅给几何和时长。法杖及束端表达式暂不接retire，因为表达式/变量仍不进入该完成通路，缺口见issues/pd-api-requests第72轮。其余法术结算、20刻聚光锁定、5墙反弹、护盾真实子步交点和长按原速均保留。

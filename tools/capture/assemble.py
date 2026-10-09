@@ -145,6 +145,7 @@ for _scene, _spec in SCENES.items():
 SCENES["recoil_light"] = {"length": 220, "title": "后坐力 / 创造飞行豁免 / 蓄能强光", "metric": "warm", "fade_window": (70, 110), "quiet": (0, 8), "decay": "collapse"}
 SCENES["shield_balance"] = {"length": 250, "title": "单卡与八卡护盾 / 破盾当次保护 / 靶子固定", "metric": "blue", "fade_window": (138, 225), "quiet": (0, 8), "decay": "collapse"}
 SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 原地聚光阵与锁定方向", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
+SCENES["pd_api"] = {"length": 120, "title": "PD跟踪曲线 / 静止受光 / 帧间尺寸 / 完成销毁", "metric": "blue", "quiet": (0, 6), "decay": "collapse"}
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
@@ -406,6 +407,15 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("空场起飞", max(cover[:2]) <= empty, f"前 2 帧特效像素 {cover[:2]}（阈值 ≤{empty}）"))
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
+
+    if scene == "pd_api":
+        tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        # 固定机位下只框住右侧track方片，排除左侧受光片和中间编排/变量夹具。
+        counts = {t: int(blue_mask(tick_frames[t])[410:520, 700:850].sum())
+                  for t in (10, 24, 65) if t in tick_frames}
+        result["asserts"].append(("跟踪片元出生与熄灭曲线真正渲染",
+            len(counts) == 3 and counts[24] > 1000 and counts[10] < counts[24] * 0.25 and counts[65] < counts[24] * 0.25,
+            f"游戏刻10/24/65的独立片元覆盖={counts}"))
 
     if scene in ("wand_casting_first_person", "wand_casting_wide"):
         # 杖首由原生模型idle承担：未施法窗口不再出现错位的眼锚悬浮符印。

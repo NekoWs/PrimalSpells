@@ -6,10 +6,10 @@
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第62轮已接入组缩放接续与移动锚点插值；未决需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
 
 ParticleDrawing（`particledrawing`）是本模组的**必需前置**，且仍在 **ALPHA** 迭代期
-（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.15-ALPHA`）。
+（当前锁定版本见 `gradle.properties` 的 `particledrawing_version`，现为 `1.0.16-ALPHA`）。
 它是粒子能力的**唯一实现方**；PrimalSpells 只做接线与使用。
 
-**当前锁定版本：`1.0.15-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
+**当前锁定版本：`1.0.16-ALPHA`**（见 `gradle.properties`；本文提到具体 API 时以 `lib/` 里的
 `-sources.jar` 为准，不看旧版本记忆）。
 
 **触发条件**（满足任一即进入本政策）：
@@ -762,3 +762,14 @@ ConcentratedLightFx只使用PD 1.0.15公开ParticleBatch.trackAll、spawnAll、�
 ## 第71轮：球壳接点与长按移动
 
 本轮只修正提供给现有spawnAll/sizeCurve的空间端点：使用Move捕获的精确球壳接点。没有前置API缺口或新增需求，不升级PD、不自写插值或渲染；第66/68轮未决问题保持。
+
+
+## 第72轮：1.0.16-ALPHA恢复接线
+
+目标：跟踪位置时片元独立长出与熄灭、移动束端点缓动收敛、组外观在相邻tick间连续、静止暗片随动态光离开恢复。PD分别提供位置/外观接管分离、变量当前值重定向及先更新后快照、Bridge尺寸/颜色partialTick插值、光场版本/分摊超时缓存失效。
+
+汇聚之光删除固定终点的一次20刻move降级，恢复真实进度平方缓入的trackAll(points(progress²))；固定部署点/方向、20刻蓄能、5墙反弹及发射后阵体视觉反冲保留。等离子束恢复setVariableInterpolated(...,1)，不再因旧变量饥饿问题退回立即热更。
+
+PixelVfx.retire/shatter用scaleTo(...).retire()替换服务端ticks+2掐表销毁；组有限指令完成由客户端上报，额外2刻桥接收尾，客户端缺席由PD负责兜底。原生寿命曲线碎片不改成整组缩向场心。
+
+法杖脚下位置保留实体getter，这是直接锚定玩家位置的合适表达；新版Bridge已插值表达式尺寸/颜色。法阵presence缓动与冷却表达式的定时销毁暂不改成retire：setVariableInterpolated不更新有限时间轴、表达式分支跳过完成上报，见第72轮API需求。禁止用无效果有限指令伪造完成标记，也不自写客户端回调或尺寸播放器。

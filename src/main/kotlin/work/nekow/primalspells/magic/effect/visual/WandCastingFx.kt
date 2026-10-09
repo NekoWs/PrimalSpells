@@ -46,7 +46,7 @@ object WandCastingFx {
                 dissolve=fade;
                 x=fx+ax+(bx-ax)*q;y=fy+dissolve*dissolve*0.08;
                 z=fz+az+(bz-az)*q;
-                sc=min(1,max(0,(t/260-q)*24))*sqrt(remaining);
+                sc=min(1,max(0,(t/260-q)*24))*pow(remaining,0.75);
                 glint=pow(max(0,cos(2*PI*q-t*0.0018-lane*2*PI/3)),12);
                 r=0.20+glint*0.30;g=0.65+glint*0.30;b=0.78+glint*0.22;a=1;
             """)
@@ -58,7 +58,7 @@ object WandCastingFx {
                 x=fx+cos(theta)*1.2+cos(angle)*rad;
                 y=fy+0.025;z=fz+sin(theta)*1.2+sin(angle)*rad;
                 entry=min(1,max(0,(t-180)/160));entry=entry*entry*(3-2*entry);
-                sc=entry*(0.86+0.10*sin(t*0.0016+lane*2*PI/3))*sqrt(remaining);
+                sc=entry*(0.86+0.10*sin(t*0.0016+lane*2*PI/3))*pow(remaining,0.75);
                 r=0.38;g=0.92;b=1;a=1;
             """)
             update()
@@ -74,7 +74,7 @@ object WandCastingFx {
                 appear=min(1,max(0,(t-delayStart)/75));appear=appear*appear*(3-2*appear);
                 lit=min(1,max(0,(1-dp-q)*24+1));lit=lit*lit*(3-2*lit);
                 x=fx+ax+(bx-ax)*q;y=fy+0.03;z=fz+az+(bz-az)*q;
-                sc=delayOn*appear*(0.28+0.72*lit)*(1-done)*sqrt(remaining);
+                sc=delayOn*appear*(0.28+0.72*lit)*(1-done)*pow(remaining,0.75);
                 r=0.88;g=0.96;b=1;a=1;
             """)
 
@@ -89,7 +89,7 @@ object WandCastingFx {
                 bx=cos(theta+2*PI/3)*rad;bz=sin(theta+2*PI/3)*rad;
                 x=fx+ax+(bx-ax)*q;y=fy+0.015;z=fz+az+(bz-az)*q;
                 lit=min(1,max(0,(rp-q)*24+1));lit=lit*lit*(3-2*lit);
-                sc=rechargeOn*appear*(0.45+lit*0.55)*(1-done)*sqrt(remaining);
+                sc=rechargeOn*appear*(0.45+lit*0.55)*(1-done)*pow(remaining,0.75);
                 r=0.12+lit*0.16;g=0.30+lit*0.38;b=0.72+lit*0.28;a=1;
             """)
 
@@ -152,7 +152,8 @@ object WandCastingFx {
 
         fun retire() {
             expires = level.gameTime + EXIT_TICKS
-            groups.forEach { it.setVariableInterpolated("presence", "0", 7, EasingType.EASE_IN_OUT).destroyAfter(EXIT_TICKS) }
+            // PD1.0.16的变量缓动尚不参与完成回报；暂保留余量，需求落地后改retire。
+            groups.forEach { it.setVariableInterpolated("presence", "0", 8, EasingType.LINEAR).destroyAfter(EXIT_TICKS) }
             retiring += this
         }
 

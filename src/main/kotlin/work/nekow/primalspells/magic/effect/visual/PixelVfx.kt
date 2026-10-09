@@ -17,7 +17,7 @@ object PixelVfx {
 
     /** 从当前合成倍率有限收束至零；出生、膨胀或脉冲中断仍由PD接续。 */
     fun retire(group: ParticleGroup?, ticks: Int = 6) {
-        group?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
+        group?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.retire()
     }
 
     /** 飞散碎片只收片元尺寸，保留原速度与位置，不把整批拉回场心。 */
@@ -31,7 +31,7 @@ object PixelVfx {
     /** 破裂时径向外移和片元熄灭同时进行；抵消scale的几何内缩，轮廓只向外打开。 */
     fun shatter(group: ParticleGroup?, ticks: Int = 5, radiusScale: Float = 1f) {
         group?.moveAlongOffset(radiusScale * 2f, ticks, EasingType.EASE_IN_OUT)
-            ?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.destroyAfter(ticks + 2)
+            ?.scaleTo(0f, ticks, EasingType.EASE_IN_OUT)?.retire()
     }
 
     /** 碎屑保持运动，单片起落并错峰结束；不把几何整体缩向轴心。 */

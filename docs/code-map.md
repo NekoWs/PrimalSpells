@@ -326,3 +326,8 @@ WandCastingFx改为两枚常驻符印和三根脚下充能柱；法杖OBJ改为�
 ## 第71轮：球壳接点与长按移动
 
 斜擦护盾接点：Move.shieldHolders/ShieldGuard.interceptSegment → EnergyShield.absorbProjectile(from,to) → Projectile.shieldReflectionPoint → ConcentratedLightFx。长按不减速：WandItem构造的DataComponents.USE_EFFECTS，全档法杖共用。验收：ShieldBalanceScene的grazing-*与native-held-wand-input-*。
+
+
+## 第72轮PD接线
+
+client/capture/PdApiScene.kt为前置运行时回归；magic/effect/visual/PixelVfx.kt使用有限编排完成销毁；ConcentratedLightFx恢复trackAll+sizeCurve；magic/effect/lifecycle/PlasmaBeam.kt恢复一刻端点缓动。依赖版本与加载下限统一在gradle.properties，lib主JAR和sources同时替换。

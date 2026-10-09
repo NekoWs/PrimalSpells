@@ -23,23 +23,23 @@ JDK 由 `foojay-resolver-convention` 插件按 toolchain 自动下载；本机�
 ## 2. 依赖
 
 ```groovy
-// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.15-ALPHA）
+// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.16-ALPHA）
 compileOnly  files("lib/particledrawing-${particledrawing_version}.jar")   // 编译期接口
 localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // 开发环境运行时（不传递给下游）
 ```
 
-- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.15-ALPHA,)`）、`ordering="AFTER"`。
+- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.16-ALPHA,)`）、`ordering="AFTER"`。
 - jar 以**本地文件**形式签入 `lib/`，不走 Maven；文件名与版本区间都由 `gradle.properties` 驱动（`particledrawing_version` / `particledrawing_version_range`），`build.gradle` 与 `mods.toml` 不再硬编码。
 - 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：`ParticleManager`（`create`/`trackAll`/`setVelocityAll`/`applyForceAll`）、
   `ParticleHandle`（`setVelocity`/`track`/`position`/`applyForce`/`attachTo`/`attachToLocal`/`remove`）、`Color`；
   另有 `ParticleBatch`（**程序化粒子集的推荐入口**：`add`/`trackAll`/`setVelocityAll`/`applyForceAll`/`forEach`/`removeIf`/`ensureSize`/`evictDead`）、`ParticleGroup`（编排式动画）、`EffectCallbacks`、`EffectVarStore`。
 - ✅ **构建口径（同名换 jar 的坑，已解决）**：2026-09-30 当天曾在**同一版本号字符串**下替换过 `lib/` 里的 jar，
   旧构建缺 `position`/`applyForce`/`attachTo`/`trackAll` 而 `versionRange` 拦不住。
-  现在 PD 每加一批 API 就提版本（当前 **1.0.15-ALPHA**），本模组的下限同步为 `[1.0.15-ALPHA,)`，
+  现在 PD 每加一批 API 就提版本（当前 **1.0.16-ALPHA**），本模组的下限同步为 `[1.0.16-ALPHA,)`，
   旧构建在加载期就会被拒绝，**不需要再靠日期约定**。
 - ⚠️ **预发布版本的版本区间（踩过一次的坑）**：FML 用 Maven 版本语义比较，`1.0.11-ALPHA` 排序**低于** `1.0.11`，
   所以下限写 `[1.0.11,)` 会报 `Mod primalspells requires particledrawing 1.0.11 or above / Currently, particledrawing is 1.0.11-ALPHA`。
-  下限必须带上预发布标识（当前即 `[1.0.15-ALPHA,)`；规则在 1.0.8-ALPHA 那次实测过：带标识的下限接受该预发布版与之后的版本，拒绝对应更低的版本；比较大小写不敏感）。
+  下限必须带上预发布标识（当前即 `[1.0.16-ALPHA,)`；规则在 1.0.8-ALPHA 那次实测过：带标识的下限接受该预发布版与之后的版本，拒绝对应更低的版本；比较大小写不敏感）。
 - **升级依赖的三步**（都只改 `gradle.properties` + 放 jar）：
   1. 新 jar（含 `-sources.jar` 更好）放进 `lib/`；
   2. 改 `gradle.properties` 的 `particledrawing_version`（= jar 文件名里的版本段）与 `particledrawing_version_range`（下限 = 该版本，预发布要带标识）；
@@ -47,12 +47,12 @@ localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // �
 - ⚠️ **若第 3 步失败**：不要在本模组绕过或自研替代实现 —— 按
   [conventions.md](conventions.md) 第 9 节的政策停下，并把 API 修改需求登记到
   [issues/pd-api-requests.md](issues/pd-api-requests.md)（政策全文见 [design/effects-api.md](design/effects-api.md) 第 0 节）。
-- 当前锁定版本为 **1.0.15-ALPHA**：新增当前倍率接续的scaleTo/scaleBy、零尺寸不绘制、移动组锚点相邻样本插值、空间变量缓动、发射器jitter及寿命/曲线热更新；大批次运动/销毁载荷由PD自动拆包。
+- 当前锁定版本为 **1.0.16-ALPHA**：修复track与寿命曲线并用、静止片元光照缓存、组尺寸/颜色帧间插值、变量缓动重定向及输入顺序；新增有限编排onAnimationComplete/retire。表达式/热更变量完成回报尚有限制，见pd-api-requests第72轮。
 - 本地前置源码项目位于 `D:/Backup/IDEA Projects/ParticleDrawing`。本轮执行 `gradlew.bat build sourcesJar --console=plain`，复制build/libs中的主JAR与sources JAR；另外执行 `gradlew.bat test --rerun-tasks --console=plain`，测试成功。
 - 增量动画仍按“从现在起”追加，不能自行再补播放游标。发射器`.sizeCurve`是**追加乘数曲线**；重复热更新应使用`.lifeCurve(ParticleLifeCurve.of(ParticleCurve.scale(...)))`覆盖，避免累积到8条通道上限。
 - 上一版本为 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
   `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
-- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.15-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
+- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.16-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
   源码 jar **不接进构建**（只作对照用）：Gradle 的 file 依赖没有 sources 变体，2026-10-04 试过
   `compileOnly` + `idea.module.scopes` 想让 IDEA 悬停看到 KDoc，**实测没生效**，已撤回 —— 别再试这条。
 
@@ -460,3 +460,22 @@ ShieldBalanceScene增加12项真实Move高速护盾检查：4.8、24、64格/刻
 ShieldBalanceScene新增12项检查，总41项：4组真实子步擦边/斜入射检查及被动扫场不重复改写，共8项；客户端原版applyInput验证7档法杖×主副手14种不减速、可疾跑且弓仍减速，共3项；正常部署、20刻蓄能后的可见擦边光束交点1项。速度4.8/12/64格每刻，解析球壳交点误差小于0.001格，持盾者未受伤、弹存活且命中次数0。人工检查71b第114刻原始帧（00103.png），入射与反射光束在盾面同一点衔接。
 
 最终8场帧数/玩法/像素可见性/空场/退场/媒体门禁全部PASS，构建通过。总体报告仍仅因既有5条OSHI启动异常FAIL；用户手动重启复验尚未进行，未过滤异常或调整门槛。本轮未新增PD API需求。
+
+
+## 第72轮：构建PD1.0.16并恢复原生接线（2026-10-09）
+
+前置源码D:/Backup/IDEA Projects/ParticleDrawing，提交5557ed0；执行gradlew.bat build sourcesJar及test --rerun-tasks，330测试、0失败/错误/跳过。主JAR SHA256=53c00075ce0b306cfd5571acbbefd08aca58e2a6cbd24ac59550b533e8090cb5，复制后与源码项目产物一致。lib仅保留1.0.16主JAR与sources，gradle版本/下限与最终模组内mods.toml均为[1.0.16-ALPHA,)；升级构建--no-build-cache和最终build均成功。
+
+最终13场3179帧、9丢帧（shield_balance，250刻原预算12内），211/211玩法检查通过。8个法术场来自72a，pd_api来自72c，4个法杖视角来自72e；来源build/capture/final72/runs.tsv、summary.tsv，画廊index.html、报告report.txt；原日志final72a/c/e.log。72a/b的PD夹具曾误用未乘曲线的基础快照/光源筛选列表，不能证明曲线渲染，未作为最终证据；最终只用snapshot验证track位置，独立像素区域验证寿命曲线的真实绘制。
+
+PdApiScene：同一静止Bridge实例原生extract光照输出15728640→15728869→15728640；光源移回再次变亮，销毁再次恢复。Bridge尺寸在partialTick=0/.25/.5/.75/1五个点严格递增且中点线性，不依靠20fps视频推导高刷。连续1刻变量热更的目标0.92收敛到0.88，没有旧版重启饥饿；普通组完成回调在出生后50刻到达，远早于68刻兜底，成员随客户端回报归零。曲线方片独立ROI在出生/保持/熄灭三个窗口验证覆盖起落，并确认跟踪期间位置不断推进。
+
+人工查看第一人称汇聚之光第43帧，恢复track后白金镜阵正常可见，不再冻结为首帧小点；第三人称正面第146帧法阵正在有限退场。保持20刻蓄能、固定方向、真实反射接点、5次墙反弹、0.06出手反冲及法杖主副手原速。
+
+PD新增完成API对expression/setVariableInterpolated仍有限制；普通组已接入，法杖/等离子表达式收尾保留旧清理，缺口登记pd-api-requests第72轮，不自写客户端销毁协议。总体日志仍有既有5条OSHI启动异常，用户手动重启复验未进行。
+
+第72a轮画面门禁发现旧7刻EASE_IN_OUT的法阵退场在三个视角单帧覆盖下降37～39%，超过既有35%门槛。presence改8刻LINEAR，使实色面积更均匀收束，销毁余量仍12刻且不更改门禁；72d的线性presence仍在最后一个采样留下约15%覆盖；片元尺寸改presence^0.75（面积presence^1.5），末尾更早收细，四视角补录72e。PD夹具包含60刻尺寸收尾，场景声明改为渐进退场而非瞬时消失，其专属ROI仍严格检查出生/保持/熄灭。
+
+72e三角法阵/60度第一人称/90度第一人称的最大单帧覆盖下降分别18.6%/19.7%/18.7%，归零前分别5.5%/5.6%/6.0%，维持原35%/10%门槛；未通过的72a/d视角不作为最终证据。
+
+最终13场帧数/玩法/像素可见性/空场/退场/媒体门禁全部PASS；第三人称正面退场最大单帧下降19.7%、归零前7.3%也通过。PD方片ROI第10/24/65刻覆盖30/4346/225像素，说明track位置接管没有冻结出生/熄灭尺寸。总体报告仅因既有5条OSHI启动异常FAIL，未关闭日志门禁。

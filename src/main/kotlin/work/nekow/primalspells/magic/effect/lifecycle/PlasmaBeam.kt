@@ -34,7 +34,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
         val end = if (projectile.maxHitTargets < 0 || hit.type == net.minecraft.world.phys.HitResult.Type.MISS) intended else hit.location
         val beam = group ?: createBeam(world, start, end).also { group = it }
         for ((name, value) in listOf("sx" to start.x, "sy" to start.y, "sz" to start.z,
-            "ex" to end.x, "ey" to end.y, "ez" to end.z)) beam.setVariableLive(name, value.toString())
+            "ex" to end.x, "ey" to end.y, "ez" to end.z)) beam.setVariableInterpolated(name, value.toString(), 1)
         if (status.age % 4 == 0) {
             SpellInteractions.beam(projectile, start, end, work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
             work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world), end,
@@ -81,6 +81,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
     }
     override fun onDie() {
         group?.setVariableLive("endMs", ((status.age - 1).coerceAtLeast(0) * 50).toString())
+        // 表达式收尾尚无PD完成回报；保留有限余量，见第72轮API需求。
         group?.destroyAfter(8)
         worldBurst()
         group = null

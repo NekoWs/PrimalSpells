@@ -53,12 +53,16 @@ class ConcentratedLightFx : BaseEffect() {
                 .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(3,1,EasingType.EASE_OUT))
         }))
             chargeRest = points(1.0)
-            batch.handles().forEachIndexed { i, handle -> handle.move(chargeRest[i], ConcentratedLight.CHARGE_TICKS, EasingType.EASE_IN) }
+            // 位置只由track接管；出生尺寸仍由PD寿命曲线逐帧播放。
         }
     }
     override fun onTick() {
         val pm=manager ?: return
-        if(projectile.awaitingRelease) { previous=point();return }
+        if(projectile.awaitingRelease) {
+            val progress = (status.age.toDouble() / ConcentratedLight.CHARGE_TICKS).coerceIn(0.0, 1.0)
+            charge?.trackAll(points(progress * progress))
+            previous=point();return
+        }
         if(charge!=null) {
             // 阵体留在部署点承受反冲：先后退张开，再回弹熄灭，不追着高速光束移动。
             releaseRecoil(pm, charge!!);charge=null

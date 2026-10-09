@@ -425,3 +425,8 @@ concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→�
 ## 第71轮：球壳接点与长按移动
 
 普通有hitRadius的运动投射物，护盾球壳碰撞由Move的真实子步负责；不要再在实体tick用pos-velocity重建路径。特殊射线/跃迁若直接调用命中入口，仍需提供真实来向；visual读取shieldReflectionPoint可用精确球壳接点连接束，而非安全推出位置。
+
+
+## 第72轮PD使用口径
+
+1.0.16允许ParticleBatch.trackAll与sizeCurve共用；位置与寿命外观分别由PD管理，不必改成固定终点move规避冻结。空间变量可持续setVariableInterpolated(...,1)，重定向与输入快照顺序已修复。有限糖指令收尾用scaleTo(...).retire()等客户端回报，不按服务端ticks+2提前销毁。表达式与独立变量缓动暂不支持同样的完成生命周期，接入前查pd-api-requests第72轮，不能用伪造有限指令冒充完成信号。

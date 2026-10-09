@@ -1390,6 +1390,53 @@ Noita 火花弹的观感恰恰相反（`SPARK_LIFETIME 2~6` 这一档才是它�
 
 ## 附录 B：ParticleDrawing 已闭环条目（备查）
 
+
+### 1.0.16-ALPHA：第72轮关闭第62/66/68轮前置缺口
+
+第62轮由Bridge尺寸/颜色partialTick插值、变量重定向当前值捕获和先更新后快照闭环；组程序仍20Hz计算，渲染端逐帧插值，不声称程序改为逐帧重算。第66轮光照按动态光场版本和超时失效，固定片元暗→亮→暗无需移动或重建。第68轮track仅接管位置，寿命曲线继续驱动外观。
+
+接线恢复汇聚之光trackAll+出生曲线与等离子一刻空间缓动；普通组PixelVfx退场等待客户端完成。法杖实体getter保留合理锚定语义。完成回报对表达式/热更变量仍不完整，另列第72轮新请求；未伪造有限命令或本侧播放器。源码核对、330项PD单测及实机证据见build-and-run第72轮。
+
+以下保留当时登记原文（状态与版本均为历史语境）：
+
+### [需求] 组动画及热更变量的视觉尺寸逐渲染帧求值
+
+- 状态：未决，第62轮，2026-10-09；停止严格高刷新率连续性的接入尝试。
+- 目标模型：组scaleTo/scaleBy、表达式sc、变量缓动在60/144Hz时也连续变化；提前中断捕获当帧值，完成至零后才销毁。
+- 现有能力：1.0.15-ALPHA已补scaleTo当前倍率接续、零尺寸、移动样本、setVariableInterpolated。其ClientAnimationProgramManager.tick只从ParticleRenderHandler.onPlayerTick调用，now按gameTime×50求值；refreshInputs先复制变量，applyVarEases后更新变量。ClientParticleEngine.applyProgramFrame直接syncScale，BridgeParticle.getQuadSize(partialTick)直接返回scaleH，没有组尺寸的相邻帧插值。位置端点能由桥接插值，但尺寸/变量输出仍是20Hz阶梯。
+- 证据：已核对本地源码与1.0.15-ALPHA sources JAR；第62d轮第三人称正面退场覆盖t197仍3423px、t198归零，销毁早于该视角最后变量收束；当时PNG已被后续补录替换，数值与日志保留在assembly62d.log；当前PNG/视频见build/capture/out。其余视角20fps门禁通过，不能据此证明高刷连续。
+- 期望API：组动画/变量/表达式视觉通道使用同一单调渲染时钟逐帧求值；或桥接层插值尺寸/色彩。变量重定向先按当前时钟求旧曲线值，再捕获起点，热更新新目标每tick持续输入不能饥饿；先更新变量再形成表达式输入快照。公开onAnimationComplete/retire(duration)让销毁与客户端真正到零一致。
+- 影响面：WandCastingFx的presence/移动变量、PlasmaBeam端点，以及全部组级尺寸起落；ParticleLifeCurve自身已有逐帧尺寸通路，不属于此缺口。
+- 临时降级：保留前置原生组/变量动画及现有位置桥接插值，不自写播放器；法阵350ms原生缓动、600ms销毁留余量，继续逐帧检查末尾不能硬切。严格高刷保证等待前置补齐。
+
+- 第63轮补充：持续运动时每刻重启1刻setVariableInterpolated确实导致法阵/移动光束位置不收敛。本轮停止该接入点，玩家位置改用已有实体getter、束端点改用已有setVariableLive+原生位置桥；没有自写粒子更新/插值。仍需修正重定向时当前值捕获与refreshInputs/applyVarEases顺序，并实现逐渲染帧求值。
+
+
+## 第66轮：静止非发光粒子的光照缓存不失效（2026-10-09）
+
+- 状态：未决；本地源码及锁定1.0.15-ALPHA sources JAR均确认同一逻辑，未修改前置或在本模组补渲染器。
+- 目标能力：非发光片元在外部动态光靠近时变亮，光源移动/销毁/关闭发光后及时恢复环境亮度；原版方块光变化、区块重新加载同样刷新。
+- 复现：暗室生成位置固定、`glowing(false)`、寿命长的方片；首次渲染前在旁边创建`glowing(true)`光源，随后移开或销毁光源。方片不跨方块时仍保持先前亮度；把方片跨过方块边界才刷新。反向情况（先暗后加光）也会错误保持暗。
+- 源码：`core/client/BridgeParticle.kt:334–354`，`cachedLight`只在初值<0或整数方块坐标改变时调用`super.getLightCoords`，没有时间、光源版本或世界亮度失效条件。MC26.2 `Particle.getLightCoords`调用`LightCoordsUtil.getLightCoords`，PD `BrightnessGetterMixin`叠加动态光；因此缓存的是动态光合并后的结果，而非稳定环境基值。与是否additive无关。
+- 期望修复：由PD在客户端管理光照缓存失效；可缓存环境采样但按世界亮度变更刷新，并在每个渲染帧用当前动态光重新合并；或使用环境/动态光版本号使缓存失效。发光→非发光、光源移动/关闭/删除、动态光总开关切换、区块卸载重载都必须覆盖。无需PS轮询/重发粒子。
+- 验收：固定非发光方片暗→亮→暗，无移动、无重建；60/144Hz均能恢复；移动方片与静止方片结果一致，客户端离开世界后不残留旧光照。
+- 影响面：爆炸烟团、晶面暗边与全部`glowing(false)`法术片元。临时处理：保留原生光照与粒子，不通过强制发光、改色、抖位置或逐刻重生绕过。等待PD修复后更新前置再实机闭环。
+
+
+
+## 第68轮：track位置接管错误冻结寿命曲线（2026-10-09）
+
+- 状态：未决；本地源码及锁定1.0.15-ALPHA sources JAR均确认相同逻辑。
+- 目标能力：ParticleBatch.trackAll只接管位置；sizeCurve仍独立控制片元出生和熄灭，特别是0→1出生。
+- 复现：spawnAll创建anisoWorld(0.125,0.125)、lifetime(-1)、sizeCurve(0→0,3→1)方片，随后每刻trackAll。实机第68a轮第一人称第43帧只剩1～3像素亮点，尺寸没有成长。
+- 原因：ClientParticleEngine.applyTrackPosition把id加入directIds，但frameSyncCurves无条件跳过directIds；位置桥只syncPosition，不刷新外观。track占用的标记与完整动画程序直写外观共用，冻结在首帧曲线乘数。
+- 期望修复：区分仅位置接管与完整外观接管；track/trackAll的粒子逐渲染帧正常求寿命曲线，并保留anisoWorld尺寸。覆盖出生、保持、收尾、改变位置源及60/144Hz。
+- 影响面：汇聚之光原先的逐刻棱片跟随，以及所有track+lifeCurve组合。
+- 接入处理：停止本次trackAll+sizeCurve组合；固定镜阵无需追踪实体，改用已有公开ParticleHandle.move一次性20刻插值至合拢位置，sizeCurve只管尺寸。不自写求值、渲染、尺寸补偿或重生粒子；等PD修复后再验证需要实时跟随的组合。
+
+
+
+
 ### 1.0.15-ALPHA：第62轮闭环（2026-10-09）
 
 本地ParticleDrawing编译与49套/322项测试通过；对应接线为发射器jitter/life/lifeCurve覆盖、scaleTo零尺寸/当前倍率接续、Movable/updateAnchor及插值空间变量。
@@ -1936,3 +1983,8 @@ ShieldBalanceScene真实Move测试4.8、24、64格/刻正入射及12格/刻斜�
 左右擦边、上下斜射及64格/刻近切线射击的交点误差均小于0.001格；后续被动扫场不改位置/速度/法力。实际部署并完成20刻蓄能的可见擦边射击同样通过，人工查看第114刻原始帧确认交点在盾面。
 
 所有法杖统一USE_EFFECTS(canSprint=true, interactVibrations=true, speedMultiplier=1)，保留原版使用生命周期。原版LocalPlayer.applyInput实测7档法杖×主副手共14种均为正常0.98前进输入且可疾跑，弓对照仍0.196。最终8场140项玩法检查与视觉/媒体门禁通过；证据及既有OSHI限制见build-and-run第71轮。
+
+
+## 2026-10-09：第72轮前置升级与旧降级恢复
+
+锁定1.0.16-ALPHA、替换lib主JAR及sources，汇聚之光恢复track+sizeCurve、等离子恢复1刻端点缓动，普通有限组收尾改等待客户端完成信号。PD自身330项测试与本侧13场211项检查通过，视觉/媒体全部PASS；光照固定片元暗亮恢复、Bridge子帧尺寸、热更变量收敛及完成回调均有运行时证据。法阵退场适配新的尺寸插值，8刻presence线性缓动与尺寸presence^0.75通过四个视角原连续门槛。原62/66/68轮需求原文及结论归入附录B；表达式/热更变量完成信号仍未覆盖，单独登记第72轮请求且保留旧有限清理。完整来源与OSHI环境限制见build-and-run第72轮。

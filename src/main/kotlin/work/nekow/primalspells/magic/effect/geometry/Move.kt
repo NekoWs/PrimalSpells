@@ -77,12 +77,24 @@ class Move(
                     emptyList()
                 }
 
+                // 球壳半径大于实体本体；斜擦球壳也必须在本刻视觉之前反射。
+                val shieldHolders = if (checkEntities && projectile.maxHitTargets >= 0) {
+                    val shellSweep = AABB(Vec3(startPos), Vec3(newPos)).inflate(2.7)
+                    level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity::class.java, shellSweep) {
+                        it.isAlive && it !== caster && work.nekow.primalspells.magic.core.ShieldGuard.hasShield(it)
+                    }
+                } else emptyList()
+
                 var prevPos = Vector3f(startPos)
                 for (i in 1..steps) {
                     val t = min(i * stepSize, distance)
                     val checkPos = Vector3f(stepVec).mul(t).add(startPos)
                     // 离开枪口所在的施法者碰撞箱后才允许返弹自伤，避免刚出手就撞自己。
                     if (!caster.boundingBox.inflate(hitRadius).contains(Vec3(checkPos))) leftCaster = true
+
+                    for (holder in shieldHolders) {
+                        if (work.nekow.primalspells.magic.core.ShieldGuard.interceptSegment(level, holder, projectile, prevPos, checkPos)) return
+                    }
 
                     if (checkEntities) {
                         val px = checkPos.x.toDouble()
@@ -102,7 +114,7 @@ class Move(
                         if (!projectile.alive || !projectile.motionEnabled) return
                     }
 
-                    if (throughBlocks) continue
+                    if (throughBlocks) { prevPos = Vector3f(checkPos); continue }
                     val blockPos = BlockPos(
                         floor(checkPos.x).toInt(),
                         floor(checkPos.y).toInt(),

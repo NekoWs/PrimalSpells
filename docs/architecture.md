@@ -526,3 +526,12 @@ TestDummyEntity在knockback之外覆盖push(x,y,z)，并设原版KNOCKBACK_RESIS
 Projectile.hitEntity现在先调用ShieldGuard拦截，成功返回true，不计hitTargets、不置死亡、不派发onHitEntity/onHit；Move收到true立即结束本刻旧扫掠，保留护盾给出的壳外位置与反射速度。避免先死亡后反射，以及旧newPos覆盖反射位置。伤害通道里的ShieldGuard仍为绕过公共命中入口的光束提供兜底。ChainArc的跃迁入口同样尊重true，恢复慢漂移速率但保留被反射的方向。
 
 Projectile.recoilOnCast默认为false，蓄能法术可显式true让付费queueCastRecoil立即施力；releaseCastRecoil仍用recoilApplied保证一次性，复制/触发不排队。汇聚之光recoil=0.06、recoilOnCast=true，在拿牌实际付费出手时轻推，20刻释放不再次推。
+
+
+## 第71轮：球壳接点与长按移动
+
+Move宽相位另查询持盾LivingEntity，扩大到球壳而非只看本体；按真实相邻子步from/to调用ShieldGuard.interceptSegment，早于实体碰撞、方块后续推进和VISUAL。护盾反射成功立即停掉本刻入射扫描。EnergyShield对这类已由Move负责的运动弹不再于实体tick被动扫场，避免反射晚于光束绘制或使用pos-velocity造出未走过的线。原版投射物、静态束源及特殊命中兜底保留。
+
+Projectile.shieldReflectionPoint记录本刻精确球壳接点，Projectile.tick清空；ConcentratedLightFx把白光脊/金侧线接到该点而非推出壳外0.05格后的安全位置，下一刻也从此点续接。成员簿记/插值仍由PD原生完成，本侧仅提供真实路径端点。
+
+WandItem为所有法杖提供原版USE_EFFECTS=UseEffects(canSprint=true,interactVibrations=true,speedMultiplier=1)，保留startUsingItem与onUseTick连发，不用mixin改玩家输入。

@@ -233,6 +233,8 @@ class EnergyShield : Modifier() {
                 if (!p.alive) continue
                 if (p.caster === holder) continue      // 自己施放的法术不弹（出生在面前，否则出生即被弹回）
                 if (p.maxHitTargets < 0) continue      // 穿透：完全无视护盾
+                // 有实体碰撞的运动弹已在Move按真实子步检测；不能在视觉之后重建虚假入射线。
+                if (p.motionEnabled && p.collisionEnabled && p.hitRadius > 0.0) continue
                 tryBlock(level, holder, shellCenter, p)
             }
         }
@@ -247,46 +249,44 @@ class EnergyShield : Modifier() {
     }
 
     /**
-     * **命中兜底**：投射物在同一 tick 内就穿过壳面并贴到持有者身上时，由 `SpellDamage` 在结算伤害前问这一句。
-     *
-     * 为什么需要它：投射物的「移动 + 命中结算 + 到寿死亡」全在 `MagicManager.tick`（`ServerTickEvent.Pre`）里做完，
-     * 而护盾的被动扫场跑在**同一 tick 更晚**的实体 tick 里。于是高速法术（`laser` 单 tick 位移 5 格、`maxAge = 1`）
-     * 在扫场看到它之前就已经打完了、而且已经被 `maxAge` 收走 —— 扫场再准也拦不到。
-     * 这里的规则与 [tryBlock] **完全同一套**（同一条穿越判定、同一套强度/MP/破口），
-     * 只是把评估时机挪到「真正命中的那一刻」。
+     * 移动子步拦截与直接命中兜底共用入口。Move传入真实相邻子步[from]/[to]，
+     * 在本体命中及视觉之前完成反射；其它直接伤害入口未提供线段时仍保留原有兜底。
+     * 强度、MP和破口统一交给[tryBlock]。
      *
      * @return true = 已格挡（调用方跳过伤害），投射物已被反射
      */
-    fun absorbProjectile(level: ServerLevel, wand: Wand, holder: Entity, projectile: Projectile): Boolean {
+    fun absorbProjectile(level: ServerLevel, wand: Wand, holder: Entity, projectile: Projectile,
+                         from: Vector3f? = null, to: Vector3f = projectile.status.pos): Boolean {
         if (wand.loadedMagics.firstOrNull { it is EnergyShield } !== this) return false
         if (!holder.isAlive) return false
         if (projectile.caster === holder) return false
         if (projectile.maxHitTargets < 0) return false   // 穿透不吃护盾这一套
         this.wand = wand
         expireBreach(level.gameTime)
-        return tryBlock(level, holder, shellCenter(holder), projectile)
+        return tryBlock(level, holder, shellCenter(holder), projectile, from, to)
     }
 
     /**
-     * 对**一枚投射物**做一次格挡判定 —— 两个入口共用：tick 末尾的全场扫（[onInventoryTick]）
-     * 与命中兜底（[absorbProjectile]）。
+     * 对一枚投射物做格挡判定：移动子步/命中入口[absorbProjectile]，
+     * 以及不走实体碰撞的载体被动入口[onInventoryTick]共用。
      *
      * @return true = 这一发被格挡（已扣 MP、已反射、已出玻璃板）；false = 不归护盾管或已从破口穿过
      */
-    private fun tryBlock(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: Projectile): Boolean {
+    private fun tryBlock(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: Projectile,
+                         from: Vector3f? = null, to: Vector3f = p.status.pos): Boolean {
         // 光束的束源不碰撞实体，但射线命中仍声明 DirectDamage，并传入真实命中线段。
         // 无直接伤害的爆炸点等仍走爆炸入口。
         if (p.hitRadius <= 0.0 && p.effects.none { it is DirectDamage }) return false
-        // 本引擎的 `velocity` 就是「每 tick 位移」（`Move` 用它做位置积分），所以上一 tick 的位置
-        // 恰好是 `pos - velocity`。用它拼出这一 tick 的位移线段 —— 不做扫掠就会漏掉单 tick
-        // 位移超过壳厚度的法术（laser 5 格/tick）。
+        // Move提供实际走过的子步；仅未提供from的兼容入口才用pos-velocity估算。
+        // 不可在反射完成后用新速度重建旧入射路径。
         val velocity = p.status.velocity
         val hit = resolveIncoming(
-            level, holder, shellCenter, p.status.pos, velocity,
-            System.identityHashCode(p), strengthOf(p),
+            level, holder, shellCenter, to, velocity,
+            System.identityHashCode(p), strengthOf(p), from,
         ) ?: return false
 
         // 挡下了：以壳面法线反射，并把投射物推到壳外 0.05 格（下一 tick 必然离开判定面）
+        p.shieldReflectionPoint = Vec3(hit.point)
         val speed = velocity.length()
         velocity.normalize().reflect(hit.normal).mul(speed)
         p.status.pos = Vector3f(hit.normal).mul(0.05f).add(hit.point)
@@ -376,8 +376,9 @@ class EnergyShield : Modifier() {
         velocity: Vector3f,
         identity: Int,
         strength: Double,
+        from: Vector3f? = null,
     ): ShellHit? {
-        val prev = Vector3f(pos).sub(velocity)
+        val prev = from ?: Vector3f(pos).sub(velocity)
 
         // 先登记「这一 tick 它在壳外」——下一步就可能被壳"追上"而落到壳内
         val ex = pos.x - shellCenter.x

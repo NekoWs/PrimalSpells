@@ -20,10 +20,11 @@ import work.nekow.primalspells.wand.Wand
  * 查的是**手上的法杖**（主手/副手 —— 与护盾 `needInventory` 的生效条件一致），
  * 不用任何全局注册表，因此没有注册/注销的生命周期问题。
  *
- * 两个入口各司其职：
+ * 各入口共用护盾规则：
+ * - [interceptSegment]：Move的真实相邻子步，早于本体命中和光束绘制；
  * - [absorbExplosion]：独立爆炸点（`Explosion.customExplode`）；
- * - [absorbProjectile]：**命中兜底** —— 投射物在同一 tick 内就穿壳贴脸时（高速法术），
- *   护盾的 tick 末尾扫场已经看不到它了（`MagicManager.tick` 先跑完移动/命中/到寿死亡）。
+ * - [absorbProjectile]：其它直接命中路径的伤害前兜底；
+ * - [absorbVanillaProjectile]：原版投射物命中事件。
  *
  * 口径全文见 [docs/design/combat-pricing.md] §3。
  */
@@ -47,6 +48,18 @@ object ShieldGuard {
     ): Boolean = withShield(entity) { shield, wand ->
         shield.absorbExplosion(level, wand, entity, center, radius, falloffDamage)
     }
+
+    /** Move宽相位只保留真正持盾的实体，避免对子步中的每个生物反复查杖。 */
+    fun hasShield(entity: LivingEntity): Boolean = HANDS.any { hand ->
+        WandItem.getWand(entity.getItemInHand(hand))?.loadedMagics?.any { it is EnergyShield } == true
+    }
+
+    /** 按本刻真实相邻子步测试球壳，早于本体命中和视觉阶段。 */
+    fun interceptSegment(level: ServerLevel, entity: LivingEntity, projectile: Projectile,
+                         from: org.joml.Vector3f, to: org.joml.Vector3f): Boolean =
+        withShield(entity) { shield, wand ->
+            shield.absorbProjectile(level, wand, entity, projectile, from, to)
+        }.also { if (it) projectile.shieldedImpactTargets += entity.uuid }
 
     /**
      * 尝试让 [entity] 手上的护盾**格挡这枚即将命中它的投射物**。

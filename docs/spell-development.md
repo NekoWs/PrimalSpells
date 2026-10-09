@@ -420,3 +420,8 @@ concentrated_light、recoil_damper、recoil_boost已按注册→物品资源→�
 公共Projectile.hitEntity返回true表示护盾拦截，不是实体命中；自定义碰撞/跃迁必须立即放弃旧路径，不能继续用入射位置/速度覆盖反射结果，也不能消耗命中次数或触发荷载。普通命中返回false，按原有回调和死亡规则执行。
 
 蓄能法术设置recoilOnCast=true可在付费施法时反冲；默认false保持等待释放。子弹不调用queueCastRecoil，不重复推动施法者。
+
+
+## 第71轮：球壳接点与长按移动
+
+普通有hitRadius的运动投射物，护盾球壳碰撞由Move的真实子步负责；不要再在实体tick用pos-velocity重建路径。特殊射线/跃迁若直接调用命中入口，仍需提供真实来向；visual读取shieldReflectionPoint可用精确球壳接点连接束，而非安全推出位置。

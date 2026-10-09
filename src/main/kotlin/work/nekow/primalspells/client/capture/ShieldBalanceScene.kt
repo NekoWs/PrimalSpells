@@ -27,7 +27,10 @@ object ShieldBalanceScene {
     fun scene(): Scene {
         val name="shield_balance";val checks=linkedMapOf<Int,MutableList<Check>>()
         fun record(t:Int,id:String,ok:Boolean,info:String){checks.getOrPut(t){arrayListOf()}.add(Check(name,t,id,ok,info))}
+        val clientResults=java.util.concurrent.ConcurrentHashMap<String,Pair<Boolean,String>>()
         var left:TestDummyEntity?=null;var right:TestDummyEntity?=null
+        var grazingLight:work.nekow.primalspells.magic.projectile.ConcentratedLight?=null
+        var grazingContact:Vec3?=null
         lateinit var one:Wand;lateinit var eight:Wand
         fun shield(wand:Wand)=wand.loadedMagics.first{it is EnergyShield} as EnergyShield
         fun equip(holder:net.minecraft.world.entity.LivingEntity,count:Int):Wand {
@@ -102,6 +105,23 @@ object ShieldBalanceScene {
                         record(t,"reflected-light-still-hits-$speed-$angled",victim.health==964f && holder.health==1000f && !light.alive,"victim=${victim.health} holder=${holder.health} alive=${light.alive}")
                         light.die();holder.discard();victim.discard()
                     }
+                    // 擦过球壳但完全错开本体：旧逻辑只会在视觉之后的被动tick反射。
+                    for ((speed, ox, oy) in listOf(Triple(4.8f,1.2,0.0),Triple(4.8f,-1.2,0.0),Triple(12f,0.9,0.9),Triple(64f,1.62,0.0))) {
+                        val holder=pig(6.0);val ws=equip(holder,8)
+                        val center=holder.position().add(0.0,holder.bbHeight*0.55,0.0)
+                        val start=center.add(ox,oy,-3.0)
+                        val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
+                        light.caster=ctx.player;light.wand=Wand("shield-graze");light.position=start.toVector3f();light.velocity=Vector3f(0f,0f,1f);light.speed=speed/Projectile.LAUNCH_SPEED_SCALE
+                        light.spell();light.status.age=20;light.tick()
+                        val contact=light.shieldReflectionPoint
+                        val expected=center.add(ox,oy,-kotlin.math.sqrt(1.7*1.7-ox*ox-oy*oy))
+                        val normal=contact?.subtract(center)?.normalize()
+                        record(t,"grazing-contact-correct-before-passive-$speed-$ox-$oy",contact!=null && contact.distanceTo(expected)<0.001 && light.alive && light.status.hitTargets==0 && holder.health==1000f && ws.status.mana==9995.0,"contact=$contact expected=$expected pos=${light.status.pos} mana=${ws.status.mana}")
+                        val position=Vector3f(light.status.pos);val velocity=Vector3f(light.status.velocity)
+                        ws.tick(holder,ctx.level)
+                        record(t,"grazing-no-late-shift-$speed-$ox-$oy",normal!=null && Vec3(velocity).dot(normal)>0 && kotlin.math.abs(velocity.length()-speed)<0.001 && position==light.status.pos && velocity==light.status.velocity && ws.status.mana==9995.0,"velocity=$velocity pos=${light.status.pos} mana=${ws.status.mana}")
+                        light.alive=false;light.die();holder.discard()
+                    }
                     val chainHolder=pig(6.0);val chainWand=equip(chainHolder,8)
                     val chain=MagicManager.create("chain_bolt") as Projectile
                     chain.caster=ctx.player;chain.wand=Wand("shield-chain");chain.position=chainHolder.boundingBox.center.add(0.0,0.0,-2.8).toVector3f();chain.velocity=Vector3f(0f,0f,1f);chain.spell()
@@ -113,6 +133,29 @@ object ShieldBalanceScene {
                     dummy.push(2.0,3.0,4.0)
                     record(t,"dummy-rejects-direct-and-explosion-push",dummy.deltaMovement.lengthSqr()==0.0 && dummy.position()==start && dummy.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE)==1.0,"velocity=${dummy.deltaMovement}");dummy.discard()
                 }
+                if(t==20)net.minecraft.client.Minecraft.getInstance().execute {
+                    val player=net.minecraft.client.Minecraft.getInstance().player ?: return@execute
+                    val oldInput=player.input;val main=player.mainHandItem;val off=player.offhandItem
+                    val values=arrayListOf<Float>()
+                    try {
+                        player.stopUsingItem()
+                        player.input=object:net.minecraft.client.player.ClientInput(){override fun getMoveVector()=net.minecraft.world.phys.Vec2(0f,1f)}
+                        player.applyInput();val baseline=player.zza
+                        val items=listOf(ModItems.WAND.get())+ModItems.WAND_TIERS.values.map{it.get()}
+                        var sprint=true
+                        for(item in items)for(hand in listOf(InteractionHand.MAIN_HAND,InteractionHand.OFF_HAND)) {
+                            val stack=ItemStack(item);player.setItemInHand(hand,stack);player.startUsingItem(hand);player.applyInput();values+=player.zza
+                            sprint=sprint && stack.get(net.minecraft.core.component.DataComponents.USE_EFFECTS)!!.canSprint()
+                            player.stopUsingItem()
+                        }
+                        clientResults["native-held-wand-input-keeps-speed"]=((baseline>0.9f && values.all{kotlin.math.abs(it-baseline)<0.0001}) to "baseline=$baseline values=$values")
+                        clientResults["held-wand-can-sprint"]=sprint to "all tiers and both hands=$sprint"
+                        player.setItemInHand(InteractionHand.MAIN_HAND,ItemStack(net.minecraft.world.item.Items.BOW));player.startUsingItem(InteractionHand.MAIN_HAND);player.applyInput()
+                        clientResults["native-other-item-slowdown-unchanged"]=(kotlin.math.abs(player.zza-baseline*0.2f)<0.0001) to "bow=${player.zza} baseline=$baseline"
+                    } finally {
+                        player.stopUsingItem();player.setItemInHand(InteractionHand.MAIN_HAND,main);player.setItemInHand(InteractionHand.OFF_HAND,off);player.input=oldInput;player.applyInput()
+                    }
+                }
                 if(t==60){left=ctx.spawnDummy(-3.0,floor+1.0,0.0);right=ctx.spawnDummy(3.0,floor+1.0,0.0);one=equip(left!!,1);eight=equip(right!!,8)}
                 if(t in listOf(70,74,78,140)) {
                     if(t==140)eight.status.mana=0.0
@@ -121,12 +164,29 @@ object ShieldBalanceScene {
                         p.position=Vector3f(holder.x.toFloat(),floor+1.8f,-6f);p.velocity=Vector3f(0f,0f,1f);p.speed=3f;p.maxAge=30;p.spell();MagicManager.add(p)
                     }
                 }
+                if(t==90) {
+                    val p=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
+                    p.caster=ctx.player;p.wand=Wand("grazing-visual")
+                    val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
+                    p.position=center.add(1.2,0.0,-7.0).toVector3f();p.velocity=Vector3f(0f,0f,1f);p.spell();MagicManager.add(p);grazingLight=p
+                }
+                if(t in 105..125 && grazingContact==null && grazingLight?.shieldReflectionPoint!=null)grazingContact=grazingLight!!.shieldReflectionPoint
+                if(t==115)grazingLight?.alive=false
+                if(t==130) {
+                    val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
+                    val expected=center.add(1.2,0.0,-kotlin.math.sqrt(1.7*1.7-1.2*1.2))
+                    record(t,"runtime-grazing-contact-visible-at-shell",grazingContact?.distanceTo(expected)?.let{it<0.001}==true,"contact=$grazingContact expected=$expected")
+                }
                 if(t==84)record(t,"runtime-one-breaks-eight-remains-intact",shield(one).breached && !shield(eight).breached && eight.status.mana<10000.0,"one=${shield(one).breached} eight=${shield(eight).breached} mana=${eight.status.mana}")
                 if(t==147)record(t,"runtime-eight-breaks-after-mana-depletion",shield(eight).breached,"breached=${shield(eight).breached}")
                 if(t==200)MagicManager.projectiles.forEach{it.alive=false}
                 if(t==220){left?.discard();right?.discard()}
             },checksAt={ctx,t ->
                 if(t==249){record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}
+                if(t==249)for(id in listOf("native-held-wand-input-keeps-speed","held-wand-can-sprint","native-other-item-slowdown-unchanged")) {
+                    val result=clientResults[id] ?: (false to "client callback did not finish")
+                    record(t,id,result.first,result.second)
+                }
                 checks[t].orEmpty()
             })
     }

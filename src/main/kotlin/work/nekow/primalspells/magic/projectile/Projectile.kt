@@ -47,7 +47,11 @@ abstract class Projectile: Magic() {
     /** 本次命中的护盾已抵消对象；同一次命中的爆炸/死亡荷载不能再次穿过刚开的破口伤害它。 */
     val shieldedImpactTargets = hashSetOf<java.util.UUID>()
 
+    /** 本刻实际球壳接触点；视觉连接此点，不连接推出壳外的安全偏移。 */
+    var shieldReflectionPoint: net.minecraft.world.phys.Vec3? = null
+
     override fun tick() {
+        shieldReflectionPoint = null
         shieldedImpactTargets.clear()
         super.tick()
     }

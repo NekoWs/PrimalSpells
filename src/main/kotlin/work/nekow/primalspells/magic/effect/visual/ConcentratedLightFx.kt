@@ -64,7 +64,7 @@ class ConcentratedLightFx : BaseEffect() {
             releaseRecoil(pm, charge!!);charge=null
             releaseFlash(pm)
         }
-        val end=point();val distance=previous.distanceTo(end)
+        val end=projectile.shieldReflectionPoint ?: point();val distance=previous.distanceTo(end)
         if(distance>0.001) {
             val count=(distance/0.125).toInt().coerceIn(2,192)
             val direction=end.subtract(previous).normalize()

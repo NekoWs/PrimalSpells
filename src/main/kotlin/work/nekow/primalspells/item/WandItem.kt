@@ -23,7 +23,10 @@ import work.nekow.primalspells.wand.WandManager
 import java.util.*
 import work.nekow.primalspells.registry.ModItems
 
-class WandItem(properties: Properties) : Item(properties) {
+class WandItem(properties: Properties) : Item(properties.component(
+    net.minecraft.core.component.DataComponents.USE_EFFECTS,
+    net.minecraft.world.item.component.UseEffects(true, true, 1.0f),
+)) {
 
     /** 数值同步仍是同一根杖，不能触发原版重新装备的上下跳动；换槽/换杖照常。 */
     override fun shouldCauseReequipAnimation(oldStack: ItemStack, newStack: ItemStack, slotChanged: Boolean): Boolean {

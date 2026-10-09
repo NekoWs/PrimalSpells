@@ -757,3 +757,8 @@ ConcentratedLightFx只使用PD 1.0.15公开ParticleBatch.trackAll、spawnAll、�
 ## 第69轮：纯视觉发射反冲
 
 沿用原生ParticleHandle.move一次性两拍接续与既有resize收尾；Deferred只调度第2刻回弹，不承担粒子插值或渲染。没有使用track+sizeCurve、不升级前置、无新增API需求；第68轮曲线冻结需求仍待PD修复。
+
+
+## 第71轮：球壳接点与长按移动
+
+本轮只修正提供给现有spawnAll/sizeCurve的空间端点：使用Move捕获的精确球壳接点。没有前置API缺口或新增需求，不升级PD、不自写插值或渲染；第66/68轮未决问题保持。

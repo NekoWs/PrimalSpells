@@ -223,5 +223,19 @@
   "screen.primalspells.hud.hits": "命中 / 击杀反馈",
   "screen.primalspells.hud.direction": "受击方向",
   "screen.primalspells.hud.selected": "%s · %s%% · 预览数值",
-  "screen.primalspells.hud.save_failed": "保存失败，请检查配置目录权限。"
+  "screen.primalspells.hud.save_failed": "保存失败，请检查配置目录权限。",
+  "key.primalspells.preview": "法术链预览",
+  "preview.primalspells.title": "下一次施法 · 抽牌树",
+  "preview.primalspells.wait": "等待服务端预览…",
+  "preview.primalspells.summary": "MP %s · ⌛ %st / ◇ %st · →%s",
+  "preview.primalspells.help": "同域修正无牌序 · / 分隔独立荷载 · 缩进表示复制/追加 · 滚轮浏览",
+  "preview.primalspells.hint": "悬停法杖按 V 查看法术链",
+  "preview.primalspells.kind.projectile": "投射物",
+  "preview.primalspells.kind.modifier": "修正",
+  "preview.primalspells.kind.divide": "复制单卡",
+  "preview.primalspells.kind.all": "抽取全部",
+  "preview.primalspells.kind.trigger": "追加触发",
+  "preview.primalspells.kind.timer": "追加定时",
+  "preview.primalspells.kind.expiration": "追加失效",
+  "editor.primalspells.help": "点击装卸 · 拖动标题 · 滚轮浏览 · Esc关闭"
 }

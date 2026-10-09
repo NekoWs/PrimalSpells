@@ -72,7 +72,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
-            val registrar = event.registrar("1.1.0")
+            val registrar = event.registrar("1.2.0")
 
             // S→C：交给客户端安装的处理器（服务端上为 null）
             registrar.playToClient(
@@ -94,6 +94,59 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 ScreenShakePayload.STREAM_CODEC
             ) { payload, _ ->
                 ClientPayloadSink.screenShake?.invoke(payload)
+            }
+
+            val previewCodec = work.nekow.primalspells.network.WandPreviewPayload.STREAM_CODEC
+            registrar.playBidirectional(work.nekow.primalspells.network.WandPreviewPayload.ID, previewCodec) { payload, context ->
+                if (context.player() is ServerPlayer) {
+                    val player = context.player() as ServerPlayer
+                    val now = player.level().gameTime
+                    val data = player.persistentData
+                    val last = data.getLongOr("primalspells:preview_at", -100L)
+                    if (payload.preview == null && now - last >= 5) {
+                        data.putLong("primalspells:preview_at", now)
+                        val stacks = player.containerMenu.slots.map { it.item } + player.containerMenu.carried
+                        val stack = stacks.firstOrNull { it.item is WandItem && it.get(ModItems.WAND_ID)?.wandId == payload.wandId }
+                        val wand = stack?.let(WandItem::getWand)
+                        if (wand != null) net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                            work.nekow.primalspells.network.WandPreviewPayload(payload.wandId, wand.preview()))
+                    }
+                } else ClientPayloadSink.wandPreview?.invoke(payload)
+            }
+
+            registrar.playToServer(work.nekow.primalspells.network.EditWandPayload.ID,
+                work.nekow.primalspells.network.EditWandPayload.STREAM_CODEC) { payload, context ->
+                val player = context.player() as? ServerPlayer ?: return@playToServer
+                val menu = player.containerMenu
+                if (menu.containerId != payload.menuId) return@playToServer
+                val slot = menu.slots.getOrNull(payload.slot) ?: return@playToServer
+                val stack = slot.item
+                val item = stack.item as? WandItem ?: return@playToServer
+                if (!slot.mayPickup(player) || stack.get(ModItems.WAND_ID)?.wandId != payload.wandId) return@playToServer
+                val wand = WandItem.getWand(stack) ?: return@playToServer
+                if (payload.spellSlot !in 0 until maxOf(wand.size, wand.magics.size)) return@playToServer
+                // 创造物品栏的光标按原版规则由客户端管理；只允许已注册散卡，生存不接受此通路。
+                if (payload.creativeCount >= 0) {
+                    if (!player.isCreative) return@playToServer
+                    if (payload.creativeCount == 0 && payload.creativeSpell.isEmpty()) menu.carried = net.minecraft.world.item.ItemStack.EMPTY
+                    else {
+                        val spellItem = ModItems.spellItem(payload.creativeSpell) ?: return@playToServer
+                        val cursor = net.minecraft.world.item.ItemStack(spellItem)
+                        if (payload.creativeCount !in 1..cursor.maxStackSize) return@playToServer
+                        cursor.count = payload.creativeCount; menu.carried = cursor
+                    }
+                }
+                if (!menu.carried.isEmpty && ModItems.spellIdOf(menu.carried.item) == null) return@playToServer
+                stack.set(ModItems.WAND_SELECTED_SLOT, payload.spellSlot)
+                item.overrideOtherStackedOnMe(stack, menu.carried, slot, net.minecraft.world.inventory.ClickAction.SECONDARY,
+                    player, object : net.minecraft.world.entity.SlotAccess {
+                        override fun get() = menu.carried
+                        override fun set(value: net.minecraft.world.item.ItemStack): Boolean { menu.carried = value; return true }
+                    })
+                // 创造界面刻意忽略原版单独光标包；完整菜单同步包含权威光标。
+                menu.broadcastFullState()
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                    work.nekow.primalspells.network.WandPreviewPayload(payload.wandId, wand.preview()))
             }
 
             // C→S：滚轮选槽（法杖与小包共用）

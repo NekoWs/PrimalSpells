@@ -1,5 +1,7 @@
 # 代码导航（code-map）
 
+第83轮：`wand/WandPreview.kt`为只读抽牌结果，`Wand.preview()`复用真实解析；`client/input/WandEditorOverlay.kt`为原容器悬浮编杖，`client/screen/WandPreviewScreen.kt`为完整预览；`network/{WandPreviewPayload,EditWandPayload}.kt`承载服务端预览及已验证菜单编辑，`client/capture/FoundationScene.kt`验证实际网络/装卸。贴图路径与交互见[设计](design/spell-preview.md)。
+
 > 用途：**知道要改什么，但不知道文件在哪**。结构规则见 [conventions.md](conventions.md)，运行机制见 [architecture.md](architecture.md)。
 > 路径均相对 `src/main/kotlin/work/nekow/primalspells/`（Java mixin 在 `src/main/java/…`）。
 >

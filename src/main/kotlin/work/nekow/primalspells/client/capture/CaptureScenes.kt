@@ -101,7 +101,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
+    fun all(): List<Scene> = listOf(FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 

@@ -601,3 +601,10 @@ HUD、独立锯片及第一人称画面/媒体门禁PASS。new_spells的36项原
 capture.ps1每秒检查新录制目录的崩溃报告与FATAL；加载崩溃不再只等待总超时。失败时打印报告前50行或日志末45行，保存build/capture/failure.json（原因、报告路径、日志路径、UTC时间），保留部分帧且不进入成功画廊装配。Gradle标准错误独立保存为gradle.stderr.log；非零退出和总超时同样走诊断。结束范围只限本次启动器及其子进程，不再广泛扫描其它MC。
 
 diagnostics.ps1是可独立验证的只读诊断辅助。PowerShell语法解析通过；缺失预览客户端处理器的加载错误夹具正确定位并输出JSON，无错误的空目录不误报。第83轮首轮真实加载失败来自NeoForge26.2双向包必须另行注册客户端处理器；补齐RegisterClientPayloadHandlersEvent后foundations12/12、spell_chain76/76通过。OSHI普通ERROR仍交给最终日志门禁，不将其当作FATAL提前退出或过滤。
+
+
+## 第83轮：法术链预览与悬浮编辑实机
+
+`gradlew.bat build --console=plain`成功。foundations录制210/210帧、零丢帧，21/21真实断言通过：只读预览、独立荷载/复制控制、费用双冷却与真实出手一致、实际双向网络、创造菜单槽映射、取出/装入/替换回交、非法数量与伪造ID拒绝。证据在build/capture/out/foundations，日志build/capture-turn83-editor-final.log；早期只读版与spell_chain的76/76回归保存在build/capture/turn83-preview。已查看原版灰色面板/槽位实机帧；资源包覆盖路径见design/spell-preview。
+
+本机既有5条OSHI异常仍使总体报告失败，未过滤日志或降低判据。中途启动崩溃由双向包客户端处理器未单独注册引起，已接RegisterClientPayloadHandlersEvent并经后续多次真实启动复验。

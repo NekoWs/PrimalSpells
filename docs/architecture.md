@@ -579,3 +579,8 @@ RogueMageEntity手持真实WandItem，每刻调用Wand.tick(this)维护被动与
 负mana费用表示返还法力，必须经过Wand.consumeMana，返还后立即限制到本杖0～最大法力，不得把溢出累积成额外法力池。付费前和Wand.tick、fromTag也修正旧版本的超额值。额外法术保持注册id mana_injection和-30费用，只有显示名由注入玛那改为额外法术，不改旧存档、资源或修正联动键。
 
 no_knockback会同时跳过原版受击方向通知。SpellImpact只在真实接受伤害后给ServerPlayer补indicateDamage，方向为传播方向的反向，水平向量为0时使用施法者相对位置；不为反馈另加击退或伤害。正治疗不走此分支。界面具体语义见design/hud.md。
+
+
+## 第83轮：只读预览与菜单编辑
+
+Wand.preview使用隔离的牌堆/卡牌副本直接调用drawChain/payChain/discard，不驱动世界钩子，不修改原杖。展开树按链分scope，费用与实际支付身份对应。客户端仅显示服务端结果；悬浮编辑依原容器菜单索引、拾取权限、wandId及光标散卡验证后调用原WandItem装卸。创造菜单槽映射到inventoryMenu，完整菜单同步携带权威光标；生存不接受客户端声明的散卡。协议1.2.0，不改存档键。

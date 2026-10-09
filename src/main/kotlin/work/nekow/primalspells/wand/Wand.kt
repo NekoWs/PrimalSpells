@@ -278,11 +278,13 @@ class Wand(var id: String) {
     }
 
     private class MutableCastResult {
+        val accepted = arrayListOf<Magic>()
         var resetDelay = false
         var delay = 0.0
         var recharge = 0.0
         var delayReduction = 0.0
         fun account(card: Magic) {
+            accepted += card
             delay += card.delay
             recharge += card.recharge
             delayReduction += min(0.0, card.delay.toDouble())
@@ -316,6 +318,56 @@ class Wand(var id: String) {
         // 全部链完成后才允许回洗，避免同次施法重复抽取刚支付的牌。
         discard()
         return CastResult(result.resetDelay, result.delayReduction)
+    }
+
+    /** 只读预览：在独立牌堆/法力副本上复用drawChain、payChain和冷却结算，不激活任何效果。 */
+    fun preview(): WandPreview {
+        val copy = Wand(id)
+        copy.mana = mana; copy.charge = charge; copy.cast = cast; copy.size = size
+        copy.delayTickCount = delayTickCount; copy.rechargeTickCount = rechargeTickCount
+        copy.status.mana = status.mana
+        copy.drawPile += drawPile.map { it.clone() }
+        copy.discardPile += discardPile.map { it.clone() }
+        copy.loadedMagics += loadedMagics.map { it.clone() }
+        val chain = copy.drawChain(cast)
+        data class Draft(val card: Magic, val scope: String, val depth: Int, val kind: String, val modifiers: List<String>)
+        val draft = arrayListOf<Draft>()
+        var scopeIndex = 0
+        fun visit(cards: List<Magic>, scope: String, depth: Int) {
+            fun flat(xs: List<Magic>): List<Magic> = xs.flatMap {
+                if (it is work.nekow.primalspells.magic.core.DrawAction) flat(it.expanded) else listOf(it)
+            }
+            val modifiers = flat(cards).filterIsInstance<Modifier>().map { it.id }
+            cards.forEach { card ->
+                val kind = when (card) {
+                    is work.nekow.primalspells.magic.core.DrawAction -> card.kind.name.lowercase()
+                    is Modifier -> "modifier"
+                    else -> "projectile"
+                }
+                draft += Draft(card, scope, depth, kind, modifiers)
+                if (card is work.nekow.primalspells.magic.core.DrawAction) visit(card.expanded, scope, depth + 1)
+                if (card is TriggerSpell) visit(card.payload, "$scope/hit${scopeIndex++}", depth + 1)
+                if (card is Projectile) card.addedTriggers.forEach {
+                    visit(it.cards, "$scope/${it.kind.name.lowercase()}${scopeIndex++}", depth + 1)
+                }
+            }
+        }
+        visit(chain, "root", 0)
+        val accounting = MutableCastResult()
+        val paid = copy.payChain(chain, accounting)
+        copy.status.delay = accounting.delay; copy.status.recharge = accounting.recharge
+        copy.discard()
+        val delay = (if (accounting.resetDelay) 0.0 else max(copy.status.delay,
+            (delayTicks() + accounting.delayReduction).coerceAtLeast(0.0))).coerceAtLeast(0.0)
+        val reasons = copy.status.failedReason.toMutableList()
+        if (status.delay > 0) reasons += "Delay ${fmt(status.delay)}t"
+        if (status.recharge > 0) reasons += "Recharge ${fmt(status.recharge)}t"
+        if (paid.none { it is Projectile }) reasons += "No payable projectile"
+        return WandPreview(draft.take(4096).map {
+            WandPreview.Row(it.card.id, it.scope, it.depth, it.kind, it.card.mana,
+                it.card in accounting.accepted, draft.filter { m -> m.scope == it.scope && m.card is Modifier && m.card in accounting.accepted }.map { m -> m.card.id })
+        }, copy.status.mana, delay, copy.status.recharge.coerceAtLeast(0.0), reasons,
+            paid.count { it is Projectile })
     }
 
     /**

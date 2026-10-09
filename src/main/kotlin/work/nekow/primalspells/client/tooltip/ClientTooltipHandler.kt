@@ -23,6 +23,10 @@ object ClientTooltipHandler {
 
     @SubscribeEvent
     fun onGatherTooltip(event: RenderTooltipEvent.GatherComponents) {
+        val mc = Minecraft.getInstance()
+        val mx = mc.mouseHandler.xpos() * mc.window.guiScaledWidth / mc.window.screenWidth
+        val my = mc.mouseHandler.ypos() * mc.window.guiScaledHeight / mc.window.screenHeight
+        if (work.nekow.primalspells.client.input.WandEditorOverlay.contains(mx, my)) { event.tooltipElements.clear(); return }
         val stack = event.itemStack
 
         // 法术小包：槽位网格 + 选中槽法术
@@ -50,6 +54,7 @@ object ClientTooltipHandler {
                 Component.translatable("tooltip.primalspells.hold_alt").withStyle(ChatFormatting.DARK_GRAY)
             ))
         }
+        event.tooltipElements.add(Either.left(Component.translatable("preview.primalspells.hint").withStyle(ChatFormatting.DARK_GRAY)))
         event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
         addSelectedSpellLines(event, spells, wandId, pouch = false)
     }

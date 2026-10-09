@@ -223,5 +223,19 @@
   "screen.primalspells.hud.hits": "Hit / kill feedback",
   "screen.primalspells.hud.direction": "Damage direction",
   "screen.primalspells.hud.selected": "%s · %s%% · Preview values",
-  "screen.primalspells.hud.save_failed": "Could not save. Check config folder permissions."
+  "screen.primalspells.hud.save_failed": "Could not save. Check config folder permissions.",
+  "key.primalspells.preview": "Spell chain preview",
+  "preview.primalspells.title": "Next cast · Draw tree",
+  "preview.primalspells.wait": "Waiting for server…",
+  "preview.primalspells.summary": "MP %s · ⌛ %st / ◇ %st · →%s",
+  "preview.primalspells.help": "Modifiers share scope · / separates payloads · Indent: control expansion · Scroll",
+  "preview.primalspells.hint": "Hover a wand and press V to preview",
+  "preview.primalspells.kind.projectile": "Projectile",
+  "preview.primalspells.kind.modifier": "Modifier",
+  "preview.primalspells.kind.divide": "Copy next card",
+  "preview.primalspells.kind.all": "Draw all",
+  "preview.primalspells.kind.trigger": "Add trigger",
+  "preview.primalspells.kind.timer": "Add timer",
+  "preview.primalspells.kind.expiration": "Add expiration",
+  "editor.primalspells.help": "Click slots · Drag title · Scroll · Esc"
 }

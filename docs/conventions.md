@@ -377,3 +377,7 @@ client/render/WandModelProperty.kt为原生物品数值属性和短暂模型闪�
 ## 第80轮新增文件落位
 
 HUD状态/绘制/配置放`client/hud/{WandHudRenderer,WandHudPainter,HudLayout}.kt`；原生Screen放`client/screen/HudEditorScreen.kt`，H键及模组配置工厂由PrimalSpellsClient注册。`network/HudImpactPayload.kt`经ClientPayloadSink接线，公共伤害入口不引用客户端。实机夹具放`client/capture/HudSawScene.kt`。无旧→新类迁移、无SavedData键变更；本机布局JSON不塞进服务端法杖NBT。
+
+## 第83轮预览与编辑落位
+
+只读结果放`wand/WandPreview.kt`，解析仍归Wand。网络放`network/{WandPreviewPayload,EditWandPayload}.kt`，完整预览在`client/screen/WandPreviewScreen.kt`，原容器悬浮窗在`client/input/WandEditorOverlay.kt`，实机夹具在`client/capture/FoundationScene.kt`。GUI可覆盖贴图放assets/primalspells/textures/gui/sprites/wand_editor，不修改原id/NBT；协议1.2.0。录制诊断辅助放tools/capture/diagnostics.ps1。没有旧→新类迁移。

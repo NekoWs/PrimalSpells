@@ -176,19 +176,24 @@ class WandItem(properties: Properties) : Item(properties.component(
         action: ClickAction, player: Player, carried: SlotAccess
     ): Boolean {
         if (action != ClickAction.SECONDARY) return false
+        if (player.level().isClientSide) return other.isEmpty || findMagic(other.item) != null
         val wand = getWand(self) ?: return false
-        if (!other.isEmpty) return addToCursor(self, wand, other.item, carried)
+        if (!other.isEmpty) return addToCursor(self, wand, other, carried, player)
         removeToCursor(self, wand, carried)
         return true
     }
 
     private fun addToCursor(
-        stack: ItemStack, wand: Wand, carriedItem: Item, carried: SlotAccess
+        stack: ItemStack, wand: Wand, other: ItemStack, carried: SlotAccess, player: Player
     ): Boolean {
-        val spellId = findMagic(carriedItem) ?: return false
+        val spellId = findMagic(other.item) ?: return false
         val target = selectedSlot(stack, wand)
         val existing = placeMagic(wand, stack, target, spellId)
-        if (existing != null) carried.set(makeStack(existing)) else carried.set(ItemStack.EMPTY)
+        if (other.count == 1) carried.set(existing?.let(::makeStack) ?: ItemStack.EMPTY)
+        else {
+            other.shrink(1)
+            if (existing != null) { val returned = makeStack(existing); if (!player.inventory.add(returned)) player.drop(returned, false) }
+        }
         return true
     }
 

@@ -11,7 +11,8 @@ import work.nekow.primalspells.registry.ModItems
 
 class WandSpellTooltip(
     val spells: List<String>,
-    val wandId: String
+    val wandId: String,
+    val slots: List<work.nekow.primalspells.wand.WandPreview.Slot>? = null,
 ): TooltipComponent
 
 class ClientWandSpellTooltip(
@@ -28,12 +29,17 @@ class ClientWandSpellTooltip(
 
     override fun extractImage(font: Font, x: Int, y: Int, w: Int, h: Int, graphics: GuiGraphicsExtractor) {
         val selected = SpellSlotTracker.getSelectedSlot(tooltip.wandId)
+        val slots = tooltip.slots ?: WandPreviewCache.slots(tooltip.wandId, tooltip.spells)
         for (i in tooltip.spells.indices) {
             val sx = x + 2 + (i % SLOTS_PER_ROW) * SLOT_SIZE
             val sy = y + 2 + (i / SLOTS_PER_ROW) * SLOT_SIZE
             graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_BG, sx, sy, SLOT_SIZE, SLOT_SIZE)
+            WandPreviewCache.color(slots, i)?.let { graphics.fill(sx + 1, sy + 1, sx + SLOT_SIZE - 1, sy + SLOT_SIZE - 1, it) }
             if (i == selected) {
-                graphics.fill(sx, sy, sx + SLOT_SIZE, sy + SLOT_SIZE, 0x80_FF_FF_FF.toInt())
+                graphics.fill(sx, sy, sx + SLOT_SIZE, sy + 1, -1)
+                graphics.fill(sx, sy + SLOT_SIZE - 1, sx + SLOT_SIZE, sy + SLOT_SIZE, -1)
+                graphics.fill(sx, sy + 1, sx + 1, sy + SLOT_SIZE - 1, -1)
+                graphics.fill(sx + SLOT_SIZE - 1, sy + 1, sx + SLOT_SIZE, sy + SLOT_SIZE - 1, -1)
             }
             val spellId = tooltip.spells.getOrElse(i) { "" }
             if (spellId.isNotEmpty()) {

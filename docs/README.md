@@ -12,7 +12,7 @@
 | 文档 | 内容 | 什么时候读 |
 |---|---|---|
 | [todo.md](todo.md) | 已确认的开发方向：法术链预览、整合接口、红石与非破坏性交互 | 规划后续工作 |
-| [design/spell-preview.md](design/spell-preview.md) | 服务端法术链预览、可拖动悬浮编杖与资源包贴图 | 修改编杖和预览 |
+| [design/spell-preview.md](design/spell-preview.md) | 原容器编杖、法术链槽位分色与V键只读预览 | 修改编杖和预览 |
 | [design/acquisition.md](design/acquisition.md) | 结构战利品、游荡术士与夺杖规则 | 修改获取方式或敌人 |
 | [design/hud.md](design/hud.md) | 图标/数字HUD、真实冷却、H键拖动缩放与本机配置 | 修改HUD或布局设置 |
 | [architecture.md](architecture.md) | 分层架构、法术对象模型、牌堆与施法流程、投射物生命周期、持久化、网络、客户端 | **第一次接触本项目**；要改核心机制、排查「为什么没生效」 |

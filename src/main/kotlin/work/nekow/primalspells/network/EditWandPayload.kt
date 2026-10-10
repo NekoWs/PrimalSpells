@@ -5,7 +5,7 @@ import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
 
-/** 悬浮编辑发送菜单/槽索引；创造光标只接收已注册散卡及合法数量，不接收任意组件或法杖数值。 */
+/** 创造物品栏原右键装卸的光标同步；只接收已注册散卡及合法数量，不接收任意组件或法杖数值。 */
 data class EditWandPayload(val menuId: Int, val slot: Int, val wandId: String, val spellSlot: Int, val creativeSpell: String = "", val creativeCount: Int = -1) : CustomPacketPayload {
     override fun type() = ID
     companion object {

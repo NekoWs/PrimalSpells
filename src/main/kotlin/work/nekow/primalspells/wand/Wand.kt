@@ -176,8 +176,10 @@ class Wand(var id: String) {
     /**
      * 深度优先抽取一条链：触发牌先预留完整荷载，再继续父链预算。
      * 本轮手牌不回洗；荷载不从弃牌堆绕回，避免抽到自身。
+     * trace仅供只读槽位分色观察原卡和作用域，正常施放不安装观察器。
      */
-    private fun drawChain(budget: Int, wrapping: Boolean = true): ArrayList<Magic> {
+    private fun drawChain(budget: Int, wrapping: Boolean = true,
+                          trace: ((Magic, String) -> Unit)? = null, scope: String = "root"): ArrayList<Magic> {
         var remaining = budget
         var allowWrap = wrapping
         val chain = arrayListOf<Magic>()
@@ -187,7 +189,7 @@ class Wand(var id: String) {
                 allowWrap && discardPile.isNotEmpty() -> discardPile
                 else -> return null
             }
-            return pile.removeFirst().also { hand += it }.clone()
+            return pile.removeFirst().also { hand += it; trace?.invoke(it, scope) }.clone()
         }
         fun shots(cards: List<Magic>): List<Projectile> = cards.flatMap {
             when (it) {
@@ -199,14 +201,14 @@ class Wand(var id: String) {
         fun prepare(card: Magic): Int {
             val action = card as? work.nekow.primalspells.magic.core.DrawAction
             if (action == null) {
-                if (card is TriggerSpell) card.payload += drawChain(card.triggerCast, false)
+                if (card is TriggerSpell) card.payload += drawChain(card.triggerCast, false, trace, if (trace == null) scope else "$scope/hit${hand.size}")
                 return card.cast - 1
             }
             when (action.kind) {
                 work.nekow.primalspells.magic.core.DrawAction.Kind.ALL -> {
                     // 只抽当前剩余牌；耗尽后剩余多重施放预算也不能绕回旧弃牌。
                     allowWrap = false
-                    action.expanded += drawChain(Int.MAX_VALUE, false)
+                    action.expanded += drawChain(Int.MAX_VALUE, false, trace, scope)
                     return -1
                 }
                 work.nekow.primalspells.magic.core.DrawAction.Kind.DIVIDE -> {
@@ -217,10 +219,10 @@ class Wand(var id: String) {
                     return cost
                 }
                 else -> {
-                    val carrier = drawChain(1, false)
+                    val carrier = drawChain(1, false, trace, scope)
                     val targets = shots(carrier)
                     if (targets.isNotEmpty()) {
-                        val payload = drawChain(1, false)
+                        val payload = drawChain(1, false, trace, if (trace == null) scope else "$scope/${action.kind.name.lowercase()}${hand.size}")
                         targets.forEach { it.addedTriggers += work.nekow.primalspells.magic.core.AppendedPayload(
                             action.kind, ArrayList(payload.map(work.nekow.primalspells.magic.core.SpellAssembly::copyCard))) }
                         // Noita追加系列：寻找载体途中经过的普通修正免费，抽牌控制仍付费。
@@ -370,7 +372,24 @@ class Wand(var id: String) {
             WandPreview.Row(it.card.id, it.scope, it.depth, it.kind, it.card.mana,
                 it.card in accounting.accepted, draft.filter { m -> m.scope == it.scope && m.card is Modifier && m.card in accounting.accepted }.map { m -> m.card.id })
         }, copy.status.mana, delay, copy.status.recharge.coerceAtLeast(0.0), reasons,
-            paid.count { it is Projectile })
+            paid.count { it is Projectile }, previewSlots())
+    }
+
+    /** 整副配置分色复用同一抽牌器，仅观察原卡被抽入哪个作用域，不付费、不回洗、不执行效果。 */
+    private fun previewSlots(): List<WandPreview.Slot> {
+        val copy = Wand(id)
+        val sources = java.util.IdentityHashMap<Magic, Int>()
+        magics.forEachIndexed { index, card -> card?.clone()?.let { sources[it] = index; copy.drawPile += it } }
+        val slots = MutableList(maxOf(size, magics.size)) { i -> WandPreview.Slot(magics.getOrNull(i)?.id.orEmpty(), "") }
+        var chain = 0
+        while (copy.drawPile.isNotEmpty()) {
+            copy.drawChain(cast.coerceAtLeast(1), false, { source, scope ->
+                sources[source]?.let { i -> slots[i] = WandPreview.Slot(source.id, scope) }
+            }, "chain${chain++}")
+            // 下一条链只看余下配置，不把此前抽牌再次排回队列。
+            copy.hand.clear()
+        }
+        return slots
     }
 
     /**

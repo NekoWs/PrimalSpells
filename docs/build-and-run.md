@@ -621,3 +621,14 @@ diagnostics.ps1是可独立验证的只读诊断辅助。PowerShell语法解析�
 脚本另以--no-daemon启动独立运行树，避免共用Gradle daemon使超时/崩溃清理漏掉本次游戏；识别Capture日志中的场景、截图、写帧FAILED。build/verify/capture-diagnostics-v2通过正反例与PowerShell语法校验，OSHI普通ERROR及failed=0不误报为致命驱动错误。总体报告仍被既有5条OSHI异常判失败，不过滤异常，不自动重启电脑。
 
 最终悬浮编辑复验foundations 260/260帧、零丢帧、27/27断言通过，证据build/capture/out/foundations，日志build/capture-turn83-editor-verified.log。新增生存光标装卸、真实标题拖动及打开完整预览；完整预览沿用最近服务端结果再刷新，消除节流造成的空白等待。与上述progression 26、exploration 19、spell_chain 76合计148项原生检查通过。独立Gradle启动树已实机验证；诊断夹具另覆盖实际“screenshot FAILED at tick N:”格式。
+
+
+## 第84轮：恢复原编杖与槽位分色（2026-10-10）
+
+执行`gradlew.bat build --console=plain`成功，无Kotlin警告。悬浮窗、专用贴图和相关tooltip遮挡逻辑已删除，生存操作回到原版容器右键，创造物品栏仅保留经过验证的本地光标同步。V键现在直接打开只读分色槽位，不再路由到编辑窗；tooltip自动显示整副配置分组，不需要按V。
+
+最终foundations 260/260帧、零丢帧、42/42原生检查通过，证据`build/capture/out/foundations`，日志`build/capture-turn84-final.log`。覆盖真实注册V键点击、容器V事件和网络回报，创造右键取出/装入，生存滚轮首尾环绕/同步、持卡选槽、右键取出/装入/替换回交，预览后继续编辑，箱子菜单选槽同步及装卸。整副布局检查覆盖独立荷载、重复同名卡、零MP、多次施法剩余链和空槽；不把客户端自拟解析当作权威。
+
+首轮foundations 33/33和spell_chain 76/76均通过，零丢帧，保存于`build/capture/turn84-initial`，日志`build/capture-turn84-initial.log`；随后只为新增创造和箱子操作重跑foundations。最终42＋76共118项原生检查通过，采用260＋400共660帧。人工查看175t预览确认同链底色、荷载异色、选槽细边；之后仅缩短英文帮助句避免文本裁切。第83轮最终悬浮窗证据另存`build/capture/turn83-editor-verified`，属于已撤销方案的历史记录。
+
+全部场景画面/帧数/媒体门禁通过；总体报告仍因既有5条OSHI/Perflib异常失败，未过滤异常、未修改门槛、未自动重启电脑。协议1.3.0增加服务端槽位归属，联机双方需同步更新；存档格式不变。

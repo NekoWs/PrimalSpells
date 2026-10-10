@@ -23,6 +23,8 @@ data class WandPreviewPayload(val wandId: String, val preview: WandPreview? = nu
                     b.writeDouble(r.mana); b.writeBoolean(r.accepted)
                     b.writeVarInt(r.modifiers.size); r.modifiers.forEach { b.writeUtf(it) }
                 }
+                b.writeVarInt(v.slots.size)
+                v.slots.forEach { b.writeUtf(it.id); b.writeUtf(it.scope) }
             }
             override fun decode(b: RegistryFriendlyByteBuf): WandPreviewPayload {
                 val id = b.readUtf(128)
@@ -33,7 +35,8 @@ data class WandPreviewPayload(val wandId: String, val preview: WandPreview? = nu
                 val rows = List(count()) {
                     WandPreview.Row(b.readUtf(), b.readUtf(), b.readVarInt(), b.readUtf(), b.readDouble(), b.readBoolean(), List(count()) { b.readUtf() })
                 }
-                return WandPreviewPayload(id, WandPreview(rows, mana, delay, recharge, reasons, shots))
+                val slots = List(count()) { WandPreview.Slot(b.readUtf(), b.readUtf()) }
+                return WandPreviewPayload(id, WandPreview(rows, mana, delay, recharge, reasons, shots, slots))
             }
         }
     }

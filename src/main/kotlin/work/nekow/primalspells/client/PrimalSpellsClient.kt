@@ -70,22 +70,23 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         bus.addListener<net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent> { event ->
             event.register(work.nekow.primalspells.network.WandPreviewPayload.ID) { payload, _ -> ClientPayloadSink.wandPreview?.invoke(payload) }
         }
-        ClientPayloadSink.wandPreview = { work.nekow.primalspells.client.input.WandEditorOverlay.accept(it); (net.minecraft.client.Minecraft.getInstance().gui.screen() as? work.nekow.primalspells.client.screen.WandPreviewScreen)?.accept(it) }
+        ClientPayloadSink.wandPreview = {
+            work.nekow.primalspells.client.tooltip.WandPreviewCache.accept(it)
+            (net.minecraft.client.Minecraft.getInstance().gui.screen() as? work.nekow.primalspells.client.screen.WandPreviewScreen)?.accept(it)
+        }
         val previewKey = net.minecraft.client.KeyMapping("key.primalspells.preview", org.lwjgl.glfw.GLFW.GLFW_KEY_V, hudCategory)
         bus.addListener<net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent> { it.register(previewKey) }
         fun openPreview() {
             val mc = net.minecraft.client.Minecraft.getInstance()
             val player = mc.player ?: return
             val screen = mc.gui.screen()
-            if (screen is net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*> && screen.hoveredSlot?.item?.item is work.nekow.primalspells.item.WandItem) {
-                work.nekow.primalspells.client.input.WandEditorOverlay.open(screen, screen.hoveredSlot!!); return
-            }
             val stack = if (screen is net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>) {
                 val x = mc.mouseHandler.xpos() * mc.window.guiScaledWidth / mc.window.screenWidth
                 val y = mc.mouseHandler.ypos() * mc.window.guiScaledHeight / mc.window.screenHeight
-                screen.menu.slots.firstOrNull { it.isActive && x >= screen.getLeftPos() + it.x && x < screen.getLeftPos() + it.x + 18 && y >= screen.getTopPos() + it.y && y < screen.getTopPos() + it.y + 18 }?.item
-                    ?: player.mainHandItem
-            } else player.mainHandItem
+                screen.hoveredSlot?.item?.takeIf { it.item is work.nekow.primalspells.item.WandItem }
+                    ?: screen.menu.slots.firstOrNull { it.isActive && x >= screen.getLeftPos() + it.x && x < screen.getLeftPos() + it.x + 18 && y >= screen.getTopPos() + it.y && y < screen.getTopPos() + it.y + 18 }?.item?.takeIf { it.item is work.nekow.primalspells.item.WandItem }
+                    ?: player.mainHandItem.takeIf { it.item is work.nekow.primalspells.item.WandItem } ?: player.offhandItem
+            } else player.mainHandItem.takeIf { it.item is work.nekow.primalspells.item.WandItem } ?: player.offhandItem
             val id = stack.get(ModItems.WAND_ID)?.wandId ?: return
             mc.gui.setScreen(work.nekow.primalspells.client.screen.WandPreviewScreen(id, screen))
         }
@@ -124,14 +125,14 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
 
         // 3. 纯客户端事件与功能注册
         ScreenShakeClient.install()
-        NeoForge.EVENT_BUS.register(work.nekow.primalspells.client.input.WandEditorOverlay)
+        NeoForge.EVENT_BUS.register(work.nekow.primalspells.client.input.CreativeWandEditHandler)
         NeoForge.EVENT_BUS.register(ClientTooltipHandler)
         NeoForge.EVENT_BUS.register(ClientContainerDragHandler)
         NeoForge.EVENT_BUS.register(SpellSlotScrollHandler)
 
         NeoForge.EVENT_BUS.addListener<ClientPlayerNetworkEvent.LoggingOut> {
             // 4. 清理只增不减的客户端缓存
-            work.nekow.primalspells.client.input.WandEditorOverlay.clear()
+            work.nekow.primalspells.client.tooltip.WandPreviewCache.clear()
             WandHudRenderer.clear()
             WandModelProperty.clear()
             ScreenShakeClient.clear()

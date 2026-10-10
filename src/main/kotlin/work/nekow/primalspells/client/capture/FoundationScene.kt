@@ -15,6 +15,7 @@ object FoundationScene {
         var floor = 0
         var id = ""
         var wand: Wand? = null
+        var chest: net.minecraft.world.SimpleContainer? = null
         fun record(t: Int, name: String, ok: Boolean, detail: String) { checks.getOrPut(t) { arrayListOf() }.add(Check("foundations", t, name, ok, detail)) }
         return Scene("foundations", "法术链预览 / 服务端真实解析", 24, 260, showHud = true, allowScreen = true,
             prepare = { ctx -> floor = ctx.floorBlockY(0, 0); ctx.buildStudio(0, 0, floor); ctx.setup(false, 0.0, floor + 2.0, -7.0, 0f, 5f); ctx.command("gamemode creative @a") },
@@ -31,6 +32,10 @@ object FoundationScene {
                     val before = requireNotNull(wand).saveTag().toString()
                     val p = requireNotNull(wand).preview()
                     record(t, "preview-is-read-only", before == requireNotNull(wand).saveTag().toString(), before)
+                    record(t, "layout-isolates-payload-and-empty-slots", p.slots[0].scope == p.slots[1].scope && p.slots[1].scope != p.slots[2].scope && p.slots[2].scope == p.slots[3].scope && p.slots.drop(4).all { it.scope.isEmpty() }, p.slots.toString())
+                    val all = Wand("layout-all"); all.magics += listOf("fireball", "fireball", "trigger_fireball", "fireball", "fireball").map { MagicManager.create(it)!! }; all.load(); all.status.mana = 0.0
+                    val scopes = all.preview().slots.take(5).map { it.scope }
+                    record(t, "layout-covers-all-casts-with-duplicate-cards-and-zero-mana", scopes.toSet().size == 5 && scopes[3].startsWith(scopes[2] + "/"), scopes.toString())
                     val carrier = p.rows.first { it.id == "trigger_fireball" }
                     val saw = p.rows.first { it.id == "chainsaw" }
                     record(t, "payload-scope-is-isolated", "omnidirectional_scatter" !in carrier.modifiers && "omnidirectional_scatter" in saw.modifiers && saw.scope != carrier.scope, p.toString())
@@ -44,81 +49,89 @@ object FoundationScene {
                     val poor = Wand("poor"); poor.mana = 1.0; poor.status.mana = 1.0; poor.magics += MagicManager.create("concentrated_light")!!; poor.load()
                     record(t, "preview-reports-insufficient-mana", poor.preview().shots == 0 && poor.preview().reasons.any { it.startsWith("Mana") }, poor.preview().toString())
                 }
+                if (t == 53) record(t, "creative-right-click-removes-card", requireNotNull(wand).magics[0] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), ctx.player.containerMenu.carried.toString())
+                if (t == 60) record(t, "creative-right-click-inserts-card", requireNotNull(wand).magics[0]?.id == "double_cast" && ctx.player.containerMenu.carried.isEmpty, ctx.player.containerMenu.carried.toString())
                 if (t == 65) {
                     val w = requireNotNull(wand); val plan = w.preview()
                     record(t, "real-cast-started", w.spell(ctx.player), "mana=${w.status.mana}")
                     record(t, "preview-matches-real-fees-cooldowns", kotlin.math.abs(w.status.mana - plan.manaAfter) < 1e-6 && w.status.delay == plan.delay && w.status.recharge == plan.recharge,
                         "real=${w.status.mana}/${w.status.delay}/${w.status.recharge}; preview=$plan")
                 }
-                if (t == 90) record(t, "floating-remove-to-cursor", requireNotNull(wand).magics[0] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), "cursor=${ctx.player.containerMenu.carried}")
-                if (t == 100) {
-                    record(t, "floating-insert-in-empty-slot", requireNotNull(wand).magics[4]?.id == "double_cast" && ctx.player.containerMenu.carried.isEmpty, "cards=${requireNotNull(wand).magics.map { it?.id }}")
-
+                if (t == 80) {
+                    ctx.command("gamemode survival @a")
+                    ctx.player.inventory.setItem(9, ItemStack(ModItems.spellItem("speed_boost")!!))
+                    ctx.player.containerMenu.broadcastFullState()
                 }
-                if (t == 110) record(t, "creative-invalid-stack-is-rejected", requireNotNull(wand).magics[5] == null && ctx.player.containerMenu.carried.isEmpty, "cursor=${ctx.player.containerMenu.carried}")
-                if (t == 120) record(t, "floating-swap-keeps-old-card", requireNotNull(wand).magics[4]?.id == "speed_boost" && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), "cursor=${ctx.player.containerMenu.carried}")
-                if (t == 135) record(t, "forged-id-cannot-edit", requireNotNull(wand).magics[6] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), "slot6=${requireNotNull(wand).magics[6]}")
-                if (t == 160) { ctx.player.containerMenu.carried = ItemStack.EMPTY; ctx.player.containerMenu.broadcastFullState(); ctx.command("gamemode survival @a") }
-                if (t == 190) record(t, "survival-remove-is-server-authoritative", requireNotNull(wand).magics[4] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("speed_boost"), ctx.player.containerMenu.carried.toString())
-                if (t == 205) record(t, "survival-insert-consumes-cursor", requireNotNull(wand).magics[6]?.id == "speed_boost" && ctx.player.containerMenu.carried.isEmpty, ctx.player.containerMenu.carried.toString())
-                if (t == 225) { ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY); MagicManager.projectiles.forEach { it.alive = false } }
+                if (t == 95) record(t, "wheel-wraps-to-last-slot", ctx.player.mainHandItem.get(ModItems.WAND_SELECTED_SLOT) == 17, ctx.player.mainHandItem.toString())
+                if (t == 102) record(t, "wheel-selection-reaches-server", ctx.player.mainHandItem.get(ModItems.WAND_SELECTED_SLOT) == 0, ctx.player.mainHandItem.toString())
+                if (t == 110) record(t, "vanilla-right-click-removes-card", requireNotNull(wand).magics[0] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), ctx.player.containerMenu.carried.toString())
+                if (t == 120) record(t, "wheel-works-with-carried-card", ctx.player.mainHandItem.get(ModItems.WAND_SELECTED_SLOT) == 4, ctx.player.mainHandItem.toString())
+                if (t == 130) record(t, "vanilla-right-click-inserts-card", requireNotNull(wand).magics[4]?.id == "double_cast" && ctx.player.containerMenu.carried.isEmpty, ctx.player.containerMenu.carried.toString())
+                if (t == 150) record(t, "vanilla-right-click-swap-keeps-old-card", requireNotNull(wand).magics[4]?.id == "speed_boost" && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), ctx.player.containerMenu.carried.toString())
+                if (t == 160) record(t, "vanilla-inventory-receives-returned-card", ctx.player.inventory.getItem(9).item == ModItems.spellItem("double_cast") && ctx.player.containerMenu.carried.isEmpty, ctx.player.inventory.getItem(9).toString())
+                if (t == 195) record(t, "editing-still-works-after-preview", requireNotNull(wand).magics[4] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("speed_boost"), ctx.player.containerMenu.carried.toString())
+                if (t == 210) record(t, "roundtrip-preserves-card-count", requireNotNull(wand).magics[4]?.id == "speed_boost" && ctx.player.containerMenu.carried.isEmpty && ctx.player.inventory.getItem(9).item == ModItems.spellItem("double_cast"), requireNotNull(wand).magics.map { it?.id }.toString())
+                if (t == 213) {
+                    val box = net.minecraft.world.SimpleContainer(27); chest = box
+                    box.setItem(0, ctx.player.mainHandItem); ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY)
+                    ctx.player.openMenu(net.minecraft.world.SimpleMenuProvider({ menuId, inventory, _ -> net.minecraft.world.inventory.ChestMenu.threeRows(menuId, inventory, box) }, net.minecraft.network.chat.Component.literal("Wand editing test")))
+                }
+                if (t == 220) record(t, "chest-wheel-selection-reaches-server", chest!!.getItem(0).get(ModItems.WAND_SELECTED_SLOT) == 5, chest.getItem(0).toString())
+                if (t == 230) record(t, "chest-vanilla-right-click-removes-card", requireNotNull(wand).magics[4] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("speed_boost"), ctx.player.containerMenu.carried.toString())
+                if (t == 240) record(t, "chest-vanilla-right-click-inserts-card", requireNotNull(wand).magics[4]?.id == "speed_boost" && ctx.player.containerMenu.carried.isEmpty, ctx.player.containerMenu.carried.toString())
+                if (t == 250) { chest?.setItem(0, ItemStack.EMPTY); ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY); ctx.player.inventory.setItem(9, ItemStack.EMPTY); MagicManager.projectiles.forEach { it.alive = false } }
             },
             clientTick = { mc, t ->
-                if (t == 20) mc.gui.setScreen(WandPreviewScreen(id, null))
-                if (t == 35) record(t, "real-network-preview-received", (mc.gui.screen() as? WandPreviewScreen)?.preview?.rows?.isNotEmpty() == true, "screen=${mc.gui.screen()}")
-                if (t == 55) mc.gui.setScreen(null)
-                if (t == 80) mc.gui.setScreen(net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!))
-                if (t == 83) {
-                    val screen = mc.gui.screen() as net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>
-                    val slot = screen.menu.slots.first { it.item.get(ModItems.WAND_ID)?.wandId == id }
-                    work.nekow.primalspells.client.input.WandEditorOverlay.open(screen, slot)
-                }
-                if (t == 102) {
-                    // 散卡上限1；伪造数量3必须被拒绝，不能借创造光标通道绕过物品限制。
-                    mc.player!!.containerMenu.carried = ItemStack(ModItems.spellItem("speed_boost")!!, 3)
-                }
-                if (t == 112) mc.player!!.containerMenu.carried = ItemStack(ModItems.spellItem("speed_boost")!!)
-                if (t in listOf(86, 96, 105, 115, 180, 195)) {
-                    val overlay = work.nekow.primalspells.client.input.WandEditorOverlay
-                    val target = when(t) { 86 -> 0; 96 -> 4; 105 -> 5; 195 -> 6; else -> 4 }
-                    val screen = mc.gui.screen()!!
-                    val mouse = net.minecraft.client.input.MouseButtonEvent((overlay.x + 10 + target * 18).toDouble(), (overlay.y + 26).toDouble(), net.minecraft.client.input.MouseButtonInfo(0, 0))
+                fun inventory() = mc.gui.screen() as net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>
+                fun wandSlot() = inventory().menu.slots.first { it.item.get(ModItems.WAND_ID)?.wandId == id }
+                fun click(slot: net.minecraft.world.inventory.Slot, button: Int) {
+                    val screen = inventory()
+                    val mouse = net.minecraft.client.input.MouseButtonEvent((screen.getLeftPos() + slot.x + 8).toDouble(),
+                        (screen.getTopPos() + slot.y + 8).toDouble(), net.minecraft.client.input.MouseButtonInfo(button, 0))
                     val event = net.neoforged.neoforge.client.event.ScreenEvent.MouseButtonPressed.Pre(screen, mouse, false)
                     net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event)
-                    record(t, "real-overlay-click-$t", event.isCanceled, "cancelled=${event.isCanceled}; cursor=${mc.player!!.containerMenu.carried}; view=${(screen as net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>).menu.carried}")
+                    val creative = screen is net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen && button == 1
+                    record(t, "right-click-route-$t", event.isCanceled == creative, "creative=$creative; cancelled=${event.isCanceled}")
+                    if (!event.isCanceled) { screen.mouseClicked(mouse, false); screen.mouseReleased(mouse) }
                 }
-                if (t == 125) {
-                    val screen = mc.gui.screen() as net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>
-                    val slot = screen.menu.slots.first { it.item.get(ModItems.WAND_ID)?.wandId == id }
-                    net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(work.nekow.primalspells.network.EditWandPayload(screen.menu.containerId, slot.index, "forged", 6))
+                fun wheel(delta: Double) {
+                    val screen = inventory(); val slot = wandSlot()
+                    net.minecraft.client.gui.screens.inventory.AbstractContainerScreen::class.java.getDeclaredField("hoveredSlot").apply { isAccessible = true }.set(screen, slot)
+                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(net.neoforged.neoforge.client.event.ScreenEvent.MouseScrolled.Pre(screen,
+                        (screen.getLeftPos() + slot.x + 8).toDouble(), (screen.getTopPos() + slot.y + 8).toDouble(), 0.0, delta))
                 }
-                if (t == 145) {
-                    val overlay = work.nekow.primalspells.client.input.WandEditorOverlay
-                    val event = net.neoforged.neoforge.client.event.ScreenEvent.MouseButtonPressed.Pre(mc.gui.screen()!!,
-                        net.minecraft.client.input.MouseButtonEvent((overlay.x + 20).toDouble(), (overlay.y + 67).toDouble(), net.minecraft.client.input.MouseButtonInfo(0, 0)), false)
-                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event)
+                if (t == 20) net.minecraft.client.KeyMapping.click(com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(org.lwjgl.glfw.GLFW.GLFW_KEY_V))
+                if (t == 35) record(t, "world-v-opens-real-network-preview", (mc.gui.screen() as? WandPreviewScreen)?.preview?.rows?.isNotEmpty() == true, "screen=${mc.gui.screen()}")
+                if (t == 40 || t == 61) mc.gui.setScreen(null)
+                if (t == 45) mc.gui.setScreen(net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!))
+                if (t == 85) mc.gui.setScreen(net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!))
+                if (t == 90) wheel(1.0)
+                if (t == 97) wheel(-1.0)
+                if (t in listOf(48, 55, 105, 125, 145, 185, 200, 225, 235)) click(wandSlot(), 1)
+                if (t == 115) repeat(4) { wheel(-1.0) }
+                if (t == 135 || t == 155) click(inventory().menu.slots.first { it.container === mc.player!!.inventory && it.slotIndex == 9 }, 0)
+                if (t == 165) {
+                    val screen = inventory(); net.minecraft.client.gui.screens.inventory.AbstractContainerScreen::class.java.getDeclaredField("hoveredSlot").apply { isAccessible = true }.set(screen, wandSlot())
+                    val key = net.neoforged.neoforge.client.event.ScreenEvent.KeyPressed.Pre(screen, net.minecraft.client.input.KeyEvent(org.lwjgl.glfw.GLFW.GLFW_KEY_V, 0, 0))
+                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(key)
+                    record(t, "inventory-v-opens-preview", key.isCanceled && mc.gui.screen() is WandPreviewScreen, "screen=${mc.gui.screen()}")
                 }
-                if (t == 150) {
-                    val screen = mc.gui.screen() as? WandPreviewScreen
-                    record(t, "editor-opens-complete-preview", screen?.preview?.rows?.isNotEmpty() == true, "screen=$screen")
-                    screen?.onClose()
-                }
-                if (t == 155 || t == 220) mc.gui.setScreen(null)
-                if (t == 170) mc.gui.setScreen(net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!))
                 if (t == 175) {
-                    val screen = mc.gui.screen() as net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>
-                    work.nekow.primalspells.client.input.WandEditorOverlay.open(screen, screen.menu.slots.first { it.item.get(ModItems.WAND_ID)?.wandId == id })
+                    val screen = mc.gui.screen() as? WandPreviewScreen
+                    record(t, "inventory-preview-uses-edited-recipe", screen?.preview?.slots?.getOrNull(4)?.id == "speed_boost", screen?.preview.toString())
                 }
-                if (t == 210) {
-                    val overlay = work.nekow.primalspells.client.input.WandEditorOverlay
-                    val screen = mc.gui.screen()!!; val oldX = overlay.x; val oldY = overlay.y
-                    fun mouse(x: Int, y: Int) = net.minecraft.client.input.MouseButtonEvent(x.toDouble(), y.toDouble(), net.minecraft.client.input.MouseButtonInfo(0, 0))
-                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(net.neoforged.neoforge.client.event.ScreenEvent.MouseButtonPressed.Pre(screen, mouse(oldX + 20, oldY + 8), false))
-                    val moved = net.neoforged.neoforge.client.event.ScreenEvent.MouseDragged.Pre(screen, mouse(oldX, oldY + 16), -20.0, 8.0)
-                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(moved)
-                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(net.neoforged.neoforge.client.event.ScreenEvent.MouseButtonReleased.Pre(screen, mouse(oldX, oldY + 16)))
-                    record(t, "real-title-drag-moves-window", moved.isCanceled && overlay.x == oldX - 20 && overlay.y == oldY + 8, "${overlay.x},${overlay.y}")
+                if (t == 180) (mc.gui.screen() as? WandPreviewScreen)?.onClose()
+                if (t == 201) {
+                    val stack = wandSlot().item
+                    work.nekow.primalspells.client.tooltip.WandPreviewCache.slots(id, stack.get(ModItems.WAND_SPELLS).orEmpty())
                 }
+                if (t == 215) {
+                    val slots = work.nekow.primalspells.client.tooltip.WandPreviewCache.slots(id, wandSlot().item.get(ModItems.WAND_SPELLS).orEmpty())
+                    record(t, "tooltip-receives-complete-slot-colors", slots.size == 18 && slots[1].scope != slots[2].scope && slots[2].scope == slots[3].scope && slots[5].scope.isEmpty(), slots.toString())
+                }
+                if (t == 216) wheel(-1.0)
+                if (t == 221) wheel(1.0)
+                if (t == 245) mc.player!!.closeContainer()
             },
             checksAt = { _, t -> checks[t]?.toList().orEmpty() }, finish = { ctx -> ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY) })
     }

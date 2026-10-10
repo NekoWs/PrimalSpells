@@ -15,14 +15,13 @@ import work.nekow.primalspells.mixin.AbstractContainerScreenInvokerMixin
  * 默认（不按 Ctrl）完全保持原版交互，互不干扰。
  *
  * 交互通过原版 slotClicked(PICKUP) 协议实现，与服务端完全同步：
- * - 按下（Ctrl 按下、容器槽位、非浮窗区域、无携带、非 Shift、非双击、非工作台）：
+ * - 按下（Ctrl 按下、容器槽位、无携带、非 Shift、非双击、非工作台）：
  *   PICKUP 拾起并取消原版按下（阻止原版 clickedSlot/skipNextRelease 内部状态干扰）
  * - 释放：
  *   * 同一槽位（单击）→ 不取消，物品保留在光标 = 原版"单击拾起"语义
  *   * 其他空槽 → 单次 PICKUP（移动）
  *   * 其他有物品槽 → 两步 PICKUP 实现真正互换（双方都留在槽位，光标清空）
  *   * 空白 → PICKUP 放回原槽
- *   * 浮窗区域 → 不接管，由悬浮窗（tryAddFromCarried）消费光标物品
  * - 工作台（CraftingScreen）：整体禁用（与快速填充/双击合成等原版交互冲突）
  */
 object ClientContainerDragHandler {

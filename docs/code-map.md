@@ -2,7 +2,7 @@
 
 第83轮整合：`integration/{PackRules,SpellApi,SpellEvents}.kt`为资源重载/公共入口/事件；`entity/MageSchool.kt`为流派与战术；`item/SpellCompassItem.kt`为真实结构定位；`magic/projectile/immobile/{UtilityPulse,SurveyPulse,ItemPull,FeatherWard}.kt`为生活法术。`client/capture/ProgressionScene.kt`验证事件权限、拾取、合成/定位、精英和真实数据包热重载。
 
-第83轮：`wand/WandPreview.kt`为只读抽牌结果，`Wand.preview()`复用真实解析；`client/input/WandEditorOverlay.kt`为原容器悬浮编杖，`client/screen/WandPreviewScreen.kt`为完整预览；`network/{WandPreviewPayload,EditWandPayload}.kt`承载服务端预览及已验证菜单编辑，`client/capture/FoundationScene.kt`验证实际网络/装卸。贴图路径与交互见[设计](design/spell-preview.md)。
+第84轮：`wand/WandPreview.kt`/`Wand.preview()`给出真实抽牌预览与整副槽位归属；`client/tooltip/{WandSpellTooltip,WandPreviewCache}.kt`显示链底色，`client/screen/WandPreviewScreen.kt`为V键只读槽位预览；`client/input/CreativeWandEditHandler.kt`仅转交创造模式原右键装卸。悬浮窗及专用GUI资源已移除，生存编杖走原版协议；网络保留WandPreviewPayload、创造专用EditWandPayload及原SelectSpellSlotPayload。交互见[设计](design/spell-preview.md)。
 
 > 用途：**知道要改什么，但不知道文件在哪**。结构规则见 [conventions.md](conventions.md)，运行机制见 [architecture.md](architecture.md)。
 > 路径均相对 `src/main/kotlin/work/nekow/primalspells/`（Java mixin 在 `src/main/java/…`）。

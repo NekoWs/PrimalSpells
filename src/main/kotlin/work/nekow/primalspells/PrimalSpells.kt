@@ -73,7 +73,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
-            val registrar = event.registrar("1.2.0")
+            val registrar = event.registrar("1.3.0")
 
             // S→C：交给客户端安装的处理器（服务端上为 null）
             registrar.playToClient(
@@ -118,6 +118,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
             registrar.playToServer(work.nekow.primalspells.network.EditWandPayload.ID,
                 work.nekow.primalspells.network.EditWandPayload.STREAM_CODEC) { payload, context ->
                 val player = context.player() as? ServerPlayer ?: return@playToServer
+                if (!player.isCreative || payload.creativeCount < 0) return@playToServer
                 val menu = player.containerMenu
                 if (menu.containerId != payload.menuId) return@playToServer
                 val slot = menu.slots.getOrNull(payload.slot) ?: return@playToServer
@@ -126,7 +127,7 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 if (!slot.mayPickup(player) || stack.get(ModItems.WAND_ID)?.wandId != payload.wandId) return@playToServer
                 val wand = WandItem.getWand(stack) ?: return@playToServer
                 if (payload.spellSlot !in 0 until maxOf(wand.size, wand.magics.size)) return@playToServer
-                // 创造物品栏的光标按原版规则由客户端管理；只允许已注册散卡，生存不接受此通路。
+                // 创造物品栏右键编辑仍需同步本地光标；只允许已注册散卡，生存不接受此通路。
                 if (payload.creativeCount >= 0) {
                     if (!player.isCreative) return@playToServer
                     if (payload.creativeCount == 0 && payload.creativeSpell.isEmpty()) menu.carried = net.minecraft.world.item.ItemStack.EMPTY
@@ -156,23 +157,19 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
                 SelectSpellSlotPayload.STREAM_CODEC
             ) { payload, context ->
                 val player = context.player() as? ServerPlayer ?: return@playToServer
-                val inv = player.inventory
-                for (i in 0 until inv.containerSize) {
-                    val stack = inv.getItem(i)
-                    val matched = if (payload.pouch) {
-                        stack.item is SpellPouchItem && SpellPouchItem.getPouchId(stack) == payload.targetId
-                    } else {
-                        stack.item is WandItem && stack.get(ModItems.WAND_ID)?.wandId == payload.targetId
-                    }
-                    if (matched) {
-                        if (payload.pouch) {
-                            stack.set(ModItems.POUCH_SELECTED_SLOT.get(), payload.slot)
-                        } else {
-                            stack.set(ModItems.WAND_SELECTED_SLOT.get(), payload.slot)
-                        }
-                        break
-                    }
+                fun matches(stack: net.minecraft.world.item.ItemStack) = if (payload.pouch) {
+                    stack.item is SpellPouchItem && SpellPouchItem.getPouchId(stack) == payload.targetId
+                } else {
+                    stack.item is WandItem && stack.get(ModItems.WAND_ID)?.wandId == payload.targetId
                 }
+                // 法杖也可在当前箱子里；只搜玩家可拾取的真实槽位与本人背包。
+                val stack = player.containerMenu.slots.firstOrNull { it.mayPickup(player) && matches(it.item) }?.item
+                    ?: (0 until player.inventory.containerSize).firstNotNullOfOrNull { player.inventory.getItem(it).takeIf(::matches) }
+                    ?: return@playToServer
+                val size = if (payload.pouch) SpellPouchItem.SLOT_COUNT else WandItem.getWandData(stack)?.second?.size ?: return@playToServer
+                if (payload.slot !in 0 until size) return@playToServer
+                stack.set(if (payload.pouch) ModItems.POUCH_SELECTED_SLOT.get() else ModItems.WAND_SELECTED_SLOT.get(), payload.slot)
+                player.containerMenu.broadcastChanges()
             }
         }
     }

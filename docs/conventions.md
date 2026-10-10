@@ -388,3 +388,8 @@ HUD状态/绘制/配置放`client/hud/{WandHudRenderer,WandHudPainter,HudLayout}
 新增`integration/`公共服务端领域，放`PackRules.kt`（原子资源重载）、`SpellApi.kt`（v1施法入口）、`SpellEvents.kt`（NeoForge事件）。注册仍只在PrimalSpells/registry；不向公共包引用client。敌人流派/战术放`entity/MageSchool.kt`，罗盘放`item/SpellCompassItem.kt`。生活法术放`magic/projectile/immobile/{UtilityPulse,SurveyPulse,ItemPull,FeatherWard}.kt`；同名文件承载同名类。`client/capture/ProgressionScene.kt`只在显式开发录制加载。
 
 数据资源放`data/<namespace>/primalspells/{loot_profiles,wand_tiers}`，目录层级含命名空间与资源前缀。例包放docs/examples/exploration-pack，设计与兼容契约见design/pack-integration、design/world-utility。SpellLootProfile从枚举改为数据类，旧六个访问名与byKey保留；无其他类迁移，不改法术/法杖/伤害ID与NBT键。
+
+
+## 第84轮编杖回退落位
+
+删除client/input/WandEditorOverlay.kt及textures/gui/sprites/wand_editor资源，不迁移窗口。原输入SpellSlotScrollHandler、ClientContainerDragHandler和WandItem装卸继续使用；新增client/input/CreativeWandEditHandler.kt仅接创造物品栏原右键，新增client/tooltip/WandPreviewCache.kt缓存最近悬停的服务端分色结果。WandPreviewScreen保留独立只读入口并简化为槽位分色；EditWandPayload仅用于创造光标同步，生存走原版协议。协议1.3.0增加WandPreview.Slot，不变更存档。第83轮落位记录中的悬浮窗已失效，以本节为准。

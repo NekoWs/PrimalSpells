@@ -9,6 +9,7 @@ import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.entity.TestDummyEntity
@@ -77,7 +78,7 @@ object SpellExpansionScenes {
                 }
                 if (t == 40) {
                     val p = MagicManager.projectiles.first { it.id == "dormant_crystal" && it.caster === ctx.player }
-                    Explosion.customExplode(ctx.player, org.joml.Vector3f(p.status.pos), 1.0f, 0.0)
+                    Explosion.customExplode(ctx.player, Vector3d(p.status.pos), 1.0f, 0.0)
                 }
                 if (t == 70) cast(ctx, listOf("crystal_detonation"), 0.0, y, -2.0)
                 if (t == 95) MagicManager.projectiles.forEach { it.alive = false }

@@ -14,6 +14,8 @@ import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.TriggerSpell
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.util.toPosition
 
 class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
@@ -307,8 +309,8 @@ class Wand(var id: String) {
             work.nekow.primalspells.magic.core.SpellAssembly.apply(p, modifiers)
             p.caster = caster
             p.wand = this
-            p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toVector3f()
-            p.velocity = WandAim.direction(caster, net.minecraft.world.phys.Vec3(p.position)).toVector3f()
+            p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toPosition()
+            p.velocity = WandAim.direction(caster, p.position.toVec3()).toVector3f()
             p.castFromWand = true
             p.spell()
             p.queueCastRecoil()

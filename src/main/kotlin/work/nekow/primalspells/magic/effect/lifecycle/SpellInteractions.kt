@@ -58,9 +58,10 @@ object SpellInteractions {
         }
     }
     private fun touches(shot: Projectile, center: Vec3, radius: Double): Boolean {
-        val p = point(shot)
-        val v = Vec3(shot.status.velocity.x.toDouble(), shot.status.velocity.y.toDouble(), shot.status.velocity.z.toDouble())
-        return segmentDistance(center, p.subtract(v), p) <= radius
+        // 反射后的速度不能反推旧路径；否则墙外没经过的水晶会被凭空激活。
+        val path = shot.flightPath
+        return if (path.size < 2) point(shot).distanceTo(center) <= radius
+            else path.zipWithNext().any { (from, to) -> segmentDistance(center, from, to) <= radius }
     }
     private fun segmentDistance(p: Vec3, a: Vec3, b: Vec3): Double {
         val d = b.subtract(a)

@@ -1,12 +1,14 @@
 package work.nekow.primalspells.magic.projectile
 
 import net.minecraft.world.entity.Entity
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.effect.geometry.Move
 import work.nekow.primalspells.magic.effect.geometry.Position
 import work.nekow.primalspells.magic.effect.visual.Trajectory
 import work.nekow.primalspells.magic.effect.geometry.Velocity
+import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.util.HitResult
 import work.nekow.primalspells.util.HitType
 import work.nekow.primalspells.util.Lore
@@ -111,7 +113,7 @@ abstract class Projectile: Magic() {
     var maxHitTargets: Int = 1
     var bounceScaler: Vector3f = Vector3f(0.9f, 0.9f, 0.9f)
 
-    lateinit var position: Vector3f
+    lateinit var position: Vector3d
     lateinit var velocity: Vector3f
     var dragCoeff: Float = 0.005f
     var speed: Float = 1f
@@ -169,11 +171,11 @@ abstract class Projectile: Magic() {
         val level = entity.level() as? net.minecraft.server.level.ServerLevel
         if (!(damageType == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && status.damage > 0) && entity is net.minecraft.world.entity.LivingEntity && level != null &&
             work.nekow.primalspells.magic.core.ShieldGuard.absorbProjectile(level, entity, this)) return true
-        val offset = Vector3f(status.pos).sub(entity.position().toVector3f())
+        val offset = status.pos.toVec3().subtract(entity.boundingBox.center).toVector3f()
         val direction = currentDirection()
         val impactNormal = if (offset.lengthSquared() > 1e-8f) offset.normalize() else Vector3f(direction).negate()
         val rebound = direction.reflect(impactNormal)
-        val result = HitResult(HitType.ENTITY, Vector3f(status.pos), rebound, entity)
+        val result = HitResult(HitType.ENTITY, Vector3d(status.pos), rebound, entity)
 
         status.hitTargets++
         if (maxHitTargets > 0 && status.hitTargets >= maxHitTargets) {
@@ -187,24 +189,26 @@ abstract class Projectile: Magic() {
         return false
     }
 
-    fun hitBlock(pos: Vector3f, faceNormal: Vector3f) {
-        val rebound = currentDirection().reflect(faceNormal)
-        val castPos = Vector3f(faceNormal).mul(0.01f).add(pos)
+    /** 墙角同时进入的轴分别反向，不能用平均法线交换不等长的速度分量。 */
+    fun hitBlock(pos: Vector3d, faceNormal: Vector3f, reflectionAxes: Int = 0) {
+        fun reflect(vector: Vector3f): Vector3f {
+            if (reflectionAxes == 0) return vector.reflect(faceNormal)
+            if (reflectionAxes and 1 != 0 && vector.x * faceNormal.x < 0) vector.x = -vector.x
+            if (reflectionAxes and 2 != 0 && vector.y * faceNormal.y < 0) vector.y = -vector.y
+            if (reflectionAxes and 4 != 0 && vector.z * faceNormal.z < 0) vector.z = -vector.z
+            return vector
+        }
+        val rebound = reflect(currentDirection())
+        val castPos = Vector3d(pos).add(
+            faceNormal.x * work.nekow.primalspells.magic.effect.geometry.SweptCollision.SEPARATION,
+            faceNormal.y * work.nekow.primalspells.magic.effect.geometry.SweptCollision.SEPARATION,
+            faceNormal.z * work.nekow.primalspells.magic.effect.geometry.SweptCollision.SEPARATION)
         val result = HitResult(HitType.BLOCK, castPos, rebound)
-
         if (status.bounces > 0) {
             status.bounces--
-            val speed = status.velocity.length()
-            status.velocity
-                .normalize()
-                .reflect(faceNormal)
-                .mul(speed)
-                .mul(bounceScaler.x, bounceScaler.y, bounceScaler.z)
-            status.pos = castPos
-        } else {
-            alive = false
-        }
-
+            reflect(status.velocity).mul(bounceScaler)
+            status.pos.set(castPos)
+        } else alive = false
         effects.forEach { it.onHitBlock(pos) }
         effects.forEach { it.onHit(result) }
         onHitBlock(pos)
@@ -212,7 +216,7 @@ abstract class Projectile: Magic() {
     }
 
     open fun onHitEntity(entity: Entity) { }
-    open fun onHitBlock(pos: Vector3f) { }
+    open fun onHitBlock(pos: Vector3d) { }
     open fun onHit(result: HitResult) { }
 
     override fun onSpell() { }

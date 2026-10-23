@@ -11,14 +11,13 @@
 | 原容器编杖/小包 | `item/{WandItem,SpellPouchItem}.kt`、`client/input/{SpellSlotScrollHandler,ClientContainerDragHandler,CreativeWandEditHandler}.kt` |
 | 法杖创建/保存/持有者 | `wand/{WandTier,WandManager,WandSavedData}.kt`，WandStats定义在WandTier.kt |
 | 法术注册 | `magic/core/MagicManager.kt`；物品由 `registry/ModItems.kt` 自动创建 |
-| 运动、反弹、追踪 | `magic/effect/geometry/{Move,Tracking,Bounce,ConstantAcceleration}.kt` |
+| 运动、反弹、追踪 | `magic/effect/geometry/{Move,SweptCollision,Tracking,Bounce,ConstantAcceleration}.kt` |
 | 命中/伤害/击退/冻结 | `magic/effect/lifecycle/{SpellDamage,SpellImpact,DirectDamage,FrozenStatus}.kt` |
 | 护盾判定/反射点 | `magic/core/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
 | 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |
 | 爆炸与跨投射物联动 | `magic/effect/lifecycle/{Explosion,ExplosionFx,SpellInteractions,SpellResonance,CrystalReaction}.kt` |
 | 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，高速光脊按实际里程采样，不改写命中轨迹 |
 | 普通尾迹/特殊弹本体 | `magic/effect/visual/`；通用造型 `PixelVfx.kt` |
-| 被动瞄准 | `magic/modifier/Aim.kt`、`magic/effect/visual/AimingFx.kt`、`wand/WandAim.kt`；原版轮廓接入 `client/render/AimHighlights.kt` 与 `AimHighlightMixin` |
 | 持杖三角形/宝石出生点 | `magic/effect/visual/WandCastingFx.kt`、`wand/WandAim.kt` |
 | 模型/姿势/施法余光 | `client/render/{WandModelProperty,WandHandPose,WandArmPose}.kt`、`tools/wands/generate_models.py` |
 | HUD/布局/反馈 | `client/hud/`、`client/screen/HudEditorScreen.kt`、`network/HudImpactPayload.kt` |
@@ -29,6 +28,7 @@
 | 数据重载/API/事件 | `integration/{PackRules,SpellApi,SpellEvents}.kt` |
 | PD管理器/共享spawn | `util/PdParticles.kt`；PD能力问题只记台账 |
 | 录制/诊断 | `client/capture/CaptureDriver.kt`、CaptureScenes及各Scene；`tools/capture/{capture.ps1,diagnostics.ps1,assemble.py}` |
+| 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
 | 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 光照连续性复现 | `client/capture/ParticleLightingScene.kt`，场景particle_lighting |
 
@@ -54,7 +54,6 @@
 | `quadruple_cast` / 四重施放 | `magic/modifier/QuadrupleCast.kt` |
 | `quintuple_cast` / 五重施放 | `magic/modifier/QuintupleCast.kt` |
 | `reduce_recharge` / 缩短充能时间 | `magic/modifier/ReduceRecharge.kt` |
-| `aim` / 瞄准 | `magic/modifier/Aim.kt` |
 | `torch` / 火把 | `magic/modifier/Torch.kt` |
 | `sawblade` / 锯片 | `magic/projectile/Sawblade.kt` |
 | `healing_bolt` / 治疗弹 | `magic/projectile/HealingBolt.kt` |
@@ -116,4 +115,4 @@
 
 ## 4. Java mixin
 
-`src/main/java/work/nekow/primalspells/mixin/`：`WandUseAnimationMixin`取消成功施法后的重举，`ItemInHandRendererAccessor`供原生高度回归观察。AimHighlightMixin仅将AimHighlights并入Minecraft原版轮廓判断。所有客户端mixin只在client列表加载，不让公共服务端类引用。
+`src/main/java/work/nekow/primalspells/mixin/`：`WandUseAnimationMixin`取消成功施法后的重举，`ItemInHandRendererAccessor`供原生高度回归观察。只在mixin配置client列表加载，不让公共服务端类引用。

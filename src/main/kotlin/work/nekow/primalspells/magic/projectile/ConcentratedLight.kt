@@ -1,6 +1,5 @@
 package work.nekow.primalspells.magic.projectile
 
-import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.core.SpellDamageType
 import work.nekow.primalspells.magic.effect.lifecycle.Hurt

@@ -1,6 +1,7 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.effect.visual.BlackHoleFx
@@ -37,7 +38,7 @@ class BlackHole : AreaFieldEffect(
 
     override fun clearVisuals(manager: ParticleManager, center: Vec3) {
         visuals.clear(manager)
-        if (projectile.storedEnergy > 0) Explosion.customExplode(caster, org.joml.Vector3f(status.pos),
+        if (projectile.storedEnergy > 0) Explosion.customExplode(caster, Vector3d(status.pos),
             (3.0 * projectile.areaScale).toFloat(), projectile.storedEnergy, manager.level, projectile)
     }
 

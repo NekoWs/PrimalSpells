@@ -2,6 +2,7 @@
 package work.nekow.primalspells.client.capture
 
 import net.minecraft.client.Minecraft
+import org.joml.Vector3d
 import work.nekow.particledrawing.core.client.ClientParticleEngine
 import work.nekow.particledrawing.lighting.DynamicLightManager
 import java.util.concurrent.ConcurrentHashMap
@@ -92,23 +93,23 @@ object NewSpellScene {
                     record("appended-copy-independent",copy.addedTriggers.single().cards[1]!==payload[1],"original/copy child identity")
                     val (_,hitShots)=cast(listOf("add_trigger","fireball","healing_bolt"))
                     val hit=hitShots.single();hit.collisionEnabled=false;hit.status.bounces=1
-                    hit.hitBlock(Vector3f(hit.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
+                    hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
                     record("appended-hit-releases-on-bounce",hit.alive && hit.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"alive=${hit.alive}")
                     val (_,pierced)=cast(listOf("piercing","add_trigger","fireball","healing_bolt"))
                     val through=pierced.single();through.collisionEnabled=false
                     through.hitEntity(source!!)
                     val heldPayload=through.addedTriggers.single().cards.isNotEmpty()
-                    through.hitBlock(Vector3f(through.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
+                    through.hitBlock(Vector3d(through.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
                     record("appended-piercing-entity-waits-for-block",heldPayload && through.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"held=$heldPayload")
                     val (_,early)=cast(listOf("add_timer","fireball","healing_bolt"))
                     val earlyTimer=early.single();earlyTimer.collisionEnabled=false
-                    earlyTimer.hitBlock(Vector3f(earlyTimer.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
+                    earlyTimer.hitBlock(Vector3d(earlyTimer.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
                     record("timer-earlier-collision-releases",earlyTimer.status.age<20 && earlyTimer.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"age=${earlyTimer.status.age}")
                     val (_,death)=cast(listOf("add_expiration","fireball","healing_bolt"))
                     val deathTrigger=death.single();deathTrigger.collisionEnabled=false;deathTrigger.status.bounces=1
-                    deathTrigger.hitBlock(Vector3f(deathTrigger.status.pos),Vector3f(0f,0f,-1f))
+                    deathTrigger.hitBlock(Vector3d(deathTrigger.status.pos),Vector3f(0f,0f,-1f))
                     val waits=deathTrigger.alive && deathTrigger.addedTriggers.single().cards.isNotEmpty()
-                    deathTrigger.hitBlock(Vector3f(deathTrigger.status.pos),Vector3f(0f,0f,1f));MagicManager.tick()
+                    deathTrigger.hitBlock(Vector3d(deathTrigger.status.pos),Vector3f(0f,0f,1f));MagicManager.tick()
                     record("expiration-waits-through-bounce-until-death",waits && deathTrigger.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"waits=$waits")
                     val (_,reduced)=cast(listOf("reduce_recharge","fireball"))
                     record("reduce-recharge-registered",reduced.single().modifiers["reduce_recharge"]==1,"recipe=${reduced.single().modifiers}")
@@ -141,7 +142,7 @@ object NewSpellScene {
                     val p=MagicManager.create("sawblade") as Projectile
                     p.caster=source!!;p.wand=Wand("saw-frame");p.wand.status.particleManager=ParticleManager.of(ctx.level)
                     // 摄影机正对盘面；下坠和侧面厚度另由sawblade_falling连续录制。
-                    p.position=Vector3f(-2f,ctx.floorBlockY(0,0)+3f,0f);p.velocity=Vector3f(0.05f,0f,0f)
+                    p.position=Vector3d((-2f).toDouble(), (ctx.floorBlockY(0,0)+3f).toDouble(), (0f).toDouble());p.velocity=Vector3f(0.05f,0f,0f)
                     p.spell();MagicManager.add(p);saw=p
                     val target=ctx.spawnDummy(6.0,ctx.floorBlockY(0,0)+1.0,0.0)
                     val before=target.totalDamage
@@ -149,7 +150,7 @@ object NewSpellScene {
                     val first=target.totalDamage-before;p.tick();SpellDamage.hit(ctx.level,target,p,p.status.damage)
                     record("saw-cut-once-per-tick",first==12.0 && target.totalDamage-before==24.0,"first=$first total=${target.totalDamage-before}")
                     target.discard()
-                    val b=p.status.bounces;p.hitBlock(Vector3f(p.status.pos),Vector3f(0f,0f,-1f))
+                    val b=p.status.bounces;p.hitBlock(Vector3d(p.status.pos),Vector3f(0f,0f,-1f))
                     record("saw-bounces-and-self-harms",p.alive && p.status.bounces==b-1 && p.selfDamage,"bounces=${p.status.bounces} self=${p.selfDamage}")
                     val w=Wand("torch-idle");torch=MagicManager.create("torch") as Torch;w.magics+=torch!!;w.load();w.tick(source!!,ctx.level)
                 }

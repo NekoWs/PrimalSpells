@@ -1,6 +1,7 @@
 package work.nekow.primalspells.magic.modifier
 
 import net.minecraft.server.level.ServerLevel
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.core.MagicManager
@@ -47,7 +48,7 @@ class QuantumEntanglement : Modifier() {
                     val clone = work.nekow.primalspells.magic.core.SpellAssembly.copy(projectile)
                     clone.caster = caster
                     clone.wand = wand
-                    clone.position = Vector3f(projectile.status.pos)
+                    clone.position = Vector3d(projectile.status.pos)
                     clone.velocity = Vector3f(projectile.velocity)
                     clone.effects += OrbitEffect(
                         leader = projectile,
@@ -104,7 +105,7 @@ class QuantumEntanglement : Modifier() {
 
         override fun onActive() {
             orbitPhase = phaseOffset
-            status.pos.add(radius * cos(orbitPhase), 0f, radius * sin(orbitPhase))
+            status.pos.add((radius * cos(orbitPhase)).toDouble(), 0.0, (radius * sin(orbitPhase)).toDouble())
         }
 
         override fun onTick() {
@@ -124,7 +125,7 @@ class QuantumEntanglement : Modifier() {
             val dy = radius * verticalFactor * sin(orbitPhase * 2f)
             val dz = radius * sin(orbitPhase)
 
-            status.velocity.set(cx + dx, cy + dy, cz + dz).sub(status.pos)
+            status.velocity.set((cx + dx - status.pos.x).toFloat(), (cy + dy - status.pos.y).toFloat(), (cz + dz - status.pos.z).toFloat())
         }
     }
 }

@@ -6,12 +6,14 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.PixelVfx
+import work.nekow.primalspells.util.toVec3
 import java.util.ArrayDeque
 import java.util.UUID
 
@@ -46,7 +48,7 @@ class ChainArc : BaseEffect(), DirectDamage {
         if (status.age < nextJumpAge || status.age >= projectile.maxAge) return
         jumpsMade++
         nextJumpAge = jumpAge(jumpsMade + 1)
-        val start = Vec3(status.pos)
+        val start = status.pos.toVec3()
         val driveSpeed = status.velocity.length().toDouble() / DRIFT_RATIO
         val radius = (driveSpeed * 4.0).coerceAtLeast(1.0) * projectile.areaScale
         val target = world.getEntitiesOfClass(LivingEntity::class.java, AABB.ofSize(start, radius*2, radius*2, radius*2)) {
@@ -55,12 +57,12 @@ class ChainArc : BaseEffect(), DirectDamage {
         }.minByOrNull { it.id }
         val heading = if (status.velocity.lengthSquared() > 1e-8f) Vec3(status.velocity).normalize() else projectile.launchDirection
         val end = target?.boundingBox?.center ?: start.add(heading.scale(radius * 0.625))
-        status.pos.set(end.x.toFloat(), end.y.toFloat(), end.z.toFloat())
+        status.pos.set(end.x, end.y, end.z)
         PixelVfx.arc(ParticleManager.of(world), start, end)
         SpellInteractions.beam(projectile, start, end, MagicManager.projectiles.toList())
         val block = BlockPos.containing(end)
         if (!world.getBlockState(block).getCollisionShape(world, block).isEmpty && !projectile.throughBlocks) {
-            projectile.hitBlock(Vector3f(status.pos), Vector3f(heading.x.toFloat(),heading.y.toFloat(),heading.z.toFloat()).negate())
+            projectile.hitBlock(Vector3d(status.pos), Vector3f(heading.x.toFloat(),heading.y.toFloat(),heading.z.toFloat()).negate())
             return
         }
         if (target != null) {

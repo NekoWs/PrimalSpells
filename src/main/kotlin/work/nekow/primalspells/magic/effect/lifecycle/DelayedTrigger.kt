@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
@@ -32,7 +33,7 @@ class DelayedTrigger(
             work.nekow.primalspells.magic.core.SpellAssembly.apply(shot, modifiers)
             shot.caster = caster
             shot.wand = wand
-            shot.position = Vector3f(status.pos) // 寿命结束位置
+            shot.position = Vector3d(status.pos) // 寿命结束位置
             shot.velocity = Vector3f(dir)        // 原施法朝向
             shot.spell()
             MagicManager.add(shot)

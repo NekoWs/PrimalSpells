@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.*
 import work.nekow.primalspells.magic.effect.BaseEffect
@@ -24,14 +25,14 @@ class AppendedTrigger : BaseEffect() {
     override fun onExpire() = onDie()
     private fun direction() = if (status.velocity.lengthSquared() > 1e-8f) Vector3f(status.velocity).normalize()
         else projectile.launchDirection.toVector3f()
-    private fun release(trigger: AppendedPayload, pos: Vector3f, dir: Vector3f) {
+    private fun release(trigger: AppendedPayload, pos: Vector3d, dir: Vector3f) {
         val cards = trigger.cards.toList()
         trigger.cards.clear()
         val modifiers = cards.filterIsInstance<Modifier>()
         cards.filterIsInstance<Projectile>().forEach { shot ->
             SpellAssembly.apply(shot, modifiers)
             shot.caster = caster; shot.wand = wand
-            shot.position = Vector3f(pos); shot.velocity = Vector3f(dir)
+            shot.position = Vector3d(pos); shot.velocity = Vector3f(dir)
             shot.spell(); MagicManager.add(shot)
         }
     }

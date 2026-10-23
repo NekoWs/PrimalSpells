@@ -1,7 +1,7 @@
 package work.nekow.primalspells.magic.effect
 
 import net.minecraft.world.entity.Entity
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.core.MagicStatus
 import work.nekow.primalspells.magic.projectile.Projectile
@@ -52,7 +52,7 @@ open class BaseEffect : Cloneable {
     open fun onTick() { }
     open fun onActive() { }
     open fun onHitEntity(target: Entity) { }
-    open fun onHitBlock(pos: Vector3f) { }
+    open fun onHitBlock(pos: Vector3d) { }
     open fun onHit(result: HitResult) { }
     open fun onExpire() { }
 

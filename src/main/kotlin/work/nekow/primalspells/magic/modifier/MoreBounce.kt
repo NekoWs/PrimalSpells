@@ -3,7 +3,7 @@ package work.nekow.primalspells.magic.modifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.geometry.Bounce
@@ -39,7 +39,7 @@ class MoreBounce : Modifier() {
              *
              * @param pos 碰撞方块坐标
              */
-            override fun onHitBlock(pos: Vector3f) {
+            override fun onHitBlock(pos: Vector3d) {
                 // 仅当投射物存活（即弹跳成功, 而非死亡）时播放音效
                 if (!projectile.alive) return
 

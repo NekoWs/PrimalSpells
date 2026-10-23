@@ -1,9 +1,11 @@
 package work.nekow.primalspells.magic.core
 
+
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.magic.modifier.EnergyShield
 import work.nekow.primalspells.magic.projectile.Projectile
@@ -55,7 +57,7 @@ object ShieldGuard {
     }
 
     /** 持续光束按球壳实际交点排序，避免先扣远处护盾的法力。 */
-    fun segmentEntry(entity: LivingEntity, from: org.joml.Vector3f, to: org.joml.Vector3f): Vec3? {
+    fun segmentEntry(entity: LivingEntity, from: Vector3d, to: Vector3d): Vec3? {
         for (hand in HANDS) {
             val wand = WandItem.getWand(entity.getItemInHand(hand)) ?: continue
             val shield = wand.loadedMagics.firstOrNull { it is EnergyShield } as? EnergyShield ?: continue
@@ -66,7 +68,7 @@ object ShieldGuard {
 
     /** 按本刻真实相邻子步测试球壳，早于本体命中和视觉阶段。 */
     fun interceptSegment(level: ServerLevel, entity: LivingEntity, projectile: Projectile,
-                         from: org.joml.Vector3f, to: org.joml.Vector3f): Boolean =
+                         from: Vector3d, to: Vector3d): Boolean =
         !(projectile.damageType == SpellDamageType.HEALING && projectile.status.damage > 0) && withShield(entity) { shield, wand ->
             shield.absorbProjectile(level, wand, entity, projectile, from, to)
         }.also { if (it) projectile.shieldedImpactTargets += entity.uuid }

@@ -10,8 +10,6 @@ package work.nekow.primalspells.network
  * 在专用服务器上它们保持 `null`，处理器什么也不做。
  */
 object ClientPayloadSink {
-    /** 被动瞄准实体轮廓租约。 */
-    var aimTarget: ((AimTargetPayload) -> Unit)? = null
     /** 只读法术链预览回报。 */
     var wandPreview: ((WandPreviewPayload) -> Unit)? = null
     /** 真实法术命中反馈。 */

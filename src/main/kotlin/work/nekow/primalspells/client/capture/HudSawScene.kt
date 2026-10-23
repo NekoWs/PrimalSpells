@@ -12,6 +12,7 @@ import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import org.lwjgl.glfw.GLFW
 import work.nekow.particledrawing.api.ParticleManager
@@ -216,9 +217,9 @@ object HudSawScene {
         val checks = linkedMapOf<Int, MutableList<Check>>()
         var shot: Projectile? = null
         var floor = 0
-        var initialY = 0f
+        var initialY = 0.0
         var bounced = false
-        var previousY = 0f
+        var previousY = 0.0
         var caster: work.nekow.primalspells.entity.TestDummyEntity? = null
         return Scene(name, "锯片 / 自然下坠 / 地面反弹 / 金属碎散", 24, 130,
             prepare = { ctx ->
@@ -231,7 +232,7 @@ object HudSawScene {
                 if (t == 10) {
                     shot = (MagicManager.create("sawblade") as Projectile).also {
                         it.caster = caster!!; it.wand = Wand("falling-saw"); it.wand.status.particleManager = ParticleManager.of(ctx.level)
-                        it.position = Vector3f(-3f, floor + 4f, 0f); it.velocity = Vector3f(0.15f, 0f, 0f)
+                        it.position = Vector3d((-3f).toDouble(), (floor + 4f).toDouble(), (0f).toDouble()); it.velocity = Vector3f(0.15f, 0f, 0f)
                         it.spell(); MagicManager.add(it); initialY = it.status.pos.y; previousY = initialY
                     }
                 }

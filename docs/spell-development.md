@@ -38,6 +38,8 @@ DirectDamage声明单次直接强度，实际命中走SpellDamage/SpellImpact；
 
 ## 3. 修正与阶段
 
+世界位置（Projectile.position、MagicStatus.pos、HitResult.pos及onHitBlock参数）使用Vector3d；从原版Vec3用toPosition转换，传回原版/PD用toVec3。速度与方向仍使用Vector3f，必须先用double世界坐标做差，再转换局部向量；复制/触发荷载不得中途降低接点精度。Move统一完成分段扫掠与本刻余时，效果不要另写端点碰撞或反弹后手动截断移动。
+
 Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已初始化参数，onTick用于持续行为；制导在GUIDANCE写速度或声明追踪目标，碰撞由MOTION的Move完成，粒子在VISUAL读最终位置。不要在普通轨道里直接改坐标绕过碰撞。
 
 同一链的所有修正统一收集、按ID规范化装配，与放前放后无关。加法、倍率、归零分开处理，不依赖卡序；同类√N叠加使用isStackPrimary/stackScale，只由首实例计算一次。effect.clone为浅拷贝，可变集合/状态不能在投射物间共享。

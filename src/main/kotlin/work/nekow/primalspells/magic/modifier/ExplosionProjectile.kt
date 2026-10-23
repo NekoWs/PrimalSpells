@@ -3,6 +3,7 @@ package work.nekow.primalspells.magic.modifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
@@ -55,7 +56,7 @@ class ExplosionProjectile : Modifier() {
                 val bullet = work.nekow.primalspells.magic.core.SpellAssembly.copy(projectile)
                 bullet.caster = caster
                 bullet.wand = wand
-                bullet.position = Vector3f(status.pos)
+                bullet.position = Vector3d(status.pos)
                 bullet.velocity = work.nekow.primalspells.magic.core.SpellAssembly.launch(bullet, perp, bulletSpeed)
 
                 // 设置爆炸效果

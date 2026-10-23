@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.DamageNumber
@@ -46,7 +47,7 @@ object CrystalLifecycleScene {
                     val p=MagicManager.create("dormant_crystal") as Projectile
                     p.maxAge=100 // 只压缩摄影时间；到期/预警仍由正式生命周期执行。
                     p.caster=ctx.player;p.wand=Wand("crystal-lifetime")
-                    p.position=Vector3f(0f,floor+1f,0f);p.velocity=Vector3f(0f,0f,1f)
+                    p.position=Vector3d((0f).toDouble(), (floor+1f).toDouble(), (0f).toDouble());p.velocity=Vector3f(0f,0f,1f)
                     p.spell();p.motionEnabled=false;p.collisionEnabled=false
                     reaction=p.effects.filterIsInstance<CrystalReaction>().single();crystal=p;MagicManager.add(p)
                 }

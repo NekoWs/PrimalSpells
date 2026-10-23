@@ -30,6 +30,6 @@
 
 `client/hud/HudLayout.kt`管理布局和本机JSON；`WandHudPainter.kt`共享正式/编辑预览绘制；`WandHudRenderer.kt`管理客户端缓存、动画和事件；`client/screen/HudEditorScreen.kt`管理原生Screen输入。
 
-`SyncWandStatsPayload`包含equipRemaining/equipTotal/manaBlocked；手持杖每刻同步，背包其它杖仍按20刻节流。当前网络协议1.4.0，客户端和服务端需要使用同一版。`HudImpactPayload`只将实际接受的非治疗、非自伤命中回报给玩家施法者，不修改伤害结算。退出世界清数值与动画，保留本机布局。
+`SyncWandStatsPayload`包含equipRemaining/equipTotal/manaBlocked；手持杖每刻同步，背包其它杖仍按20刻节流。当前网络协议1.5.0，客户端和服务端需要使用同一版。`HudImpactPayload`只将实际接受的非治疗、非自伤命中回报给玩家施法者，不修改伤害结算。退出世界清数值与动画，保留本机布局。
 
 录制方式见 [构建与运行](../build-and-run.md)，未覆盖范围见 [verify](../issues/verify.md)；不同整合包HUD叠放、自然日光及多人接受度仍需体验验证。

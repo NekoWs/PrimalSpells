@@ -6,6 +6,7 @@ import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.toVec3
 
 /** 随弹体收拢的六枚锁印；只有真实到期才在最终位置打开，绝不提前播放爆开。 */
 class DelayedCastFx : BaseEffect() {
@@ -16,7 +17,7 @@ class DelayedCastFx : BaseEffect() {
     var releasedAtAge: Int = -1
         private set
 
-    private fun center() = Vec3(status.pos)
+    private fun center() = status.pos.toVec3()
     private fun points(): List<Vec3> {
         val radius = (0.1 + 0.3 * (1.0 - status.age.toDouble() / projectile.maxAge.coerceAtLeast(1))) * projectile.areaScale
         val center = center()

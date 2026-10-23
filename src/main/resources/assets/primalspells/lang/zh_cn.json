@@ -252,7 +252,5 @@
   "mage.primalspells.warden": "守御",
   "mage.primalspells.arcanist": "秘法",
   "mage.primalspells.siege": "聚光",
-  "compass.primalspells.starter": "村庄·入门法术",
-  "item.primalspells.aim": "瞄准",
-  "lore.primalspells.aim.desc": "被动：持杖时显示64格内的细瞄准光线，高亮中央直线首先命中的实体；被方块遮挡时停止。不预测散射、追踪或反弹。"
+  "compass.primalspells.starter": "村庄·入门法术"
 }

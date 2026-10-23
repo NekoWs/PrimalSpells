@@ -3,7 +3,7 @@ package work.nekow.primalspells.magic.modifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.Explosion
@@ -30,7 +30,7 @@ class BounceExplosion : Modifier() {
         // 添加弹跳音效（与爆炸效果相互独立）
         effects += object : BaseEffect() {
 
-            override fun onHitBlock(pos: Vector3f) {
+            override fun onHitBlock(pos: Vector3d) {
                 if (!projectile.alive) return
 
                 val level = caster.level() as? ServerLevel ?: return

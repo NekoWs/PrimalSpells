@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.pathfinder.PathType
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.projectile.Projectile
@@ -141,7 +142,7 @@ class DroneEntity(
         bolt.caster = this
         bolt.wand = droneWand
         val eye = eyePosition
-        bolt.position = Vector3f(eye.x.toFloat(), eye.y.toFloat(), eye.z.toFloat())
+        bolt.position = Vector3d(eye.x, eye.y, eye.z)
         val center = target.position().add(0.0, target.bbHeight / 2.0, 0.0)
         val dir = center.subtract(eye).normalize()
         bolt.velocity = Vector3f(dir.x.toFloat(), dir.y.toFloat(), dir.z.toFloat())

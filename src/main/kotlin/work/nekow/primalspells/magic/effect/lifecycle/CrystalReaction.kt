@@ -2,7 +2,7 @@ package work.nekow.primalspells.magic.effect.lifecycle
 
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.core.MagicManager
@@ -88,7 +88,7 @@ class CrystalReaction : BaseEffect() {
         val world = level ?: return
         detonated = true
         projectile.alive = false
-        Explosion.customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, world, projectile)
+        Explosion.customExplode(caster, Vector3d(status.pos), status.explosionRadius, status.explosionDamage, world, projectile)
     }
 
     override fun onExpire() { detonate() }

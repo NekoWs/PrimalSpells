@@ -38,17 +38,17 @@ class SelfOrbit : Modifier() {
             override fun onActive() {
                 driveSpeed = status.velocity.length()
                 previousTravel = driveSpeed
-                val dx = status.pos.x - caster.x.toFloat()
-                val dz = status.pos.z - caster.z.toFloat()
+                val dx = status.pos.x - caster.x
+                val dz = status.pos.z - caster.z
                 orbitPhase = atan2(dz.toDouble(), dx.toDouble()).toFloat()
             }
 
             override fun onTick() {
                 if (!projectile.alive) return
                 val center = caster
-                val cx = center.x.toFloat()
-                val cy = (center.y + center.eyeHeight).toFloat()
-                val cz = center.z.toFloat()
+                val cx = center.x
+                val cy = center.y + center.eyeHeight
+                val cz = center.z
 
                 // 与上一段实际命令比较，只继承阻尼/加减速倍率，不把较短的弦长当成速度衰减。
                 if (previousTravel > 1e-6f) driveSpeed *= status.velocity.length() / previousTravel
@@ -65,7 +65,7 @@ class SelfOrbit : Modifier() {
                 val px = cx + radius * cos(orbitPhase)
                 val pz = cz + radius * sin(orbitPhase)
 
-                val delta = org.joml.Vector3f(px, cy, pz).sub(status.pos)
+                val delta = org.joml.Vector3f((px - status.pos.x).toFloat(), (cy - status.pos.y).toFloat(), (pz - status.pos.z).toFloat())
                 if (delta.length() > currentSpeed && currentSpeed > 0f) delta.normalize().mul(currentSpeed)
                 status.velocity.set(delta)
                 previousTravel = delta.length()

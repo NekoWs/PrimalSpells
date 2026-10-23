@@ -5,9 +5,11 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.toPosition
 
 /** 移动束源发出六格持续光束；最终位置求值、碰墙截断，每 tick 结算且最多选四个目标。 */
 class PlasmaBeam : BaseEffect(), DirectDamage {
@@ -37,14 +39,14 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
         val hit = world.clip(ClipContext(start, intended, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
         var end = if (projectile.maxHitTargets < 0 || hit.type == net.minecraft.world.phys.HitResult.Type.MISS) intended else hit.location
         // 束源始终留在原处；先让完整射线通过正式护盾入口，再绘制实际可见区间。
-        val originalPos = org.joml.Vector3f(status.pos)
+        val originalPos = Vector3d(status.pos)
         val originalVelocity = org.joml.Vector3f(status.velocity)
         var blocked = false
         try {
             if (projectile.maxHitTargets >= 0 && start.distanceToSqr(end) > 1e-8) {
-                val from = start.toVector3f()
-                val to = end.toVector3f()
-                status.velocity.set(to).sub(from)
+                val from = start.toPosition()
+                val to = end.toPosition()
+                status.velocity.set(end.subtract(start).toVector3f())
                 val shields = world.getEntitiesOfClass(LivingEntity::class.java, AABB(start, end).inflate(2.7)) {
                     it.isAlive && work.nekow.primalspells.magic.core.ShieldGuard.hasShield(it)
                 }.mapNotNull { holder -> work.nekow.primalspells.magic.core.ShieldGuard.segmentEntry(holder, from, to)
@@ -83,7 +85,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             for (target in candidates) {
                 val box = target.boundingBox.inflate(0.15 * projectile.areaScale)
                 val point = if (box.contains(start)) start else box.clip(start, end).orElse(target.boundingBox.center)
-                status.pos.set(point.x.toFloat(), point.y.toFloat(), point.z.toFloat())
+                status.pos.set(point.x, point.y, point.z)
                 val delta = point.subtract(start)
                 status.velocity.set(delta.x.toFloat(), delta.y.toFloat(), delta.z.toFloat())
                 SpellDamage.hit(world, target, projectile, status.damage)

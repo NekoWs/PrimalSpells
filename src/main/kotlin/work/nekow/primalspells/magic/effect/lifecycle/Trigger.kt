@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import org.joml.Vector3d
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.TriggerSpell
@@ -37,7 +38,7 @@ class Trigger : BaseEffect() {
             work.nekow.primalspells.magic.core.SpellAssembly.apply(shot, modifiers)
             shot.caster = caster
             shot.wand = wand
-            shot.position = org.joml.Vector3f(result.pos)
+            shot.position = Vector3d(result.pos)
             shot.velocity = org.joml.Vector3f(result.normal)
             shot.spell()
             MagicManager.add(shot)

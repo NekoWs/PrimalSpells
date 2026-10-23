@@ -58,7 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
-    "aim": {"length": 160, "title": "被动瞄准 / 原生目标轮廓 / 墙面截断", "metric": "white", "quiet": (0, 6), "decay": "none", "decay_reason": "实体轮廓为离散命中指示，细线的原生缩片退场由专属尺寸断言验证"},
+    "collision_precision": {"length": 140, "title": "高速反弹 / 双精度接点 / 连续余程", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "多次真实发射分别退场，机制读取实际扫掠与接触回调"},
     "homing_light": {"length": 150, "title": "六格追踪 / 弧线扫掠 / 聚光照明", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "范围/真实曲线碰撞与照明各有独立原生断言，多个发射阶段不共用全局退场峰值"},
     "particle_lighting": {"length": 110, "title": "粒子照明 / 出生与退场连续性", "metric": "blue", "quiet": (0, 6), "decay": "none", "decay_reason": "独立观察原生光场与透明度，连续性由光照数值断言验证"},
     "projectile_flight": {"length": 130, "title": "弩箭对比 / 路径追踪 / 拖尾淡出", "metric": "orange", "quiet": (0, 6), "decay": "none"},
@@ -151,7 +151,7 @@ for _scene, _spec in SCENES.items():
     if _spec.get("decay", "gradual") == "gradual":
         _spec["decay"] = "collapse"
 # 这两场包含真实爆炸/锯齿飞散，使用已有解体门禁（至少4帧），不能要求瞬间消失。
-SCENES["recoil_light"] = {"length": 220, "title": "后坐力 / 创造飞行豁免 / 蓄能强光", "metric": "warm", "fade_window": (70, 110), "quiet": (0, 8), "decay": "collapse"}
+SCENES["recoil_light"] = {"length": 220, "title": "后坐力 / 创造飞行豁免 / 蓄能强光", "metric": "warm", "fade_window": (58, 85), "quiet": (0, 8), "decay": "collapse"}
 SCENES["shield_balance"] = {"length": 250, "title": "单卡与八卡护盾 / 破盾当次保护 / 靶子固定", "metric": "blue", "fade_window": (138, 225), "quiet": (0, 8), "decay": "collapse"}
 SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 原地聚光阵与锁定方向", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
 SCENES["pd_api"] = {"length": 120, "title": "PD跟踪曲线 / 静止受光 / 帧间尺寸 / 完成销毁", "metric": "blue", "quiet": (0, 6), "decay": "collapse"}

@@ -16,6 +16,7 @@ import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.Abstra
 import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleManager
@@ -256,7 +257,7 @@ class EnergyShield : Modifier() {
      * @return true = 已格挡（调用方跳过伤害），投射物已被反射
      */
     fun absorbProjectile(level: ServerLevel, wand: Wand, holder: Entity, projectile: Projectile,
-                         from: Vector3f? = null, to: Vector3f = projectile.status.pos): Boolean {
+                         from: Vector3d? = null, to: Vector3d = projectile.status.pos): Boolean {
         if (wand.loadedMagics.firstOrNull { it is EnergyShield } !== this) return false
         if (!holder.isAlive) return false
         if (projectile.caster === holder) return false
@@ -273,7 +274,7 @@ class EnergyShield : Modifier() {
      * @return true = 这一发被格挡（已扣 MP、已反射、已出玻璃板）；false = 不归护盾管或已从破口穿过
      */
     private fun tryBlock(level: ServerLevel, holder: Entity, shellCenter: Vec3, p: Projectile,
-                         from: Vector3f? = null, to: Vector3f = p.status.pos): Boolean {
+                         from: Vector3d? = null, to: Vector3d = p.status.pos): Boolean {
         // 光束的束源不碰撞实体，但射线命中仍声明 DirectDamage，并传入真实命中线段。
         // 无直接伤害的爆炸点等仍走爆炸入口。
         if (p.hitRadius <= 0.0 && p.effects.none { it is DirectDamage }) return false
@@ -285,11 +286,11 @@ class EnergyShield : Modifier() {
             System.identityHashCode(p), strengthOf(p), from,
         ) ?: return false
 
-        // 挡下了：以壳面法线反射，并把投射物推到壳外 0.05 格（下一 tick 必然离开判定面）
-        p.shieldReflectionPoint = Vec3(hit.point)
+        // 以壳面法线反射，只分离数值误差；Move继续消耗本刻余时。
+        p.shieldReflectionPoint = Vec3(hit.point.x, hit.point.y, hit.point.z)
         val speed = velocity.length()
         velocity.normalize().reflect(hit.normal).mul(speed)
-        p.status.pos = Vector3f(hit.normal).mul(0.05f).add(hit.point)
+        p.status.pos.set(hit.point).add(hit.normal.x * 1e-7, hit.normal.y * 1e-7, hit.normal.z * 1e-7)
         return true
     }
 
@@ -311,7 +312,7 @@ class EnergyShield : Modifier() {
         val velocity = p.deltaMovement
         val hit = resolveIncoming(
             level, holder, shellCenter,
-            Vector3f(p.x.toFloat(), p.y.toFloat(), p.z.toFloat()),
+            Vector3d(p.x, p.y, p.z),
             Vector3f(velocity.x.toFloat(), velocity.y.toFloat(), velocity.z.toFloat()),
             p.id, strength,
         ) ?: return false
@@ -356,7 +357,7 @@ class EnergyShield : Modifier() {
     }
 
     /** 挡下时的壳面进入点与法线（调用方据此做自己的那套反射）。 */
-    private class ShellHit(val point: Vector3f, val normal: Vector3f)
+    private class ShellHit(val point: Vector3d, val normal: Vector3f)
 
     /**
      * 一次格挡判定的**公共部分** —— 自家法术（[tryBlock]）与原版投射物（[tryBlockVanilla]）共用。
@@ -372,13 +373,13 @@ class EnergyShield : Modifier() {
         level: ServerLevel,
         holder: Entity,
         shellCenter: Vec3,
-        pos: Vector3f,
+        pos: Vector3d,
         velocity: Vector3f,
         identity: Int,
         strength: Double,
-        from: Vector3f? = null,
+        from: Vector3d? = null,
     ): ShellHit? {
-        val prev = from ?: Vector3f(pos).sub(velocity)
+        val prev = from ?: Vector3d(pos).sub(velocity)
 
         // 先登记「这一 tick 它在壳外」——下一步就可能被壳"追上"而落到壳内
         val ex = pos.x - shellCenter.x
@@ -394,7 +395,7 @@ class EnergyShield : Modifier() {
 
         val seen = identity in seenOutside
         val hitPoint = shellEntry(prev, pos, shellCenter, allowInsideStart = seen) ?: return null
-        val normal = Vector3f(hitPoint).sub(Vector3f(shellCenter.x.toFloat(), shellCenter.y.toFloat(), shellCenter.z.toFloat()))
+        val normal = Vec3(hitPoint.x - shellCenter.x, hitPoint.y - shellCenter.y, hitPoint.z - shellCenter.z).toVector3f()
         if (normal.lengthSquared() < 1e-6f) return null
         normal.normalize()
         if (velocity.dot(normal) >= 0) return null             // 正在远离壳面：不是「打进来」
@@ -513,8 +514,8 @@ class EnergyShield : Modifier() {
     }
 
     /** 返回真实球壳的入射点，仅供持续束按近远排序；格挡仍走正式结算。 */
-    fun segmentEntry(holder: Entity, from: Vector3f, to: Vector3f): Vec3? =
-        shellEntry(from, to, shellCenter(holder), allowInsideStart = false)?.let { Vec3(it) }
+    fun segmentEntry(holder: Entity, from: Vector3d, to: Vector3d): Vec3? =
+        shellEntry(from, to, shellCenter(holder), allowInsideStart = false)?.let { Vec3(it.x, it.y, it.z) }
 
     /**
      * 球壳球心（世界坐标）：相对脚底抬高到身体中段（[shellCenterOffset]），比眼睛位置更贴近「包裹全身」。
@@ -540,16 +541,16 @@ class EnergyShield : Modifier() {
      * 这一 tick 起点已经在壳内 —— 那就把当前位置当作进入点，照挡。
      */
     private fun shellEntry(
-        from: Vector3f,
-        to: Vector3f,
+        from: Vector3d,
+        to: Vector3d,
         center: Vec3,
         allowInsideStart: Boolean = false,
-    ): Vector3f? {
+    ): Vector3d? {
         val fx = from.x - center.x
         val fy = from.y - center.y
         val fz = from.z - center.z
         if (fx * fx + fy * fy + fz * fz < SHELL_RADIUS * SHELL_RADIUS) {
-            return if (allowInsideStart) Vector3f(from) else null
+            return if (allowInsideStart) Vector3d(from) else null
         }
 
         val dx = to.x - from.x
@@ -564,10 +565,10 @@ class EnergyShield : Modifier() {
         val sq = sqrt(disc)
         val t = (-b - sq) / (2.0 * a)
         if (t < 0.0 || t > 1.0) return null
-        return Vector3f(
-            (from.x + dx * t).toFloat(),
-            (from.y + dy * t).toFloat(),
-            (from.z + dz * t).toFloat(),
+        return Vector3d(
+            from.x + dx * t,
+            from.y + dy * t,
+            from.z + dz * t,
         )
     }
 

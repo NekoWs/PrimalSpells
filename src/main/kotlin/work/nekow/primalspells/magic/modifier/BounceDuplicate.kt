@@ -3,6 +3,7 @@ package work.nekow.primalspells.magic.modifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
@@ -84,7 +85,7 @@ class BounceDuplicate : Modifier() {
                 val launchVelocity = work.nekow.primalspells.magic.core.SpellAssembly.launch(clone, launchDirection, speedMagnitude)
 
                 // 设置复制体的初始位置（弹跳碰撞点）和速度
-                clone.position = Vector3f(result.pos)
+                clone.position = Vector3d(result.pos)
                 clone.velocity = Vector3f(launchVelocity)
 
                 // 施放复制体并注册到管理器

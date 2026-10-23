@@ -7,7 +7,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.ShieldGuard
 import work.nekow.primalspells.magic.effect.BaseEffect
@@ -30,17 +30,17 @@ class Explosion(
     private var terminalHit = false
 
     override fun onHitEntity(target: Entity) {
-        if (onHit && !bounceOnly) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
+        if (onHit && !bounceOnly) customExplode(caster, Vector3d(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
         if (onHit && !projectile.alive) terminalHit = true
     }
 
-    override fun onHitBlock(pos: Vector3f) {
+    override fun onHitBlock(pos: Vector3d) {
         if (onHit && (!bounceOnly || projectile.alive)) customExplode(caster, pos, status.explosionRadius, status.explosionDamage, shot = projectile)
         if (onHit && !projectile.alive) terminalHit = true
     }
 
     override fun onDie() {
-        if (onDeath && !terminalHit) customExplode(caster, Vector3f(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
+        if (onDeath && !terminalHit) customExplode(caster, Vector3d(status.pos), status.explosionRadius, status.explosionDamage, shot = projectile)
     }
 
     companion object {
@@ -53,7 +53,11 @@ class Explosion(
          * @param radius 爆炸半径（方块数；<= 0 直接返回）
          * @param damage 中心最大伤害（线性衰减到边缘为 0）
          */
-        fun customExplode(source: Entity, center: Vector3f, radius: Float, damage: Double, level: ServerLevel? = null, shot: work.nekow.primalspells.magic.projectile.Projectile? = null) {
+        /** 兼容局部向量来源；世界位置调用双精度重载。 */
+        fun customExplode(source: Entity, center: org.joml.Vector3fc, radius: Float, damage: Double, level: ServerLevel? = null, shot: work.nekow.primalspells.magic.projectile.Projectile? = null) =
+            customExplode(source, Vector3d(center), radius, damage, level, shot)
+
+        fun customExplode(source: Entity, center: Vector3d, radius: Float, damage: Double, level: ServerLevel? = null, shot: work.nekow.primalspells.magic.projectile.Projectile? = null) {
             val serverLevel = level ?: (source.level() as? ServerLevel) ?: return
             if (radius <= 0f) return
 

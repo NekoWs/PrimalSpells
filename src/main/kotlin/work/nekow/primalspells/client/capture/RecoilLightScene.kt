@@ -9,11 +9,13 @@ import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.level.GameType
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.*
 import work.nekow.primalspells.magic.projectile.*
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.util.toPosition
 import kotlin.math.abs
 
 object RecoilLightScene {
@@ -30,7 +32,7 @@ object RecoilLightScene {
                 val floor=ctx.floorBlockY(0,0)
                 fun shot(id:String,mods:List<String> = emptyList(),z:Float=-5f):Projectile {
                     val p=MagicManager.create(id) as Projectile;SpellAssembly.apply(p,mods.map{MagicManager.create(it) as Modifier})
-                    p.caster=ctx.player;p.wand=Wand("recoil-$t-$id");p.position=Vector3f(0f,floor+4f,z);p.velocity=Vector3f(0f,0f,1f);p.spell();return p
+                    p.caster=ctx.player;p.wand=Wand("recoil-$t-$id");p.position=Vector3d((0f).toDouble(), (floor+4f).toDouble(), (z).toDouble());p.velocity=Vector3f(0f,0f,1f);p.spell();return p
                 }
                 if(t==8) {
                     val pig=EntityTypes.PIG.create(ctx.level,EntitySpawnReason.COMMAND)!!
@@ -52,11 +54,11 @@ object RecoilLightScene {
                     // 付费检查只验证出手推力，立即结束其蓄能，避免污染后续独立发射镜头。
                     MagicManager.projectiles.filterIsInstance<ConcentratedLight>().filter{it.caster===pig}.forEach{it.alive=false}
                     pig.deltaMovement=Vec3.ZERO
-                    val child=MagicManager.create("fireball") as Projectile;child.caster=pig;child.wand=Wand("child");child.position=Vector3f(8f,floor+4f,0f);child.velocity=Vector3f(0f,0f,1f);child.spell()
+                    val child=MagicManager.create("fireball") as Projectile;child.caster=pig;child.wand=Wand("child");child.position=Vector3d((8f).toDouble(), (floor+4f).toDouble(), (0f).toDouble());child.velocity=Vector3f(0f,0f,1f);child.spell()
                     record(t,"unarmed-child-does-not-kick",pig.deltaMovement.lengthSqr()==0.0,"velocity=${pig.deltaMovement}")
                     child.alive=false;child.die()
                     val charged=MagicManager.create("concentrated_light") as ConcentratedLight
-                    charged.caster=pig;charged.wand=Wand("charged-recoil");charged.position=Vector3f(8f,floor+4f,0f);charged.velocity=Vector3f(0f,0f,1f);charged.spell();charged.queueCastRecoil()
+                    charged.caster=pig;charged.wand=Wand("charged-recoil");charged.position=Vector3d((8f).toDouble(), (floor+4f).toDouble(), (0f).toDouble());charged.velocity=Vector3f(0f,0f,1f);charged.spell();charged.queueCastRecoil()
                     record(t,"focused-light-small-recoil-on-cast",abs(pig.deltaMovement.length()-0.06)<1e-6,"velocity=${pig.deltaMovement}")
                     charged.status.age=ConcentratedLight.CHARGE_TICKS;charged.tick();val kick=pig.deltaMovement.length()
                     record(t,"focused-light-release-does-not-repeat-recoil",abs(kick-0.06)<1e-6 && abs(pig.deltaMovement.length()-kick)<1e-6,"kick=$kick")
@@ -72,14 +74,14 @@ object RecoilLightScene {
                     h.alive=false;h.die()
                     val player=ctx.player;val mode=player.gameMode.gameModeForPlayer;val flying=player.abilities.flying;val velocity=player.deltaMovement
                     player.setGameMode(GameType.CREATIVE);player.abilities.flying=true;player.deltaMovement=Vec3(0.05,0.02,0.0)
-                    val field=shot("black_hole");val center=player.boundingBox.center.add(2.0,0.0,0.0);field.status.pos.set(center.x.toFloat(),center.y.toFloat(),center.z.toFloat());field.tick()
+                    val field=shot("black_hole");val center=player.boundingBox.center.add(2.0,0.0,0.0);field.status.pos.set(center.x,center.y,center.z);field.tick()
                     record(t,"creative-flight-not-attracted",player.deltaMovement==Vec3(0.05,0.02,0.0) && !player.hasEffect(net.minecraft.world.effect.MobEffects.SLOWNESS),"velocity=${player.deltaMovement}")
                     player.abilities.flying=false;field.tick()
                     record(t,"creative-ground-still-attracted",player.deltaMovement.x>0.05,"velocity=${player.deltaMovement}")
                     field.alive=false;field.die();player.setGameMode(mode);player.abilities.flying=flying;player.deltaMovement=velocity
                     // 独立测量飞行距离；场景木桩/墙面的命中另由上面的扫掠和下面的反弹检查覆盖。
                     val light=shot("concentrated_light") as ConcentratedLight;light.collisionEnabled=false
-                    val start=Vector3f(light.status.pos)
+                    val start=Vector3d(light.status.pos)
                     repeat(ConcentratedLight.CHARGE_TICKS){light.status.age=it;light.tick()}
                     record(t,"charge-window-no-premature-shot",light.awaitingRelease && light.status.pos==start && light.status.velocity.length()==0f,"pos=${light.status.pos} awaiting=${light.awaitingRelease}")
                     light.status.age=ConcentratedLight.CHARGE_TICKS;light.tick()
@@ -91,7 +93,7 @@ object RecoilLightScene {
                     for(z in listOf(-10,6))for(x in -1..1)for(y in floor+3..floor+5)ctx.level.setBlock(BlockPos(x,y,z),Blocks.STONE.defaultBlockState(),2)
                     val rebound=shot("concentrated_light") as ConcentratedLight;rebound.status.age=ConcentratedLight.CHARGE_TICKS
                     var bounced=0
-                    repeat(40){if(rebound.alive){val before=rebound.status.bounces;rebound.tick();rebound.status.age++;if(rebound.status.bounces<before)bounced++}}
+                    repeat(40){if(rebound.alive){val before=rebound.status.bounces;rebound.tick();rebound.status.age++;bounced += before - rebound.status.bounces}}
                     record(t,"five-real-wall-bounces-then-stop",bounced==5 && !rebound.alive,"bounced=$bounced alive=${rebound.alive}")
                     rebound.die()
                     for(z in listOf(-10,6))for(x in -1..1)for(y in floor+3..floor+5)ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
@@ -114,7 +116,7 @@ object RecoilLightScene {
         lateinit var wand: Wand
         var stack=net.minecraft.world.item.ItemStack.EMPTY
         var cast=false
-        var anchor:Vector3f?=null
+        var anchor:Vector3d?=null
         var direction:Vec3?=null
         return Scene(name,"第一人称汇聚之光 / 原地聚光阵与锁定方向",24,180,
             thirdPerson=false,showHands=true,
@@ -133,7 +135,7 @@ object RecoilLightScene {
             tick={ctx,t ->
                 if(t==8)ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,stack)
                 if(t==28)cast=wand.spell(ctx.player)
-                if(t==30){val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand};anchor=p?.status?.pos?.let{Vector3f(it)};direction=p?.launchDirection;p?.collisionEnabled=false}
+                if(t==30){val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand};anchor=p?.status?.pos?.let{Vector3d(it)};direction=p?.launchDirection;p?.collisionEnabled=false}
                 // 本场隔离朝向锁定与首人称退场，墙面/护盾反弹由独立场景检查。
                 if(t==41)MagicManager.projectiles.filter{it.wand===wand}.forEach{it.alive=false}
                 if(t==100){ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);ctx.player.inventory.setItem(7,net.minecraft.world.item.ItemStack.EMPTY);MagicManager.projectiles.forEach{it.alive=false}}
@@ -143,7 +145,7 @@ object RecoilLightScene {
             },checksAt={ctx,t ->
                 val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand}
                 when(t){
-                    35 -> listOf(Check(name,t,"real-wand-charges-at-fixed-world-point",cast && p?.awaitingRelease==true && anchor!=null && p.status.pos.distance(anchor!!)<0.001f && p.status.pos.distance(work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(ctx.player,wand).toVector3f())>0.15f,"cast=$cast age=${p?.status?.age} pos=${p?.status?.pos} anchor=$anchor origin=${work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(ctx.player,wand)}"))
+                    35 -> listOf(Check(name,t,"real-wand-charges-at-fixed-world-point",cast && p?.awaitingRelease==true && anchor!=null && p.status.pos.distance(anchor!!)<0.001f && p.status.pos.distance(work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(ctx.player,wand).toPosition())>0.15f,"cast=$cast age=${p?.status?.age} pos=${p?.status?.pos} anchor=$anchor origin=${work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(ctx.player,wand)}"))
                     40 -> listOf(Check(name,t,"real-wand-releases-after-charge-with-locked-direction",p!=null && !p.awaitingRelease && p.releasedAtAge==ConcentratedLight.CHARGE_TICKS && direction!=null && Vec3(p.status.velocity).normalize().dot(direction!!)>0.999 && ctx.player.lookAngle.dot(direction!!)<0.8,"released=${p?.releasedAtAge} velocity=${p?.status?.velocity} locked=$direction look=${ctx.player.lookAngle}"))
                     179 -> listOf(Check(name,t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"),Check(name,t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}"))
                     else -> emptyList()

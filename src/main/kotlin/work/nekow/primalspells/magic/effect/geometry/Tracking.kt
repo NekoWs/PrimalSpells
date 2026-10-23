@@ -8,8 +8,10 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.toVec3
 
 /** 沿预计飞行段锁定实体中心；只声明目标与转向强度，由Move连续转弯和扫掠命中。 */
 class Tracking(
@@ -34,12 +36,15 @@ class Tracking(
         }
     }
 
-    override fun onHitBlock(pos: org.joml.Vector3f) { passedTargets.clear() }
+    override fun onHitBlock(pos: Vector3d) {
+        passedTargets.clear(); lastTarget = null; activeGuidance = null; projectile.guidance = null
+        onTick()
+    }
 
     override fun onTick() {
         if (!projectile.alive || !projectile.motionEnabled || !isStackPrimary) return
         val level = caster.level() as? ServerLevel ?: return
-        val center = Vec3(status.pos)
+        val center = status.pos.toVec3()
         val speed = status.velocity.length().toDouble()
         if (!speed.isFinite() || speed < 1e-8) return
         // 高速弹不能只查刻起点；沿预计位移段寻找目标，已锁定目标优先保留。

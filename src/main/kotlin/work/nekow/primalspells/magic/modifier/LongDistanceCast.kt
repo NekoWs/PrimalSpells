@@ -36,7 +36,7 @@ class LongDistanceCast : Modifier() {
                 val hit = level.clip(ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, caster))
                 val destination = if (hit.type == net.minecraft.world.phys.HitResult.Type.MISS) end
                     else hit.location.subtract(direction.scale(0.15))
-                status.pos.set(destination.x.toFloat(), destination.y.toFloat(), destination.z.toFloat())
+                status.pos.set(destination.x, destination.y, destination.z)
                 val manager = ParticleManager.of(level)
                 val group = manager.createGroup(destination)
                 Draw.circle(manager, destination, 0.45, 48, colorFn = ColorSource.of(Color.ofInt(180, 135, 255, 255)),

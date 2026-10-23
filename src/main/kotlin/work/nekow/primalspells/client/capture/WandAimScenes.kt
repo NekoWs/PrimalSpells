@@ -1,6 +1,7 @@
 package work.nekow.primalspells.client.capture
 
 import net.minecraft.client.Minecraft
+import org.joml.Vector3d
 import work.nekow.primalspells.mixin.ItemInHandRendererAccessor
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
@@ -15,6 +16,7 @@ import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.WandCastingFx
 import work.nekow.primalspells.registry.ModItems
+import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandAim
@@ -34,12 +36,12 @@ object WandAimScenes {
             results["$label-hit"] = false
             Deferred.after(ctx.level, 0) {
                 val shot = MagicManager.projectiles.lastOrNull { it.wand === wand }
-                val expected = shot?.let { aim.subtract(Vec3(it.position)).normalize() }
+                val expected = shot?.let { aim.subtract(it.position.toVec3()).normalize() }
                 results["$label-direction"] = shot != null && expected != null &&
                     Vec3(shot.velocity).normalize().distanceTo(expected) < 1.0e-5
                 shot?.effects?.add(object : BaseEffect() {
                     override fun onHitEntity(target: Entity) { if (target === dummy && label != "occluded") results["$label-hit"] = true }
-                    override fun onHitBlock(pos: org.joml.Vector3f) { if (label == "occluded" && pos.z in 6f..7f) results["$label-hit"] = true }
+                    override fun onHitBlock(pos: Vector3d) { if (label == "occluded" && pos.z in 6f..7f) results["$label-hit"] = true }
                 })
             }
         }

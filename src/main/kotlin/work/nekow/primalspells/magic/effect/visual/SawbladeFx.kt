@@ -1,10 +1,12 @@
 package work.nekow.primalspells.magic.effect.visual
 
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.toVec3
 import kotlin.math.*
 
 /** 厚齿钢盘、深色盘身和亮轴；沿真实轨迹插值，碰撞少量火星，结束向外碎散。 */
@@ -17,7 +19,7 @@ class SawbladeFx : BaseEffect() {
     private var lastSpark = -10
 
     private fun points(): List<Vec3> {
-        val center = Vec3(status.pos)
+        val center = status.pos.toVec3()
         val forward = axis
         val up = Vec3(0.0, 1.0, 0.0)
         val normal = forward.cross(up).normalize()
@@ -59,8 +61,8 @@ class SawbladeFx : BaseEffect() {
         phaseAngle += 0.47 + min(0.22, status.velocity.length() * 0.08)
         batch?.trackAll(points())
     }
-    override fun onHitBlock(pos: org.joml.Vector3f) = sparks(Vec3(pos), Color.ofInt(255, 211, 114))
-    override fun onHitEntity(target: net.minecraft.world.entity.Entity) = sparks(Vec3(status.pos), Color.ofInt(204, 232, 239))
+    override fun onHitBlock(pos: Vector3d) = sparks(pos.toVec3(), Color.ofInt(255, 211, 114))
+    override fun onHitEntity(target: net.minecraft.world.entity.Entity) = sparks(status.pos.toVec3(), Color.ofInt(204, 232, 239))
     private fun sparks(point: Vec3, color: Color) {
         if (status.age - lastSpark < 3) return
         lastSpark = status.age
@@ -75,7 +77,7 @@ class SawbladeFx : BaseEffect() {
     override fun onDie() {
         val pm = manager ?: return
         val particles = batch ?: return
-        val center = Vec3(status.pos)
+        val center = status.pos.toVec3()
         particles.forEach { _, handle, position, _ ->
             val radial = position.subtract(center).normalize()
             handle.setVelocity(radial.scale(0.10).add(Vec3(status.velocity).scale(0.12)))

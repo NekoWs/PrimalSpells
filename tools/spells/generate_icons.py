@@ -14,7 +14,7 @@ MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','exte
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
              'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter')
-NEW_IDS = ('divide_two', 'divide_three', 'divide_five', 'divide_ten', 'cast_all', 'add_trigger', 'add_timer', 'add_expiration', 'triple_cast', 'quadruple_cast', 'quintuple_cast', 'reduce_recharge', 'sawblade', 'healing_bolt', 'torch', 'aim')
+NEW_IDS = ('divide_two', 'divide_three', 'divide_five', 'divide_ten', 'cast_all', 'add_trigger', 'add_timer', 'add_expiration', 'triple_cast', 'quadruple_cast', 'quintuple_cast', 'reduce_recharge', 'sawblade', 'healing_bolt', 'torch')
 UTILITY_IDS = ('survey_pulse','item_pull','feather_ward')
 IDS = PROJECTILES + MODIFIERS + NEW_IDS + UTILITY_IDS
 WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
@@ -205,10 +205,6 @@ def icon(name):
         for x,y in ((16,6),(25,10),(26,18),(21,26),(11,26),(6,18),(7,10)):box(x,y,WHITE,1)
         box(16,16,DARK_BLUE,2)
     elif name=='healing_bolt':plus(16,16,'#7cffa0');arrow((5,24),(11,20),WHITE,1)
-    elif name=='aim':
-        d.ellipse((15,7,27,23),outline=BLUE,width=1)
-        line(((4,16),(22,16)),WHITE,1);line(((21,5),(21,25)),BLUE,1)
-        box(21,16,WHITE,1);line(((5,13),(5,19)),PURPLE,2)
     elif name=='torch':
         line(((14,20),(11,27)),WHITE,3);flame(18,13)
     elif name=='survey_pulse':

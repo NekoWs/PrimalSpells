@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.core.client.ClientParticleEngine
@@ -16,6 +17,8 @@ import work.nekow.primalspells.magic.effect.visual.FlightTrace
 import work.nekow.primalspells.magic.projectile.ConcentratedLight
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.util.toPosition
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.acos
@@ -38,7 +41,7 @@ object HomingLightScene {
             val p = MagicManager.create(id) as Projectile
             SpellAssembly.apply(p, (List(homing) { "homing" } + extras).map { MagicManager.create(it) as Modifier })
             p.caster = ctx.player; p.wand = Wand("homing-light-$id")
-            p.position = start.toVector3f(); p.velocity = Vector3f(0f, 0f, 1f)
+            p.position = start.toPosition(); p.velocity = Vector3f(0f, 0f, 1f)
             if (flightSpeed != null) p.speed = flightSpeed / Projectile.LAUNCH_SPEED_SCALE
             p.spell()
             return p
@@ -85,10 +88,10 @@ object HomingLightScene {
 
                     val straight = shot(ctx, "concentrated_light", aimOrigin, homing = 0) as ConcentratedLight
                     straight.collisionEnabled = false; straight.status.age = ConcentratedLight.CHARGE_TICKS; straight.tick()
-                    val trace = FlightTrace.sample(straight, aimOrigin, Vec3(straight.status.pos), 0.125)
-                    record(t, "laser-speed-and-dense-continuous-trace", abs(Vec3(straight.status.pos).distanceTo(aimOrigin) - 64.0) < 0.001 &&
+                    val trace = FlightTrace.sample(straight, aimOrigin, straight.status.pos.toVec3(), 0.125)
+                    record(t, "laser-speed-and-dense-continuous-trace", abs(straight.status.pos.toVec3().distanceTo(aimOrigin) - 64.0) < 0.001 &&
                         trace.size >= 513 && trace.zipWithNext().all { (a, b) -> a.position.distanceTo(b.position) <= 0.126 },
-                        "distance=${Vec3(straight.status.pos).distanceTo(aimOrigin)} samples=${trace.size}")
+                        "distance=${straight.status.pos.toVec3().distanceTo(aimOrigin)} samples=${trace.size}")
                     straight.alive = false; straight.die()
 
                     for ((range, copies, expected) in listOf(Triple(5.9, 1, true), Triple(6.1, 1, false), Triple(8.0, 2, true))) {
@@ -125,14 +128,22 @@ object HomingLightScene {
                     }
                     reference.alive = false; reference.die()
                     if (blocker != null) ctx.level.setBlock(blocker, Blocks.STONE.defaultBlockState(), 2)
-                    val wallProbe = ready(); wallProbe.tick()
-                    record(t, "curved-sweep-hits-block-missed-by-straight-chord", blocker != null && wallProbe.status.bounces == 4,
+                    var contactedBlock = false
+                    val wallProbe = ready()
+                    wallProbe.effects += object : work.nekow.primalspells.magic.effect.BaseEffect() {
+                        override fun onHitBlock(pos: Vector3d) {
+                            if (blocker != null && AABB(blocker).inflate(1e-6).contains(pos.toVec3())) contactedBlock = true
+                        }
+                    }
+                    wallProbe.tick()
+                    record(t, "curved-sweep-hits-block-missed-by-straight-chord", blocker != null && contactedBlock,
                         "block=$blocker bounces=${wallProbe.status.bounces} end=${wallProbe.status.pos}")
                     wallProbe.alive = false; wallProbe.die()
                     if (blocker != null) ctx.level.setBlock(blocker, Blocks.AIR.defaultBlockState(), 2)
+                    val previousDamage = dummy.totalDamage
                     val hit = ready()
                     repeat(12) { if (hit.alive) { hit.tick(); hit.status.age++ } }
-                    record(t, "curved-light-actually-hits-entity-center", dummy.totalDamage == 36.0, "damage=${dummy.totalDamage}")
+                    record(t, "curved-light-actually-hits-entity-center", dummy.totalDamage - previousDamage == 36.0, "damage=${dummy.totalDamage - previousDamage}")
                     hit.alive = false; hit.die(); dummy.discard()
 
                     // 真正穿透后，当前刻余程保持接触切线；之后不能回锁已穿过的目标。
@@ -173,7 +184,7 @@ object HomingLightScene {
                                 "damage=$before/$first/${victim.totalDamage}")
                             // 在未经过的目标上重新制导，不能因跳过旧目标而关闭整个追踪修正。
                             val next = ctx.spawnDummy(origin.x + 1.0, victim.y, origin.z + 5.0)
-                            pierce.status.pos.set(origin.x.toFloat(), victim.boundingBox.center.y.toFloat(), (origin.z + 3.0).toFloat())
+                            pierce.status.pos.set(origin.x, victim.boundingBox.center.y, (origin.z + 3.0))
                             pierce.status.velocity.set(0f, 0f, ConcentratedLight.FLIGHT_SPEED)
                             repeat(12) { if (pierce.alive && next.totalDamage == 0.0) { pierce.tick(); pierce.status.age++ } }
                             record(t, "piercing-can-seek-another-target", next.totalDamage > 0.0, "damage=${next.totalDamage}")
@@ -205,7 +216,7 @@ object HomingLightScene {
                 }
                 if (t == 47) {
                     val beam = checkNotNull(display)
-                    record(t, "charge-remains-at-deployment-point", beam.awaitingRelease && beam.status.pos.z == -8f,
+                    record(t, "charge-remains-at-deployment-point", beam.awaitingRelease && beam.status.pos.z == -8.0,
                         "age=${beam.status.age} pos=${beam.status.pos}")
                 }
                 if (t == 54) {

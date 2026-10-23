@@ -7,7 +7,7 @@
 | 抽牌作用域 | 同链修正无牌序；触发荷载独立，子链散射不污染载体；付费一次、链锯清整次延迟 | spell_chain、foundations |
 | 复制与后代 | 按配方重建独立effect/荷载，抵消重复速度倍率，量子复制有本体与真实命中 | spell_mechanics、spell_resonance |
 | 寿命触发 | 定时到期当刻释放；休眠水晶到期爆炸，提前死亡与expire区分 | spell_timing、crystal_lifecycle |
-| 碰撞与反射 | 普通轨道经过Move；墙反弹与实体穿刺分开，高速盾反弹在死亡/命中前完成，视觉使用真实壳面接点 | spell_chain、shield_balance |
+| 碰撞与反射 | 出生豁免不误伤、返弹自伤保留；双精度世界位置，解析扫掠薄形状/拼缝并按接点排序；斜墙/墙角不嵌入，同刻多次反弹走完余时；光束保留折点，水晶联动读取实际路径 | collision_precision、spell_chain、shield_balance |
 | 等离子束 | 默认静态，本体随位置；有效射线在墙/护盾截断，视觉与伤害共用截点，允许自伤 | expansion_plasma、spell_chain |
 | 追踪与弹速 | 扫掠预计飞行段找六格侧向范围内的目标中心，前方对准度优先，排除后方回锁；穿透后当刻沿当前切线渐入新目标的曲率，不抑制重复伤害；真实子步与光束共用路径 | homing_light、projectile_flight |
 | 汇聚之光 | 原地锁定方向蓄能10t，释放后64格/t连续光脊；主芯照明有限退场，保留真实5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
@@ -17,7 +17,6 @@
 | 多卡护盾 | 卡数提高抗性与立方窗口预算，破盾当次仍吸收；无常驻壳和多余圆环 | shield_balance |
 | 黑洞 | 高质量互吸缓慢、静态源不碰撞、原维度持续结算，创造飞行免吸 | damage_mass、spell_stability |
 | 晶体 | 外向晶面、多角可读、临爆加速白闪和爆碎 | crystal_lifecycle、sawblade_falling |
-| 被动瞄准 | 实际持杖驱动64格细线，首实体/方块接点与高亮一致；重复卡单实例，卸卡/闲置有限退场，保留原生发光 | aim、wand_aim |
 | 持杖与模型 | 原生低模idle/宝石余光，准星瞄准，长按不减速，成功使用不重举 | wand_casting、wand_aim |
 | 脚下法阵 | 实时跟实体、独立慢自转；透明出生，PD首次接管原子同步，正常退场等原生完成 | pd_api、wand_casting |
 | HUD | 无重复充能准心；短尖芒命中、径向绘制/外散击杀与方向受击；本机布局拖动缩放 | magic_hud |

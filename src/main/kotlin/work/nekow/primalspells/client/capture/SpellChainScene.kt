@@ -17,6 +17,7 @@ import work.nekow.primalspells.magic.effect.lifecycle.PlasmaBeam
 import work.nekow.primalspells.magic.projectile.*
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.*
+import work.nekow.primalspells.util.toPosition
 import kotlin.math.abs
 
 /** 真实世界回归束壳截点、穿刺触发、强追踪、付费机枪配方与十秒统计重置。 */
@@ -55,7 +56,7 @@ object SpellChainScene {
                 fun shot(id:String, pos:Vec3, mods:List<String> = emptyList(), caster:LivingEntity = ctx.player):Projectile {
                     val p=MagicManager.create(id) as Projectile
                     SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
-                    p.caster=caster;p.wand=Wand("chain-$id-$t");p.position=pos.toVector3f();p.velocity=Vector3f(0f,0f,1f)
+                    p.caster=caster;p.wand=Wand("chain-$id-$t");p.position=pos.toPosition();p.velocity=Vector3f(0f,0f,1f)
                     p.spell();return p
                 }
                 if(t==8) {
@@ -63,7 +64,7 @@ object SpellChainScene {
                     val parent=MagicManager.create("trigger_fireball") as TriggerFireball
                     SpellAssembly.apply(parent,listOf(MagicManager.create("piercing") as Modifier))
                     parent.payload += MagicManager.create("fireball")!!
-                    parent.caster=ctx.player;parent.wand=Wand("piercing-trigger");parent.position=target.boundingBox.center.toVector3f();parent.velocity=Vector3f(0f,0f,1f);parent.spell()
+                    parent.caster=ctx.player;parent.wand=Wand("piercing-trigger");parent.position=target.boundingBox.center.toPosition();parent.velocity=Vector3f(0f,0f,1f);parent.spell()
                     parent.hitEntity(target)
                     record(t,"piercing-entity-damages-and-keeps-payload",target.totalDamage==4.0 && parent.payload.size==1 && parent.alive,"damage=${target.totalDamage} payload=${parent.payload.size} alive=${parent.alive}")
                     val before=MagicManager.projectiles.size
@@ -168,7 +169,7 @@ object SpellChainScene {
                         val before=shield.status.mana
                         p.tick()
                         val end=p.effects.filterIsInstance<PlasmaBeam>().single().beamEnd
-                        record(t,"beam-clips-real-shell-$i",abs(end.distanceTo(center)-1.7)<1e-4 && end.z<0 && p.status.pos.distance(start.toVector3f())<1e-5 && p.status.velocity.lengthSquared()==0f,"end=$end source=${p.status.pos}")
+                        record(t,"beam-clips-real-shell-$i",abs(end.distanceTo(center)-1.7)<1e-4 && end.z<0 && p.status.pos.distance(start.toPosition())<1e-5 && p.status.velocity.lengthSquared()==0f,"end=$end source=${p.status.pos}")
                         record(t,"beam-protects-holder-and-behind-$i",holder!!.totalDamage==0.0 && behind!!.totalDamage==0.0 && shield.status.mana<before,"holder=${holder!!.totalDamage} behind=${behind!!.totalDamage} mana=${shield.status.mana}")
                         if(i==0){visibleBeam=p;MagicManager.add(p)} else {p.alive=false;p.die()}
                     }

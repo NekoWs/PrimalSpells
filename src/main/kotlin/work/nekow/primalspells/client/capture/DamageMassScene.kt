@@ -8,6 +8,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.animal.pig.Pig
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.DamageNumber
@@ -46,7 +47,7 @@ object DamageMassScene {
                 fun shot(id:String,at:Vec3,mods:List<String> = emptyList()):Projectile {
                     val p=MagicManager.create(id) as Projectile
                     SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
-                    p.caster=ctx.player;p.wand=Wand("mass-$t-$id");p.position=Vector3f(at.x.toFloat(),at.y.toFloat(),at.z.toFloat())
+                    p.caster=ctx.player;p.wand=Wand("mass-$t-$id");p.position=Vector3d((at.x).toDouble(), (at.y).toDouble(), (at.z).toDouble())
                     p.velocity=Vector3f(0f,0f,1f);p.spell();return p
                 }
                 if(t==8) {

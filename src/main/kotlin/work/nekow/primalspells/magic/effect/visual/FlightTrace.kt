@@ -17,10 +17,19 @@ object FlightTrace {
         val length = lengths.sum()
         // 高速聚光一刻可跨64格，仍保留八分之一格光脊，避免旧上限把激光拉成断续点线。
         val count = ceil(length / spacing).toInt().coerceIn(1, 4096)
+        // 等距采样可能跨过反射点，切掉墙角。额外保留真实折点，光束不能画进墙里。
+        var travelled = 0.0
+        val corners = arrayListOf<Double>()
+        for (i in 1 until points.lastIndex) {
+            travelled += lengths[i - 1]
+            val before = points[i].subtract(points[i - 1]).normalize()
+            val after = points[i + 1].subtract(points[i]).normalize()
+            if (before.dot(after) < 0.9999) corners += travelled
+        }
+        val distances = ((0..count).map { length * it / count } + corners).sorted().distinct()
         var segment = 0
         var passed = 0.0
-        return (0..count).map { index ->
-            val at = length * index / count
+        return distances.map { at ->
             while (segment < lengths.lastIndex && at > passed + lengths[segment]) passed += lengths[segment++]
             val a = points[segment]; val b = points[segment + 1]
             Sample(a.lerp(b, ((at - passed) / lengths[segment]).coerceIn(0.0, 1.0)), b.subtract(a).normalize())

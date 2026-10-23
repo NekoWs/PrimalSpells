@@ -73,12 +73,8 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         }
 
         bus.addListener<RegisterPayloadHandlersEvent> { event ->
-            val registrar = event.registrar("1.4.0")
+            val registrar = event.registrar("1.5.0")
 
-            registrar.playToClient(work.nekow.primalspells.network.AimTargetPayload.ID,
-                work.nekow.primalspells.network.AimTargetPayload.STREAM_CODEC) { payload, _ ->
-                ClientPayloadSink.aimTarget?.invoke(payload)
-            }
             // S→C：交给客户端安装的处理器（服务端上为 null）
             registrar.playToClient(
                 SyncWandStatsPayload.ID,

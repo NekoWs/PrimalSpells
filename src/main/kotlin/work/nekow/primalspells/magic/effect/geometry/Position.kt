@@ -1,6 +1,6 @@
 package work.nekow.primalspells.magic.effect.geometry
 
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 
@@ -10,11 +10,11 @@ import work.nekow.primalspells.magic.effect.BaseEffect
  * 阶段：[EffectPhase.SETUP] —— 必须最先执行，后续所有效果都建立在它写好的位置上。
  */
 class Position(
-    var pos: Vector3f
+    var pos: Vector3d
 ): BaseEffect() {
     override val phase = EffectPhase.SETUP
 
     override fun onActive() {
-        status.pos = pos
+        status.pos = Vector3d(pos)
     }
 }

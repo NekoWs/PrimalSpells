@@ -6,6 +6,7 @@ import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.ConcentratedLight
+import work.nekow.primalspells.util.toVec3
 import kotlin.math.*
 
 /** 粗像素棱片向白金核心聚焦，再接连续光束与短暂余辉；全程实色硬边。 */
@@ -15,7 +16,7 @@ class ConcentratedLightFx : BaseEffect() {
     private var charge: ParticleBatch? = null
     private var previous = Vec3.ZERO
     private var chargeRest = emptyList<Vec3>()
-    private fun point() = Vec3(status.pos)
+    private fun point() = status.pos.toVec3()
     private fun points(progress: Double = (status.age.toDouble()/ConcentratedLight.CHARGE_TICKS).coerceIn(0.0,1.0)): List<Vec3> {
         val forward = projectile.launchDirection
         val side = forward.cross(Vec3(0.0,1.0,0.0)).let { if(it.lengthSqr()<1e-8) Vec3(1.0,0.0,0.0) else it.normalize() }
@@ -72,7 +73,7 @@ class ConcentratedLightFx : BaseEffect() {
             releaseRecoil(pm, charge!!);charge=null
             releaseFlash(pm)
         }
-        val end=projectile.shieldReflectionPoint ?: point()
+        val end=point()
         val samples=FlightTrace.sample(projectile,previous,end,0.125)
         if(samples.isNotEmpty()) {
             // 白色光脊与金色侧线在空间上分开，实色片元不共面覆盖。

@@ -6,6 +6,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.projectile.arrow.Arrow
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.core.client.ClientParticleEngine
@@ -101,7 +102,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(AimScene.scene(), HomingLightScene.scene(), ParticleLightingScene.scene(), ProjectileFlightScene.scene(), ProgressionScene.scene(), FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
+    fun all(): List<Scene> = listOf(CollisionPrecisionScene.scene(), HomingLightScene.scene(), ParticleLightingScene.scene(), ProjectileFlightScene.scene(), ProgressionScene.scene(), FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -216,7 +217,7 @@ object CaptureScenes {
     /** 录制专用定位效果：走真实 OVERRIDE 阶段，固定镜头便于看出结构有没有留在出生点。 */
     private fun addFieldMotion(id: String) {
         val p = MagicManager.projectiles.single { it.id == id }
-        val origin = Vector3f(p.status.pos)
+        val origin = Vector3d(p.status.pos)
         p.effects += object : BaseEffect() {
             override val phase = EffectPhase.OVERRIDE
             private var age = 0
@@ -229,7 +230,7 @@ object CaptureScenes {
                     t < 60 -> 2.7f - (t - 45) * 0.36f
                     else -> -2.7f
                 }
-                status.pos.set(origin.x + offset, origin.y, origin.z)
+                status.pos.set((origin.x + offset).toDouble(), origin.y.toDouble(), origin.z.toDouble())
             }
         }.also {
             it.caster = p.caster
@@ -602,7 +603,7 @@ object CaptureScenes {
         val projectile = MagicManager.create("large_explosion") as Projectile
         projectile.caster = caster
         projectile.wand = wand
-        projectile.position = Vector3f(CX + offsetX, floorY + 2.0f, CZ + 0.5f)
+        projectile.position = Vector3d((CX + offsetX).toDouble(), (floorY + 2.0f).toDouble(), (CZ + 0.5f).toDouble())
         projectile.velocity = Vector3f(0f, 0f, 0f)
         projectile.spell()
         MagicManager.add(projectile)
@@ -824,13 +825,13 @@ object CaptureScenes {
 
     /** 火球消失后相机停在最后看到的位置（没有它就退回施法点上方）。 */
     private fun lastTrailTarget(): Vector3f =
-        if (trailSeen) Vector3f(lastTrailX, lastTrailY, lastTrailZ) else Vector3f(CX + 0.5f, 4f, CZ + 0.5f)
+        if (trailSeen) Vector3f(lastTrailX.toFloat(), lastTrailY.toFloat(), lastTrailZ.toFloat()) else Vector3f(CX + 0.5f, 4f, CZ + 0.5f)
 
     // 跟拍机位跨 tick 的缓存（相机函数每个 tick 都要用上一帧的朝向，火球消失后还要停在原地）
     private var trailSeen = false
-    private var lastTrailX = 0f
-    private var lastTrailY = 0f
-    private var lastTrailZ = 0f
+    private var lastTrailX = 0.0
+    private var lastTrailY = 0.0
+    private var lastTrailZ = 0.0
     private var lastTrailDirX = 0f
     private var lastTrailDirZ = -1f
 
@@ -917,7 +918,7 @@ object CaptureScenes {
         val projectile = MagicManager.create("laser") as Projectile
         projectile.caster = caster
         projectile.wand = wand
-        projectile.position = from
+        projectile.position = Vector3d(from)
         projectile.velocity = aim.sub(from).normalize()
         projectile.spell()
         MagicManager.add(projectile)
@@ -979,7 +980,7 @@ object CaptureScenes {
                 // 保留摄影相机作为施法者；爆炸也可伤害来源本人，伤害观察目标单独放在爆心旁。
                 bolt.caster = ctx.player
                 bolt.wand = Wand("capture-explosion")
-                bolt.position = Vector3f(CX + 0.5f, floorY + 2.0f, CZ + 0.5f)
+                bolt.position = Vector3d((CX + 0.5f).toDouble(), (floorY + 2.0f).toDouble(), (CZ + 0.5f).toDouble())
                 bolt.velocity = Vector3f(0f, 0f, 0f)
                 // 客户端计数可能领先服务端；在真实死亡回调内采样，确保同一次结算已有伤害与粒子。
                 // Explosion 已在构造器中先注入，观察器位于它之后，不改变任何结算行为。

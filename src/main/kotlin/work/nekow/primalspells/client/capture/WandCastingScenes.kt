@@ -12,6 +12,7 @@ import work.nekow.primalspells.magic.effect.visual.WandCastingFx
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
+import work.nekow.primalspells.util.toPosition
 import kotlin.math.sin
 
 /** 真玩家持有真实法杖：切换预热、待机、移动跟随、两种冷却与放下清理。 */
@@ -93,7 +94,7 @@ object WandCastingScenes {
                     // add走pendingAdd；在下一Pre tick并入活动表后、第一次Move之前验证真实出生点。
                     work.nekow.primalspells.util.Deferred.after(ctx.level, 0) {
                         val shot = MagicManager.projectiles.lastOrNull { it.wand === first }
-                        gemOriginMatches = firstCast && shot != null && shot.position.distance(gem.toVector3f()) < 0.0001f
+                        gemOriginMatches = firstCast && shot != null && shot.position.distance(gem.toPosition()) < 0.0001f
                     }
                 }
                 // 等第一轮充能收尾结束再重复施法，避免将下一轮柱体当成退场残留。

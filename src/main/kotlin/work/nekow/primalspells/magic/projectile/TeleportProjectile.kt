@@ -3,7 +3,7 @@ package work.nekow.primalspells.magic.projectile
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
-import org.joml.Vector3f
+import org.joml.Vector3d
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.effect.visual.Trajectory
 import work.nekow.primalspells.util.HitResult
@@ -42,7 +42,7 @@ class TeleportProjectile : Projectile() {
         teleportTo(status.pos)
     }
 
-    private fun teleportTo(pos: Vector3f) {
+    private fun teleportTo(pos: Vector3d) {
         if (teleported) return
         teleported = true
         val level = caster.level() as? ServerLevel ?: return

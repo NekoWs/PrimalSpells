@@ -11,6 +11,7 @@ import net.minecraft.world.entity.animal.pig.Pig
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
@@ -21,6 +22,8 @@ import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
+import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.util.toPosition
 
 /** 原版受伤验证破盾当次保护、卡数预算和法力，再用左右双靶记录真实碎片表现。 */
 object ShieldBalanceScene {
@@ -54,8 +57,8 @@ object ShieldBalanceScene {
                     val p=MagicManager.create("fireball") as Projectile;SpellAssembly.apply(p,mods.map{MagicManager.create(it) as Modifier})
                     p.caster=ctx.player;p.wand=Wand("shield-probe");p.status.damage=damage
                     val center=holder.boundingBox.center
-                    p.position=center.add(0.0,0.0,-4.0).toVector3f();p.velocity=Vector3f(0f,0f,1f);p.spell()
-                    p.status.pos=center.add(0.0,0.0,-0.5).toVector3f();p.status.velocity.set(0f,0f,4.8f)
+                    p.position=center.add(0.0,0.0,-4.0).toPosition();p.velocity=Vector3f(0f,0f,1f);p.spell()
+                    p.status.pos=center.add(0.0,0.0,-0.5).toPosition();p.status.velocity.set(0f,0f,4.8f)
                     p.hitEntity(holder);p.die();return p
                 }
                 if(t==8) {
@@ -86,7 +89,7 @@ object ShieldBalanceScene {
                     val inner=pig(0.0);val wi=equip(inner,8)
                     Explosion.customExplode(ctx.player,inner.boundingBox.center.toVector3f(),2f,10.0)
                     record(t,"internal-explosion-remains-dangerous",inner.health==990f && wi.status.mana==10000.0,"health=${inner.health}");inner.discard()
-                    // 绕过被动扫场时机，真正让Move在单刻内撞进持盾原版生物。
+                    // 实际Move单刻穿越球壳；忽略摄影棚墙面，隔离首反射与剩余路程，墙反弹另有专场。
                     for ((speed, angled) in listOf(4.8f to false, 24f to false, 64f to false, 12f to true)) {
                         val holder=pig(6.0);val ws=equip(holder,8)
                         val center=holder.boundingBox.center
@@ -94,13 +97,13 @@ object ShieldBalanceScene {
                         val distance=if(speed>12f)10.0 else 3.6
                         val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                         light.caster=ctx.player;light.wand=Wand("shield-fast-$speed-$angled")
-                        light.position=center.subtract(heading.scale(distance)).toVector3f();light.velocity=heading.toVector3f();light.speed=speed/Projectile.LAUNCH_SPEED_SCALE
+                        light.position=center.subtract(heading.scale(distance)).toPosition();light.velocity=heading.toVector3f();light.speed=speed/Projectile.LAUNCH_SPEED_SCALE;light.throughBlocks=true
                         light.spell();light.status.age=work.nekow.primalspells.magic.projectile.ConcentratedLight.CHARGE_TICKS;light.tick();light.status.age++
-                        val reflected=Vec3(light.status.pos);val velocity=Vec3(light.status.velocity)
+                        val reflected=light.status.pos.toVec3();val velocity=Vec3(light.status.velocity)
                         record(t,"fast-light-reflects-alive-$speed-$angled",light.alive && light.status.hitTargets==0 && light.status.bounces==5 && holder.health==1000f && !shield(ws).breached && velocity.dot(heading)<-speed*0.99 && reflected.distanceTo(center)>1.7,"alive=${light.alive} hits=${light.status.hitTargets} pos=$reflected velocity=$velocity health=${holder.health}")
                         ws.tick(holder,ctx.level)
                         record(t,"fast-light-charged-once-$speed-$angled",ws.status.mana==9995.0,"mana=${ws.status.mana}")
-                        val victim=pig(6.0);val back=center.subtract(heading.scale(6.0));victim.setPos(back.x,holder.y,back.z)
+                        val victim=pig(6.0);val back=reflected.add(velocity.normalize().scale(2.0));victim.setPos(back.x,back.y-victim.bbHeight/2.0,back.z)
                         repeat(3){if(light.alive){light.tick();light.status.age++}}
                         record(t,"reflected-light-still-hits-$speed-$angled",victim.health==964f && holder.health==1000f && !light.alive,"victim=${victim.health} holder=${holder.health} alive=${light.alive}")
                         light.die();holder.discard();victim.discard()
@@ -111,20 +114,20 @@ object ShieldBalanceScene {
                         val center=holder.position().add(0.0,holder.bbHeight*0.55,0.0)
                         val start=center.add(ox,oy,-3.0)
                         val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
-                        light.caster=ctx.player;light.wand=Wand("shield-graze");light.position=start.toVector3f();light.velocity=Vector3f(0f,0f,1f);light.speed=speed/Projectile.LAUNCH_SPEED_SCALE
+                        light.caster=ctx.player;light.wand=Wand("shield-graze");light.position=start.toPosition();light.velocity=Vector3f(0f,0f,1f);light.speed=speed/Projectile.LAUNCH_SPEED_SCALE;light.throughBlocks=true
                         light.spell();light.status.age=work.nekow.primalspells.magic.projectile.ConcentratedLight.CHARGE_TICKS;light.tick()
                         val contact=light.shieldReflectionPoint
                         val expected=center.add(ox,oy,-kotlin.math.sqrt(1.7*1.7-ox*ox-oy*oy))
                         val normal=contact?.subtract(center)?.normalize()
                         record(t,"grazing-contact-correct-before-passive-$speed-$ox-$oy",contact!=null && contact.distanceTo(expected)<0.001 && light.alive && light.status.hitTargets==0 && holder.health==1000f && ws.status.mana==9995.0,"contact=$contact expected=$expected pos=${light.status.pos} mana=${ws.status.mana}")
-                        val position=Vector3f(light.status.pos);val velocity=Vector3f(light.status.velocity)
+                        val position=Vector3d(light.status.pos);val velocity=Vector3f(light.status.velocity)
                         ws.tick(holder,ctx.level)
                         record(t,"grazing-no-late-shift-$speed-$ox-$oy",normal!=null && Vec3(velocity).dot(normal)>0 && kotlin.math.abs(velocity.length()-speed)<0.001 && position==light.status.pos && velocity==light.status.velocity && ws.status.mana==9995.0,"velocity=$velocity pos=${light.status.pos} mana=${ws.status.mana}")
                         light.alive=false;light.die();holder.discard()
                     }
                     val chainHolder=pig(6.0);val chainWand=equip(chainHolder,8)
                     val chain=MagicManager.create("chain_bolt") as Projectile
-                    chain.caster=ctx.player;chain.wand=Wand("shield-chain");chain.position=chainHolder.boundingBox.center.add(0.0,0.0,-2.8).toVector3f();chain.velocity=Vector3f(0f,0f,1f);chain.spell()
+                    chain.caster=ctx.player;chain.wand=Wand("shield-chain");chain.position=chainHolder.boundingBox.center.add(0.0,0.0,-2.8).toPosition();chain.velocity=Vector3f(0f,0f,1f);chain.spell()
                     chain.status.age=4;chain.tick()
                     record(t,"chain-shield-reflection-keeps-outgoing-drift",chain.alive && chain.status.hitTargets==0 && chain.status.velocity.z<0 && chainHolder.health==1000f && chainWand.status.mana==9995.0,"velocity=${chain.status.velocity} health=${chainHolder.health} mana=${chainWand.status.mana}")
                     chain.alive=false;chain.die();chainHolder.discard()
@@ -161,16 +164,19 @@ object ShieldBalanceScene {
                     if(t==140)eight.status.mana=0.0
                     for(holder in listOf(left!!,right!!)) {
                         val p=MagicManager.create("fireball") as Projectile;p.caster=ctx.player;p.wand=Wand("shield-runtime");p.status.damage=36.0
-                        p.position=Vector3f(holder.x.toFloat(),floor+1.8f,-6f);p.velocity=Vector3f(0f,0f,1f);p.speed=3f;p.maxAge=30;p.spell();MagicManager.add(p)
+                        p.position=Vector3d((holder.x).toDouble(), (floor+1.8f).toDouble(), (-6f).toDouble());p.velocity=Vector3f(0f,0f,1f);p.speed=3f;p.maxAge=30;p.spell();MagicManager.add(p)
                     }
                 }
                 if(t==90) {
                     val p=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                     p.caster=ctx.player;p.wand=Wand("grazing-visual")
                     val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
-                    p.position=center.add(1.2,0.0,-7.0).toVector3f();p.velocity=Vector3f(0f,0f,1f);p.spell();MagicManager.add(p);grazingLight=p
+                    p.position=center.add(1.2,0.0,-7.0).toPosition();p.velocity=Vector3f(0f,0f,1f);p.spell();MagicManager.add(p);grazingLight=p
                 }
-                if(t in 100..120 && grazingContact==null && grazingLight?.shieldReflectionPoint!=null)grazingContact=grazingLight!!.shieldReflectionPoint
+                if(t in 100..120 && grazingContact==null && grazingLight?.shieldReflectionPoint!=null) {
+                    val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
+                    grazingContact=grazingLight!!.flightPath.firstOrNull { kotlin.math.abs(it.distanceTo(center)-1.7)<1e-6 }
+                }
                 if(t==115)grazingLight?.alive=false
                 if(t==130) {
                     val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)

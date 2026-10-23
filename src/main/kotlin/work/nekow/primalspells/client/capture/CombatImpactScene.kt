@@ -19,6 +19,7 @@ import work.nekow.primalspells.magic.effect.lifecycle.*
 import work.nekow.primalspells.registry.ModDamageTypes
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.util.toPosition
 import kotlin.math.abs
 
 /** 真原版生物验证伤害/抗性/自伤与暗核，避免测试木桩免伤/免击退掩盖原版固定推力。 */
@@ -50,7 +51,7 @@ object CombatImpactScene {
                 fun shot(id:String,at:Vec3,mods:List<String> = emptyList(),caster:net.minecraft.world.entity.Entity=ctx.player):Projectile {
                     val p=MagicManager.create(id) as Projectile
                     SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
-                    p.caster=caster;p.wand=Wand("impact-$t-$id");p.position=at.toVector3f();p.velocity=Vector3f(0f,0f,1f)
+                    p.caster=caster;p.wand=Wand("impact-$t-$id");p.position=at.toPosition();p.velocity=Vector3f(0f,0f,1f)
                     p.spell();return p
                 }
                 if(t==8) {

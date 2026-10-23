@@ -7,6 +7,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
@@ -14,6 +15,7 @@ import work.nekow.primalspells.magic.core.*
 import work.nekow.primalspells.magic.effect.lifecycle.*
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.util.toVec3
 
 /** 第54轮：真实法杖发射、生命周期和跨投射物反应的实机回归。 */
 object SpellQualityScenes {
@@ -72,7 +74,7 @@ object SpellQualityScenes {
                     val p = MagicManager.create("fireball") as Projectile
                     SpellAssembly.apply(p, listOf(MagicManager.create("homing") as Modifier))
                     p.caster = ctx.player; p.wand = Wand("first-tick-tracking")
-                    p.position = Vector3f(0f, target!!.boundingBox.center.y.toFloat(), -2f); p.velocity = Vector3f(0f, 0f, 1f)
+                    p.position = Vector3d((0f).toDouble(), (target!!.boundingBox.center.y).toDouble(), (-2f).toDouble()); p.velocity = Vector3f(0f, 0f, 1f)
                     p.spell(); probe = p
                     val launchSpeed = p.status.velocity.length()
                     p.tick()
@@ -81,7 +83,7 @@ object SpellQualityScenes {
                     target!!.discard()
                     val piercing = MagicManager.create("fireball") as Projectile
                     piercing.caster = ctx.player; piercing.wand = Wand("wall-pass")
-                    piercing.position = Vector3f(0f, floor+3f, 2.8f); piercing.velocity = Vector3f(0f, 0f, 1f)
+                    piercing.position = Vector3d((0f).toDouble(), (floor+3f).toDouble(), (2.8f).toDouble()); piercing.velocity = Vector3f(0f, 0f, 1f)
                     piercing.throughBlocks = true; piercing.spell(); piercing.tick(); probe = piercing
                     piercing.alive = false; piercing.die()
                 }
@@ -129,7 +131,7 @@ object SpellQualityScenes {
                 fun probe(id: String, mods: List<String> = emptyList(), pos: Vector3f = Vector3f(0f,floor+3f,0f)): Projectile {
                     val p = MagicManager.create(id) as Projectile
                     SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
-                    p.caster=ctx.player;p.wand=Wand("probe-$t-$id");p.position=pos;p.velocity=Vector3f(0f,0f,1f);p.dragCoeff=0f
+                    p.caster=ctx.player;p.wand=Wand("probe-$t-$id");p.position=Vector3d(pos);p.velocity=Vector3f(0f,0f,1f);p.dragCoeff=0f
                     p.spell();return p
                 }
                 fun record(label: String, ok: Boolean, detail: String) { checks += Check(name,t,label,ok,detail) }
@@ -161,7 +163,7 @@ object SpellQualityScenes {
                         val before=p.status.bounces;val particles=ParticleManager.of(ctx.level).getEngine().particleCount()
                         p.hitEntity(hitTarget)
                         record("entity-not-bounce-$mod",p.alive && p.status.bounces==before && ParticleManager.of(ctx.level).getEngine().particleCount()-particles<300,"alive=${p.alive} bounces=$before -> ${p.status.bounces} impactParticles=${ParticleManager.of(ctx.level).getEngine().particleCount()-particles}")
-                        p.hitBlock(Vector3f(p.status.pos),Vector3f(0f,0f,-1f))
+                        p.hitBlock(Vector3d(p.status.pos),Vector3f(0f,0f,-1f))
                         record("block-counts-bounce-$mod",p.status.bounces==before-1,"bounces=${p.status.bounces}")
                         p.alive=false;p.die()
                     }
@@ -183,7 +185,7 @@ object SpellQualityScenes {
                             val p=probe("fireball",listOf(mod)+if(fast==1)listOf("speed_boost")else emptyList())
                             p.collisionEnabled=false
                             repeat(80) { p.tick();p.status.age++ }
-                            val radius=Vec3(p.status.pos).distanceTo(ctx.player.eyePosition)
+                            val radius=p.status.pos.toVec3().distanceTo(ctx.player.eyePosition)
                             p.alive=false;p.die();radius
                         }
                         record("speed-expands-$mod",radii[0]>2.3 && radii[1]>radii[0]+.2 && radii[1]-radii[0]<1.0,"radii=$radii")
@@ -269,7 +271,7 @@ object SpellQualityScenes {
                 val copy = ordered.clone(); SpellAssembly.inherit(ordered, copy)
                 for (p in listOf(ordered, copy)) {
                     p.caster = ctx.player; p.wand = Wand("ordered-probe")
-                    p.position = Vector3f(0f, floor+3f, 0f); p.velocity = Vector3f(0f, 0f, 1f); p.spell()
+                    p.position = Vector3d((0f).toDouble(), (floor+3f).toDouble(), (0f).toDouble()); p.velocity = Vector3f(0f, 0f, 1f); p.spell()
                 }
                 matrixOk = copy.modifierOrder == ordered.modifierOrder && copy.status.damage == 11.0 && ordered.status.damage == 11.0 && copy.status.explosionDamage == 24.0 && ordered.status.explosionDamage == 24.0
                 for (id in shots) for (mod in modifiers) {
@@ -294,7 +296,7 @@ object SpellQualityScenes {
                     work.nekow.primalspells.util.Deferred.after(ctx.level, 0) {
                         bomb = MagicManager.projectiles.firstOrNull { it.id == "small_explosion" }
                         bomb?.let {
-                            it.status.pos.set(0f, floor+2.0f, 0f)
+                            it.status.pos.set(0.0, floor+2.0, 0.0)
                             it.alive = false
                         }
                     }
@@ -335,7 +337,7 @@ object SpellQualityScenes {
                 }
                 if (t == 175) cast(ctx, listOf("damage_boost", "freeze_charge", "speed_boost", "fireball"), -4.0, floor+3.0, -3.0)
                 if (t in 176..182 && !clusterHit) MagicManager.projectiles.firstOrNull { it.id == "fireball" && "bounce_duplicate" in it.modifiers }?.let { p ->
-                    p.hitBlock(Vector3f(p.status.pos), Vector3f(0f, 0f, -1f)); clusterHit = true
+                    p.hitBlock(Vector3d(p.status.pos), Vector3f(0f, 0f, -1f)); clusterHit = true
                 }
             }, checksAt = { ctx, t -> when (t) {
                 2 -> listOf(Check(name, t, "all-modifier-projectile-assemblies", matrixOk && matrix >= 400, "pairs=$matrix independent=$matrixOk"))

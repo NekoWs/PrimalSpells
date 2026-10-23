@@ -15,6 +15,7 @@ import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.SpellAssembly
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.util.toPosition
 import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -38,7 +39,7 @@ object ProjectileFlightScene {
             val p = MagicManager.create("fireball") as Projectile
             SpellAssembly.apply(p, mods.map { MagicManager.create(it) as Modifier })
             p.caster = ctx.player; p.wand = Wand("flight-$position")
-            p.position = position.toVector3f(); p.velocity = direction; p.spell()
+            p.position = position.toPosition(); p.velocity = direction; p.spell()
             return p
         }
         return Scene(name, "高速发射 / 飞行段追踪 / 拖尾寿命淡出", 24, 130,

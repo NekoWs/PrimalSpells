@@ -6,6 +6,7 @@ import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.ChainArc
+import work.nekow.primalspells.util.toVec3
 
 /** 常驻像素魔弹与四枚蓄电齿：跟随最终位置，接近跃迁时收拢；电流连接只在真实跃迁时生成。 */
 class ChainBoltFx : BaseEffect() {
@@ -13,7 +14,7 @@ class ChainBoltFx : BaseEffect() {
     private var manager: ParticleManager? = null
     private var batch: ParticleBatch? = null
     private fun points(): List<Vec3> {
-        val p = Vec3(status.pos)
+        val p = status.pos.toVec3()
         val progress = (status.age % ChainArc.JUMP_INTERVAL) / ChainArc.JUMP_INTERVAL
         val radius = (0.12 + 0.12 * (1.0-progress)) * projectile.areaScale
         return listOf(p, p.add(radius,0.0,0.0),p.add(-radius,0.0,0.0),p.add(0.0,radius,0.0),p.add(0.0,-radius,0.0))
@@ -30,6 +31,6 @@ class ChainBoltFx : BaseEffect() {
         particles.trackAll(points())
     }
     override fun onDie() {
-        manager?.let { PixelVfx.retireBatch(it,batch,Vec3(status.pos),4) };batch=null
+        manager?.let { PixelVfx.retireBatch(it,batch,status.pos.toVec3(),4) };batch=null
     }
 }

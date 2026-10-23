@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.core
 
+import org.joml.Vector3d
 import org.joml.Vector3f
 
 /**
@@ -9,7 +10,8 @@ import org.joml.Vector3f
  * 爆炸参数等。投射物位置/速度由 `Move` 在 [EffectPhase.MOTION] 阶段唯一推进。
  */
 data class MagicStatus(
-    var pos: Vector3f = Vector3f(),
+    /** 世界坐标必须保留double，远坐标也能逐1/16格积分。 */
+    var pos: Vector3d = Vector3d(),
     var velocity: Vector3f = Vector3f(),
     var damage: Double = 0.0,
     /** 直接伤害被接受后附加的冻结时长；0 为关闭。 */

@@ -5,6 +5,7 @@ import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.toVec3
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -34,7 +35,7 @@ class ChainsawFx : BaseEffect() {
         val axis = side.scale(cos(roll)).add(up.scale(sin(roll)))
         lastCutAxis = axis
         val bend = direction.cross(axis).normalize()
-        val center = Vec3(status.pos)
+        val center = status.pos.toVec3()
         val radius = (0.28 + random.nextDouble() * 0.18) * projectile.areaScale
         val curve = (if (random.nextBoolean()) 1 else -1) * (0.1 + random.nextDouble() * 0.12) * projectile.areaScale
         val count = 7 + random.nextInt(3)

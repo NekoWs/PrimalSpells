@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
@@ -14,6 +15,7 @@ import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.DelayedCastFx
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.util.toPosition
 
 /** 链锯整次清零、链内修正无牌序差异，真实移动载体的视觉爆开与荷载出生严格同刻。 */
 object SpellTimingScenes {
@@ -52,7 +54,7 @@ object SpellTimingScenes {
                         val p=MagicManager.create("delayed_cast") as Projectile
                         SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
                         p.caster=ctx.player;p.wand=Wand("delay-visual-$index")
-                        p.position=Vector3f(if(index==0)-3f else 3f,floor+3f,-2f);p.velocity=Vector3f(0f,0f,1f)
+                        p.position=Vector3d((if(index==0)-3f else 3f).toDouble(), (floor+3f).toDouble(), (-2f).toDouble());p.velocity=Vector3f(0f,0f,1f)
                         val payload=MagicManager.create("laser") as Projectile
                         payload.effects+=object:BaseEffect() {
                             override fun onActive() {
@@ -88,7 +90,7 @@ object SpellTimingScenes {
                         override fun onHitEntity(target:net.minecraft.world.entity.Entity) { sawHit=target===sawTarget && status.damage==5.0 }
                     }
                     saw.caster=ctx.player;saw.wand=Wand("saw-hit")
-                    saw.position=Vector3f(0f,(sawTarget!!.boundingBox.center.y).toFloat(),-1.2f);saw.velocity=Vector3f(0f,0f,1f)
+                    saw.position=Vector3d((0f).toDouble(), ((sawTarget!!.boundingBox.center.y)).toDouble(), (-1.2f).toDouble());saw.velocity=Vector3f(0f,0f,1f)
                     saw.spell();MagicManager.add(saw)
                 }
                 if(t==76) MagicManager.projectiles.forEach { it.alive=false }
@@ -97,7 +99,7 @@ object SpellTimingScenes {
                     val saw=MagicManager.create("chainsaw") as Projectile
                     SpellAssembly.apply(saw,listOf("extended_lifetime","speed_boost").map { MagicManager.create(it) as Modifier })
                     saw.caster=ctx.player;saw.wand=Wand("saw-long-visual")
-                    saw.position=Vector3f(-2f,floor+3f,-2f);saw.velocity=Vector3f(0f,0f,.1f)
+                    saw.position=Vector3d((-2f).toDouble(), (floor+3f).toDouble(), (-2f).toDouble());saw.velocity=Vector3f(0f,0f,.1f)
                     saw.spell();saw.maxAge=8;saw.collisionEnabled=false
                     longSaw=saw;MagicManager.add(saw)
                 }
@@ -159,7 +161,7 @@ object SpellTimingScenes {
                         val dummy=ctx.spawnDummy(-6.0,ctx.floorBlockY(0,0)+2.0,4.0)
                         val p=MagicManager.create("fireball") as Projectile
                         SpellAssembly.apply(p,listOf(MagicManager.create("homing") as Modifier))
-                        p.caster=ctx.player;p.wand=Wand("radius-probe");p.position=dummy.boundingBox.center.add(-distance,0.0,0.0).toVector3f()
+                        p.caster=ctx.player;p.wand=Wand("radius-probe");p.position=dummy.boundingBox.center.add(-distance,0.0,0.0).toPosition()
                         p.velocity=Vector3f(0f,0f,1f);p.spell();p.collisionEnabled=false;p.tick()
                         val turned=p.status.velocity.x>0.1f
                         p.alive=false;p.die();dummy.discard();return turned

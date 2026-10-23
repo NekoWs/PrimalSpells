@@ -85,7 +85,6 @@ object MagicManager {
         register { QuintupleCast() }
         register { ReduceRecharge() }
         register { Torch() }
-        register { Aim() }
         register { Sawblade() }
         register { HealingBolt() }
 

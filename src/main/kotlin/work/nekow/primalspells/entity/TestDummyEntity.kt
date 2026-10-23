@@ -14,6 +14,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.magic.core.MagicManager
@@ -165,7 +166,7 @@ class TestDummyEntity(
         val projectile = MagicManager.create(id) as? Projectile ?: return
         projectile.caster = this
         projectile.wand = attackWand
-        projectile.position = Vector3f(eye.x.toFloat(), eye.y.toFloat(), eye.z.toFloat())
+        projectile.position = Vector3d(eye.x, eye.y, eye.z)
         projectile.velocity = Vector3f(unit.x.toFloat(), unit.y.toFloat(), unit.z.toFloat())
         projectile.spell()
         MagicManager.add(projectile)

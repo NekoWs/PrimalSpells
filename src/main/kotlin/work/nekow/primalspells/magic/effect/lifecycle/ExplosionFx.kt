@@ -1,12 +1,14 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import kotlin.math.*
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.effect.visual.PixelVfx
 import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.util.ScreenShake
-import kotlin.math.*
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 
 /** 非对称火舌向外撕裂、火星弹道和翻卷烟尘；每次爆炸独立取样，绝不整体收球。 */
 object ExplosionFx {
@@ -36,10 +38,10 @@ object ExplosionFx {
             val d = direction()
             val life = 12 + random.nextInt(17)
             val fast = random.nextDouble() < 0.18
-            sparks += ParticleSpawnSpec().position(center.add(d.scale(0.2)))
+            sparks += spellParticleSpec().position(center.add(d.scale(0.2)))
                 .color(flame[random.nextInt(flame.size)])
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if (fast) 0.375f else 0.125f, 0.09375f)
-                    .glowing(true).additive(false).also { if (fast) it.alignTo(Vec3.ZERO,d) })
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(if (fast) 0.375f else 0.125f, 0.09375f)
+                    .additive(false).also { if (fast) it.alignTo(Vec3.ZERO,d) })
                 .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
             sparkVelocity += d.scale((0.18+r*0.05)*(0.6+random.nextDouble()*1.3)).add(0.0, 0.06, 0.0)
         }
@@ -49,9 +51,9 @@ object ExplosionFx {
         val flashVelocity = ArrayList<Vec3>()
         repeat(320) {
             val d = direction()
-            flash += ParticleSpawnSpec().position(center.add(d.scale(r*0.08)))
-                .color(Color.ofInt(255, 251, 215)).visual(ParticleVisual().style(ParticleStyle.SQUARE)
-                    .anisoWorld(0.25f, 0.1875f).glowing(true).additive(false))
+            flash += spellParticleSpec().position(center.add(d.scale(r*0.08)))
+                .color(Color.ofInt(255, 251, 215)).visual(spellVisual().style(ParticleStyle.SQUARE)
+                    .anisoWorld(0.25f, 0.1875f).additive(false))
                 .lifetime(5).sizeCurve(CurveKey.at(0,0),CurveKey.at(0.5,1,EasingType.EASE_OUT),
                     CurveKey.at(1.5,1),CurveKey.at(5,0,EasingType.EASE_IN))
             flashVelocity += d.scale(0.22+r*0.06)
@@ -77,9 +79,9 @@ object ExplosionFx {
                         val life = (if (r >= 5) 18 else 12) + slice * 2 + random.nextInt(12)
                         val burnOut = if (r >= 5) 12 else 8
                         val size = if (edge) 0.3125f else if (r >= 5) 0.5625f else 0.4375f
-                        specs += ParticleSpawnSpec().position(center.add(axis.scale((slice+phase)*0.10)).add(off.scale(0.35)))
+                        specs += spellParticleSpec().position(center.add(axis.scale((slice+phase)*0.10)).add(off.scale(0.35)))
                             .color(flame[if (edge) 2 else if(slice>=3) 0 else 1])
-                            .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size,size).glowing(true).additive(false))
+                            .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(size,size).additive(false))
                             .lifetime(life).sizeCurve(CurveKey.at(0,0),CurveKey.at(1,0.8,EasingType.EASE_OUT),
                                 CurveKey.at(3,1.15,EasingType.EASE_OUT),CurveKey.at(life-burnOut,1),CurveKey.at(life,0,EasingType.EASE_OUT))
                         velocities += axis.scale(power*(0.65+slice*0.11)).add(off.scale(0.10+slice*0.012)).add(0.0,0.025,0.0)
@@ -94,8 +96,8 @@ object ExplosionFx {
         val shardVelocity = ArrayList<Vec3>()
         repeat((r*12).toInt().coerceIn(20,96)) {
             val d=direction();val life=7+random.nextInt(8)
-            shards += ParticleSpawnSpec().position(center.add(d.scale(r*0.12))).color(flame[0])
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.5f,0.125f).glowing(true).additive(false)
+            shards += spellParticleSpec().position(center.add(d.scale(r*0.12))).color(flame[0])
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.5f,0.125f).additive(false)
                     .alignTo(Vec3.ZERO,d))
                 .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
             shardVelocity += d.scale(0.5+r*0.08+random.nextDouble()*0.25)
@@ -109,9 +111,9 @@ object ExplosionFx {
             repeat(128) {
                 val d = direction()
                 val life = 12+random.nextInt(12)
-                smoke += ParticleSpawnSpec().position(center.add(d.scale(r*(0.16+random.nextDouble()*0.22))))
+                smoke += spellParticleSpec().position(center.add(d.scale(r*(0.16+random.nextDouble()*0.22))))
                     .color(if (random.nextBoolean()) Color.ofInt(147,134,116) else Color.ofInt(66,60,57))
-                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.5f,0.5f).additive(false).glowing(false))
+                    .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.5f,0.5f).additive(false))
                     .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
                 velocities += d.scale(0.07+random.nextDouble()*0.06).add(0.0,0.055,0.0)
             }

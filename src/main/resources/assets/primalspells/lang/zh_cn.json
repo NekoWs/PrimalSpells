@@ -252,5 +252,7 @@
   "mage.primalspells.warden": "守御",
   "mage.primalspells.arcanist": "秘法",
   "mage.primalspells.siege": "聚光",
-  "compass.primalspells.starter": "村庄·入门法术"
+  "compass.primalspells.starter": "村庄·入门法术",
+  "item.primalspells.light": "光",
+  "lore.primalspells.light.desc": "使本链法术照亮周围；每枚弹体仅一个光源，重复修正不叠加光源。"
 }

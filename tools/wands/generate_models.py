@@ -219,8 +219,8 @@ def static_body():
     mesh.prism('obsidian_pommel',[(7.02,-2.7),(8,-4.8),(8.98,-2.7),(8.65,-1.65),(7.35,-1.65)],7.4,8.6,'obsidian','edge',bevel=.13,rim='edge')
     mesh.lathe('pommel_inset',[(-4.05,0),(-3.3,.40),(-2.6,0)],'gem',4)
     # 宽窄变化、真实倒角和内侧暗边让折臂成为立体零件，而非平面套圈。
-    mesh.prism('ivory_seal_crown',[(7.45,18.9),(5.68,21.22),(5.68,22.16),(6.94,23.26),(7.10,25.98),(8.22,26.75),(8.74,26.75),
-                                  (7.98,25.42),(7.86,22.85),(6.58,21.64),(6.62,21.33),(8.18,19.62)],7.40,8.60,'ivory','ivory_edge',bevel=.13,rim='ivory_light')
+    mesh.prism('ivory_seal_crown',[(x-.95,y) for x,y in [(7.45,18.9),(5.68,21.22),(5.68,22.16),(6.94,23.26),(7.10,25.98),(8.22,26.75),(8.74,26.75),
+                                  (7.98,25.42),(7.86,22.85),(6.58,21.64),(6.62,21.33),(8.18,19.62)]],7.40,8.60,'ivory','ivory_edge',bevel=.13,rim='ivory_light')
     mesh.prism('obsidian_crown_spine',[(8.35,19.0),(9.78,21.2),(9.78,23.55),(8.95,25.95),(9.35,26.5),
                                      (10.52,23.65),(10.52,20.95),(9.0,18.8)],7.46,8.54,'obsidian','edge',bevel=.10,rim='edge')
     binding(mesh,'lower_crystal_collar',18.28,1.05)
@@ -263,11 +263,11 @@ def crystal(glow):
             return base
         name=base+f'_glow{glow}'
         rgb=PALETTE[base]
-        PALETTE[name]=tuple(round(v+(255-v)*glow/15*.58) for v in rgb)
+        PALETTE[name]=tuple(round(v+(255-v)*glow/15*.96) for v in rgb)
         return name
     y=grip_constant('GEM_MODEL_Y')
-    top=(8.03,y+2.7,8.02);bottom=(7.97,y-2.7,7.98)
-    ring=[(6.94,y,8),(8,y,7.18),(9.06,y,8),(8,y,8.82)]
+    top=(8.03,y+2.35,8.02);bottom=(7.97,y-2.35,7.98)
+    ring=[(7.25,y,8),(8,y,7.32),(8.75,y,8),(8,y,8.68)]
     mesh.group('cut_amethyst_facets')
     # 直接把晶面切成互不重叠的色阶区，亮脉属于表面本身，避免贴面深度冲突。
     boundary=[(1,0,0),(.57,.43,0),(.43,.57,0),(0,1,0),(0,.55,.45),(0,.45,.55),(0,0,1),(.45,0,.55),(.55,0,.45)]

@@ -1,14 +1,16 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.util.toVec3
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 /** 单道随机弧形锯切：实色齿尖沿刃外移，短促熄灭，不叠固定十字。 */
 class ChainsawFx : BaseEffect() {
@@ -47,9 +49,9 @@ class ChainsawFx : BaseEffect() {
                 .add(direction.scale(tooth))
             velocities += axis.scale(across * 0.035).add(bend.scale(curve * 0.12))
             val life = 3 + random.nextInt(2)
-            ParticleSpawnSpec().position(center.add(offset))
+            spellParticleSpec().position(center.add(offset))
                 .color(if (i % 3 == 0) projectile.bodyColor else Color.WHITE)
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.125f, 0.125f).glowing(true))
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.125f, 0.125f))
                 .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
         }
         val pm = ParticleManager.of(world)

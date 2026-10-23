@@ -87,6 +87,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 | 场景 | 主要覆盖 |
 |---|---|
+| spell_lighting | 默认投射物目录零光源、昼夜像素不变、光修正真实付费/去重/复制/荷载隔离与退场 |
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
 | spell_performance | 固定32发高速物理/制导、512普通/冻结弹联动，逐样本服务端计时与线程分配；[口径与结果](design/performance.md) |
 | collision_precision | 双精度接点、24种斜反弹、单刻余程、薄形状/拼缝/跨格形状、墙角分量、命中排序、自伤豁免与真实路径联动 |

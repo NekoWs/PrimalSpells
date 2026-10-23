@@ -6,6 +6,7 @@ import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.spellVisual
 
 /** 远距施放：在 SETUP 后将本次投射物出生点前移；从触发荷载施放时仍相对命中点计算。 */
 class LongDistanceCast : Modifier() {
@@ -40,7 +41,7 @@ class LongDistanceCast : Modifier() {
                 val manager = ParticleManager.of(level)
                 val group = manager.createGroup(destination)
                 Draw.circle(manager, destination, 0.45, 48, colorFn = ColorSource.of(Color.ofInt(180, 135, 255, 255)),
-                    scale = 0.65f, group = group, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+                    scale = 0.65f, group = group, visual = spellVisual().style(ParticleStyle.SQUARE))
                 group.scale(1.6f, 4).delay(4).scale(0f, 4).destroyAfter(4)
             }
         }

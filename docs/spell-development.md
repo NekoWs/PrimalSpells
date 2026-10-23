@@ -66,7 +66,7 @@ Projectile.damageType与selfDamage分别声明，类型不自动开启自伤。�
 
 ## 6. 粒子与资源
 
-PD接线先读 [effects-api](design/effects-api.md)；遇能力缺口按政策停止并登记，不在本侧补渲染/光照。造型遵循 [像素风格](design/minecraft-visuals.md) 与 [连贯性](design/animation-continuity.md)。
+粒子默认使用`spellVisual/spellParticle/spellParticleSpec`，保持全亮但不照亮环境；仅照明卡显式申请光源。PD接线先读 [effects-api](design/effects-api.md)；遇能力缺口按政策停止并登记，不在本侧补渲染/光照。造型遵循 [像素风格](design/minecraft-visuals.md) 与 [连贯性](design/animation-continuity.md)。
 
 新增卡需物品定义、模型、纹理和zh_cn/en_us名称/描述，图标加入tools/spells/generate_icons.py。创造栏按投射物、静态投射物、修正、其他/被动分组，别打乱现有注册排序规则。获取池在数据资源中提供来源；生成型卡不随意进入敌人配方。
 

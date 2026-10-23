@@ -35,6 +35,7 @@
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
 | 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 法杖外观/占屏回归 | `client/capture/WandDesignScene.kt`，场景wand_design；户外主副手/左惯用手和紫晶实际像素边界 |
+| 法术默认光照/光修正 | `client/capture/SpellLightingScene.kt`，场景spell_lighting；目录零光源、昼夜全亮、单源预算/复制/荷载 |
 | 光照连续性复现 | `client/capture/ParticleLightingScene.kt`，场景particle_lighting |
 
 ## 2. 法术ID与实现
@@ -59,6 +60,7 @@
 | `quadruple_cast` / 四重施放 | `magic/modifier/QuadrupleCast.kt` |
 | `quintuple_cast` / 五重施放 | `magic/modifier/QuintupleCast.kt` |
 | `reduce_recharge` / 缩短充能时间 | `magic/modifier/ReduceRecharge.kt` |
+| `light` / 光 | `magic/modifier/Light.kt`、`magic/effect/visual/SpellLightFx.kt` |
 | `torch` / 火把 | `magic/modifier/Torch.kt` |
 | `sawblade` / 锯片 | `magic/projectile/Sawblade.kt` |
 | `healing_bolt` / 治疗弹 | `magic/projectile/HealingBolt.kt` |

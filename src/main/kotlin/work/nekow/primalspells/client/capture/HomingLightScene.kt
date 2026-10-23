@@ -212,7 +212,7 @@ object HomingLightScene {
                     val dummy = ctx.spawnDummy(1.0, floor + 2.0, 8.0)
                     target = dummy
                     lightPoint = Vec3(-4.0, dummy.boundingBox.center.y, -8.0)
-                    display = (shot(ctx, "concentrated_light", lightPoint) as ConcentratedLight)
+                    display = (shot(ctx, "concentrated_light", lightPoint, extras = listOf("light")) as ConcentratedLight)
                         .also(ProjectileRuntime::add)
                 }
                 if (t == 47) {
@@ -226,7 +226,7 @@ object HomingLightScene {
                 }
                 if (t == 82) {
                     val charge = light.filterKeys { it in 42..49 }.values
-                    record(t, "charge-emits-real-light-and-ramps-up", charge.size >= 4 && charge.max() > charge.min() + 2.0,
+                    record(t, "charge-with-light-modifier-emits-real-light", charge.size >= 4 && charge.max() > 10.0,
                         "samples=$light")
                     val dummy = checkNotNull(target)
                     record(t, "runtime-guided-beam-hits", dummy.totalDamage == 36.0, "damage=${dummy.totalDamage}")

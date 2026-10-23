@@ -6,6 +6,8 @@ import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.util.toVec3
 
 /** 随弹体收拢的六枚锁印；只有真实到期才在最终位置打开，绝不提前播放爆开。 */
@@ -30,9 +32,9 @@ class DelayedCastFx : BaseEffect() {
         val world = caster.level() as? ServerLevel ?: return
         manager = ParticleManager.of(world)
         val specs = points().mapIndexed { index, point ->
-            ParticleSpawnSpec().position(point).color(if (index == 0) Color.ofInt(218, 255, 187) else Color.GREEN)
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(
-                    if (index == 0) 0.1875f else 0.125f, if (index == 0) 0.1875f else 0.125f).glowing(true))
+            spellParticleSpec().position(point).color(if (index == 0) Color.ofInt(218, 255, 187) else Color.GREEN)
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(
+                    if (index == 0) 0.1875f else 0.125f, if (index == 0) 0.1875f else 0.125f))
                 .lifetime(-1).sizeCurve(CurveKey.at(0, 0), CurveKey.at(2, 1, EasingType.EASE_OUT))
         }
         batch = ParticleBatch(manager!!).also { it.addAll(manager!!.spawnAll(specs)) }

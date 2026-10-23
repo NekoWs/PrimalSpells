@@ -50,17 +50,15 @@ ParticleVisual定义贴图、UV、广告牌/方向、各向异性尺寸、混合
 
 ## 5. 全亮与动态光照
 
-`glowing(true)`表示片元免环境光照，`lightLevel(0..15)`表示向世界照明，两者不是同一效果，也不是加法混合。当前默认lightLevel为15，需明确所需照明；火把只有一颗14级光源，阵列明确为0。
+`glowing(true)`表示片元免环境光照，`lightLevel(0..15)`表示向世界照明，两者不是同一效果，也不是加法混合。PD默认lightLevel为15，不能只设置全亮而漏掉光源等级。
 
-Builder的glowing/lightLevel还决定客户端光源索引，不能只在visual内声明就假定已登记；`spawnParticle`封装会同步这两个字段，直接Builder调用也必须遵守。
+法术统一使用`spellVisual()`、`ParticleManager.spellParticle()`、`spellParticleSpec()`：visual、单颗Builder与批量Spec均显式全亮、零环境照明。`spawnParticle`与Draw使用同一外观契约；飞行发射器另外显式`glowing(true).lightLevel(0)`。爆炸、护盾、晶体、光束、施法阵和碎屑都遵守该默认值，夜晚保持颜色且不登记动态光源。
 
-DynamicLightManager读取PD原生lightIntensity(partialTick)：基础lightLevel × 静态乘数 × LIGHT曲线 × alpha × 尺寸包络，再叠加热更接续偏移。已有缩片、fade和表达式presence会同时收束照明，不改变硬边实色风格。光场签名与静止区块重建按1/16级光强更新，受光粒子缓存随光场版本失效。
+修正`light`（光）由`SpellLightFx`给所属链每枚弹体添加一颗14级动态光源，不给每个装饰片元/拖尾采样点登记光源。重复卡仍收费，但只由首实例创建；复制体继承独立源，触发荷载完全隔离。光源跟随本体的PD track样本，2t升亮，结束从当前光强接续4t熄灭，6t后回收；没有逐刻重建光源或热更全套装饰片元。长光束只照亮本体附近，不铺设整条路径光源。火把是明确的被动照明法术，保留一颗14级光源。
 
-新增公开入口：ParticleCurve.light / Builder、SpawnSpec、Emitter的lightCurve；ParticleVisual.lightIntensity设置静态乘数，ParticleHandle.lightIntensity(multiplier, durationTicks, easing)从当前实际光强接续。LIGHT仅影响照明，不改变片元alpha或全亮。
+DynamicLightManager读取PD原生lightIntensity(partialTick)：基础lightLevel × 静态乘数 × LIGHT曲线 × alpha × 尺寸包络，再叠加热更接续偏移。LIGHT只影响环境照明，不改变片元alpha/全亮；ParticleVisual.lightIntensity为静态乘数，ParticleHandle.lightIntensity从当前光强接续。全局/空间格预算与相机距离裁剪继续由PD负责，不在本模组另写预算管理器。
 
-汇聚之光在SpawnSpec显式登记glowing/lightLevel：主芯15级光照与10t LIGHT曲线，其他棱片免环境光但不承担光源；光脊分段布置12级光源、排光14级，均按曲线收尾。释放/取消时主芯用lightIntensity从当前值退到零。
-
-显式remove仍立即移除光源；需要正常退场的调用方必须先用尺寸/alpha/LIGHT曲线或lightIntensity缓动到零，再回收。没有曲线的固定尺寸粒子不会因升级自动获得入退场动画。光源预算裁剪和所有法术完整覆盖仍需应用层验收，不能仅凭接口出现宣称全局闪烁已消除。
+`spell_lighting`实际运行注册投射物目录，默认特效峰值超过一万颗时光源数为零；昼夜对照检查实际像素颜色。真实付费重复卡、同源复制、独立荷载以及光源有限退场均有原生断言。`particle_lighting`保留PD曲线/缩片原生光场检查；六个相关场景134项机制断言及画面门禁通过，1120帧零丢帧。普通拖尾逐颗透明度观察所需只读接口见[PD需求](../issues/pd-api-requests.md)。
 
 ## 6. 升级与验证
 

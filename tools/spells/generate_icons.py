@@ -13,7 +13,7 @@ MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','exte
              'piercing','bounce_explosion','homing','bounce_duplicate','gradual_accelerate',
              'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
              'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
-             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter')
+             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter','light')
 NEW_IDS = ('divide_two', 'divide_three', 'divide_five', 'divide_ten', 'cast_all', 'add_trigger', 'add_timer', 'add_expiration', 'triple_cast', 'quadruple_cast', 'quintuple_cast', 'reduce_recharge', 'sawblade', 'healing_bolt', 'torch')
 UTILITY_IDS = ('survey_pulse','item_pull','feather_ward')
 IDS = PROJECTILES + MODIFIERS + NEW_IDS + UTILITY_IDS
@@ -205,6 +205,10 @@ def icon(name):
         for x,y in ((16,6),(25,10),(26,18),(21,26),(11,26),(6,18),(7,10)):box(x,y,WHITE,1)
         box(16,16,DARK_BLUE,2)
     elif name=='healing_bolt':plus(16,16,'#7cffa0');arrow((5,24),(11,20),WHITE,1)
+    elif name=='light':
+        d.polygon(((16,10),(21,16),(16,22),(11,16)),fill=YELLOW)
+        box(16,16,WHITE,2)
+        for a,b in [((16,5),(16,8)),((16,24),(16,27)),((5,16),(8,16)),((24,16),(27,16)),((7,7),(10,10)),((22,22),(25,25)),((7,25),(10,22)),((22,10),(25,7))]: line((a,b),YELLOW,1)
     elif name=='torch':
         line(((14,20),(11,27)),WHITE,3);flame(18,13)
     elif name=='survey_pulse':

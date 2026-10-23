@@ -1,13 +1,16 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import kotlin.math.*
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.util.toVec3
-import kotlin.math.*
 
 /** 厚齿钢盘、深色盘身和亮轴；沿真实轨迹插值，碰撞少量火星，结束向外碎散。 */
 class SawbladeFx : BaseEffect() {
@@ -40,13 +43,13 @@ class SawbladeFx : BaseEffect() {
         val direction = Vec3(status.velocity).multiply(1.0, 0.0, 1.0)
         if (direction.lengthSqr() > 1e-8) axis = direction.normalize()
         batch = ParticleBatch(pm).also { b -> b.addAll(pm.spawnAll(points().mapIndexed { i, p ->
-            ParticleSpawnSpec().position(p).color(when {
+            spellParticleSpec().position(p).color(when {
                 i < 64 -> if (i % 2 == 0) Color.ofInt(221, 235, 238) else Color.ofInt(133, 157, 170)
                 i < 88 -> Color.ofInt(88, 105, 123)
                 i < 96 -> Color.ofInt(185, 229, 241)
                 else -> Color.ofInt(190, 157, 87)
-            }).visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if (i < 64) 0.109375f else 0.125f,
-                if (i < 64) 0.109375f else 0.125f).glowing(true).additive(false))
+            }).visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(if (i < 64) 0.109375f else 0.125f,
+                if (i < 64) 0.109375f else 0.125f).additive(false))
                 .lifetime(-1).sizeCurve(CurveKey.at(0, 0), CurveKey.at(1.5, 1, EasingType.EASE_OUT))
         })) }
     }
@@ -69,8 +72,8 @@ class SawbladeFx : BaseEffect() {
         val pm = manager ?: return
         repeat(3) { i ->
             val angle = phaseAngle + i * 2.4
-            pm.create().position(point).color(color).visual(ParticleVisual().style(ParticleStyle.SQUARE)
-                .anisoWorld(0.0625f, 0.0625f).glowing(true)).lifetime(6)
+            pm.spellParticle().position(point).color(color).visual(spellVisual().style(ParticleStyle.SQUARE)
+                .anisoWorld(0.0625f, 0.0625f)).lifetime(6)
                 .sizeCurve(*PixelVfx.lifeKeys(6)).spawn()?.setVelocity(Vec3(cos(angle) * 0.10, 0.05 + i * 0.025, sin(angle) * 0.10))
         }
     }

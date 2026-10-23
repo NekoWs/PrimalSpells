@@ -5,7 +5,8 @@
     "fireball",
     "torch",
     "bounce",
-    "item_pull"
+    "item_pull",
+    "light"
   ],
   "loadouts": [
     [

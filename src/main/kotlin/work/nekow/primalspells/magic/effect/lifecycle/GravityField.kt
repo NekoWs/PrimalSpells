@@ -1,5 +1,9 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.Mth
@@ -13,16 +17,12 @@ import work.nekow.particledrawing.api.ParticleBatch
 import work.nekow.particledrawing.api.ParticleGroup
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.api.ParticleStyle
-import work.nekow.particledrawing.api.ParticleVisual
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.util.Deferred
 import work.nekow.primalspells.util.ParticleShapes
 import work.nekow.primalspells.util.spawnParticle
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import work.nekow.primalspells.util.spellVisual
 
 /**
  * 重力场：服务端维持半径五格的迟缓 IV，并给穿过的魔法投射物附加向下加速度。
@@ -105,8 +105,8 @@ class GravityField : AreaFieldEffect(
                     FALL_SCALE,
                     FALL_LIFETIME_TICKS,
                     acceleration = FALL_ACCELERATION,
-                    visual = ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.125f, 0.125f)
-                        .alignTo(Vec3.ZERO, Vec3(0.0, -1.0, 0.0)).glowing(true).additive(false),
+                    visual = spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.125f, 0.125f)
+                        .alignTo(Vec3.ZERO, Vec3(0.0, -1.0, 0.0)).additive(false),
                 )
             )
         }
@@ -163,7 +163,7 @@ class GravityField : AreaFieldEffect(
     /** 四条断开的经线描出球形边界，顶部环为下压波的发源面；固定几何在 PD 本地缓慢自转。 */
     private fun spawnBoundary(manager: ParticleManager, center: Vec3) {
         val group = manager.createGroup(center)
-        val visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false)
+        val visual = spellVisual().style(ParticleStyle.SQUARE).additive(false)
         repeat(4) { meridian ->
             val azimuth = meridian * PI / 2.0
             repeat(2) { half ->
@@ -210,17 +210,17 @@ class GravityField : AreaFieldEffect(
             Vec3(center.x, floor + WELL_RING_LIFT, center.z),
             radius, WELL_RING_PARTICLES,
             colorFn = WELL_RING_COLOR, scale = WELL_RING_SCALE, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false),
+            visual = spellVisual().style(ParticleStyle.SQUARE).additive(false),
         )
         val pivot = Vec3(center.x, floor + WELL_RING_LIFT, center.z)
         Draw.circle(manager, pivot, radius * 0.78, 120,
             colorFn = WELL_RING_COLOR, scale = 0.5f, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
+            visual = spellVisual().style(ParticleStyle.SQUARE).additive(false))
         repeat(24) { index ->
             val radial = Vec3(cos(index * PI / 12.0), 0.0, sin(index * PI / 12.0))
             Draw.line(manager, pivot.add(radial.scale(radius * 0.86)), pivot.add(radial.scale(radius * 0.95)), 4,
                 colorFn = WELL_RING_COLOR, scale = 0.55f, group = group,
-                visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
+                visual = spellVisual().style(ParticleStyle.SQUARE).additive(false))
         }
         group.spin(Vec3(0.0, 1.0, 0.0), WELL_RING_SPIN_RADIANS_PER_TICK)
         group.anchor(Anchor.Movable(Vec3(center.x, floor + WELL_RING_LIFT, center.z), Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 3, EasingType.EASE_OUT)
@@ -250,7 +250,7 @@ class GravityField : AreaFieldEffect(
         Draw.circle(
             manager, Vec3(center.x, startY, center.z), radius, RING_PARTICLES,
             colorFn = RING_COLOR, scale = RING_SCALE, group = group,
-            visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false),
+            visual = spellVisual().style(ParticleStyle.SQUARE).additive(false),
         )
         // 同一波面带八个向下尖的刻度，远看也能读出施力方向，而不是一圈漂浮的雪。
         repeat(8) { index ->
@@ -260,7 +260,7 @@ class GravityField : AreaFieldEffect(
             val tip = p.add(0.0, -0.28, 0.0)
             for (end in listOf(p.add(side), p.subtract(side))) {
                 Draw.line(manager, end, tip, 4, colorFn = RING_COLOR, scale = 0.5f, group = group,
-                    visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+                    visual = spellVisual().style(ParticleStyle.SQUARE))
             }
         }
         group.move(0.0, -fall, 0.0, fallTicks, EasingType.EASE_IN)

@@ -111,4 +111,4 @@ PD原生首次外观原子接管、变量终点完成回报和退场retire已接
 
 `gradle/architecture.gradle`的checkArchitecture随check/build执行：公共侧禁止导入客户端，core禁止导入具体卡和内容注册，抽牌/付费禁止导入PD、表现与网络。它检查Kotlin显式import，不是完整的字节码依赖证明；全限定调用和反射仍需代码审查。实机foundations额外覆盖注册/物品表一致、重复ID拒绝、存档游标/单位恢复、预览只读和弹体插入/到期/清理顺序；progression保留真实外部事件取消与公共API验证。
 
-当前重构回归：`foundations,spell_chain,progression,exploration,spell_performance,collision_precision,homing_light,shield_balance`八场306项机制检查通过，1804帧、16丢帧均在原预算内，视觉与日志门禁通过。证据在`build/capture/architecture-suite/`；独立性能复测在`build/capture/out/spell_performance/`。源码依赖检查另用违规公共侧/核心导入验证确实拒绝构建，删除探针后通过；图标生成器覆盖全部65个注册ID。构建无单元测试源，这些通过项来自原生场景与依赖检查。
+当前重构回归：`foundations,spell_chain,progression,exploration,spell_performance,collision_precision,homing_light,shield_balance`八场306项机制检查通过，1804帧、16丢帧均在原预算内，视觉与日志门禁通过。证据在`build/capture/architecture-suite/`；独立性能复测在`build/capture/out/spell_performance/`。源码依赖检查另用违规公共侧/核心导入验证确实拒绝构建，删除探针后通过；图标生成器覆盖全部注册ID。构建无单元测试源，这些通过项来自原生场景与依赖检查。

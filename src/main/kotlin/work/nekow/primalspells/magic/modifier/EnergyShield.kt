@@ -29,6 +29,8 @@ import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.Lore
 import work.nekow.primalspells.util.Polyhedra
 import work.nekow.primalspells.util.pdParticles
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.wand.Wand
 
 /**
@@ -717,7 +719,7 @@ class EnergyShield : Modifier() {
             level, holder, panels,
             edgeColor = BREACH_OUTLINE_COLOR, edgeScale = BREACH_OUTLINE_SCALE,
             withFill = false, holdTicks = max(1, ticks - BREACH_OUTLINE_FADE_TICKS),
-            fadeTicks = BREACH_OUTLINE_FADE_TICKS, follow = true, glow = false,
+            fadeTicks = BREACH_OUTLINE_FADE_TICKS, follow = true,
         )
     }
 
@@ -735,7 +737,6 @@ class EnergyShield : Modifier() {
         driftOf: (Polyhedra.Panel) -> Vec3? = { null },
         fillColor: Color = GLASS_FILL_COLOR,
         follow: Boolean = false,
-        glow: Boolean = true,
     ) {
         val manager = wand.pdParticles(level)
         val center = shellCenter(holder)
@@ -762,11 +763,11 @@ class EnergyShield : Modifier() {
                     if (drift == null && withFill && i >= panel.ring.size && i % 4 != 0) return@forEachIndexed
                     if (drift == null && withFill && i < panel.ring.size && i % 3 != 0) return@forEachIndexed
                     val edge = i < panel.ring.size
-                    val handle = manager.create().position(center.add(offset))
+                    val handle = manager.spellParticle().position(center.add(offset))
                         .color(if (edge) edgeColor else fillColor)
-                        .visual(work.nekow.particledrawing.api.ParticleVisual().style(work.nekow.particledrawing.api.ParticleStyle.SQUARE)
+                        .visual(spellVisual().style(work.nekow.particledrawing.api.ParticleStyle.SQUARE)
                             .anisoWorld(if (edge) edgeScale * 0.2f else 0.09375f, if (edge) edgeScale * 0.2f else 0.046875f)
-                            .glowing(glow).spin(i * 0.47))
+                            .spin(i * 0.47))
                         .lifetime(holdTicks + fadeTicks + if (drift != null) i % 13 else if (follow) -(i % 5) else i % 5)
                         .sizeCurve(*work.nekow.primalspells.magic.effect.visual.PixelVfx.lifeKeys(
                             holdTicks + fadeTicks + if (drift != null) i % 13 else if (follow) -(i % 5) else i % 5))

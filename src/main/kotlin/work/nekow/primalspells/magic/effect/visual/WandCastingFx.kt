@@ -1,5 +1,8 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import java.util.UUID
+import kotlin.math.cos
+import kotlin.math.sin
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
@@ -7,12 +10,11 @@ import net.minecraft.world.entity.HumanoidArm
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
-import work.nekow.primalspells.wand.WandGrip
 import work.nekow.primalspells.item.WandItem
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.wand.Wand
-import java.util.UUID
-import kotlin.math.cos
-import kotlin.math.sin
+import work.nekow.primalspells.wand.WandGrip
 
 /** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
@@ -94,8 +96,8 @@ object WandCastingFx {
             // 出生包保持隐藏，表达式第一帧直接给出尺寸/颜色，避免包间露出完整图形。
             val group = manager.createGroup(player.position())
             repeat(count) {
-                group.add(manager.create().position(player.position()).color(Color.ofInt(85, 218, 226).withAlpha(0f))
-                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size, size).glowing(true).lightLevel(0).additive(false))
+                group.add(manager.spellParticle().position(player.position()).color(Color.ofInt(85, 218, 226).withAlpha(0f))
+                    .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(size, size).additive(false))
                     .lifetime(-1).spawn())
             }
             group.setVariable("clockOffset", elapsed)
@@ -244,9 +246,9 @@ object WandCastingFx {
         val manager = ParticleManager.of(caster.level())
         val group = manager.createGroup(center)
         repeat(24) { i ->
-            group.add(manager.create().position(center).color(Color.ofInt(195, 253, 240).withAlpha(0f))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<6) 0.1875f else 0.125f, 0.125f)
-                    .glowing(true).additive(false)).lifetime(-1).spawn())
+            group.add(manager.spellParticle().position(center).color(Color.ofInt(195, 253, 240).withAlpha(0f))
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i<6) 0.1875f else 0.125f, 0.125f)
+                    .additive(false)).lifetime(-1).spawn())
         }
         group.setVariable("cx", center.x).setVariable("cy", center.y).setVariable("cz", center.z)
             .setVariable("dx", forward.x).setVariable("dy", forward.y).setVariable("dz", forward.z)

@@ -6,6 +6,8 @@ import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.ChainArc
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.util.toVec3
 
 /** 常驻像素魔弹与四枚蓄电齿：跟随最终位置，接近跃迁时收拢；电流连接只在真实跃迁时生成。 */
@@ -23,9 +25,9 @@ class ChainBoltFx : BaseEffect() {
         val world = caster.level() as? ServerLevel ?: return
         val pm = manager ?: ParticleManager.of(world).also { manager=it }
         val particles = batch ?: ParticleBatch(pm).also { b ->
-            b.addAll(pm.spawnAll(points().mapIndexed { i,p -> ParticleSpawnSpec().position(p)
+            b.addAll(pm.spawnAll(points().mapIndexed { i,p -> spellParticleSpec().position(p)
                 .color(if(i==0) Color.ofInt(232,251,255) else projectile.bodyColor)
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.1875f else 0.125f,0.125f).glowing(true))
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.1875f else 0.125f,0.125f))
                 .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(2,1)) }));batch=b
         }
         particles.trackAll(points())

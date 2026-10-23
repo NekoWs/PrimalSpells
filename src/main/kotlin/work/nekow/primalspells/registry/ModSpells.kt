@@ -39,6 +39,7 @@ object ModSpells {
         SpellRegistry.register { QuintupleCast() }
         SpellRegistry.register { ReduceRecharge() }
         SpellRegistry.register { Torch() }
+        SpellRegistry.register { Light() }
         SpellRegistry.register { Sawblade() }
         SpellRegistry.register { HealingBolt() }
 

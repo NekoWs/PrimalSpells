@@ -33,6 +33,7 @@
 
 - 延长存在时间：+25t，40MP，delay+5t。
 - 全向散射：2MP，delay-10t、recharge-20t，散射+720°；只作用所属链。
+- 光：3MP，delay/recharge不变；每枚本链弹体一颗14级光源，重复卡不增加光源。
 - 缩短充能时间：12MP，delay-3t、recharge-7t。
 - 穿刺：200MP，delay+10t、recharge不变；多张逐张付费并叠加延迟，成功付费链锯仍清整次delay。
 - 额外法术 mana_injection：每张返30MP，当前MP始终≤法杖上限；实际命中额外返蓝也封顶。

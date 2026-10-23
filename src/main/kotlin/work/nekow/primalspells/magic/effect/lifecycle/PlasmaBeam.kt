@@ -10,6 +10,8 @@ import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.runtime.ProjectileRuntime
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.util.toPosition
 
 /** 移动束源发出六格持续光束；最终位置求值、碰墙截断，每 tick 结算且最多选四个目标。 */
@@ -100,7 +102,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             val color = if (layer == 0) Color.ofInt(225, 252, 255) else Color.ofInt(54, 185, 242)
             Draw.curve(manager, { t -> start.lerp(end, t) }, 192, ColorSource.of(color),
                 if (layer == 0) 0.7f else 0.45f, group = beam,
-                visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+                visual = spellVisual().style(ParticleStyle.SQUARE))
         }
         for ((name, value) in listOf("sx" to start.x, "sy" to start.y, "sz" to start.z,
             "ex" to end.x, "ey" to end.y, "ez" to end.z)) beam.setVariable(name, value)
@@ -115,8 +117,8 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
         val manager = ParticleManager.of(world)
         val core = manager.createGroup(start)
         repeat(40) { i ->
-            core.add(manager.create().position(start).color(if (i < 8) Color.ofInt(225,252,255) else Color.ofInt(45,180,235))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.1f,0.1f).glowing(true))
+            core.add(manager.spellParticle().position(start).color(if (i < 8) Color.ofInt(225,252,255) else Color.ofInt(45,180,235))
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.1f,0.1f))
                 .lifetime(-1).spawn())
         }
         core.setVariable("sx",start.x).setVariable("sy",start.y).setVariable("sz",start.z).setVariable("presence",1.0)

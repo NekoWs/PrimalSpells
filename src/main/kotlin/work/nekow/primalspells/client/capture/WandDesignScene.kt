@@ -37,7 +37,7 @@ object WandDesignScene {
                 // 仅布置独立run/capture世界，避免旧摄影棚墙面影响自然背景的材质判断。
                 for(x in -17..17) for(z in -17..17) {
                     ctx.level.setBlock(BlockPos(x,floor,z),Blocks.GRASS_BLOCK.defaultBlockState(),2)
-                    for(y in floor+1..floor+14) ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
+                    for(y in floor+1..floor+32) ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
                 }
                 fun decorate(pos: BlockPos, state: net.minecraft.world.level.block.state.BlockState) {
                     scenery.putIfAbsent(pos,ctx.level.getBlockState(pos))

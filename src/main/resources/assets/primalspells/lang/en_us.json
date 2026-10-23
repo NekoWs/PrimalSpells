@@ -252,5 +252,7 @@
   "mage.primalspells.warden": "Warden",
   "mage.primalspells.arcanist": "Arcanist",
   "mage.primalspells.siege": "Siege",
-  "compass.primalspells.starter": "Villages / starter spells"
+  "compass.primalspells.starter": "Villages / starter spells",
+  "item.primalspells.light": "Light",
+  "lore.primalspells.light.desc": "Illuminates the surroundings of spells in this chain. One light source per projectile; duplicates add no sources."
 }

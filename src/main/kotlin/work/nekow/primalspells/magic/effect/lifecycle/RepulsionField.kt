@@ -10,6 +10,7 @@ import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.runtime.ProjectileRuntime
+import work.nekow.primalspells.util.spellVisual
 
 /** 斥力场：半径四格，对魔法弹与原版弹施加有限外推；不反射归属，不影响生物。 */
 class RepulsionField : BaseEffect() {
@@ -32,7 +33,7 @@ class RepulsionField : BaseEffect() {
                     center.add(if (plane == 2) 0.0 else u, if (plane == 0) 0.0 else v,
                         if (plane == 0) v else if (plane == 2) u else 0.0)
                 }, 96, ColorSource.of(Color.ofInt(245, 145, 80, 255)), 0.6f, group = shell,
-                    visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true).additive(false))
+                    visual = spellVisual().style(ParticleStyle.SQUARE).additive(false))
             }
             shell.spin(Vec3(0.2, 1.0, 0.1).normalize(), 0.025).pulse(1.04f, 10)
             shell.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 3, work.nekow.particledrawing.core.easing.EasingType.EASE_OUT)

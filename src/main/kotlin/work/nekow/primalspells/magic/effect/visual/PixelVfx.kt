@@ -1,10 +1,13 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import kotlin.math.*
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.util.ParticleShapes
-import kotlin.math.*
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 
 /** 实色像素的冲击、折线和晶面造型；本侧只给几何与初值，积分、旋转、寿命交给PD。 */
 object PixelVfx {
@@ -42,11 +45,11 @@ object PixelVfx {
         val turn = manager.level.random.nextDouble() * PI * 2
         ParticleShapes.fibonacciSphere(count).forEachIndexed { i, direction ->
             val d = Vec3(direction.x * cos(turn) - direction.z * sin(turn), direction.y, direction.x * sin(turn) + direction.z * cos(turn))
-            specs += ParticleSpawnSpec().position(center.add(d.scale(spread)))
+            specs += spellParticleSpec().position(center.add(d.scale(spread)))
                 .color(if (i % 7 == 0) Color.ofInt(240, 250, 255) else color)
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(
                     if (i % 5 == 0) 0.1875f else 0.0625f, if (i % 5 == 0) 0.0625f else 0.0625f)
-                    .glowing(true).spin(i * 0.37))
+                    .spin(i * 0.37))
                 .lifetime(life + i % 13).sizeCurve(*lifeKeys(life + i % 13))
             velocities += d.scale(speed * (0.55 + manager.level.random.nextDouble() * 0.8)).add(0.0, 0.06, 0.0)
         }
@@ -65,8 +68,8 @@ object PixelVfx {
         repeat(128) { i ->
             val a = i * PI * 2 / 128
             val p = center.add(u.scale(cos(a) * radius)).add(v.scale(sin(a) * radius))
-            group.add(manager.create().position(p).color(color).style(ParticleStyle.SQUARE)
-                .visual(ParticleVisual().anisoWorld(0.0625f, 0.0625f).glowing(true))
+            group.add(manager.spellParticle().position(p).color(color).style(ParticleStyle.SQUARE)
+                .visual(spellVisual().anisoWorld(0.0625f, 0.0625f))
                 .lifetime(life + i % 5).sizeCurve(*lifeKeys(life + i % 5)).spawn())
         }
         group.scale(growth, 5, EasingType.EASE_OUT).destroyAfter(life + 5)
@@ -88,9 +91,9 @@ object PixelVfx {
             val p = points[i].lerp(points[i + 1], j / 8.0)
             val arrival = 0.05 + (i * 8 + j) / 143.0 * 4.5
             // 每片沿固定折线先后展开，寿命曲线不接管位置；白热前锋跟随出现时间推进。
-            specs += ParticleSpawnSpec().position(p).color(if (j % 3 == 0) Color.ofInt(224, 250, 255) else color)
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.09375f, 0.09375f)
-                    .glowing(true).additive(false)).lifetime(12).sizeCurve(
+            specs += spellParticleSpec().position(p).color(if (j % 3 == 0) Color.ofInt(224, 250, 255) else color)
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.09375f, 0.09375f)
+                    .additive(false)).lifetime(12).sizeCurve(
                     CurveKey.at(0, 0), CurveKey.at(arrival, 0),
                     CurveKey.at(arrival + 0.9, 1, EasingType.EASE_OUT), CurveKey.at(arrival + 1.5, 1),
                     CurveKey.at(arrival + 5.4, 0, EasingType.EASE_IN_OUT))
@@ -112,7 +115,7 @@ object PixelVfx {
             facet(manager, group, b, a, top, palette[face])
             facet(manager, group, a, b, bottom, palette[(face + 2) % 4])
             Draw.line(manager, a, b, 9, ColorSource.of(Color.ofInt(224, 174, 65)), 0.5f,
-                group = group, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+                group = group, visual = spellVisual().style(ParticleStyle.SQUARE))
         }
         group.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD)).scaleTo(0f, 0).scaleTo(1f, 3, EasingType.EASE_OUT)
         return group
@@ -122,15 +125,15 @@ object PixelVfx {
     private fun facet(manager: ParticleManager, group: ParticleGroup, a: Vec3, b: Vec3, c: Vec3, color: Color) {
         val normal = b.subtract(a).cross(c.subtract(a)).normalize()
         val rows = ceil(max(a.distanceTo(c), b.distanceTo(c)) / 0.055).toInt().coerceAtLeast(1)
-        val visual = ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f, 0.0625f)
-            .billboard(false).spin(atan2(-normal.y, normal.z), asin(normal.x.coerceIn(-1.0, 1.0)), 0.0).glowing(true)
+        val visual = spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f, 0.0625f)
+            .billboard(false).spin(atan2(-normal.y, normal.z), asin(normal.x.coerceIn(-1.0, 1.0)), 0.0)
         for (row in 0..rows) {
             val t = row.toDouble() / rows
             val left = a.lerp(c, t); val right = b.lerp(c, t)
             val columns = ceil(left.distanceTo(right) / 0.055).toInt().coerceAtLeast(1)
             for (column in 0..columns) {
                 val p = left.lerp(right, column.toDouble() / columns)
-                group.add(manager.create().position(p).color(color).visual(visual).lifetime(-1).spawn())
+                group.add(manager.spellParticle().position(p).color(color).visual(visual).lifetime(-1).spawn())
             }
         }
     }

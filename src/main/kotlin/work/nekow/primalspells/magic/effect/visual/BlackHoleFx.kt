@@ -1,5 +1,7 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import kotlin.math.cos
+import kotlin.math.sin
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.Anchor
 import work.nekow.particledrawing.api.Color
@@ -9,11 +11,10 @@ import work.nekow.particledrawing.api.ParticleBatch
 import work.nekow.particledrawing.api.ParticleGroup
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.api.ParticleStyle
-import work.nekow.particledrawing.api.ParticleVisual
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.util.ParticleShapes
-import kotlin.math.cos
-import kotlin.math.sin
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellVisual
 
 /**
  * 黑洞的服务端表现接线，由 BlackHole 的三个视觉钩子驱动，每次施法独立持有。
@@ -49,10 +50,10 @@ class BlackHoleFx {
             }
             val tangent = DISC_NORMAL.cross(radial).normalize().scale(0.22)
             batch.add(
-                manager.create().position(center.add(radial.scale(RADIUS * areaScale)))
+                manager.spellParticle().position(center.add(radial.scale(RADIUS * areaScale)))
                     .color(if (index % 3 == 0) DUST_BRIGHT else DUST_COLOR)
                     .scale(if (index % 3 == 0) 0.55f else 0.8f)
-                    .style(ParticleStyle.SQUARE).glowing(true).additive(false)
+                    .style(ParticleStyle.SQUARE).additive(false)
                     .lifetime(60).sizeCurve(*PixelVfx.lifeKeys(60)).spawn()?.also { it.setVelocity(tangent) },
             )
         }
@@ -86,13 +87,13 @@ class BlackHoleFx {
         val dark = manager.createGroup(center)
         // 用实色小方粒子密铺球面，保留 MC 的颗粒尺度；暗核遮挡后方星点。
         Draw.sphere(manager, center, CORE_RADIUS, 160, ColorSource.of(CORE_COLOR), 1.4f,
-            group = dark, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+            group = dark, visual = spellVisual().style(ParticleStyle.SQUARE))
 
         core = dark.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD))
 
         val edge = manager.createGroup(center)
         Draw.sphere(manager, center, RADIUS, 128, ColorSource.of(BOUNDARY_COLOR), 0.55f,
-            group = edge, visual = ParticleVisual().style(ParticleStyle.SQUARE).glowing(true))
+            group = edge, visual = spellVisual().style(ParticleStyle.SQUARE))
 
         boundary = edge.anchor(Anchor.Movable(center, Vec3.ZERO, work.nekow.particledrawing.api.Orient.WORLD))
     }

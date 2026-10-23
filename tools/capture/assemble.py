@@ -58,6 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "spell_lighting": {"length": 220, "title": "法术全亮 / 光照修正 / 单源预算与独立荷载", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "昼夜像素与原生光场、光源数量、独立荷载分别检查"},
     "wand_design": {"length": 160, "title": "暮紫封印 / 户外低位持握 / 左右手", "metric": "violet_model", "quiet": (0, 6), "decay": "none", "decay_reason": "材质/占屏来自实际紫晶像素，装备和收杖保留原版动画；施法及粒子清理由原生断言覆盖"},
     "spell_performance": {"length": 140, "title": "原生 CPU / 分配基准", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "机制计时与真实光束展示分别取证，性能数据不设机器相关通过阈值"},
     "collision_precision": {"length": 140, "title": "高速反弹 / 双精度接点 / 连续余程", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "多次真实发射分别退场，机制读取实际扫掠与接触回调"},
@@ -442,6 +443,18 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
 
+    if scene == "spell_lighting":
+        ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        def probe_pixels(t):
+            rgb = np.asarray(Image.open(ticks[t]).convert("RGB"), dtype=np.int16)
+            r, g, b = rgb.transpose(2, 0, 1)
+            mask = (r > 70) & (b > 100) & (b > r * 1.3) & (r > g * 1.3)
+            return rgb[mask]
+        day, night = probe_pixels(70), probe_pixels(80)
+        difference = float(np.abs(np.median(day, axis=0) - np.median(night, axis=0)).max()) if len(day) and len(night) else 999.0
+        result["asserts"].append(("全亮粒子昼夜颜色不变", len(day) > 100 and len(night) > 100 and difference <= 2,
+            f"日间/夜间像素={len(day)}/{len(night)}，RGB中位数最大差={difference}，要求≤2"))
+
     if scene == "wand_design":
         ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
         for tick, right in ((26, True), (66, False), (118, False)):
@@ -459,6 +472,25 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             highlights = int(((r >= 170) & (b >= 190) & (g >= 125) & (r > g * 1.08) & (b >= r)).sum())
             result["asserts"].append((f"晶面折光与亮脉实际可见-{tick}", highlights >= 40,
                 f"晶体独立区域亮折光像素={highlights}，要求≥40，排除天空/骨白折臂"))
+            gem = (b > r * 1.08) & (r > g * 1.08) & (b > 80)
+            ivory = (r > 120) & (g > 110) & (b > 95) & (r >= b) & (g >= b) & (np.abs(r - g) < 40)
+            expanded = gem.copy()
+            gap = 0
+            for distance in range(1, 16):
+                padded = np.pad(expanded, 1)
+                expanded = np.logical_or.reduce([padded[y:y + gem.shape[0], x:x + gem.shape[1]] for y in range(3) for x in range(3)])
+                if (expanded & ivory).any():
+                    gap = distance
+                    break
+            result["asserts"].append((f"悬浮紫晶与骨白折臂留空-{tick}", gem.any() and ivory.any() and gap >= 3,
+                f"实际轮廓最短像素间距={gap}，要求≥3"))
+        idle = np.asarray(Image.open(ticks[26]).convert("RGB"), dtype=np.int16)[350:505, 850:1080]
+        r, g, b = idle.transpose(2, 0, 1)
+        gem = (b > r * 1.08) & (r > g * 1.08) & (b > 80)
+        base = float(idle[gem].mean())
+        peak = max(float(np.asarray(Image.open(ticks[t]).convert("RGB"), dtype=np.int16)[350:505, 850:1080][gem].mean()) for t in (33, 34, 35))
+        result["asserts"].append(("成功施法紫晶明显升亮", peak - base >= 25,
+            f"相同晶面像素平均亮度={base:.1f}→{peak:.1f}，要求提升≥25"))
         missing = [line for line in log_lines if "Missing texture" in line and "primalspells:item/wand" in line]
         result["asserts"].append(("暮紫封印图集完整", not missing, f"缺失贴图={len(missing)}"))
 

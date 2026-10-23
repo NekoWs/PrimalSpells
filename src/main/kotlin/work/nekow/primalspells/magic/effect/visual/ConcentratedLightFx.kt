@@ -1,13 +1,15 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import kotlin.math.*
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.ConcentratedLight
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 import work.nekow.primalspells.util.toVec3
-import kotlin.math.*
 
 /** 粗像素棱片向白金核心聚焦，再接连续光束与短暂余辉；全程实色硬边。 */
 class ConcentratedLightFx : BaseEffect() {
@@ -48,14 +50,11 @@ class ConcentratedLightFx : BaseEffect() {
     override fun onActive() {
         val pm = ParticleManager.of(caster.level());manager=pm;previous=point()
         charge = ParticleBatch(pm).also { batch -> batch.addAll(pm.spawnAll(points().mapIndexed { i,p ->
-            ParticleSpawnSpec().position(p).color(if(i==0 || i in 41..49 || i%5==0) Color.ofInt(255,250,220) else Color.ofInt(246,193,66))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.125f else 0.0625f,if(i==0) 0.125f else 0.0625f)
-                    .glowing(true).additive(false))
-                // 主芯承担真实照明，其余棱片保持全亮，避免几十颗满级光源同时开关。
-                .glowing(true).lightLevel(if(i==0)15 else 0)
+            spellParticleSpec().position(p).color(if(i==0 || i in 41..49 || i%5==0) Color.ofInt(255,250,220) else Color.ofInt(246,193,66))
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.125f else 0.0625f,if(i==0) 0.125f else 0.0625f)
+                    .additive(false))
+                // 装饰片元只保持全亮；动态照明统一由“光”修正的一颗源承担。
                 .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(2,1,EasingType.EASE_OUT))
-                .lightCurve(CurveKey.at(0,0),CurveKey.at(2,0.25),
-                    CurveKey.at(ConcentratedLight.CHARGE_TICKS,1,EasingType.EASE_IN))
         }))
             chargeRest = points(1.0)
             // 位置只由track接管；出生尺寸仍由PD寿命曲线逐帧播放。
@@ -82,19 +81,16 @@ class ConcentratedLightFx : BaseEffect() {
                 val size=if(layer==0)0.25f else 0.09375f
                 val offset=if(layer==0)Vec3.ZERO else side.scale(if(layer==1)0.1875 else -0.1875)
                 val life=12+i%3
-                ParticleSpawnSpec().position(sample.position.add(offset))
+                spellParticleSpec().position(sample.position.add(offset))
                     .color(if(layer==0)Color.ofInt(255,253,233)else Color.ofInt(255,204,88))
-                    .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size,size).glowing(true).additive(false))
-                    .glowing(true).lightLevel(if(layer==0 && i%8==0)12 else 0)
+                    .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(size,size).additive(false))
                     .lifetime(life).sizeCurve(CurveKey.at(0,0),CurveKey.at(0.5,1),CurveKey.at(2,1),CurveKey.at(life,0,EasingType.EASE_OUT))
-                    .lightCurve(CurveKey.at(0,0),CurveKey.at(1,0.8),CurveKey.at(3,0.5),CurveKey.at(life,0))
             } }
             specs.chunked(256).forEach { pm.spawnAll(it) }
         }
         previous=end
     }
     override fun onDie() {
-        charge?.handles()?.forEach { it.lightIntensity(0f,4) }
         manager?.let { PixelVfx.retireBatch(it,charge,point(),4) };charge=null
     }
 
@@ -103,7 +99,6 @@ class ConcentratedLightFx : BaseEffect() {
         val forward = projectile.launchDirection
         val handles = batch.handles().toList()
         handles.forEachIndexed { i, handle ->
-            handle.lightIntensity(0f,5,EasingType.EASE_OUT)
             val rest = chargeRest[i]
             val offset = rest.subtract(origin)
             val radial = offset.subtract(forward.scale(offset.dot(forward)))
@@ -127,12 +122,10 @@ class ConcentratedLightFx : BaseEffect() {
             // 短促的反向金色排光，与向前的白光脊形成发射反冲。
             velocities+=forward.scale(-0.025).add(radial.scale(0.018))
             val life=8+i%4
-            ParticleSpawnSpec().position(previous.add(radial.scale(0.1)))
+            spellParticleSpec().position(previous.add(radial.scale(0.1)))
                 .color(if(i%4==0)Color.ofInt(255,253,233)else Color.ofInt(255,214,112))
-                .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f,0.0625f).glowing(true).additive(false))
-                .glowing(true).lightLevel(if(i==0)14 else 0)
+                .visual(spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f,0.0625f).additive(false))
                 .lifetime(life).sizeCurve(CurveKey.at(0,0),CurveKey.at(1,1),CurveKey.at(3,1),CurveKey.at(life,0,EasingType.EASE_IN_OUT))
-                .lightCurve(CurveKey.at(0,0),CurveKey.at(1,1),CurveKey.at(3,0.65),CurveKey.at(life,0))
         }
         ParticleBatch(pm).also{it.addAll(pm.spawnAll(specs));it.setVelocityAll(velocities)}
     }

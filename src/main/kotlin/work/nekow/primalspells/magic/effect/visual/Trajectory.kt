@@ -1,15 +1,22 @@
 package work.nekow.primalspells.magic.effect.visual
 
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.Anchor
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.CurveKey
 import work.nekow.particledrawing.api.EmitterHandle
-import work.nekow.particledrawing.api.ParticleCurve
-import work.nekow.particledrawing.api.ParticleLifeCurve
 import work.nekow.particledrawing.api.ParticleBatch
+import work.nekow.particledrawing.api.ParticleCurve
 import work.nekow.particledrawing.api.ParticleHandle
+import work.nekow.particledrawing.api.ParticleLifeCurve
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.api.ParticleSpawnSpec
 import work.nekow.particledrawing.api.ParticleVisual
@@ -17,13 +24,9 @@ import work.nekow.particledrawing.core.easing.EasingType
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.util.pdParticles
-import kotlin.math.abs
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.sqrt
+import work.nekow.primalspells.util.spellParticle
+import work.nekow.primalspells.util.spellParticleSpec
+import work.nekow.primalspells.util.spellVisual
 
 /** 硬边方粒拖尾，沿寿命收细并淡出；头部和发射器共用相邻样本，曲线由PD求值。 */
 class Trajectory(
@@ -114,7 +117,7 @@ class Trajectory(
             val lifetime = if (compact) 3 + (hash01(seed, i + 481) * 3).toInt() else DEATH_LIFETIME_MIN +
                 (hash01(seed, i + 481) * (DEATH_LIFETIME_MAX - DEATH_LIFETIME_MIN)).toInt()
             val size = MOTE_SIZE_MIN + (MOTE_SIZE_MAX - MOTE_SIZE_MIN) * hash01(seed, i + 461)
-            specs += ParticleSpawnSpec().position(pos)
+            specs += spellParticleSpec().position(pos)
                 .color(hotColor(0.55f + 0.45f * hash01(seed, i + 441).toFloat()))
                 .visual(runeVisual(size * 2.0))
                 .lifetime(lifetime).sizeCurve(*PixelVfx.lifeKeys(lifetime))
@@ -141,7 +144,7 @@ class Trajectory(
     private fun ensureHead(manager: ParticleManager, pos: Vec3) {
         if (intensity <= 0f) return
         if (head == null) {
-            head = manager.create()
+            head = manager.spellParticle()
                 .position(pos.x, pos.y, pos.z)
                 .color(hotColor(1f))          // 纯白热
                 .visual(runeVisual(HEAD_BLOCKS * (1 + 0.1 * projectile.modifiers.values.sum()) * projectile.areaScale)) // 0.3125格实色方粒，与尾迹起始宽度一致
@@ -174,12 +177,13 @@ class Trajectory(
         }
         val headHot = (TRAIL_HOT_HEAD_BASE + (1f - TRAIL_HOT_HEAD_BASE) * strength).coerceIn(0f, 1f)
         emitter = manager.emitter(anchor)
+            .glowing(true).lightLevel(0)
             .jitter(0.035)
             .spacing(TRAIL_SPACING)                                   // 每0.125格一颗
             .life(life)
             .color(hotColor(headHot))          // 出生实色；透明度只沿单颗尾迹的寿命淡出。
             .scale(TRAIL_SCALE_HEAD * (1 + 0.1f * projectile.modifiers.values.sum()) * projectile.areaScale.toFloat())                                  // 出生0.3125格
-            .glowing(true)
+
             .additive(false)
             // 尺寸乘数沿寿命线性收缩，世界尺寸从0.3125格降至0.0625格。
             // ⚠️ 别在前段加陡降（曾经用过「前 1/3 寿命掉到 55%」）：那会在本体与尾迹之间留一道
@@ -229,7 +233,7 @@ class Trajectory(
             val hot = 0.18f + 0.44f * hash01(seed, status.age + i + 191).toFloat()
             val life = MOTE_LIFETIME_MIN +
                 (hash01(seed, status.age + i + 231) * (MOTE_LIFETIME_MAX - MOTE_LIFETIME_MIN)).toInt()
-            specs += ParticleSpawnSpec().position(along.add(offset))
+            specs += spellParticleSpec().position(along.add(offset))
                 .color(hotColor(hot * strength))
                 .visual(runeVisual(size))
                 .lifetime(life).sizeCurve(*PixelVfx.lifeKeys(life))
@@ -250,7 +254,7 @@ class Trajectory(
             val lifetime = AFTERGLOW_LIFETIME_MIN +
                 (hash01(seed, i + 841) * (AFTERGLOW_LIFETIME_MAX - AFTERGLOW_LIFETIME_MIN)).toInt()
             val size = AFTERGLOW_SIZE_MIN + (AFTERGLOW_SIZE_MAX - AFTERGLOW_SIZE_MIN) * hash01(seed, i + 851)
-            specs += ParticleSpawnSpec()
+            specs += spellParticleSpec()
                 .position(pos.add(outward.scale(AFTERGLOW_RADIUS_MIN + (AFTERGLOW_RADIUS_MAX - AFTERGLOW_RADIUS_MIN) * hash01(seed, i + 831))))
                 .color(hotColor(0.6f + 0.4f * hash01(seed, i + 861).toFloat()))
                 .visual(runeVisual(size))
@@ -267,14 +271,14 @@ class Trajectory(
         repeat(dust) { i ->
             val outward = spherePoint(i, 251)
             velocities += outward.scale(AMBIENT_SPEED * (0.4 + 0.9 * hash01(seed, status.age + i + 311)))
-            specs += ParticleSpawnSpec()
+            specs += spellParticleSpec()
                 .position(pos.add(outward.scale(AMBIENT_RADIUS_MIN + (AMBIENT_RADIUS_MAX - AMBIENT_RADIUS_MIN) * hash01(seed, status.age + i + 291))))
                 .color(hotColor(0.35f * intensity))
                 .visual(runeVisual(AMBIENT_DOT))
                 .lifetime(AMBIENT_LIFETIME).sizeCurve(*PixelVfx.lifeKeys(AMBIENT_LIFETIME))
         }
         if (hash01(seed, status.age / AMBIENT_MOTE_PERIOD + 701) < AMBIENT_MOTE_CHANCE) {
-            specs += ParticleSpawnSpec()
+            specs += spellParticleSpec()
                 .position(pos.add(spherePoint(status.age, 331).scale(AMBIENT_MOTE_RADIUS)))
                 .color(hotColor(0.9f))
                 .visual(runeVisual(CORE_SIZE))
@@ -309,7 +313,7 @@ class Trajectory(
     }
 
     private fun runeVisual(blocks: Double): ParticleVisual =
-        ParticleVisual().anisoWorld(blocks.toFloat(), blocks.toFloat()).glowing(true).additive(false)
+        spellVisual().anisoWorld(blocks.toFloat(), blocks.toFloat()).additive(false)
 
     // =====================================================================================
     // 确定性随机

@@ -57,6 +57,9 @@ Payload放network，提供ID、StreamCodec；公共协议注册集中在 `networ
 
 ## 7. 提交前检查
 
+当前内容禁止主动音效：不播放施法/锁定/复制/爆炸/弹跳/传送/放置提示，不注册声音资源；自有生物与假人保持isSilent。`checkSilentContent`随check/build扫描运行时Kotlin/Java与声音资源，录制工具调主音量不在此限制内。原版世界的环境/生物声音不由本模组全局关闭。
+
+
 - 内容已注册，资源/语言/获取来源完整；修改创建配方不能污染模板或共享可变effect。
 - 核心机制符合 [架构第8节](architecture.md#8-关键不变量与陷阱)，新效果遵循阶段和独立荷载规则。
 - 粒子使用PD；缺陷遵守第9节；动画按 [连贯性](design/animation-continuity.md) 验证。

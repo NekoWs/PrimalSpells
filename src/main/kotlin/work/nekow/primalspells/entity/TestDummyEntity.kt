@@ -43,6 +43,9 @@ class TestDummyEntity(
     level: Level
 ) : ArmorStand(entityType, level) {
 
+    /** 模组实体始终静音，不受旧存档Silent标记影响。 */
+    override fun isSilent(): Boolean = true
+
     /** 攻击靶子：下一次开火的冷却 tick。 */
     private var attackCooldown = 0
 

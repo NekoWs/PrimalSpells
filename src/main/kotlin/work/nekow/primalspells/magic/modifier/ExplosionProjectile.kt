@@ -2,8 +2,6 @@ package work.nekow.primalspells.magic.modifier
 
 import kotlin.random.Random
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.Modifier
@@ -43,7 +41,7 @@ class ExplosionProjectile : Modifier() {
                 if (!projectile.alive) return
                 if (status.age <= 0 || status.age % interval != 0) return
 
-                val level = caster.level() as? ServerLevel ?: return
+                if (caster.level() !is ServerLevel) return
 
                 // 当前行进方向
                 val forward = if (status.velocity.lengthSquared() > 1e-8f) Vector3f(status.velocity).normalize()
@@ -65,16 +63,6 @@ class ExplosionProjectile : Modifier() {
 
                 bullet.spell()
                 ProjectileRuntime.add(bullet)
-
-                // 播放发射音效
-                level.playSound(
-                    null,
-                    status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble(),
-                    SoundEvents.FIREWORK_ROCKET_SHOOT,
-                    SoundSource.NEUTRAL,
-                    0.4f,
-                    1.5f
-                )
             }
 
             /**

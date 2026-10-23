@@ -39,3 +39,32 @@ tasks.register('checkArchitecture') {
 }
 
 tasks.named('check').configure { dependsOn('checkArchitecture') }
+
+// 当前产品规则禁止模组主动音效；不把录制工具的主音量设置误判为游戏音效。
+tasks.register('checkSilentContent') {
+    group = 'verification'
+    description = '禁止模组运行时代码播放音效或携带声音资源'
+    def runtimeSources = fileTree('src/main') {
+        include '**/*.kt', '**/*.java'
+        exclude '**/client/capture/**'
+    }
+    def soundAssets = fileTree('src/main/resources/assets/primalspells') {
+        include '**/sounds.json', '**/*.ogg', '**/*.wav', '**/*.mp3'
+    }
+    inputs.files(runtimeSources, soundAssets)
+    doLast {
+        def violations = []
+        runtimeSources.files.sort().each { source ->
+            source.readLines('UTF-8').eachWithIndex { line, index ->
+                if (line =~ /\b(?:play\w*Sound\w*|getSoundManager|playNote|playRecord)\s*\(|\bSoundEvents\b|\.(?:audio|sound)\s*\(/) {
+                    violations.add("${source.name}:${index + 1} 模组内容禁止主动音效")
+                }
+            }
+        }
+        soundAssets.files.each { violations.add("${it.name} 模组内容禁止声音资源") }
+        if (!violations.isEmpty()) throw new GradleException(violations.join('\n'))
+        logger.lifecycle('模组静音检查通过')
+    }
+}
+
+tasks.named('check').configure { dependsOn('checkSilentContent') }

@@ -26,7 +26,7 @@ PD本地项目在 `D:/Backup/IDEA Projects/ParticleDrawing`。获授权升级时
 .\gradlew.bat runData
 ```
 
-离线仅适用于依赖已缓存的机器；本机在线解析可能长时间等待，可用--offline。runClient使用run/client；runServer使用run/server并带nogui。build包含checkArchitecture源码依赖护栏；可单独运行gradlew.bat checkArchitecture。当前无单元测试源，成功不等于实机玩法和视觉已通过。
+离线仅适用于依赖已缓存的机器；本机在线解析可能长时间等待，可用--offline。runClient使用run/client；runServer使用run/server并带nogui。build包含checkArchitecture源码依赖护栏和checkSilentContent内容静音护栏；可单独运行gradlew.bat checkArchitecture。当前无单元测试源，成功不等于实机玩法和视觉已通过。静音护栏用实际playSound调用反例验证拒绝，清除探针后通过；录制主音量为零，功能回归不冒充可听音轨验证。
 
 ## 4. 产物
 

@@ -1,8 +1,6 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
@@ -14,7 +12,7 @@ import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 
 /**
  * 爆炸效果 —— 用 [MagicStatus] 的 `explosionRadius` / `explosionDamage` 触发自定义爆炸：
- * **触发即爆**（音效 + [ExplosionFx.burst] 粒子 + 按距离衰减的伤害与击退），**不破坏方块**。
+ * **触发即爆**（[ExplosionFx.burst] 粒子 + 按距离衰减的伤害与击退），**不破坏方块**。
  *
  * 第 28~31 轮曾有过「先内爆蓄力、蓄力结束再结算」的版本；**第 32 轮按用户口径整体移除**
  * （「把爆炸的蓄力阶段给移除掉，直接爆」）—— 表现层只保留爆发那一拍。
@@ -69,19 +67,10 @@ class Explosion(
 
             SpellInteractions.shock(serverLevel, Vec3(cx, cy, cz), radius.toDouble(), damage, ProjectileRuntime.projectiles.toList())
 
-            // 1. 播放自定爆炸音效
-            serverLevel.playSound(
-                null, cx, cy, cz,
-                SoundEvents.GENERIC_EXPLODE.value(),
-                SoundSource.HOSTILE,
-                1.2f,
-                0.9f + serverLevel.random.nextFloat() * 0.2f
-            )
-
-            // 2. 爆发表现（原版爆炸粒子已删除；第 32 轮起没有蓄力，触发即爆）
+            // 触发即爆的视觉表现。
             ExplosionFx.burst(ParticleManager.of(serverLevel), Vec3(cx, cy, cz), radius, shot?.id ?: "explosion")
 
-            // 3. 实体伤害 + 击退
+            // 实体伤害与击退。
             if (damage > 0.0) {
                 applyDamageAndKnockback(serverLevel, source, cx, cy, cz, radius, damage, shot)
             }

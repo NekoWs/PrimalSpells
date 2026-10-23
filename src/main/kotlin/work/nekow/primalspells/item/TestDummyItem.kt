@@ -2,8 +2,6 @@ package work.nekow.primalspells.item
 
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import net.minecraft.util.Mth
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.item.Item
@@ -16,7 +14,7 @@ import work.nekow.primalspells.entity.TestDummyEntity
 
 /**
  * 测试木桩物品：在点击位置放置一个测试木桩，放置逻辑与盔甲架一致
- * （点击面朝下失败、碰撞检测、角度吸附 45°、消耗物品、放置音效）。
+ * （点击面朝下失败、碰撞检测、角度吸附 45°、消耗物品）。
  */
 class TestDummyItem(properties: Properties) : Item(properties) {
 
@@ -34,7 +32,6 @@ class TestDummyItem(properties: Properties) : Item(properties) {
             val yRot = Mth.floor((Mth.wrapDegrees(context.rotation - 180.0f) + 22.5f) / 45.0f) * 45.0f
             dummy.snapTo(pos.x, pos.y, pos.z, yRot, 0.0f)
             level.addFreshEntityWithPassengers(dummy)
-            level.playSound(null, dummy.x, dummy.y, dummy.z, SoundEvents.ARMOR_STAND_PLACE, SoundSource.BLOCKS, 0.75f, 0.8f)
             dummy.gameEvent(GameEvent.ENTITY_PLACE, context.player)
         }
         context.itemInHand.shrink(1)

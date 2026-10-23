@@ -1,8 +1,6 @@
 package work.nekow.primalspells.magic.effect.geometry
 
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
@@ -69,8 +67,6 @@ class Tracking(
             AABB(center, end).inflate(reach), ::valid)
             .minWithOrNull(compareByDescending<LivingEntity> { alignment(it) }
                 .thenBy { pathDistanceSquared(it) }.thenBy { it.boundingBox.center.distanceToSqr(center) })
-        if (target != null && target !== lastTarget) level.playSound(null, center.x, center.y, center.z,
-            SoundEvents.SCULK_CLICKING, SoundSource.NEUTRAL, 0.2f, 1.6f)
         val travelled = if (target === lastTarget) activeGuidance?.travelled ?: 0f else 0f
         lastTarget = target
         activeGuidance = target?.let { work.nekow.primalspells.magic.projectile.Projectile.Guidance(

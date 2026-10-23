@@ -34,6 +34,9 @@ class DroneEntity(
     level: Level
 ) : PathfinderMob(entityType, level), RangedAttackMob {
 
+    /** 模组实体始终静音，不受旧存档Silent标记影响。 */
+    override fun isSilent(): Boolean = true
+
     var owner: UUID?
         get() {
             if (_owner == null) {

@@ -5,7 +5,6 @@ import net.minecraft.network.syncher.EntityDataAccessor
 import net.minecraft.network.syncher.EntityDataSerializers
 import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
 import net.minecraft.util.RandomSource
 import net.minecraft.world.Difficulty
 import net.minecraft.world.InteractionHand
@@ -35,6 +34,9 @@ class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Mon
         private set
 
     init { xpReward = 12 }
+
+    /** 模组内容保持静音，包括继承的生物/脚步声音；旧存档Silent标记不改变此规则。 */
+    override fun isSilent(): Boolean = true
 
     override fun defineSynchedData(builder: SynchedEntityData.Builder) {
         super.defineSynchedData(builder)
@@ -92,13 +94,12 @@ class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Mon
     /** AI进入可被伤害打断的准备阶段，并同步持杖姿态。 */
     fun prepareCast() {
         entityData.set(CHARGING, true)
-        playSound(SoundEvents.EVOKER_PREPARE_ATTACK, 0.65f, 0.85f + school.ordinal * 0.12f)
     }
 
     /** AI失去视线、受伤或停止时解除准备姿态。 */
     fun cancelCast() { entityData.set(CHARGING, false) }
 
-    /** 走真实法杖结算；当前地点配方均消耗法力，成功后计数并播放出手提示。 */
+    /** 走真实法杖结算；当前地点配方均消耗法力，成功后计数并更新出手姿态。 */
     fun releaseCast(): Boolean {
         cancelCast()
         val wand = WandItem.getWand(mainHandItem) ?: return false
@@ -107,7 +108,6 @@ class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Mon
         if (released) {
             successfulCasts++
             swing(InteractionHand.MAIN_HAND)
-            playSound(SoundEvents.EVOKER_CAST_SPELL, 0.65f, 1.2f)
         }
         return released
     }
@@ -117,10 +117,6 @@ class RogueMageEntity(type: EntityType<out RogueMageEntity>, level: Level) : Mon
         if (accepted) cancelCast()
         return accepted
     }
-
-    override fun getAmbientSound() = SoundEvents.EVOKER_AMBIENT
-    override fun getHurtSound(source: DamageSource) = SoundEvents.EVOKER_HURT
-    override fun getDeathSound() = SoundEvents.EVOKER_DEATH
 
     companion object {
         private val CHARGING: EntityDataAccessor<Boolean> = SynchedEntityData.defineId(RogueMageEntity::class.java, EntityDataSerializers.BOOLEAN)

@@ -2,8 +2,6 @@ package work.nekow.primalspells.magic.modifier
 
 import kotlin.random.Random
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.Modifier
@@ -21,9 +19,7 @@ import work.nekow.primalspells.util.HitType
  * - 发射方向 = 弹跳方向 + [randomStrength] 倍的随机偏移向量
  * - 速度大小 = 弹跳时投射物的当前速度
  * - 复制体立即施放并加入 ProjectileRuntime 管理
- *
- * 音效：
- * - 复制体生成时播放紫水晶钟鸣声
+
  */
 class BounceDuplicate : Modifier() {
 
@@ -58,7 +54,7 @@ class BounceDuplicate : Modifier() {
                 if (!projectile.alive) return
 
                 // 获取服务端世界实例
-                val level = caster.level() as? ServerLevel ?: return
+                if (caster.level() !is ServerLevel) return
 
                 // 重建投射物并继承非生成型修饰配方
                 val clone = work.nekow.primalspells.magic.core.SpellAssembly.copy(projectile)
@@ -91,18 +87,6 @@ class BounceDuplicate : Modifier() {
                 // 施放复制体并注册到管理器
                 clone.spell()
                 ProjectileRuntime.add(clone)
-
-                // 播放紫水晶钟鸣声 —— 复制体生成提示音
-                level.playSound(
-                    null,                                // 播放给所有附近玩家
-                    result.pos.x.toDouble(),
-                    result.pos.y.toDouble(),
-                    result.pos.z.toDouble(),
-                    SoundEvents.AMETHYST_BLOCK_CHIME,    // 紫水晶钟鸣
-                    SoundSource.NEUTRAL,                 // 环境音源
-                    0.6f,                                // 音量
-                    1.4f                                 // 音调
-                )
             }
         }
     }

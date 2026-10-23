@@ -1,8 +1,6 @@
 package work.nekow.primalspells.magic.projectile
 
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import work.nekow.particledrawing.api.Color
 import work.nekow.primalspells.magic.effect.visual.Trajectory
@@ -61,7 +59,6 @@ class TeleportProjectile : Projectile() {
         work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(manager, to, net.minecraft.world.phys.Vec3(0.0, 1.0, 0.0), 0.35, color, 12, 3f)
         work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(manager, to, color, 128, 0.2, 16)
 
-        level.playSound(null, x, y, z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.0f)
     }
 
     override fun initLore() {

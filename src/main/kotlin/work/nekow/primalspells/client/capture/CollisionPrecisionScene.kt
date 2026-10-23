@@ -54,6 +54,7 @@ object CollisionPrecisionScene {
             }, camera = { _, _ -> Pose(0.5, floor + 15.0, 0.5, 0f, 90f) },
             tick = { ctx, t ->
                 if (t == 8) {
+                    checks.getOrPut(t) { arrayListOf() }.addAll(EntityHitChecks.run(ctx, t, floor))
                     record(t, "aim-passive-is-removed", SpellRegistry.create("aim") == null, "unregistered aim")
                     val casterCenter = ctx.player.boundingBox.center
                     val self = light(ctx, casterCenter, Vec3(1.0, 0.0, 0.0), flightSpeed = 2f)

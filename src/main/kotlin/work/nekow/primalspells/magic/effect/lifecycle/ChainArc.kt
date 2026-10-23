@@ -52,7 +52,7 @@ class ChainArc : BaseEffect(), DirectDamage {
         val driveSpeed = status.velocity.length().toDouble() / DRIFT_RATIO
         val radius = (driveSpeed * 4.0).coerceAtLeast(1.0) * projectile.areaScale
         val target = world.getEntitiesOfClass(LivingEntity::class.java, AABB.ofSize(start, radius*2, radius*2, radius*2)) {
-            it.isAlive && projectile.canHarm(it) && (it === caster || !caster.isAlliedTo(it)) && it.uuid !in recent &&
+            projectile.canHitEntity(it) && (it === caster || !caster.isAlliedTo(it)) && it.uuid !in recent &&
                 it.boundingBox.center.distanceToSqr(start) <= radius*radius
         }.minByOrNull { it.id }
         val heading = if (status.velocity.lengthSquared() > 1e-8f) Vec3(status.velocity).normalize() else projectile.launchDirection

@@ -51,7 +51,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
                 val to = end.toPosition()
                 status.velocity.set(end.subtract(start).toVector3f())
                 val shields = world.getEntitiesOfClass(LivingEntity::class.java, AABB(start, end).inflate(2.7)) {
-                    it.isAlive && ShieldGuard.hasShield(it)
+                    projectile.canHitEntity(it) && ShieldGuard.hasShield(it)
                 }.mapNotNull { holder -> ShieldGuard.segmentEntry(holder, from, to)
                     ?.let { holder to it.distanceToSqr(start) } }.sortedBy { it.second }
                 for ((holder, _) in shields) {
@@ -80,7 +80,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
         }
         if (start.distanceToSqr(end) < 1e-8) return
         val candidates = world.getEntitiesOfClass(LivingEntity::class.java, AABB(start, end).inflate(0.25 * projectile.areaScale)) {
-            it.isAlive && projectile.canHarm(it) && (it === caster || !caster.isAlliedTo(it)) &&
+            projectile.canHitEntity(it) && (it === caster || !caster.isAlliedTo(it)) &&
                 (it.boundingBox.inflate(0.15 * projectile.areaScale).contains(start) ||
                     it.boundingBox.inflate(0.15 * projectile.areaScale).clip(start, end).isPresent)
         }.sortedBy { it.boundingBox.center.distanceToSqr(start) }.take(if (projectile.maxHitTargets < 0) Int.MAX_VALUE else 4)

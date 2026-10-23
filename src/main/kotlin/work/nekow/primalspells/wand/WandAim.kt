@@ -16,7 +16,7 @@ object WandAim {
         var target = if (block.type == HitResult.Type.MISS) end else block.location
         var distance = eye.distanceToSqr(target)
         val bounds = caster.boundingBox.expandTowards(end.subtract(eye)).inflate(1.0)
-        for (entity in caster.level().getEntities(caster, bounds) { it.isAlive && it.isPickable && !it.isSpectator }) {
+        for (entity in caster.level().getEntities(caster, bounds) { it.isAlive && it.canBeHitByProjectile() && !it.isSpectator }) {
             val box = entity.boundingBox.inflate(entity.pickRadius.toDouble())
             // 不把自己的坐骑或眼睛所在实体选成零距离目标。
             if (entity.rootVehicle === caster.rootVehicle || box.contains(eye)) continue

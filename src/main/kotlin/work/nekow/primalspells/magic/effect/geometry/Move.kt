@@ -65,11 +65,11 @@ class Move(
         // 反弹/换靶后的可达范围也必须在宽相位中，不能只查最初的直线包围盒。
         val swept = AABB.ofSize(start, radius * 2, radius * 2, radius * 2)
         val candidates = if (collision && hitRadius > 0) level!!.getEntities(null,
-            swept.inflate(hitRadius + 1.0)) { projectile.canHarm(it) }
+            swept.inflate(hitRadius + 1.0)) { projectile.canHitEntity(it) }
             .map { Collider(it, it.boundingBox, it.boundingBox.inflate(hitRadius)) } else emptyList()
         val shields = if (collision && hitRadius > 0 && projectile.maxHitTargets >= 0)
             level!!.getEntitiesOfClass(LivingEntity::class.java, swept.inflate(2.7)) {
-                it.isAlive && it !== caster && ShieldGuard.hasShield(it)
+                projectile.canHitEntity(it) && it !== caster && ShieldGuard.hasShield(it)
             } else emptyList()
         // 同一个接点换靶后不再立刻重复它；下一完整子步恢复原有持续命中语义。
         val startVelocity = Vector3f()
@@ -102,7 +102,7 @@ class Move(
                     if (!leftCaster && !caster.boundingBox.inflate(hitRadius).contains(from)) leftCaster = true
                     for (candidate in candidates) {
                         val entity = candidate.entity
-                        if (entity in resumeEntities || entity === caster && !leftCaster || !entity.isAlive) continue
+                        if (entity in resumeEntities || entity === caster && !leftCaster || !projectile.canHitEntity(entity)) continue
                         val currentBox = entity.boundingBox
                         if (currentBox !== candidate.original) {
                             candidate.original = currentBox; candidate.box = currentBox.inflate(hitRadius)

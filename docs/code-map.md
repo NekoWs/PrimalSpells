@@ -14,6 +14,7 @@
 | 弹体循环/停服清理 | `magic/runtime/ProjectileRuntime.kt`、`event/SpellRuntimeEvents.kt` |
 | 网络注册/服务端请求 | `network/{ModNetworking,WandRequestHandler}.kt` |
 | 运动、反弹、追踪 | `magic/effect/geometry/{Move,SweptCollision,Tracking,Bounce,ConstantAcceleration}.kt` |
+| 可命中实体筛选 | `magic/projectile/Projectile.canHitEntity`、`wand/WandAim`；`client/capture/EntityHitChecks`经collision_precision跑真实实体回归 |
 | 命中/伤害/击退/冻结 | `magic/effect/lifecycle/{SpellDamage,SpellImpact,DirectDamage,FrozenStatus}.kt` |
 | 护盾判定/反射点 | `magic/effect/lifecycle/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
 | 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |

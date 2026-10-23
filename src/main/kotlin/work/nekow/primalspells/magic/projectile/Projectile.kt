@@ -129,6 +129,10 @@ abstract class Projectile: Magic() {
     /** 自伤仅改变施法者豁免，创造/旁观无敌与护盾仍按各自原规则结算。 */
     fun canHarm(target: Entity): Boolean = target !== caster || selfDamage
 
+    /** 实体接触使用原版箭的可命中能力契约，不让掉落物/经验球/交互实体消耗命中或触发荷载。 */
+    fun canHitEntity(target: Entity): Boolean = target.isAlive && !target.isSpectator &&
+        target.canBeHitByProjectile() && canHarm(target)
+
     override fun spell() {
         // 内建效果按阶段执行（见 EffectPhase）：
         //   SETUP  —— Position / Velocity 写入出生点与初速
@@ -169,6 +173,7 @@ abstract class Projectile: Magic() {
 
     /** 返回true表示被护盾反射，调用方必须放弃当前的入射路径，不分派实体命中。 */
     fun hitEntity(entity: Entity): Boolean {
+        if (!canHitEntity(entity)) return false
         val level = entity.level() as? net.minecraft.server.level.ServerLevel
         if (!(damageType == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && status.damage > 0) && entity is net.minecraft.world.entity.LivingEntity && level != null &&
             ShieldGuard.absorbProjectile(level, entity, this)) return true

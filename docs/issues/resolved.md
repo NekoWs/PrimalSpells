@@ -10,6 +10,7 @@
 | 抽牌作用域 | 同链修正无牌序；触发荷载独立，子链散射不污染载体；付费一次、链锯清整次延迟 | spell_chain、foundations |
 | 复制与后代 | 按配方重建独立effect/荷载，抵消重复速度倍率，量子复制有本体与真实命中 | spell_mechanics、spell_resonance |
 | 寿命触发 | 定时到期当刻释放；休眠水晶到期爆炸，提前死亡与expire区分 | spell_timing、crystal_lifecycle |
+| 命中对象 | 使用原版可被投射物命中的能力判定；掉落物/经验球/效果云/Display展示实体/交互实体不阻挡弹体或消费荷载，正常生物与可射击的物品展示框仍命中；索敌/束/准星一致 | collision_precision的EntityHitChecks、homing_light、spell_chain、shield_balance |
 | 碰撞与反射 | 出生豁免不误伤、返弹自伤保留；双精度世界位置，解析扫掠薄形状/拼缝并按接点排序；斜墙/墙角不嵌入，同刻多次反弹走完余时；光束保留折点，水晶联动读取实际路径 | collision_precision、spell_chain、shield_balance |
 | 等离子束 | 默认静态，本体随位置；有效射线在墙/护盾截断，视觉与伤害共用截点，允许自伤 | expansion_plasma、spell_chain |
 | 追踪与弹速 | 扫掠预计飞行段找六格侧向范围内的目标中心，前方对准度优先，排除后方回锁；穿透后当刻沿当前切线渐入新目标的曲率，不抑制重复伤害；真实子步与光束共用路径 | homing_light、projectile_flight |

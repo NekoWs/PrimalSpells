@@ -61,7 +61,7 @@ class Tracking(
             val offset = entity.boundingBox.center.subtract(center)
             return if (offset.lengthSqr() < 1e-10) 1.0 else offset.dot(movement) / (offset.length() * movement.length())
         }
-        fun valid(entity: LivingEntity) = entity !== caster && entity.uuid !in passedTargets && entity.isAlive && !entity.isRemoved &&
+        fun valid(entity: LivingEntity) = entity !== caster && entity.uuid !in passedTargets && projectile.canHitEntity(entity) && !entity.isRemoved &&
             !caster.isAlliedTo(entity) && !(entity is Player && (entity.isCreative || entity.isSpectator)) &&
             alignment(entity) >= -1e-6 &&
             pathDistanceSquared(entity) <= reach * reach

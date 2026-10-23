@@ -13,13 +13,15 @@
 | 碰撞与反射 | 出生豁免不误伤、返弹自伤保留；双精度世界位置，解析扫掠薄形状/拼缝并按接点排序；斜墙/墙角不嵌入，同刻多次反弹走完余时；光束保留折点，水晶联动读取实际路径 | collision_precision、spell_chain、shield_balance |
 | 等离子束 | 默认静态，本体随位置；有效射线在墙/护盾截断，视觉与伤害共用截点，允许自伤 | expansion_plasma、spell_chain |
 | 追踪与弹速 | 扫掠预计飞行段找六格侧向范围内的目标中心，前方对准度优先，排除后方回锁；穿透后当刻沿当前切线渐入新目标的曲率，不抑制重复伤害；真实子步与光束共用路径 | homing_light、projectile_flight |
-| 汇聚之光 | 原地锁定方向蓄能10t，释放后64格/t连续光脊；主芯照明有限退场，保留真实5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
+| 汇聚之光 | 原地锁定方向蓄能10t，释放后64格/t连续光脊；装“光”时本体照明有限退场，保留真实5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
 | 穿刺代价 | 每张增加10t施放延迟，预览与实际付费一致；多卡叠加，链锯仍清整次delay | homing_light |
 | MP与存档 | 当前MP封顶；空槽/牌堆保序；完整刻迁移旧秒/毫秒；复制不共享wandId | spell_mechanics、exploration、magic_hud |
 | 伤害 | 独立分类/死亡文本；正治疗恢复、负治疗伤害；按实际接受强度击退，假人无击退 | damage_mass、combat_impact、new_spells |
 | 多卡护盾 | 卡数提高抗性与立方窗口预算，破盾当次仍吸收；无常驻壳和多余圆环 | shield_balance |
 | 黑洞 | 高质量互吸缓慢、静态源不碰撞、原维度持续结算，创造飞行免吸 | damage_mass、spell_stability |
 | 晶体 | 外向晶面、多角可读、临爆加速白闪和爆碎 | crystal_lifecycle、sawblade_falling |
+| 地形光照截断 | PD累计慢移位移、停住后精确刷新，脏section跨帧排队；同位置/光强重建前后地形一致、退场无残光 | light_boundary |
+| 普通粒子观察 | PD只读visitor包含零光源全亮粒子，按UUID保存实际alpha数值，恢复真实拖尾淡出观察 | fireball_trail、projectile_flight |
 | 法术环境照明 | 默认片元全亮/零光源；光修正每弹一源，重复卡去重、复制继承、荷载独立，2t升亮/4t熄灭；火把保留专用照明 | spell_lighting、particle_lighting |
 | 持杖与模型 | 暮紫封印倒角折臂/错落厚封印片/切面紫晶，重复OBJ零件唯一组名避免覆盖；低位持握，原生idle/施法余光；共用尺寸校准出生点，长按不减速、成功使用不重举 | wand_design、wand_casting、wand_aim |
 | 脚下法阵 | 实时跟实体、独立慢自转；透明出生，PD首次接管原子同步，正常退场等原生完成 | pd_api、wand_casting |
@@ -33,7 +35,7 @@
 
 ParticleBatch批量设速/施力、实体锚点、运行时Emitter、Movable相邻样本、spawnAll与寿命曲线已使用。原生Bridge负责跟随/外观插值；首次程序接管初始化两端，热更变量终点可参与完成回报，法阵和等离子退场可retire。
 
-PD 1.0.21新增LIGHT、静态光强乘数与从当前值接续的热更；动态光照使用alpha/尺寸包络，小数强度变化刷新静止区块和受光缓存。分数年龄采样和零末端由PD实现。particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场302帧无丢帧，原阈值均通过；全法术覆盖与1～2t高刷实机仍保留在verify，不能扩大通过范围。
+PD提供LIGHT、静态光强乘数、从当前值接续热更、alpha/尺寸照明包络与分数年龄求值；累计地形刷新和待刷新section队列避免慢移漏刷，forEachParticleSample只读观察普通粒子。light_boundary、spell_lighting、homing_light、particle_lighting、projectile_flight、pd_api、fireball_trail七场78项机制检查、982帧零丢帧，原阈值下画面门禁通过；预算压力、多人和1～2t高刷范围仍在verify。
 
 ## 文档维护
 

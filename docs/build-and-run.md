@@ -8,7 +8,7 @@ Minecraft 26.2、NeoForge 26.2.0.59、Java toolchain 25、Kotlin 2.4.10、Gradle
 
 ParticleDrawing主JAR作为compileOnly与localRuntime本地依赖，sources JAR仅供API对照。当前lib版本1.0.21-ALPHA；版本号与加载下限统一来自gradle.properties，预发布下限必须含ALPHA，例如 `[1.0.21-ALPHA,)`。
 
-当前PD构建源码为本地提交 `55a15b5`；`build sourcesJar --offline`和`test --rerun-tasks --offline`通过，共55组/372项测试、零失败。本项目 `build --no-build-cache --offline`通过，lib文件SHA-256与PD构建产物一致，打包的依赖下限为1.0.21-ALPHA。
+当前PD构建源码为本地提交 `8a01ffd`；`build sourcesJar --offline`和`test --rerun-tasks --offline`通过，共56组/377项测试、零失败。本项目 `build --no-build-cache --offline`通过，lib文件SHA-256与PD构建产物一致，打包的依赖下限为1.0.21-ALPHA。本次PD仍使用同一ALPHA版本号，以源码提交及JAR哈希区别构建：主JAR SHA-256为`2e98d6e7d4a12d0e4dd27f78316c442081d792bcfeeffd2e838a5612562dd3ad`，sources JAR为`263abeeadcbad3c0161516fc747d01399d56000dcb144ae1560413906262f89f`。
 
 PD本地项目在 `D:/Backup/IDEA Projects/ParticleDrawing`。获授权升级时在那里执行 `gradlew.bat build sourcesJar`，将匹配的主/源码JAR复制到lib，更新版本和下限，再运行本项目 `build --no-build-cache` 与相关录制。磁盘源码较新不代表运行依赖已更新。API缺陷按 [政策](design/effects-api.md#0-职责与缺陷处理) 停止登记，不能在本模组绕过。
 
@@ -87,7 +87,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 | 场景 | 主要覆盖 |
 |---|---|
-| light_boundary | 单颗原生PD光源慢移跨section、同位置/光强重建对照；当前地形一致性门禁失败，见PD需求 |
+| light_boundary | 单颗原生PD光源慢移跨section、同位置/光强重建对照；检查当前地形照明与光场一致、结束无残留 |
 | spell_lighting | 默认投射物目录零光源、昼夜像素不变、光修正真实付费/去重/复制/荷载隔离与退场 |
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
 | spell_performance | 固定32发高速物理/制导、512普通/冻结弹联动，逐样本服务端计时与线程分配；[口径与结果](design/performance.md) |
@@ -113,7 +113,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 门禁分别检查：1280×720、声明帧数/丢帧预算、真实玩法断言、最低可见覆盖、空场/尾帧零残留、实际退场/专属alpha或光强判据、运行日志。短退场保持95%→5%跨度3～10帧、单帧损失≤35%、清零前≤10%的严格规则；不能改阈值掩盖断帧。
 
-当前PD 1.0.21原生复验：particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场共302帧、0丢帧，机制与视觉门禁均通过。光照随alpha下降，组缩片退场最大单刻光强差1.875，原15→0硬切未复现。已知5条OSHI诊断按用户要求计入忽略项，不再使整体报告失败；其他日志门禁保持。所有法术入退场与短寿命高刷范围见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
+当前PD原生复验：light_boundary、spell_lighting、homing_light、particle_lighting、projectile_flight、pd_api、fireball_trail七场78项机制检查、982帧、0丢帧，机制与视觉门禁均通过。等价光场地形RGB差>5的像素占比为0.00%（要求≤1%）；默认零光源拖尾通过普通粒子只读visitor恢复逐颗alpha检查。已知5条OSHI诊断按用户要求计入忽略项，其他日志门禁保持。预算压力、多人与1～2t高刷范围仍见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
 
 当前性能与运动回归命令、测量负载和结果统一见[性能基准](design/performance.md)。正常捕获还检查碰撞、前方追踪/穿透切线、实际法杖命中、付费/独立荷载、护盾和晶体生命周期；机制与视觉门禁分别统计，未用FPS代替服务端计时。
 

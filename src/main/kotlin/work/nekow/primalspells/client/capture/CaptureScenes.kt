@@ -626,18 +626,20 @@ object CaptureScenes {
     private fun fireballTrail(): Scene = run {
         val name = "fireball_trail"
         var wand: Wand? = null
-        val previousAlpha = java.util.IdentityHashMap<work.nekow.particledrawing.core.client.RenderParticle, Float>()
+        val previousAlpha = hashMapOf<java.util.UUID, Float>()
         val alphaFalls = java.util.concurrent.atomic.AtomicInteger()
         val sampling = java.util.concurrent.atomic.AtomicBoolean()
         var minimumAlpha = 1f
         // 高速尾迹仅活1～2t，必须在渲染帧采样；20Hz检查会跳过同一颗粒子的整个淡出段。
         val sampler = java.util.function.Consumer<net.neoforged.neoforge.client.event.RenderFrameEvent.Post> {
-            if (sampling.get()) ClientParticleEngine.instance()?.getGlowingParticles()?.forEach { p ->
-                val alpha = p.effectiveAlpha()
+            val mc = net.minecraft.client.Minecraft.getInstance()
+            val partialTick = mc.deltaTracker.getGameTimeDeltaPartialTick(false)
+            if (sampling.get()) ClientParticleEngine.instance()?.forEachParticleSample(partialTick) { p ->
+                val alpha = p.alpha
                 if (alpha in 0.01f..0.98f) {
                     minimumAlpha = minOf(minimumAlpha, alpha)
-                    previousAlpha[p]?.let { if (alpha < it - 0.02f) alphaFalls.incrementAndGet() }
-                    previousAlpha[p] = alpha
+                    previousAlpha[p.id]?.let { if (alpha < it - 0.02f) alphaFalls.incrementAndGet() }
+                    previousAlpha[p.id] = alpha
                 }
             }
         }

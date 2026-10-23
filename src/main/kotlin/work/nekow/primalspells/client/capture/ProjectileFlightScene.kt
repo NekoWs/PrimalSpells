@@ -1,6 +1,6 @@
 package work.nekow.primalspells.client.capture
 
-import java.util.IdentityHashMap
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import net.minecraft.core.component.DataComponents
@@ -12,7 +12,6 @@ import net.minecraft.world.item.component.ChargedProjectiles
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.core.client.ClientParticleEngine
-import work.nekow.particledrawing.core.client.RenderParticle
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.SpellAssembly
 import work.nekow.primalspells.magic.core.SpellRegistry
@@ -27,7 +26,7 @@ object ProjectileFlightScene {
     fun scene(): Scene {
         val name = "projectile_flight"
         val checks = ConcurrentHashMap<Int, MutableList<Check>>()
-        val alphaBefore = IdentityHashMap<RenderParticle, Float>()
+        val alphaBefore = hashMapOf<UUID, Float>()
         val alphaFalls = AtomicInteger()
         val faded = AtomicInteger()
         val alphaSamples = ConcurrentHashMap<String, Double>()
@@ -105,13 +104,13 @@ object ProjectileFlightScene {
                     "decreasing=${alphaFalls.get()} faded=${faded.get()} minimum=${alphaSamples["minimum"]}")
                 if (t == 125) record(t, "projectiles-cleaned", ProjectileRuntime.projectiles.isEmpty(), "remaining=${ProjectileRuntime.projectiles.size}")
             }, clientTick = { _, t ->
-                if (t in 64..90) ClientParticleEngine.instance()?.getGlowingParticles()?.forEach { p ->
-                    val alpha = p.effectiveAlpha()
+                if (t in 64..90) ClientParticleEngine.instance()?.forEachParticleSample(0f) { p ->
+                    val alpha = p.alpha
                     if (alpha in 0.01f..0.98f) {
                         faded.incrementAndGet()
                         alphaSamples["minimum"] = minOf(alphaSamples["minimum"] ?: 1.0, alpha.toDouble())
-                        alphaBefore[p]?.let { if (alpha < it - 0.02f) alphaFalls.incrementAndGet() }
-                        alphaBefore[p] = alpha
+                        alphaBefore[p.id]?.let { if (alpha < it - 0.02f) alphaFalls.incrementAndGet() }
+                        alphaBefore[p.id] = alpha
                     }
                 }
                 if (t == 126) record(t, "pd-particles-zero", ClientParticleEngine.instance()?.activeCount() == 0, "remaining=${ClientParticleEngine.instance()?.activeCount()}")

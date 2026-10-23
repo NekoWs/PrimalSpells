@@ -57,9 +57,9 @@ build与run不入库。工具重建capture目录前检查绝对路径位于工�
 | damage_type缺失 | data资源是否打包/加载，run存档数据包状态；不屏蔽真实注册错误 |
 | 移包后unresolved reference | package/import和 [目录规则](conventions.md) |
 | 客户端启动错误界面不退出 | capture脚本监测崩溃/FATAL/超时，保留failure.json和当前日志 |
-| OSHI/Perflib 009异常 | Windows性能计数器问题，状态见 [open](issues/open.md)；不自动重启、不滤日志 |
+| OSHI系统信息采集异常 | 按用户要求忽略，不阻塞录制，不再要求重启或继续排障；原始日志保留 |
 
-OSHI修复脚本 `tools/verify/RepairPerformanceCounters.ps1` 需管理员、先备份，供系统排障，不是常规构建前置。用户已选择稍后手动重启；新客户端仍有5条异常，尚未确认恢复。
+录制报告只豁免OSHI日志记录及已知SystemReport进程信息查询的关联异常堆栈，单独统计忽略数量。其他JNA异常、模组错误、FATAL和崩溃报告继续阻塞；不修改系统配置或游戏原始日志。分类回归可运行 `python -B tools/capture/test_log_filter.py`。
 
 ## 7. 纯数值验证
 
@@ -107,4 +107,4 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 门禁分别检查：1280×720、声明帧数/丢帧预算、真实玩法断言、最低可见覆盖、空场/尾帧零残留、实际退场/专属alpha或光强判据、运行日志。短退场保持95%→5%跨度3～10帧、单帧损失≤35%、清零前≤10%的严格规则；不能改阈值掩盖断帧。
 
-当前PD 1.0.21原生复验：particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场共302帧、0丢帧，机制与视觉门禁均通过。光照随alpha下降，组缩片退场最大单刻光强差1.875，原15→0硬切未复现。整体报告仍因5条既有OSHI环境错误FAIL，未过滤日志。所有法术入退场与短寿命高刷范围见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
+当前PD 1.0.21原生复验：particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场共302帧、0丢帧，机制与视觉门禁均通过。光照随alpha下降，组缩片退场最大单刻光强差1.875，原15→0硬切未复现。已知5条OSHI诊断按用户要求计入忽略项，不再使整体报告失败；其他日志门禁保持。所有法术入退场与短寿命高刷范围见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。

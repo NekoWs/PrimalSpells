@@ -21,6 +21,7 @@
 | 原编杖 | 原容器滚轮/右键，V只读分色；创造专用包校验，生存原版协议 | foundations |
 | 获取与整合 | 原结构箱子追加、真实持杖敌人原物掉落、池/等级原子重载、不重掷旧杖 | exploration、progression |
 | 录制诊断 | 捕获启动崩溃/FATAL/超时/驱动错误，保留当前日志与部分帧，构建失败不误引旧MC日志 | capture.ps1、diagnostics.ps1 |
+| OSHI处理 | 按用户要求忽略系统信息采集记录及其已知关联堆栈，保留原日志，不作为待修或待重启项；其他错误/FATAL照常阻塞 | assemble.classify_log_errors、test_log_filter.py |
 
 ## 已接入的PD能力
 

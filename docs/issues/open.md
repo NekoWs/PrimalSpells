@@ -6,14 +6,6 @@
 - 尚未覆盖所有法术：固定尺寸且没有曲线的发光粒子、直接remove的正常结束路径，需要逐项声明出生/退场光强或已有视觉包络；不能以升级依赖代替完整改造。
 - 下一步：按PdParticles、PixelVfx及各法术/护盾/火把的真实生命周期补齐声明，验证移动、重复触发和收尾；使用PD现有LIGHT/lightIntensity接口，不自建光照系统。范围见 [verify](verify.md)。
 
-## 本机OSHI计数器异常
-
-- 级别：验证阻塞。启动MC记录Perflib 009英文计数器读取失败、JNA参数错误及OSHI当前进程userTime/virtualSize/residentSetSize空指针；日志门禁不能通过。
-- 已核实：系统计数器备份/重建、WMI同步和PerfOS禁用字段类型修正已执行，新进程仍失败，WMI服务重启被Windows拒绝。用户选择保存工作后手动重启，不自动重启。
-- 复现：任一capture新客户端；最近particle_lighting录制仍有5条上述异常。
-- 下一步：用户重启后复验真实OSHI当前Java进程数据，再跑录制；未恢复再排查系统组件。不得过滤ERROR或篡改SystemReport。
-- 工具与证据：`tools/verify/RepairPerformanceCounters.ps1`，`build/verify/oshi/backup-*`，`run/capture/logs/latest.log`。脚本需管理员且先备份，不作为常规构建步骤。
-
 ## 混合场景退场门禁
 
 - 级别：验证缺口。`machinegun_visual`机制6/6、可见性和零残留通过，但95%→5%跨度4帧、最大单帧覆盖下降42.2%，超35%阈值；归零前9.2%满足10%门槛。独立fireball_trail实际alpha检查通过。

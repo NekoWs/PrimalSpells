@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -678,6 +679,40 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     return result
 
 
+def classify_log_errors(log_lines: list[str]) -> tuple[list[str], list[str]]:
+    """按完整日志记录识别OSHI诊断及其堆栈，返回阻塞项和已忽略项；不修改原日志。"""
+    header = re.compile(r"^\[[^\r\n]*?\]\s+\[[^\]\r\n]+/(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\]")
+    process_info = re.compile(
+        r"\[net\.minecraft\.SystemReport/\]: Failed to get system info for "
+        r"(?:Process Loads|Process Virtual Size \(MiB\)|Process Resident Size \(MiB\))\s*$"
+    )
+    null_process = re.compile(
+        r'java\.lang\.NullPointerException: Cannot invoke "oshi\.software\.os\.OSProcess\.'
+        r'get(?:UserTime|VirtualSize|ResidentSetSize)\(\)" because "process" is null'
+    )
+    blocks: list[list[str]] = []
+    for line in log_lines:
+        if header.match(line) or not blocks:
+            blocks.append([])
+        blocks[-1].append(line)
+    bad: list[str] = []
+    ignored: list[str] = []
+    for block in blocks:
+        first = block[0]
+        # 用户要求忽略OSHI系统信息采集；其他JNA/NPE、模组报错和FATAL不在例外内。
+        known_oshi = bool(header.match(first)) and "/FATAL]" not in first and (
+            "[oshi." in first or (
+                process_info.search(first) is not None
+                and any(null_process.search(line) for line in block[1:])
+            )
+        )
+        candidates = [line for line in block if (
+            "Exception" in line or "ERROR]" in line or "/FATAL]" in line
+        ) and "[Capture] write frame" not in line]
+        (ignored if known_oshi else bad).extend(candidates)
+    return bad, ignored
+
+
 def write_report(results: list[dict], root: Path, log_lines: list[str]) -> bool:
     lines: list[str] = []
     lines.append("=== Primal Spells 实机录制报告 ===")
@@ -698,9 +733,8 @@ def write_report(results: list[dict], root: Path, log_lines: list[str]) -> bool:
         lines.append(f"    产物：{r['dir']}")
         lines.append("")
 
-    # 运行时日志（客户端/服务端）不该有异常
-    bad = [ln for ln in log_lines if ("Exception" in ln or "ERROR]" in ln) and "[Capture] write frame" not in ln]
-    lines.append(f"--- 运行日志：{len(log_lines)} 行，异常/ERROR {len(bad)} 行")
+    bad, ignored = classify_log_errors(log_lines)
+    lines.append(f"--- 运行日志：{len(log_lines)} 行，阻塞异常/ERROR {len(bad)} 行，忽略OSHI {len(ignored)} 行")
     for ln in bad[:10]:
         lines.append(f"    !! {ln.strip()[:220]}")
     if bad:

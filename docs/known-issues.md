@@ -1,14 +1,10 @@
-# 已知问题与技术债 —— 已拆分，见 `issues/`
+# 问题入口
 
-> 本文件原先承载**全部**问题记录（近 500 行），已解决的记录把未解决的淹没了。
-> 现按**状态**拆分到 [`docs/issues/`](issues/README.md)；本文件只作**旧链接的落点**，**不要在这里写新内容**。
+问题统一在 [issues](issues/README.md) 维护，本页保留兼容链接，不记录正文。
 
-| 你要找什么 | 去哪里 |
-|---|---|
-| 仍未解决的缺陷 / 技术债 / 待续开发 | [issues/open.md](issues/open.md) |
-| 静态编译过了但要**进游戏确认**的清单 | [issues/verify.md](issues/verify.md) |
-| 已解决记录（按轮次，含历史崩溃） | [issues/resolved.md](issues/resolved.md) |
-| 要提给 ParticleDrawing 的 API 需求 | [issues/pd-api-requests.md](issues/pd-api-requests.md) |
-| 目录分工与维护规则（严重度图例、何时写哪个文件） | [issues/README.md](issues/README.md) |
+- [未解决问题](issues/open.md)
+- [待体验与整合验证](issues/verify.md)
+- [修复结论](issues/resolved.md)
+- [ParticleDrawing API需求](issues/pd-api-requests.md)
 
-「这个行为是刻意的、不是 bug」这类**设计约定**不在问题台账里，见 [architecture.md 第 8 节](architecture.md)。
+预期机制见 [架构第8节](architecture.md#8-关键不变量与陷阱)，后续开发范围见 [TODO](todo.md)。

@@ -1,648 +1,108 @@
-# 构建与运行（build-and-run）
+# 构建与运行
 
-> 本文覆盖：环境要求、版本矩阵、依赖、常用 Gradle 任务、运行目录、CI、常见故障。
-> 关联文档：[issues/open.md](issues/open.md)（仍未解决的构建/运行问题）、[conventions.md](conventions.md)。
+## 1. 环境
 
----
+Minecraft 26.2、NeoForge 26.2.0.59、Java toolchain 25、Kotlin 2.4.10、Gradle wrapper 9.6.1。实际配置以gradle.properties/build.gradle/wrapper为准。CI使用Temurin 25并运行build。
 
-## 1. 版本矩阵
+## 2. 依赖与升级
 
-| 项 | 值 | 出处 |
-|---|---|---|
-| Minecraft | 26.2 | `gradle.properties` → `minecraft_version` |
-| NeoForge | 26.2.0.59 | `gradle.properties` → `neo_version` |
-| Java | 25（toolchain） | `build.gradle` → `java.toolchain.languageVersion` |
-| Kotlin | 2.4.10 | `gradle.properties` → `kotlin_version` |
-| Gradle | 9.6.1（wrapper） | `gradle/wrapper/gradle-wrapper.properties` |
-| 模组版本 | 1.0.0（`mod_version`） | `gradle.properties` |
-| modId | `primalspells` | `gradle.properties` / `@Mod(PrimalSpells.MODID)` |
-| 许可证 | GNU AGPLv3 | `gradle.properties` → `mod_license` |
+ParticleDrawing主JAR作为compileOnly与localRuntime本地依赖，sources JAR仅供API对照。当前lib版本1.0.20-ALPHA；版本号与加载下限统一来自gradle.properties，预发布下限必须含ALPHA，例如 `[1.0.20-ALPHA,)`。
 
-JDK 由 `foojay-resolver-convention` 插件按 toolchain 自动下载；本机只需能运行 Gradle 的 JVM，不必手动装 JDK 25。
-
-## 2. 依赖
-
-```groovy
-// 版本来自 gradle.properties 的 particledrawing_version（现为 1.0.20-ALPHA）
-compileOnly  files("lib/particledrawing-${particledrawing_version}.jar")   // 编译期接口
-localRuntime files("lib/particledrawing-${particledrawing_version}.jar")   // 开发环境运行时（不传递给下游）
-```
-
-- `particledrawing`（ParticleDrawing）是**必需的模组前置**：`neoforge.mods.toml` 声明 `type="required"`、`versionRange="${particledrawing_version_range}"`（现为 `[1.0.20-ALPHA,)`）、`ordering="AFTER"`。
-- jar 以**本地文件**形式签入 `lib/`，不走 Maven；文件名与版本区间都由 `gradle.properties` 驱动（`particledrawing_version` / `particledrawing_version_range`），`build.gradle` 与 `mods.toml` 不再硬编码。
-- 代码中用到的 API 位于 `work.nekow.particledrawing.api.*`：`ParticleManager`（`create`/`trackAll`/`setVelocityAll`/`applyForceAll`）、
-  `ParticleHandle`（`setVelocity`/`track`/`position`/`applyForce`/`attachTo`/`attachToLocal`/`remove`）、`Color`；
-  另有 `ParticleBatch`（**程序化粒子集的推荐入口**：`add`/`trackAll`/`setVelocityAll`/`applyForceAll`/`forEach`/`removeIf`/`ensureSize`/`evictDead`）、`ParticleGroup`（编排式动画）、`EffectCallbacks`、`EffectVarStore`。
-- ✅ **构建口径（同名换 jar 的坑，已解决）**：2026-09-30 当天曾在**同一版本号字符串**下替换过 `lib/` 里的 jar，
-  旧构建缺 `position`/`applyForce`/`attachTo`/`trackAll` 而 `versionRange` 拦不住。
-  现在 PD 每加一批 API 就提版本（当前 **1.0.20-ALPHA**），本模组的下限同步为 `[1.0.20-ALPHA,)`，
-  旧构建在加载期就会被拒绝，**不需要再靠日期约定**。
-- ⚠️ **预发布版本的版本区间（踩过一次的坑）**：FML 用 Maven 版本语义比较，`1.0.11-ALPHA` 排序**低于** `1.0.11`，
-  所以下限写 `[1.0.11,)` 会报 `Mod primalspells requires particledrawing 1.0.11 or above / Currently, particledrawing is 1.0.11-ALPHA`。
-  下限必须带上预发布标识（当前即 `[1.0.20-ALPHA,)`；规则在 1.0.8-ALPHA 那次实测过：带标识的下限接受该预发布版与之后的版本，拒绝对应更低的版本；比较大小写不敏感）。
-- **升级依赖的三步**（都只改 `gradle.properties` + 放 jar）：
-  1. 新 jar（含 `-sources.jar` 更好）放进 `lib/`；
-  2. 改 `gradle.properties` 的 `particledrawing_version`（= jar 文件名里的版本段）与 `particledrawing_version_range`（下限 = 该版本，预发布要带标识）；
-  3. `./gradlew build --no-build-cache`。
-- ⚠️ **若第 3 步失败**：不要在本模组绕过或自研替代实现 —— 按
-  [conventions.md](conventions.md) 第 9 节的政策停下，并把 API 修改需求登记到
-  [issues/pd-api-requests.md](issues/pd-api-requests.md)（政策全文见 [design/effects-api.md](design/effects-api.md) 第 0 节）。
-- 当前锁定版本为 **1.0.20-ALPHA**：包含既有跟踪/光照/曲线修复，并修复首次外观接管、变量完成账本与旧兜底失效；法阵及等离子束恢复变量完成后的retire。实机结果见第78轮。
-- 本地前置源码项目位于 `D:/Backup/IDEA Projects/ParticleDrawing`。本轮执行 `gradlew.bat build sourcesJar --console=plain`，复制build/libs中的主JAR与sources JAR；另外执行 `gradlew.bat test --rerun-tasks --console=plain`，测试成功。
-- 增量动画仍按“从现在起”追加，不能自行再补播放游标。发射器`.sizeCurve`是**追加乘数曲线**；重复热更新应使用`.lifeCurve(ParticleLifeCurve.of(ParticleCurve.scale(...)))`覆盖，避免累积到8条通道上限。
-- 早期版本 **1.0.11-ALPHA**（含 `ParticleBatch` 与实体锚点三入口、1.0.10 的批量设速/批量施力、1.0.11 的「组轴心语义」文档化与指令字段清理；近几个版本都只新增 API 或补文档，无破坏性变更）；
-  `docs/design/effects-api.md` 中「依赖升级 / `Trajectory` 迁移」已完成，`.pdrawc` 动画特效接线仍未落地。
-- `lib/` 只保留当前版本的 jar（`particledrawing-1.0.20-ALPHA.jar` + `-sources.jar`）；旧版本已清理，**对照 API 请以当前版本的 `-sources.jar` 为准**。
-  源码 jar **不接进构建**（只作对照用）：Gradle 的 file 依赖没有 sources 变体，2026-10-04 试过
-  `compileOnly` + `idea.module.scopes` 想让 IDEA 悬停看到 KDoc，**实测没生效**，已撤回 —— 别再试这条。
+PD本地项目在 `D:/Backup/IDEA Projects/ParticleDrawing`。获授权升级时在那里执行 `gradlew.bat build sourcesJar`，将匹配的主/源码JAR复制到lib，更新版本和下限，再运行本项目 `build --no-build-cache` 与相关录制。磁盘源码较新不代表运行依赖已更新。API缺陷按 [政策](design/effects-api.md#0-职责与缺陷处理) 停止登记，不能在本模组绕过。
 
 ## 3. 常用命令
 
-在仓库根目录执行（Windows 用 `gradlew.bat`，Linux/macOS 用 `./gradlew`）：
+在仓库根执行；Windows使用gradlew.bat，其他平台使用./gradlew。
 
-```bash
-./gradlew build              # 编译 + 打包（交付前必跑；CI 也跑这条）
-./gradlew compileKotlin      # 只做编译，最快的语法/包名检查
-./gradlew runClient          # 启动开发客户端（读取 run/client）
-./gradlew runServer          # 启动开发服务端（--nogui，读取 run/server）
-./gradlew gameTestServer     # 跑 GameTest 后退出
-./gradlew runData            # 数据生成（clientData 配置，输出到 src/generated/resources/）
-./gradlew --offline build     # 依赖已缓存时可离线构建（首次不可用）
-./gradlew runCapture          # 实机录制：真客户端自动跑场景并抓帧（见 §9）
-python tools/capture/assemble.py   # 把帧合成 mp4/gif/拼图并判定
+```powershell
+.\gradlew.bat build --console=plain
+.\gradlew.bat build --offline --console=plain
+.\gradlew.bat compileKotlin
+.\gradlew.bat runClient
+.\gradlew.bat runServer
+.\gradlew.bat gameTestServer
+.\gradlew.bat runData
 ```
 
-`build.gradle` 中自定义的运行配置（`runs { … }`）：
+离线仅适用于依赖已缓存的机器；本机在线解析可能长时间等待，可用--offline。runClient使用run/client；runServer使用run/server并带nogui。常规build当前无单元测试源，成功不等于实机玩法和视觉已通过。
 
-- `client`：窗口 1708×960，随机用户名 `Player####`（便于多开调试）。
-- `capture`：**实机录制**（`runType 'client'`，工作目录 `run/capture`，1280×720，场景由 `-Pcapture=` 选，见 §9）。
-- `server`：`--nogui`。
-- 三者都设置了 `neoforge.enabledGameTestNamespaces = primalspells`。
-- 工作目录：`run/<配置名>`（`client` → `run/client`）。
+## 4. 产物
 
-## 4. 运行目录与产物
+| 路径 | 用途 |
+|---|---|
+| build/libs | 构建JAR |
+| run/client/logs/latest.log、crash-reports | 开发客户端运行与崩溃诊断 |
+| run/server | 开发服务器 |
+| run/capture | 独立录制世界、配置、日志与截图 |
+| build/capture/out | 原帧、meta、视频、拼图、报告、画廊 |
+| build/capture/build.log | 本次录制前构建完整stdout/stderr |
+| build/capture/failure.json | 录制启动/运行失败摘要 |
+| src/generated/resources | 数据生成结果，按需入库 |
 
-| 路径 | 内容 | 是否入库 |
-|---|---|---|
-| `build/` | Gradle 产物、NeoForm 反编译缓存（体积很大） | 否（`.gitignore`） |
-| `run/client/` | 开发客户端工作目录：存档、日志、崩溃报告、配置 | 否 |
-| `run/client/logs/latest.log` | 最近一次运行日志 | 否 |
-| `run/client/crash-reports/` | 崩溃报告（排障第一现场） | 否 |
-| `src/generated/resources/` | 数据生成输出（已加入资源源集） | 是（按需） |
-| `lib/` | 本地前置 jar（particledrawing） | 是 |
-| `repo/` | `maven-publish` 的本地发布目录 | 否 |
+build与run不入库。工具重建capture目录前检查绝对路径位于工作区；不得清理run/client来代替录制世界重建。需保留结果时先将out归档到build/capture的其他目录，避免混合新旧帧。
 
 ## 5. CI
 
-`.github/workflows/build.yml`：push / PR 时在 `ubuntu-latest` 上安装 **Temurin JDK 25**，用 `gradle/actions/setup-gradle` 缓存，执行 `chmod +x ./gradlew` 后跑 `./gradlew build`。没有测试任务（项目当前无单元测试）。
+`.github/workflows/build.yml` 在push/PR执行Gradle build。构建覆盖编译、资源处理和打包；依赖客户端/世界的断言需开发录制单独执行，不把CI编译成功当效果验收。
 
-## 6. 常见故障
+## 6. 排障
 
-| 现象 | 原因 / 处理 |
+| 现象 | 检查 |
 |---|---|
-| 首次构建卡在下载 NeoForge / NeoForm | 需要联网访问 `maven.neoforged.net` 与 Mojang 源；成功后缓存在 `build/neoform/`，之后可 `--offline`。 |
-| `Unsupported class file major version` / toolchain 报错 | 本机 JVM 太旧；Gradle 自身需能启动的 JVM，项目 toolchain 会另拉 JDK 25。 |
-| 运行时报 `Mod file particledrawing not found` | `lib/particledrawing-<particledrawing_version>.jar` 缺失，或 `gradle.properties` 的 `particledrawing_version` 与 `lib/` 里的文件名不一致（见 §2 的升级四步）。 |
-| 启动后立刻崩溃且日志提到 `Missing element ResourceKey[minecraft:damage_type / primalspells:projectile]` | 历史上出现过（见 [issues/resolved.md](issues/resolved.md) 附录 A）：伤害类型数据包未加载时投射物结算会抛错，注意存档/`run` 目录的数据包状态。 |
-| 改了包名/移动文件后编译报「unresolved reference」 | 目录移动后 `package` 与 `import` 必须同步；用 [conventions.md](conventions.md) 第 8 节的对照表核对，并跑 `./gradlew compileKotlin`。 |
-| Parchment 参数名缺失 | MC 26.2 尚无 Pascal 版本，`gradle.properties` 里相关行保持注释状态（见其中说明）。 |
-| 想看中文/英文界面文本 | 语言键在 `src/main/resources/assets/primalspells/lang/{zh_cn,en_us}.json`。 |
+| 首次依赖下载卡住 | NeoForge/Mojang仓库网络；缓存齐全后用--offline |
+| Java class版本错误 | Gradle启动JVM与Java25 toolchain |
+| 找不到PD或版本不匹配 | lib文件名、实际JAR版本、ALPHA下限及gradle.properties |
+| damage_type缺失 | data资源是否打包/加载，run存档数据包状态；不屏蔽真实注册错误 |
+| 移包后unresolved reference | package/import和 [目录规则](conventions.md) |
+| 客户端启动错误界面不退出 | capture脚本监测崩溃/FATAL/超时，保留failure.json和当前日志 |
+| OSHI/Perflib 009异常 | Windows性能计数器问题，状态见 [open](issues/open.md)；不自动重启、不滤日志 |
 
-## 7. 离线数值自检（不启动游戏，直接跑实现）
+OSHI修复脚本 `tools/verify/RepairPerformanceCounters.ps1` 需管理员、先备份，供系统排障，不是常规构建前置。用户已选择稍后手动重启；新客户端仍有5条异常，尚未确认恢复。
 
-纯几何/数值逻辑（选点、拓扑、轨迹递推）可以**不启动游戏**直接执行真实实现：用 Gradle 缓存里的
-Kotlin 编译器手工编译「目标文件 + 一个同语义的最小替身」，再用 `java` 跑一个 `main` 打印断言结果。
-第 15 轮的截角二十面体几何就是这么验的（`util/Polyhedra.kt`：32 面板 / 60 顶点 / 90 棱 / 棱长一致 / 共面 / 邻接分类）。
+## 7. 纯数值验证
 
-要点（脚本与输出都在 `build/verify/`，**`build/` 不入库**，需要时按下面五步重建）：
+`tools/verify/CameraImpulseCheck.kt` 可调用真实CameraImpulse检查端点、连续性与限幅。几何/递推检查应编译真实实现，只为外部依赖提供最小类型替身，不复制被测算法。工具输出放build/verify。
 
-1. 从 `~/.gradle/caches/modules-2/files-2.1/` 找齐这几个 jar（缺哪个补哪个，版本取本机最新的 2.x）：
-   `org.jetbrains.kotlin:kotlin-compiler-embeddable`、`kotlin-stdlib`、`kotlin-reflect`、`kotlin-script-runtime`、
-   `org.jetbrains:annotations`、`org.jetbrains.intellij.deps:trove4j`、`org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm`
-   （把 jar 拷到一个目录里，用 `java -cp "libs/*"` 加载，避免 Git Bash 下 Windows 类路径分隔符被转换）。
-2. 写一个 `net.minecraft.world.phys.Vec3` 替身（只实现目标文件用到的方法，语义与 MC 一致）。
-3. 写 `Main.kt`：调用真实实现，把不变量写成断言，失败项计数后以非零退出。
-4. 编译：`java -cp "libs/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -cp "libs/kotlin-stdlib-<版本>.jar" -d out <目标.kt> Vec3Stub.kt Main.kt`
-5. 运行：`java -Dstdout.encoding=UTF-8 -cp "out;libs/kotlin-stdlib-<版本>.jar" harness.MainKt`
-   （不加 `-Dstdout.encoding` 时重定向到文件会按 GBK 写出，中文断言会变乱码）。
+纯数值通过不能证明PD实际曲线、发光、碰撞或网络生效；这些使用原生客户端/服务端场景。
 
-## 8. 建议的工作流
+## 8. 工作流
 
-1. 改代码 → `./gradlew compileKotlin`（快速反馈）。
-2. 功能可用性 → `./gradlew runClient`，进开发世界实测；崩溃看 `run/client/crash-reports/`，告警看 `run/client/logs/latest.log`。
-   （**没人操作电脑时**用 §9 的 `pwsh tools/capture/capture.ps1` —— 它会把实机画面录成视频给你看。）
-3. 交付前 → `./gradlew build`，并确认资源三件套（items/models/textures/lang）齐全（对照表见 [spell-development.md](spell-development.md)）。
+读路由文档和对应实现 → 改代码/当前设计 → build → 运行相关场景并保留证据 → 更新问题状态 → 检查diff并提交Git。无需为无关内容重复全场录制，但失败必须保留并明确边界。
 
----
-
-## 9. 实机录制：一条命令看到「游戏里实际长什么样」
-
-第 7 节的离线自检只能验数值/几何；「粒子在屏幕上长什么样、动画有没有按设计跑」必须进游戏看。
-这一节把「开客户端 → 进世界 → 摆位置施法 → 按 F2 截图」整条链自动化：**真客户端 + 集成服务端跑真实施法路径**
-（`Wand.spell` / `Wand.tick`），逐 tick 抓一帧，合成视频并给出 PASS/FAIL 判定。
+## 9. 实机录制流水线
 
 ```powershell
-pwsh tools/capture/capture.ps1                      # 三个场景全录（约 1 分钟）
-pwsh tools/capture/capture.ps1 -Scene black_hole    # 只录一个（逗号分隔可多个）
-pwsh tools/capture/capture.ps1 -SkipBuild           # 跳过前置的 gradlew build
-pwsh tools/capture/capture.ps1 -Offline             # 使用已缓存依赖，构建与启动均离线
-pwsh tools/capture/capture.ps1 -NoVideo             # 只判定 + 拼图，不调 ffmpeg
-
-# 等价的手工两步：
-./gradlew runCapture -Pcapture=all        # 录制（驱动录完自己退出）
-python tools/capture/assemble.py          # 合成 + 判定
+pwsh tools/capture/capture.ps1 -Offline -Scene particle_lighting -TimeoutSec 600
+pwsh tools/capture/capture.ps1 -Offline -Scene wand_casting,wand_aim -TimeoutSec 600
+pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 ```
 
-**只想手工看效果？** 游戏里跑 `/primalspells shielddummy [卡片数]` 会在视线方向 3 格放一个**持盾靶子**
-（法杖 + N 张护盾卡，靶子自己驱动被动），拿手上的法术打它就能现场看护盾的受击玻璃；大威力法术（大爆）在
-法力不够时会打穿，受击那一圈碎裂并留下 3 秒粉色破口。
-想看**第一视角**（自己的护盾被持续攻击）就用 `/primalspells shielddummy attack [法术] [间隔tick]`，
-它每 N tick 朝 32 格内最近的玩家打一发（默认火球 / 20 tick，可指定 `laser` 等）。
-清理用 `/primalspells shielddummy clear`。
-**想直接拿到某一级法杖**（六级曲线见 [design/wand-tiers.md](design/wand-tiers.md)）用
-`/primalspells wand t5`（可加 `charged` 拿蓄能型，`debug` 拿调试杖）——它会把这一根掷出的数值回报出来。
-实现见 `event/ShieldDummyCommand.kt`、`event/WandCommand.kt` 与 `TestDummyEntity.tick`。
+始终后台运行，PowerShell启动辅助进程使用Start-Process -WindowStyle Hidden并重定向stdout/stderr。客户端默认隐藏窗口，不抢键鼠；需要展示时显式使用runCapture的captureShowWindow属性。不要通过1×1窗口省略真实1280×720渲染。
 
-**录制不会打扰你**：客户端窗口默认被隐藏（`CaptureDriver.hideWindow` 走 `GLFW.glfwHideWindow` 并关掉
-`FOCUS_ON_SHOW`），并且每 tick 兜底释放鼠标抓取 —— 不会弹窗、抢焦点、锁鼠标。
-隐藏窗口在部分 Windows 驱动上会让 framebuffer 回读为 0×0，再被 Window 兜底为 1×1。
-驱动在隐藏后显式设置 1280×720 的离屏尺寸；截图读 `gameRenderer.mainRenderTarget()`，装配器对所有帧检查尺寸；
-判定里的「特效确实渲染」这条断言就是它的兜底验证。
-想看着录制跑（调机位/调场景时有用）：`pwsh tools/capture/capture.ps1` 之外加 `-PcaptureShowWindow=true`
-（即 `./gradlew runCapture -PcaptureShowWindow=true`）。
+脚本先构建，-Offline同时传递给构建和runCapture；-SkipBuild只在确认现有类产物可用时使用。它只拥有本次Gradle/游戏子进程，监测FATAL、崩溃报告、驱动错误和超时，失败保存当前日志/部分帧并停止，不杀其他MC实例。构建失败仅引用本次build.log，不引用旧运行日志。NoVideo开关尚有 [已登记缺陷](issues/open.md#novideo开关未传递到合成流程)，不要依赖它跳过ffmpeg。
 
-产物都在 `build/capture/out/`（`build/` 不入库）：
+### 场景选择
 
-| 路径 | 内容 |
+| 场景 | 主要覆盖 |
 |---|---|
-| `index.html` | **画廊**：三个场景并排（视频 + 动图 + 拼图 + 判定）—— 只想「看一眼」就看这个 |
-| `report.txt` | 判定结果（PASS/FAIL + 每个失败项） |
-| `<scene>/<scene>.mp4` | H.264 / 20fps / 1280×720 |
-| `<scene>/<scene>.gif` | 640 宽动图（贴到聊天里直接能动） |
-| `<scene>/contact.png` | 12 帧拼图（一眼看完整条时间线） |
-| `<scene>/frames/*.png` | 逐 tick 原始帧 + `frames.tsv`（帧号 ↔ tick ↔ gameTime） |
-
-### 9.1 驱动做了什么（`client/capture/CaptureDriver.kt`）
-
-| 阶段 | 行为 |
-|---|---|
-| 启动 | 关失焦暂停、隐藏 HUD、静音、关垂直同步、粒子设 ALL、渲染距离 8 |
-| 建世界 | 存档不存在就现场建**固定种子的超平坦世界**（`WorldOpenFlows.createFreshLevel`），存档存在则直接打开 |
-| 布景 | `/gamerule advance_time false` 等命令冻结时间/天气/刷怪，玩家进旁观（护盾场景用创造） |
-| 机位 | 每个场景一条**相机轨迹**（绕球心公转 / 第三人称转台），由服务端权威地每 tick 传送玩家 |
-| 施法 | 走真实路径：造 `Wand` → `wand.spell(player)`；被动（护盾）走 `wand.tick(caster, level)` |
-| 抓帧 | 客户端 tick 时记「本 tick 还没抓」，渲染线程在**本 tick 的第一帧**抓一次 → 恰好 20fps、每 tick 一帧 |
-| 断言 | 场景内检查（施法成功 / 清理干净 / 被动装载）写进 `meta.tsv`，由装配脚本收口 |
-| 收尾 | 等尾部帧落盘 → `mc.stop()` 自己退出（无人值守） |
-
-抓帧口径值得强调：**渲染帧率远高于 20Hz**，逐帧全录只会得到大量重复帧；
-「每 tick 一帧」既与游戏的实际动画步进一致，又让 100 多帧的体积可控。
-
-### 9.2 场景与判定口径
-
-| 场景 | 帧数 | 看什么 |
-|---|---|---|
-| `black_hole` | 108 | 暗核与双层倾斜吸积盘分层淡入（6–14t）→ 稳态旋转/吸入 → t=70 正常死亡 → 原组旋转塌缩并淡出（18t） |
-| `black_hole_moving` | 108 | 固定机位：右移 → 急停回圆 → 反向左移 → 停住 → 退场；检查最终定位阶段之后读取场心 |
-| `gravity_field_moving` | 130 | 同一移动时间线，检查球壳和地面井环跟随，已发射波面留在来路 |
-| `gravity_field` | 130 | 球面经线 + 加速落体细线 + 刻度波面（首层13t落地、后续26t，每13t一层）+ 地面双井环；固定结构10t淡出 |
-| `energy_shield` | 150 | 固定球体逐块搭起（16t）→ **合拢一记冲击波** → t=100「放下法杖」→ 逐块淡出消散 |
-| `fireball_trail` | 72 | 法术拖尾（第 43 轮新增，第 45 轮定稿）：前置回望机位跟拍火球 —— **白热核 + 沿轨迹收细的符文余痕**（自定义贴图 `rune_spark`）+ 贴身细碎符文；t=33 主动收球 → 之后看余痕逐颗消散 |
-
-`assemble.py` 的判定（**非零退出 = 有失败项**，可直接当 CI 门）：
-
-1. **分辨率与帧数**：所有帧必须为 1280×720；`帧数 + 丢帧数 = 场景声明长度`（丢帧由驱动如实计数），且丢帧率 ≤5%；
-2. **场景内断言**全部通过（施法/清理/被动装载/**结束时维度内剩余 PD 粒子数 = 0**）；
-3. **空场起飞**：开头 2 帧几乎没有任何特效像素；
-4. **真的渲染了**：峰值特效像素超过阈值（证明粒子确实上了屏幕，而不是只有服务端状态对）；
-5. **收干净了**：最后 3 帧几乎没有任何特效像素；
-6. **退场是渐变的**（设计上有退场动画的效果：黑洞）或**立即且干净**（设计上没有退场动画的场景），
-   或者**声明交给专属判据**（`decay: none`）——当一个场景混了两套互不相干的视觉系统
-   （护盾 = 受击玻璃板 + 大爆原版烟，全局峰值会逐次运行翻转），全局退场判定就不可靠了；
-   这时 spec 必须另有对应断言（护盾用的是粉色 `breach_fade`），脚本会校验它存在；
-7. **黑洞移动**：固定机位下，明亮内盘在往返两次停点均须离开出生点超过 60px（用 frames.tsv 定位 tick，避免丢帧偏移）；
-8. **护盾破口**（第 26 轮）：破口窗口里应有**常驻**的粉色轮廓，且到期是**淡出**而不是一帧消失。
-
-特效像素的判据是「偏蓝的亮像素」——黑底摄影棚里只有粒子满足（木桩、地面、天空都不满足），
-所以这条曲线同时充当「特效出现了/消失了/逐渐消失了」的证据。
-护盾的破口轮廓是**粉色**（蓝判据看不见），所以第 26 轮另加了一条粉色判据：**红远高于绿、且绿≈蓝**。
-爆炸的内爆/爆发是**暖色**（橙红 / 亮黄），蓝判据同样看不见，所以第 28 轮又加了两条：
-- **暖色判据**（`r > 150` 且 `r − b > 60`）：`implosion` 场景声明 `"metric": "warm"`，
-  于是它的「空场起飞 / 真的渲染 / 退场」都用暖色曲线判（其余场景仍用蓝）；
-- **暗核心判据**（亮度 `0.299r + 0.587g + 0.114b < 40`）：内爆的**黑色核心球**在中灰棚里是唯一的暗区。
-
-**跑流水线的两条硬规矩（第 29 轮补，都是为了不浪费时间）**
-
-1. **一律后台跑**：`capture.ps1` 会开真客户端，正常约 1~3 分钟，但**客户端崩溃时不会自己退出**
-   （第 29 轮实测：`FMLClientSetupEvent` 里碰 `RenderSystem` 抛 `Rendersystem called from wrong thread`，
-   游戏停在错误界面不动，前台调用把整轮对话挂死）。所以用后台任务跑，跑完再看结果。
-2. **脚本自带超时护栏**：`-TimeoutSec`（默认 300 秒）到点就杀掉 `bootstraplauncher|devlaunch|net.minecraft`
-   那个 java 进程、打印 `run/capture/logs/latest.log` 里的前 8 条异常并以失败退出。
-   想改等待上限就传 `-TimeoutSec 600`（大场景多的时候），**不要**去掉这个护栏。
-
-⚠️ `implosion` 场景**故意用中灰摄影棚**（`buildStudio(..., color = LIGHT_GRAY)`）：
-黑球在原来的黑底棚里根本看不见，而中灰（`r≈g≈b`）既不参与蓝判据也不参与暖色判据。
-别退回「红 > 蓝」那种粗判据：木桩与木构件是棕色 (135,109,68)、火球拖尾是橙色 (219,122,21)，
-两者都能通过粗判据（实测会把破口早就没了的末帧报成上万像素）。
-
-### 9.3 注意事项
-
-- 驱动只在**开发环境 + 系统属性**下注册（`CaptureDriver.shouldInstall()`）；
-  生产 jar 里 `CaptureDriver` 整个类不会被加载，也不注册任何监听器。
-- 每次跑都会删掉 `run/capture` 并从固定种子重建世界 —— **不碰 `run/client` 的存档与配置**。
-- 画面里的**黑底「摄影棚」**（地面与四壁换成黑色混凝土）是为了让细线粒子有对比度，属于**取景环境**，
-  不是玩法场景。想录自然地形：删掉 `CaptureScenes` 里的 `ctx.buildStudio(...)` 调用即可。
-- 加场景 = 两处一起改：`client/capture/CaptureScenes.kt` 的 `all()` 与 `tools/capture/assemble.py` 的 `SCENES` 表
-  （帧数/退场口径要对齐，否则判定会拦下来）。
-- 依赖：`ffmpeg`（PATH 里）+ `python`（`numpy` / `pillow`）；缺 ffmpeg 时 `-NoVideo` 仍能做判定与拼图。
-- 录制是**真机渲染**（AMD RX 7800 XT / 1280×720），窗口会真的弹出来；跑的时候别去动键盘鼠标。
-
-
-### 9.4 本机录制问题（2026-10-08）
-
-- `assemble.py` 控制台统一 UTF-8，日志损坏字符不会再导致 GBK 打印异常。
-- 若场景 PASS、总体仍 FAIL，检查报告最后的运行日志。当前本机 OSHI 的 Windows 性能计数器查询失败，
-  随后有进程信息空指针，已登记到 `issues/open.md`；不要关闭日志异常门禁以冒充全部通过。
-- 第 49–51 轮黑洞/重力场模型与预算见 [design/field-effects.md](design/field-effects.md)。
-
-
-### 9.5 第52轮内容验收
-
-`pwsh tools/capture/capture.ps1 -Scene expansion_crystals,expansion_arc,expansion_plasma,expansion_utilities,expansion_combinations`
-分别录140/150/145/220/180tick；内容与断言见 [design/spell-expansion.md](design/spell-expansion.md)。
-场景公共准备清除前一场的内部遮挡墙，保留摄影棚；斥力探针的箭矢与魔法弹分开出生，避免互相碰撞。
-等离子束使用侧面机位，避免正面沿束轴拍摄只看到一点；末尾检查投射物与PD粒子数为零。
-图标资源重建：`python tools/spells/generate_icons.py`（需要Pillow）。
-
-电弧与护盾混合场景用游戏tick8–64的独立电弧窗口量可见性及渐隐，保留全局最低像素门槛，
-避免护盾玻璃峰值掩盖电弧。组合场景使用木桩作为移动施法者，录制相机不会覆盖其位置。
-
-
-### 9.6 第53轮全量MC风格验收
-
-执行 `pwsh tools/capture/capture.ps1 -Scene all`，覆盖12条已有真实施法场景。
-本轮没有透明度渐隐：像素覆盖衰减来自尺寸收缩与错峰寿命，报告标签同步调整，最低可见性/零残留门槛保留。
-44张法术卡图标重建及16px预览见 [design/minecraft-visuals.md](design/minecraft-visuals.md)。
-
-
-### 9.7 第54轮质感与法术联动
-
-全量录制新增spell_resonance（320tick），包含448组配方/继承检查与真实晶体、冰火、吞弹、反射、集束验收。
-等离子束延寿判据改为40tick后仍活，墙挡测试前结束前一束，保留独立无伤害断言。
-爆炸即时预算按新喷射/火团/冲击圈检查1200–2200，仍在age=1死亡触发观察伤害。
-设计及结果见 [design/spell-quality.md](design/spell-quality.md)。
-
-最终13场证据为12场全量加spell_resonance定向复验，合并2309帧/零丢帧/81项断言通过；
-视频与帧仍在build/capture/out，来源记录runs.tsv，完整结果与既有OSHI日志限制见spell-quality。
-
-
-### 9.8 第55轮稳定性回归
-
-新增spell_stability（180tick）：短时双黑洞互吸携带共同前向速度穿过石墙（t45结束以隔离已确认的PD长时断线），首tick追踪、统一1.6倍初速、穿刺弹穿墙积分、晶体粒子预算与清理。
-PD批量速度超过512成员的断线已在客户端日志确认；当前前置存在此缺陷，不能把双场短时PASS当成长时稳定修复。
-修复前置后须复验至少120tick移动星尘（覆盖60tick粒子寿命积累）和513/1024成员批量更新。
-
-
-### 9.9 第56轮持杖法阵
-
-runCapture -Pcapture=black_hole,black_hole_moving,spell_resonance,wand_casting,wand_casting_first_person录制移除黑洞环和真实持杖流程。
-wand_casting为220tick，第三人称取景；CameraType现在真正按Scene.thirdPerson切换。预热阶段测试法杖放入背包，
-避免WandManager回收后测试继续调用已unload的旧引用；这是测试夹具生命周期要求。
-玩法、视觉与清理口径见design/wand-casting.md。
-
-
-黑洞环移除后，移动像素检查取固定边界星点色板，保留原游戏tick与60px双向位移门槛；不用已删除的内盘色板判空。
-
-
-### 9.10 第57轮：真实法杖模型与退场
-
-执行gradlew runCapture -Pcapture=wand_casting,wand_casting_first_person，配合§9的后台启动与300秒超时护栏；合成时只纳入本次重新录制的场景，勿将上次帧标为本次结果。
-两场各220tick；第一视角showHands=true，保持HUD状态为可见以让MC渲染手持物品，随后仅取消RenderGuiEvent.Pre绘制UI。第三视角不变。
-退场改为t187–216有限解体，50%→5%至少4帧；玩法检查验证放下后粒子仍短暂保留、16tick后归零。随机汇聚、白色间隔退场、琥珀充能收束和宝石发射需检查真实PNG/GIF，不只看服务端粒子数。
-
-宽视野复验额外录wand_casting_wide（90°，220tick），默认第一视角60°；青白专属像素判据排除饱和蓝宝石，不把模型消失当成粒子退场。录制同时关闭原版教程气泡，避免UI遮住宝石。
-
-### 第58轮持杖取景
-
-新增wand_aim验证主副手近远命中和遮挡；wand_casting_front使用Scene.thirdPersonFront展示正面握柄。正面抬头取景的弹体比俯视取景飞行更久，夹具在完成真实出生点检查后提前结束弹体，使158/208tick的归零断言只衡量持杖退场；219tick仍独立验证全部投射物及PD粒子归零。
-装配器只读取当前场景实际使用的色域指标，不改变掩码阈值和验收门槛；持杖场景新增缺失材质警告检查。
-
-### 第59轮低模法杖与idle回归
-
-录制 `-Pcapture=spell_resonance,wand_casting,wand_casting_first_person,wand_casting_wide,wand_casting_front,wand_aim`。
-法杖新增主副手原版itemUsed高度回调与空手对照；60°/90°视角按两枚符印专属色域逐帧检查，排除模型和焦点掩盖断档。充能柱只读脚下坐标，t65–77独立观察完整收尾，t78再重复施法，避免效果重叠污染断言。
-在当前录制之前遗留其它场景目录时，不把历史帧当成本轮证据；仅装配本轮6个目录（可在build/capture/round59out放6个指向out对应目录的Junction，再 `python tools/capture/assemble.py --out build/capture/round59out`）。
-结果回填design/wand-casting.md；运行日志异常门禁保持。
-
-### 第60轮模块/状态时序验收
-
-选择black_hole,black_hole_moving,spell_resonance,wand_casting,wand_casting_first_person,wand_casting_wide,wand_casting_front,wand_aim。
-客户端场景采样原生模型属性验证待机变化、主副手施法后亮态和300ms后复原；像素门禁验证t29（施法下一tick）两种冷却已经可见。短退场适配本轮要求，具体门槛见design/wand-casting.md。
-本轮独立装配目录build/capture/round60out仅包含8个对应场景的Junction，不把旧场景媒体计为新证据。日志异常门禁不变。
-
-### 第61轮动画连续性验收
-
-`./gradlew build --console=plain`；后台`runCapture -Pcapture=all`覆盖19场。
-镜头纯曲线验证：按§7使用K2JVMCompiler编译`client/CameraImpulse.kt`与`tools/verify/CameraImpulseCheck.kt`，运行`CameraImpulseCheckKt`。
-当前实机原始证据`build/capture/final61b.log`、`final61c.log`、`final61d.log`、`summary61b.tsv`、`summary61c.tsv`、`summary61d.tsv`、`runs61.tsv`及`out/`；不能关闭OSHI日志异常门禁。
-连续性设计、真实边界与结果见[animation-continuity.md](design/animation-continuity.md)。
-
-
-### 第62轮：前置源码编译与连续性复验
-
-先在`D:/Backup/IDEA Projects/ParticleDrawing`运行`gradlew.bat build sourcesJar --console=plain`；将build/libs的1.0.15-ALPHA主JAR、sources JAR复制到本项目lib，仅保留当前版本。
-改gradle.properties的版本与带ALPHA的版本下限后，运行`gradlew.bat build --no-build-cache --console=plain`。
-前置自身测试使用`gradlew.bat test --rerun-tasks --console=plain`，322项通过。
-runCapture仍须隐藏后台启动与300秒超时护栏。全量覆盖19场，稳定性场景t128检查两洞运行120tick，t92建立1024成员并执行一次setVelocityAll，t96检查保持连接。
-ParticleManager.spawnAll公开上限256与运动载荷上限是不同口径；1024成员测试用ParticleBatch.ensureSize建立集合，速度仍一次交给PD自动拆包。
-法杖第一人称最后俯视地面阵列，用实际视野检查退场；火球摄影棚清除前场遗留墙，禁止把墙体遮挡当成生命周期收尾。
-
-
-第62轮最终来源为round62c的14场与round62f的5场补录；runs62.tsv记录来源，summary62.tsv汇总3529帧/零丢帧/170项断言。不得把中间接线失败/视觉失败的62a–e当成最终证据。
-前置组尺寸/变量仍20Hz求值的源码限制单独登记，新API接线通过不等于严格高刷保证已经完成。
-
-## 第63轮验收范围
-
-全量录制新增`spell_mechanics`（220刻），其余19场保留。爆炸判据改为暖色，与随机橙黄火舌匹配；去除已删除的蓝色外环依赖，最低可见性/空场/零残留门禁保留。电弧断言改为第五次衰减命中；静止光束墙挡阶段清理上一阶段尚在显示的浮字；集束夹具改为弹跳复制的独立配方继承。环绕范围判据与增大的半径同步。
-
-第63轮最终来源为63b的14场与63c的6场补录；`build/capture/out/runs63.tsv`逐场记录来源。20场共3749帧、零丢帧、196项玩法断言全部通过；新增机制场26项全部通过。构建通过，逐场视觉门禁通过。总体报告仍被本机OSHI的5条异常阻断，不能声明流水线整体通过；该环境问题独立登记在issues/open.md §3.1。
-
-## OSHI本机计数器排障（2026-10-09，尚未验证修复）
-
-OSHI是Minecraft自带的操作系统/硬件信息库。此处异常发生在CrashReport.preload收集系统报告时，早于法术初始化；当前问题是Windows性能计数器查询失败后当前进程返回null，并非黑洞结算异常。
-
-官方流程：[Microsoft计数器重建](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/manually-rebuild-performance-counters)、[lodctr参数](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/lodctr)、[OSHI配置说明](https://www.oshi.ooo/xref/oshi/util/GlobalConfig.html)。`oshi.os.windows.hkeyperfdata=false`是受支持的备用路径，但本机仍缺少当前PID，不能采用该配置冒充修好。
-
-管理员PowerShell可执行`tools/verify/RepairPerformanceCounters.ps1`；指定`-RestoreFrom <本机备份INI>`可显式还原，`-RestartServices`执行微软流程中的查询服务重启。脚本不会自动重启电脑。每次先备份到`build/verify/oshi/backup-时间戳`，输出result.txt；必须看复查结果，不能只看lodctr退出码。生产模组不注入/替换OSHI、不隐藏硬件采集错误。
-
-本次已重建两种位宽、同步WMI、修正PerfOS错误值类型；英文Counter仍错误87，OSHI仍返回null，Windows拒绝重启WMI服务。待用户重启后复验。通过条件：OSHI当前PID非null、CPU时间/物理与虚拟内存为真实有效数据；新runCapture日志无对应异常，总体日志门禁通过。
-
-修复尝试后63d重新启动客户端并补录spell_mechanics：220帧/零丢帧/26项全通过；`build/capture/final63d.log`仍含同样5条OSHI异常，PerfOS字段类型警告已消失。用户选择稍后手动保存工作并重启，禁止本轮自动重启；重启后的系统/录制复验尚未进行。
-
-## 第64轮验收范围（2026-10-09）
-
-最终8场：`spell_timing`、`spell_mechanics`、`expansion_arc`、`expansion_combinations`、`expansion_crystals`、`crystal_lifecycle`、`spell_resonance`、`spell_stability`。1520帧、零丢帧、79/79项玩法断言通过，逐场帧数/像素可见性/退场与媒体门禁通过。新增延迟/链锯场12项，水晶生命周期场7项；真实施法、伤害、牌序与清理均走原运行时。
-
-最终画廊`build/capture/final64/index.html`，报告`report.txt`，逐场来源`runs.tsv`，帧/断言统计`summary.tsv`；该独立目录只含本轮8场，不混入此前录制。7场来自64b，延迟/链锯场来自最终64c；原日志分别存于`build/capture/final64b.log`与`final64c.log`。64a另补录第一人称施法220帧/16项通过，未计入上述8场总数。
-
-人工检查水晶四个外侧视角的填充面、白闪及到期真实爆炸；延迟载体释放前收拢、释放后与荷载同位置飞散；基础及延寿加速链锯切割均可见。图标仍用现有像素生成器，最终43张卡。
-
-总体报告仍FAIL：新客户端启动仍含既有OSHI/Perflib/JNA的5条异常，没有调整日志门禁或隐藏错误。用户尚待手动重启，法术验收通过不能作为系统计数器恢复的证明。
-
-新增两场的退场判据使用已有`collapse`门禁（50%→5%至少4帧），分别实测5/7帧；初版夹具误用“瞬间消失≤3帧”口径，已按晶体爆炸/锯齿飞散语义修正。最低可见性、空场、零残留和日志异常门禁未放宽。
-
-## 第65轮验收范围（2026-10-09）
-
-最终65f录制十场：black_hole_moving、explosion、expansion_crystals、expansion_arc、expansion_plasma、spell_resonance、spell_stability、spell_mechanics、crystal_lifecycle、combat_impact。1781帧、零丢帧，93/93项玩法检查通过。新增combat_impact的18项使用真正原版猪检查受伤/推力/抗性/自伤/暗核，另覆盖空场四跳、最近两次避让、薄墙相位、实心落点停止、延寿11跳和跃迁触发易爆修正。
-
-最终独立画廊`build/capture/final65/index.html`，报告`report.txt`，统计`summary.tsv`，逐场来源`runs.tsv`全部为65f；原日志`build/capture/final65f.log`。先前65a失败夹具及65b/c中间结果均不作为最终证据；最终长片元已改用PD alignTo径向对齐，保留原始PNG供检查。
-
-玩法门禁不因重构放宽：爆炸首拍1200～2200颗、所有场景原有像素最低覆盖/空场/退场/媒体/零PD残留规则保留。电弧四次伤害从旧逐跳衰减改为四次真实4点放电，与最终Noita机制一致。总体日志仍被既有OSHI的5条异常阻断，未把场景PASS写成系统环境恢复。
-
-65f十场视觉及媒体门禁全部通过，大爆炸暖色覆盖50%→5%跨4帧（原门槛≥4）。65d/e退场失败均不作为最终验收；最终只使用65f新客户端完整十场。开发录制setup清理邻近原版掉落物，防止伤害测试的猪肉污染后续空场；不清除或过滤粒子。构建通过；总体报告仍因既有5条OSHI异常FAIL。
-
-## 第66轮验收范围（2026-10-09）
-
-新增damage_mass场，25项真实原版生物检查覆盖8类伤害源/死亡组件/no_knockback、火/冰/爆炸原版标签、法术分派、冰冻转换、爆炸独立类型、1刻持续伤害、质量安全值和八倍惯性、双黑洞长时慢速互吸。8类名称与3种死亡变体的中英键及数据包一致性另做资源检查。
-
-最终独立目录`build/capture/final66/`，12场2286帧、零丢帧、128/128项玩法通过；`runs.tsv`记录明确来源：10场66a，等离子场66c，爆炸场66d；原日志分别`final66a/c/d.log`。未采用66a/b等离子旧护盾断言及未收尾的结果。等离子场改为前几次被盾吸收、20刻预算耗尽后击穿并冻结两条检查，时长210刻等待原有破口生命周期走完。
-
-爆炸本轮未改表现参数：原12格镜头在随机火舌最远约18格的内部，火舌掠过镜头会放大再退出屏幕，被覆盖量误判为硬切。仅验收机位移至20格，完整记录外扩与燃尽；原可见性、50%→5%至少4帧、零残留门禁均保留，最终跨度5帧。光照残留是PD缓存缺陷，源码诊断见pd-api-requests第66轮，尚未进行修复闭环。
-
-构建通过。OSHI/Perflib的既有5条启动异常仍阻断总体日志门禁，本轮不重启或过滤日志；用户手动重启后的系统复验仍待进行。
-
-最终12场的帧数/像素可见性/空场/连续退场/零残留/媒体门禁全部PASS；原版伤害分类木桩文字在expansion_arc帧20可见，双黑洞速度证据在damage_mass meta的t70/t140。总体FAIL仅包含既有5条OSHI启动异常。
-
-
-## 第67轮验收范围（2026-10-09）
-
-最终12场2470帧、零丢帧、147/147项玩法断言通过。十场既有玩法来自67a，新增recoil_light与concentrated_light_first_person来自最终67g；来源逐场记录在`build/capture/final67/runs.tsv`，原日志`final67a.log`、`final67g.log`。独立画廊`final67/index.html`、报告`report.txt`、帧/检查统计`summary.tsv`。67a新场的射程夹具失败及67b～f视觉中间结果不作为最终证据。
-
-新增22项检查覆盖付费真实施法的基础反冲、两张卡/顺序/叠加、子弹不重复反冲、蓄能后一次反冲、真实原版猪36点能量伤害、质量4%径向阻尼、创造飞行/落地、20刻禁止提前发射、148.8格纯运动距离、真实墙面只反弹一次后终止、真实法杖转向时蓄能跟随及20刻释放、最终零投射物/零PD残留。距离项单独关闭碰撞以隔离studio木桩，伤害与墙反弹另走未绕过的Move碰撞；没有修改玩法碰撞。配方矩阵自动扩为18×28=504组合。
-
-世界录制使用侧面机位/两堵墙，独立70～110刻窗口覆盖正常蓄能后的射出、一次反弹、第二次碰墙终止及余辉，避免手工检查产生的粒子污染退场指标。第一人称用上方300像素内暖色衡量杖首，排除原版裸手肤色；保留相同737像素最低可见性、空场、50%→5%至少4帧、零PD残留门槛，最终两场收尾跨度14/12帧。人工检查聚焦棱片、白光脊/金侧线、第一人称准星区域和宝石释放亮态。
-
-最终构建通过，所有12场玩法/视觉/媒体门禁通过。总体日志仍FAIL，仅含既有OSHI/Perflib/JNA的5条启动异常；用户尚待手动重启，不隐藏日志、不声称系统环境已修复。新卡资源JSON和中英键完整性检查通过，图标生成器共46卡。
-
-
-## 第68轮验收范围（2026-10-09）
-
-最终8场2181帧、7帧丢帧（均来自250刻shield_balance，在原5%/12帧容限内）、114/114项玩法通过。来源：expansion_plasma/spell_resonance/spell_mechanics/combat_impact为68a；energy_shield/shield_balance为68b；recoil_light/concentrated_light_first_person为68d。独立产物build/capture/final68，逐场来源runs.tsv、玩法summary.tsv、原日志final68a/b/d.log。未采用68a旧护盾伤害断言、过早取样的第一人称距离断言，以及68b只允许单次反弹的固定时刻检查。真实双墙手动推进精确检查五次反弹后终止；运行时检查记录剩余反弹数与速度，不假定某个场景时刻必定仅反弹一次。
-
-ShieldBalanceScene新增16项原版受伤/法力检查：1卡和8卡预算、20发144强度、零MP破盾、破盾首发及后续投射物/爆炸、同载体易爆不二次伤害、旁人爆炸、穿刺、内部爆炸、真实碰撞单卡破/八卡完整、零MP八卡破，以及假人push与100伤害爆炸免推力；结束零投射物/零PD残留。第一人称实持法杖并走动转身，t45世界坐标固定、t50仍沿出手方向且releaseAge=20。
-
-第68a视觉发现trackAll+sizeCurve冻结首帧尺寸，锁定sources及外部PD源码诊断一致；登记pd-api-requests第68轮。最终固定镜阵只用已有原生move一次性合拢，无本侧插值或渲染替代。第68d近景已缩到半径0.30格与1/16格普通片元，检查第32/43帧聚光图案及准星区域。构建及语言JSON通过。总体日志仍有既有5条OSHI启动异常，手动重启复验尚待用户完成；没有隐藏日志或宣称系统恢复。
-
-最终8场玩法/帧数/像素可见性/空场/收尾/媒体门禁全部PASS；汇聚世界/第一人称50%→5%分别13/22帧，护盾对比10帧。总体报告仅因既有5条OSHI启动异常FAIL。画廊index.html及report.txt已生成并人工检查第一人称接触表和护盾对比原始帧。
-
-
-## 第69轮验收范围（2026-10-09）
-
-只复验recoil_light、concentrated_light_first_person两场，最终69a共394帧、6丢帧（分别2/11与4/9，均在原容限），22/22玩法检查通过。原版猪蓄能释放前后速度均0，且加入0.35反冲加值仍不推动；其它法术的基础反冲、修正顺序与叠加检查仍通过。20刻释放、锁定方向、5次真实墙反弹及终止、零投射物/零PD残留保持。
-
-独立画廊build/capture/final69/index.html，报告report.txt、逐场来源runs.tsv均为69a，原日志final69a.log。人工查看第一人称释放后49/52帧及连续图，镜阵后震、张开与回弹在原部署点连续发生。两场帧数/玩法/像素可见性/空场/退场/媒体门禁全部PASS；50%→5%分别11/21帧。构建通过，中英描述同步纯视觉反冲。总体报告仍只因既有5条OSHI启动异常FAIL，未进行系统重启或隐藏日志。
-
-
-## 第70轮验收范围（2026-10-09）
-
-最终8场2180帧、8丢帧（均shield_balance，250刻原容限12帧内），128/128玩法通过。energy_shield/expansion_plasma/spell_resonance/spell_mechanics/combat_impact/concentrated_light_first_person来自70a；shield_balance来自70b；recoil_light来自70c。独立目录build/capture/final70，来源runs.tsv、统计summary.tsv，原日志final70a/b/c.log。
-
-ShieldBalanceScene增加12项真实Move高速护盾检查：4.8、24、64格/刻正面及12格/刻斜入射，每组验证反弹后存活/实体命中0/墙反弹仍5/持盾原版猪1000生命/护盾未破、被动再扫只付一次5MP、反射后实际另一实体受36伤害。另增1项连锁魔弹真实跃迁反射方向/慢漂移及MP检查，总29项。RecoilLightScene增加真实付费施法的0.06轻反冲，改蓄能队列为出手立即轻推且释放不再推，总19项。付费测例的光束在出手检查后立即结束蓄能，避免污染70～110刻独立发射镜头。
-
-70a的64格夹具出生在摄影棚后墙之外，先碰墙，不能据此判断护盾；70b只把出生点改在墙内，仍用64格/刻原生Move，不关闭任何碰撞。70b世界场的额外付费测试光束未隔离，最终仅采用70c该场；其余镜头/碰撞/像素/收尾门槛保留。最终构建和中英语言JSON检查通过。总体日志仍包含既有5条OSHI启动异常，用户手动重启复验未进行，未过滤或宣称修复。
-
-最终8场玩法/帧数/可见性/空场/收尾/媒体门禁全部PASS，世界聚光12帧、第一人称21帧、护盾对比10帧收尾跨度。人工检查护盾对比原始帧和世界聚光接触表；总体FAIL仅含既有5条OSHI启动异常。
-
-
-## 第71轮验收范围（2026-10-09）
-
-最终8场2177帧、11丢帧（shield_balance，250刻原容限12帧内），140/140玩法检查通过。除shield_balance取71b外，其余7场取71a；独立画廊build/capture/final71/index.html、report.txt、runs.tsv及summary.tsv记录来源，原日志final71a/b.log。
-
-ShieldBalanceScene新增12项检查，总41项：4组真实子步擦边/斜入射检查及被动扫场不重复改写，共8项；客户端原版applyInput验证7档法杖×主副手14种不减速、可疾跑且弓仍减速，共3项；正常部署、20刻蓄能后的可见擦边光束交点1项。速度4.8/12/64格每刻，解析球壳交点误差小于0.001格，持盾者未受伤、弹存活且命中次数0。人工检查71b第114刻原始帧（00103.png），入射与反射光束在盾面同一点衔接。
-
-最终8场帧数/玩法/像素可见性/空场/退场/媒体门禁全部PASS，构建通过。总体报告仍仅因既有5条OSHI启动异常FAIL；用户手动重启复验尚未进行，未过滤异常或调整门槛。本轮未新增PD API需求。
-
-
-## 第72轮：构建PD1.0.16并恢复原生接线（2026-10-09）
-
-前置源码D:/Backup/IDEA Projects/ParticleDrawing，提交5557ed0；执行gradlew.bat build sourcesJar及test --rerun-tasks，330测试、0失败/错误/跳过。主JAR SHA256=53c00075ce0b306cfd5571acbbefd08aca58e2a6cbd24ac59550b533e8090cb5，复制后与源码项目产物一致。lib仅保留1.0.16主JAR与sources，gradle版本/下限与最终模组内mods.toml均为[1.0.16-ALPHA,)；升级构建--no-build-cache和最终build均成功。
-
-最终13场3179帧、9丢帧（shield_balance，250刻原预算12内），211/211玩法检查通过。8个法术场来自72a，pd_api来自72c，4个法杖视角来自72e；来源build/capture/final72/runs.tsv、summary.tsv，画廊index.html、报告report.txt；原日志final72a/c/e.log。72a/b的PD夹具曾误用未乘曲线的基础快照/光源筛选列表，不能证明曲线渲染，未作为最终证据；最终只用snapshot验证track位置，独立像素区域验证寿命曲线的真实绘制。
-
-PdApiScene：同一静止Bridge实例原生extract光照输出15728640→15728869→15728640；光源移回再次变亮，销毁再次恢复。Bridge尺寸在partialTick=0/.25/.5/.75/1五个点严格递增且中点线性，不依靠20fps视频推导高刷。连续1刻变量热更的目标0.92收敛到0.88，没有旧版重启饥饿；普通组完成回调在出生后50刻到达，远早于68刻兜底，成员随客户端回报归零。曲线方片独立ROI在出生/保持/熄灭三个窗口验证覆盖起落，并确认跟踪期间位置不断推进。
-
-人工查看第一人称汇聚之光第43帧，恢复track后白金镜阵正常可见，不再冻结为首帧小点；第三人称正面第146帧法阵正在有限退场。保持20刻蓄能、固定方向、真实反射接点、5次墙反弹、0.06出手反冲及法杖主副手原速。
-
-PD新增完成API对expression/setVariableInterpolated仍有限制；普通组已接入，法杖/等离子表达式收尾保留旧清理，缺口登记pd-api-requests第72轮，不自写客户端销毁协议。总体日志仍有既有5条OSHI启动异常，用户手动重启复验未进行。
-
-第72a轮画面门禁发现旧7刻EASE_IN_OUT的法阵退场在三个视角单帧覆盖下降37～39%，超过既有35%门槛。presence改8刻LINEAR，使实色面积更均匀收束，销毁余量仍12刻且不更改门禁；72d的线性presence仍在最后一个采样留下约15%覆盖；片元尺寸改presence^0.75（面积presence^1.5），末尾更早收细，四视角补录72e。PD夹具包含60刻尺寸收尾，场景声明改为渐进退场而非瞬时消失，其专属ROI仍严格检查出生/保持/熄灭。
-
-72e三角法阵/60度第一人称/90度第一人称的最大单帧覆盖下降分别18.6%/19.7%/18.7%，归零前分别5.5%/5.6%/6.0%，维持原35%/10%门槛；未通过的72a/d视角不作为最终证据。
-
-最终13场帧数/玩法/像素可见性/空场/退场/媒体门禁全部PASS；第三人称正面退场最大单帧下降19.7%、归零前7.3%也通过。PD方片ROI第10/24/65刻覆盖30/4346/225像素，说明track位置接管没有冻结出生/熄灭尺寸。总体报告仅因既有5条OSHI启动异常FAIL，未关闭日志门禁。
-
-
-## 第73轮：法术链与PD1.0.17验收（2026-10-09）
-
-前置项目`D:/Backup/IDEA Projects/ParticleDrawing`执行`gradlew build sourcesJar`，再执行`gradlew test --rerun-tasks`：333项测试、0失败。主JAR与sources复制至lib，gradle.properties下限同步1.0.17-ALPHA；本侧执行`gradlew build --no-build-cache --console=plain`通过。
-
-最终录制命令：`pwsh tools/capture/capture.ps1 -SkipBuild -Scene spell_chain,pd_api,expansion_plasma,shield_balance,wand_casting,wand_casting_first_person,spell_stability,expansion_combinations -TimeoutSec 600`，后台隐藏执行，日志`build/capture-turn73-verified.log`。八场1780帧、零丢帧，160项原生检查159通过；唯一失败是保留的PD变量完成回报回归，已准确区分旧服务端兜底和客户端完成，见issues/pd-api-requests第73轮。其余七场全部原生检查通过。
-
-spell_chain新增400刻时间线：穿刺实体伤害/方块荷载、真实付费四卡机枪、冷却抵扣、全空间散射保速、四个正面/斜角球壳截点与盾后保护、中心强追踪实际击中、等离子自伤、伤害合并次数/列坐标、200刻无操作归零、统计显示实体随靶子清理。光束旧检查改读累计伤害，避免将有意合并的跳字或前阶段尚未刷出的跳字误认为漏伤/穿墙。
-
-WandCastingScenes恢复已有有限清理后，t154主手退场、t208副手退场、t219粒子归零均通过。有限expression施法迸发已接入客户端完成；变量完成接线仍受PD缺陷阻塞。总体报告仍会因这条PD回归与本机已有5行OSHI异常标为失败，不能宣称全量PASS。画廊在`build/capture/out/index.html`，原生检查在各场meta.tsv，汇总summary.tsv。
-
-最终画面/媒体门禁：七条玩法场景全部PASS，pd_api只有已登记的变量回报断言失败，其余可见性、连续退场、零残留及媒体生成通过。
-
-
-## 第74轮：独立法术链作用域验收（2026-10-09）
-
-执行`gradlew.bat build --console=plain`成功。最终后台录制命令：`pwsh tools/capture/capture.ps1 -SkipBuild -Scene spell_chain,spell_resonance,spell_mechanics,spell_timing,expansion_combinations,wand_casting -TimeoutSec 600`，日志`build/capture-turn74-complete.log`。
-
-六场1490帧、零丢帧，147/147项游戏内检查通过（spell_chain 76、expansion_combinations 6、spell_resonance 12、spell_mechanics 25、spell_timing 12、wand_casting 16）。作用域覆盖：真实付费四卡机枪、只散射链锯荷载、载体原有delay/recharge不被荷载改写、三层触发/延迟链、同层尾部修正与多重施放、兄弟荷载隔离、量子复制独立荷载、退款卡、未付费荷载不清零、空荷载不抽自身、加值/倍率的三种排列、荷载链锯及前后牌序一致、连续20次每刻施放。已有穿刺方块触发、护盾截束、追踪、自伤、统计跳字、十秒重置与零残留检查保持通过。
-
-配方矩阵、无人机NBT继承与跨法术反应继续通过。旧测试中的伤害证明改读假人真实totalDamage，避免5刻跳字批量窗口边界导致偶发误判；跳字显示与合并次数仍由spell_chain独立检查。电弧基础4次命中、延寿覆盖全部8个测试目标；基础7刻间隔改用不减冷却的火花弹验证。首轮捕获的旧断言失败不作为最终证据。
-
-本轮不接入PD新能力，未运行pd_api场景，不能据此关闭既有PD变量完成回报问题。总体运行日志仍有本机既有5行OSHI异常（用户手动重启后待复验），不关闭日志门禁。真实断言见`build/capture/out/<scene>/meta.tsv`，汇总`build/capture/out/summary.tsv`，画廊`build/capture/out/index.html`。
-
-
-最终媒体生成全部完成，五条场景的原生/像素/媒体门禁全部PASS。spell_mechanics的25项原生检查、可见性、空场与零残留均通过，但混合特效全局退场门禁FAIL：峰值出现在第11帧，50%→5%跨度14帧，超过该旧场景3帧瞬退阈值。同一场景前两轮该像素门禁通过；未放宽门禁，波动问题登记issues/open。最终总体FAIL包含这一像素门禁及上述5行OSHI，不能宣称所有报告PASS。配方/独立实例矩阵本轮为522组合。
-
-
-## 第75轮：高频机枪与一格追踪（2026-10-09）
-
-`gradlew.bat build --console=plain`成功。后台录制`machinegun_visual,spell_chain,spell_timing,spell_stability,spell_mechanics,spell_resonance`，日志`build/capture-turn75.log`；六场1440帧、零丢帧，139/139项游戏内检查通过。新增场景连续80刻走真实五卡机枪（含注入玛那经济修正），每刻成功施法，靶子实际受伤480，切痕方向52种、场内粒子驻留峰值96；追踪0.9格内转向、1.1格外不转向；最终投射物与PD粒子均为0。
-
-人工查看machinegun_visual第50帧：连续弹道清晰，命中周围无大片绿色碎屑或固定米字，靶子及周围空间可辨认。白金切痕维持实色方粒和尺寸起落。追踪旧夹具的目标调整到1格内，保留即时转向与中心命中证明。
-
-新场景的初版暖色像素门禁误把木桩及头顶文字计入；改为白金色阈值`R>235,G>220,B>180`与固定ROI`(540,415)-(800,550)`，只观察弹道/切痕，排除木桩和伤害跳字。使用已有short_exit严格判据（95%→5%为3～10帧、最大单帧下降≤35%、归零前≤10%），而非长退场的50%→5%至少4帧；新粒子本身寿命3～4刻，不能要求延长动画来迁就旧长退场门禁。复用同批原始帧运行`python tools/capture/assemble.py`，日志`build/capture-turn75-metrics.log`。
-
-既有spell_mechanics混合退场门禁波动和OSHI五行启动异常仍如实保留；不修改它们的阈值，也不能据本轮关闭PD变量完成问题。
-
-
-最终补充：链锯刃面使用修正后的status.velocity，而非固定原始launchDirection，确保全向散射/追踪后视觉平面与实际运动一致。针对这一视觉改动重跑machinegun_visual，日志`build/capture-turn75-final.log`：170帧、零丢帧、6/6检查通过，80次480伤害、47种方向、峰值96；短退场95%→5%跨3帧、单帧最大下降32.8%、归零前2.7%，可见性/空场/零残留/媒体全部PASS。前一批六场回归证据完整保存在`build/capture/turn75-regression`，最新机枪帧/视频保存在`build/capture/out/machinegun_visual`。最终总体仅剩既有OSHI异常；旧混合场景问题留在上一批回归报告中，未关闭。
-
-## 第76轮实机证据
-
-- 最终 `gradlew.bat build --console=plain` 成功；15张新卡的物品/模型/中英词条/64px实色图标与全部JSON资源校验通过。
-- 五场回归 `new_spells,spell_chain,wand_casting,wand_casting_first_person,spell_resonance`：1340帧、0丢帧、147/147原生检查通过；其中配方矩阵680种组合。产物保留在`build/capture/turn76-regression`，日志`build/capture-turn76-final.log`。
-- 新场景补测后最终 `new_spells`：180帧、0丢帧、34/34机制断言、所有画面/媒体判据通过；覆盖全量施放多余预算不绕回旧弃牌、复制单卡/修正/嵌套控制、费用不足、追加修正免费、复制荷载独立、命中/定时/失效条件、穿刺实体命中不释放、正负5HP治疗与锯片逐刻去重。日志`build/capture-turn76-clean.log`，产物`build/capture/out/new_spells`。
-- 法阵专用青绿色ROI排除拿起时进入画面的银色模型；8–16刻覆盖`[0,2,0,102,212,562,823,1376,2095]`，初始没有完整图形闪现。切杖时单帧最大增量28.3%，无闪亮尖峰；白/蓝两种冷却提示首帧为0，随后展开。重新装配证据`build/capture-turn76-metrics-final.log`。
-- 锯片画面独立ROI框住实际投影（x700–850/y340–450），80/90刻持续可见且变化，不能以其它特效粒子代替本体可见性。测试木桩在展示结束时清理，防止统计板污染尾帧及后续场景。
-- 总报告仍因本机既有OSHI/Perflib的5条系统异常失败；本轮所有场景断言、像素/媒体判据通过，不关闭日志门禁、不宣称总体全绿。未改系统配置或重启电脑。
-
-
-## 第77轮：火把照明修复与切杖闪烁定位（2026-10-09）
-
-- `./gradlew build`成功；后台限时600秒运行`capture.ps1 -SkipBuild -Scene new_spells,pd_api`，证据在`build/capture-turn77.log`及`build/capture/out/{new_spells,pd_api}`。
-- new_spells：179/180帧、1帧在允许丢帧预算内；原生36/36检查通过。真实torch核心动态光源数1、源位置动态光照13.9748、零环境光图经PD映射为223；卸载后光源数0，最后服务端粒子清空，媒体和锯片可见性通过。
-- pd_api：120/120帧；原生8/10通过。新增first-program-frame-does-not-flash失败：透明出生后同帧接管至sc=0/a=1，partialTick0.25/0.5/0.75仍提交可见半尺寸0.375/0.25/0.125。正常后续尺寸插值检查通过，证明是首帧初始化缺陷。已登记PD需求，未更改前置源码，也没有本侧渲染绕过。
-- 另一项失败是既有变量重定向完成回报缺陷（第73轮）。new_spells混合场景的全局白像素50%→5%为10帧，超过旧瞬退阈值3帧；保留失败，不放宽门禁。既有5条OSHI系统查询异常仍在。总体报告有失败，不宣称全绿或切杖问题已完成。
-- 此结果更正第76轮基于整刻帧的“出生闪烁修复”推断；后续PD升级必须保留并通过子帧回归。
-
-
-## 第78轮：接入PD 1.0.20并恢复完成回收（2026-10-09）
-
-- PD源码项目执行`gradlew.bat build sourcesJar --console=plain`成功；`gradlew.bat test --rerun-tasks --console=plain`成功。复制1.0.20主JAR和sources，移除本仓库旧1.0.17两份JAR，版本下限同步。PrimalSpells执行`build --no-build-cache`及最终`build`均成功。
-- 四场首轮770帧、零丢帧，存档`build/capture/turn78-regression`。主/第一人称持杖与等离子三场原生39/39检查及所有视觉/媒体门禁通过；主副手t154/t208清空，首次入场/切杖/冷却提示连续性通过。
-- 首轮pd_api的首次外观零尺寸与变量重定向完成通过，但旧“后续插值”夹具实际只做了第一次同步，新契约要求第一次原子落地，因此该项失败。夹具现在在t8初始化尺寸、t18测真正的后续插值，不修改PD或门禁阈值。
-- 只重跑受影响pd_api，120/120帧、零丢帧、10/10原生检查及视觉/媒体全部通过，证据`build/capture-turn78-final.log`和`build/capture/out/pd_api`；首次零尺寸子帧全部0，后续插值与变量完成回报均通过。前置两条未决需求原文搬到resolved附录B续，open闪烁条目移除。
-- 总日志门禁仍因5条既有OSHI/Perflib异常失败；没有过滤日志或自动重启。四场最终有效原生检查合计49/49通过，不将总体环境报告表述为全绿。
-
-## 第79轮：结构获取与真实敌对施法者（2026-10-09）
-
-- 执行`gradlew.bat build --console=plain`成功，新增公共侧实体/GLM/结构标签与客户端渲染注册正常。没有修改PD依赖或系统配置。
-- 后台隐藏运行`pwsh tools/capture/capture.ps1 -SkipBuild -Scene exploration -TimeoutSec 600`。最终日志`build/capture-turn79-final.log`；画廊`build/capture/out/index.html`，逐项证据`build/capture/out/exploration/meta.tsv`，视频/拼图在同目录。
-- exploration：240/240帧、0丢帧、19/19原生检查通过。62种法术都有合法来源；144根成品杖ID唯一、等级/配方/满法力/序列化还原正确，其中15根蓄能型保留变体命名。
-- 六类箱子经真实`/loot`与数据包GLM生成：入门箱保证1杖+1卡+手记，其余样本各2卡；无关奖励箱不受影响。五个结构标签加载；使用原版生成器创建的前哨站真实piece元数据内，候选列表保留原僵尸权重100并追加术士；结构外不生成。
-- 生存玩家实战：t22仍在准备且未出手，t65已真实施法2次并造成伤害；放墙后t70–90施法次数保持2，t92受伤取消准备；t165恰好一根原wandId/原配方掉落。t239地板完整，投射物/PD粒子均为0。
-- 最终所有场景画面/帧数/玩法/空场/媒体门禁PASS；暖色像素峰值36872，最后三帧0。人工查看结构检查版拼图与最终准备帧，实体、持杖与准备动作可见。这是获取/多次战斗夹具，不用全场单峰覆盖量推断单次动画退场；保留原生归零及尾帧无残留检查，既有特效场景阈值不改。
-- 初轮发现NeoForge26.2自动扫描GLM JSON，旧全局索引被误当成本体报缺少type；移除旧索引后通过。早期夹具曾用不可被AI攻击的木桩，以及没有@a的服务器gamemode命令留下创造玩家，两次均未作为最终实战证据；最终使用真实生存玩家，不伪造直接伤害或放宽断言。
-- 结构正向检查前的18项通过证据留在`build/capture/turn79-combat`；增加真实结构元数据后的19项通过证据在`build/capture/turn79-structure`。最终蓄能型工厂命名补齐后重跑上述唯一受影响场景。
-- 总报告仍仅因5条既有OSHI/Perflib异常失败，未过滤日志或宣称环境全绿。自然刷怪频率、多人和生存获取节奏留在issues/verify。
-
-试用命令：`/loot give @s loot minecraft:chests/village/village_temple`；`/summon primalspells:rogue_mage`。敌人测试需非和平、玩家生存模式；本轮未新建专用测试指令。
-
-## 第80轮：锯片下坠与可拖动HUD（2026-10-10）
-
-执行`gradlew.bat build --console=plain`通过。隐藏后台录制magic_hud、sawblade_falling、new_spells、wand_casting_first_person，单次超时600秒。最终证据汇集`build/capture/final80/index.html`，来源逐场列在runs.tsv；HUD来自turn80-final，锯片来自out（turn80-saw），抽牌/自伤回归来自turn80-verified，第一人称既有法阵来自turn80-initial。不把未通过的早期夹具当作最终结果。
-
-四场730帧、零丢帧，74/74项原生检查通过：HUD19、锯片3、抽牌/治疗/切割/火把36、第一人称16。HUD使用真实物品/施法/网络同步，检查双冷却、法力不足及恢复、实际受伤/击杀回报、H键打开、拖动、滚轮/角柄缩放、保存落盘、Esc取消、不同窗口边界与帧率无关缓动。锯片检查原生重力速度、真实地面碰撞反弹与最终PD/投射物归零，不用手动伪造反弹替代地面测试。
-
-人工查看HUD第39帧、编辑器第115帧及锯片第20/65帧：图标数字清楚，聚焦中央保留准星，选框覆盖实际图形；锯片是金属厚齿盘而非白圈，碎散保持外向运动。锯片独立失效窗口65～85t峰值935像素；95%→5%跨5帧，最大单帧下降28.8%，归零前1.0%，通过既有3～10帧/35%/10%门槛。
-
-首轮不足夹具错误使用恰好能支付火球的3MP，已改2MP而非放松断言；旧锯片可见性夹具沿摄影机视线飞行导致只看到盘侧，改横向发射，仍保留50像素/20变化像素原门槛。专门下坠场采用近距随行机位保证退场可读，不改粒子色域或门槛；7t缓入缓出收细曾出现37.9%单帧下降，改8t线性单片收细后28.8%。
-
-HUD、独立锯片及第一人称画面/媒体门禁PASS。new_spells的36项原生及可见性/空场/清理通过，但已有混合生命周期全局3帧瞬退门禁仍失败（95帧跨度），保留并续记issues/open第77轮；不能将其当作锯片独立退场失败。总体报告还包含5条既有OSHI/Perflib启动异常，未过滤日志。没有宣称全流水线通过；不同整合包HUD叠放与多人手感见issues/verify。
-
-试用：持杖后按H，拖动各块，滚轮或右下角缩放，保存；可在原版控制设置重绑，模组列表配置入口也可进入。配置为本机config/primalspells-hud.json。S→C协议1.1.0，客户端和服务端同步更新。
-
-## 第81轮：额外法术封顶与命中/受击HUD（2026-10-10）
-
-后台隐藏运行magic_hud、spell_chain，TimeoutSec600。最终证据`build/capture/final81/`：HUD来自turn81-final，法术链来自turn81-initial，runs.tsv记录来源；600帧、零丢帧，109/109项原生检查通过（33+76）。首轮HUD的4项受击失败来自和平难度下非玩家伤害缩放为0；改普通难度和真实生存玩家后20→18→16HP，不改伤害逻辑/断言。最终两个场景画面和媒体门禁均PASS，总体仅因既有5条OSHI/Perflib异常FAIL，未过滤日志。
-
-返蓝检查覆盖：99/100单次返蓝封顶、64次连续返蓝、空蓝回30、0容量、旧运行值999→100、旧存档999→100、超额值不能支付200MP，以及真实单卡/三卡/触发荷载退款链35MP最终均32MP。原76项作用域、持续机枪、独立荷载、付费与盾挡回归保持通过；注册id mana_injection保留，只改显示名为额外法术。
-
-真实HUD像素门禁：静止/充能窗口24/27/39t中央紫色像素均0；命中十字1116像素；红色斜十字四角覆盖159/168/168/198，水平/竖直中心线红色0；受击右/左/前向弧覆盖162/0/162，客户端原版方向角为0和-π/2。人工查看57/62/70帧，确认紫白十字、对称红X与外围像素裂纹弧清楚，不显示+1或重复充能条。末尾世界粒子归零；拖动缩放、保存与取消检查继续通过。
-
-命中6t/击杀10t、0.6t入场/2t退场；连续命中只延长收尾时间，不从隐藏反复重播。受击方向默认开启，尊重旧明确关闭配置；法术用原版indicateDamage补回no_knockback跳过的方向包，不增加击退。GUI内部状态删掉聚焦计时与连杀计数；保留原focus配置键及网络1.1.0格式，原布局兼容。设计见design/hud.md，不新增PD接入需求。
-
-## 第82轮：短尖芒准心反馈与击杀动画（2026-10-10）
-
-执行`gradlew.bat build --console=plain`成功。隐藏后台录制magic_hud，超时600秒；最终200/200帧、零丢帧、33/33原生检查通过。最终证据`build/capture/turn82-final`，录制日志`build/capture-turn82-taper.log`；该日志保留首次像素装配结果，最终报告为存档内report.txt/index.html。
-
-命中/击杀每臂4个局部像素，内侧两格2像素厚、外端两格1像素尖；受击弧1像素。默认位置/缩放下内缘在原版准星外围留空。击杀前2t向外描出，末6t扩张淡出；散开后连续击杀不将图形拉回。人工查看最终62t截图，短尖芒与白色原版准星分离。
-
-最终真实像素门禁全部通过：中央静止/充能紫色0/0/0，命中紫色174，击杀四角红色45/36/36/36且水平/竖直中心线红色0，受击右/左/前117/0/117，56～69t原版准星外围保护区彩色像素始终0。击杀61/62/64t半径38/41/44，覆盖描出和散开两个阶段。短为4格后60t尚未画出第一格，原先固定60t的采样为0；装配改采已进入描出阶段的61t，保留严格递增与非零要求，没有放宽阈值或改动录制帧。
-
-场景画面、原生检查和媒体门禁PASS，总体报告仍因既有5条OSHI/Perflib启动异常FAIL，未过滤系统日志。没有修改PD版本、伤害结算或协议。
-
-## 第83轮：录制启动失败诊断（2026-10-10）
-
-capture.ps1每秒检查新录制目录的崩溃报告与FATAL；加载崩溃不再只等待总超时。失败时打印报告前50行或日志末45行，保存build/capture/failure.json（原因、报告路径、日志路径、UTC时间），保留部分帧且不进入成功画廊装配。Gradle标准错误独立保存为gradle.stderr.log；非零退出和总超时同样走诊断。结束范围只限本次启动器及其子进程，不再广泛扫描其它MC。
-
-diagnostics.ps1是可独立验证的只读诊断辅助。PowerShell语法解析通过；缺失预览客户端处理器的加载错误夹具正确定位并输出JSON，无错误的空目录不误报。第83轮首轮真实加载失败来自NeoForge26.2双向包必须另行注册客户端处理器；补齐RegisterClientPayloadHandlersEvent后foundations12/12、spell_chain76/76通过。OSHI普通ERROR仍交给最终日志门禁，不将其当作FATAL提前退出或过滤。
-
-
-## 第83轮：法术链预览与悬浮编辑实机
-
-`gradlew.bat build --console=plain`成功。foundations录制210/210帧、零丢帧，21/21真实断言通过：只读预览、独立荷载/复制控制、费用双冷却与真实出手一致、实际双向网络、创造菜单槽映射、取出/装入/替换回交、非法数量与伪造ID拒绝。证据在build/capture/out/foundations，日志build/capture-turn83-editor-final.log；早期只读版与spell_chain的76/76回归保存在build/capture/turn83-preview。已查看原版灰色面板/槽位实机帧；资源包覆盖路径见design/spell-preview。
-
-本机既有5条OSHI异常仍使总体报告失败，未过滤日志或降低判据。中途启动崩溃由双向包客户端处理器未单独注册引起，已接RegisterClientPayloadHandlersEvent并经后续多次真实启动复验。
-
-
-## 第83轮补充：整合与探索验收
-
-`gradlew.bat build --console=plain`成功且无Kotlin编译警告。245份游戏/例包JSON及新法术贴图、双语键、设计链接校验通过。progression录制240/240帧、零丢帧、26/26真实断言通过，证据在build/capture/turn83-all-passed/progression，日志build/capture-turn83-final.log。覆盖原子资源快照、未知法术拒绝、非玩家取消不扣费/真实施法、取消/修改真实伤害、冻结进退事件、拾取拥有者/延迟/墙体/权限、缓降、显踪、真实合成、真实村庄定位、四流派、精英原杖和散卡、退让/掩体及收场归零。
-
-同场通过真正启用/禁用新数据包验证自定义命名空间池与等级覆盖：新杖法力变1234，已有80法力杖及其存档仍80，禁用后恢复默认。测试包只写在录制存档，录制清理时删除，不进入玩家存档或正式模组资源。
-
-旧exploration 19/19与spell_chain 76/76回归、零丢帧，保存于build/capture/turn83-progression-first；其中progression当时两项失败为夹具预期问题（漏计成品配方来源、未剥离僵尸护甲），已修正并经上述26/26复验。没有降低实际伤害/权限断言阈值。四流派实机帧已检查，名称颜色与真实装备可辨；美术仍复用唤魔者。
-
-脚本另以--no-daemon启动独立运行树，避免共用Gradle daemon使超时/崩溃清理漏掉本次游戏；识别Capture日志中的场景、截图、写帧FAILED。build/verify/capture-diagnostics-v2通过正反例与PowerShell语法校验，OSHI普通ERROR及failed=0不误报为致命驱动错误。总体报告仍被既有5条OSHI异常判失败，不过滤异常，不自动重启电脑。
-
-最终悬浮编辑复验foundations 260/260帧、零丢帧、27/27断言通过，证据build/capture/out/foundations，日志build/capture-turn83-editor-verified.log。新增生存光标装卸、真实标题拖动及打开完整预览；完整预览沿用最近服务端结果再刷新，消除节流造成的空白等待。与上述progression 26、exploration 19、spell_chain 76合计148项原生检查通过。独立Gradle启动树已实机验证；诊断夹具另覆盖实际“screenshot FAILED at tick N:”格式。
-
-
-## 第84轮：恢复原编杖与槽位分色（2026-10-10）
-
-执行`gradlew.bat build --console=plain`成功，无Kotlin警告。悬浮窗、专用贴图和相关tooltip遮挡逻辑已删除，生存操作回到原版容器右键，创造物品栏仅保留经过验证的本地光标同步。V键现在直接打开只读分色槽位，不再路由到编辑窗；tooltip自动显示整副配置分组，不需要按V。
-
-最终foundations 260/260帧、零丢帧、42/42原生检查通过，证据`build/capture/out/foundations`，日志`build/capture-turn84-final.log`。覆盖真实注册V键点击、容器V事件和网络回报，创造右键取出/装入，生存滚轮首尾环绕/同步、持卡选槽、右键取出/装入/替换回交，预览后继续编辑，箱子菜单选槽同步及装卸。整副布局检查覆盖独立荷载、重复同名卡、零MP、多次施法剩余链和空槽；不把客户端自拟解析当作权威。
-
-首轮foundations 33/33和spell_chain 76/76均通过，零丢帧，保存于`build/capture/turn84-initial`，日志`build/capture-turn84-initial.log`；随后只为新增创造和箱子操作重跑foundations。最终42＋76共118项原生检查通过，采用260＋400共660帧。人工查看175t预览确认同链底色、荷载异色、选槽细边；之后仅缩短英文帮助句避免文本裁切。第83轮最终悬浮窗证据另存`build/capture/turn83-editor-verified`，属于已撤销方案的历史记录。
-
-全部场景画面/帧数/媒体门禁通过；总体报告仍因既有5条OSHI/Perflib异常失败，未过滤异常、未修改门槛、未自动重启电脑。协议1.3.0增加服务端槽位归属，联机双方需同步更新；存档格式不变。
-
-
-## 第85轮：拖尾渐淡、弩速基准与路径追踪（2026-10-23）
-
-本轮`gradlew.bat --offline build --console=plain`成功，无Kotlin警告。普通联网构建遇仓库检查长时间等待，改用已有依赖缓存；录制脚本新增Offline开关，同时传给构建和runCapture，不改依赖版本。构建失败单独保存build/capture/build.log并只引用本次日志，避免误贴上轮MC输出；build/verify/capture-diagnostics-v85验证独立失败日志、原生命令非零退出码与脚本语法。
-
-最终隐藏录制projectile_flight、machinegun_visual、spell_chain、fireball_trail，共772帧、零丢帧，96/96项原生检查通过（9＋6＋76＋5）。证据build/capture/out，日志build/capture-turn85-verified.log。实际原版弩use入口发射箭速约3.17；基础火花弹4.0，首刻阻尼后3.922，复制仍4.0；路径侧距0.9格被追踪并真实造成5HP伤害，1.1格不锁定，锁定不额外加速，零速度保持有限。
-
-ProjectileFlightScene观察真实PD粒子变速后透明度下降；独立拖尾逐RenderFrameEvent.Post采样，32t时decreasing=3002、minimum=0.2359673，末尾服务端/客户端粒子严格归零。已查看飞行段与火花弹跟拍画面。提速后色阶达到既有白热档，旧orange色域漏掉主体；拖尾改用原有white色域，最低覆盖量不变，曲线门禁改为原生逐粒alpha下降，不能要求1～2刻尾迹的整场50%覆盖量跨4刻。摄影棚沿真实飞行方向延长，保留实际速度与33t死亡事件。法术链唯一旧夹具数值1.6更新为新加速弹8.0，其余76项机制语义保持。
-
-曾尝试把尾迹寿命下限改为1t，20Hz及逐渲染帧原生探针都仅见minimum=0.50714284、同颗透明度无递减；核对PD源码确认整数刻年龄和先删除后取样的短寿命缺口。按政策停止该支路，保留原4t下限，登记pd-api-requests，不实现本侧动画时钟。历史证据分别保存在turn85-first-native、turn85-regression和turn85-short-tail，最终只使用4t版本作为交付证据。
-
-projectile_flight、spell_chain与fireball_trail的画面/媒体门禁PASS。machinegun_visual仍有一项短促退场门禁失败：95%→5%跨4帧，最大单帧下降42.2%（上限35%），归零前9.2%（上限10%）；已登记issues/open。总报告还保留5条既有OSHI/Perflib异常，没有过滤系统错误或宣称全绿。
+| particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
+| projectile_flight / fireball_trail | 原版弩速对比、一格扫掠追踪、复制速度、实际alpha递减 |
+| black_hole / black_hole_moving / gravity_field / gravity_field_moving | 区域场原维度、移动跟随和收尾 |
+| energy_shield / shield_balance / spell_chain | 护盾预算/接点/束截断/穿刺荷载/同链作用域 |
+| machinegun_visual / spell_timing | 高频视觉、随机链锯、延迟当刻释放 |
+| explosion / crystal_lifecycle / sawblade_falling | 爆炸外扩、临爆晶体与锯片下坠反弹 |
+| expansion_* / spell_resonance / spell_mechanics | 光束/冰冻/远距、跨弹反应、刻迁移与后代 |
+| recoil_light / concentrated_light_first_person / combat_impact / damage_mass | 固定聚光、后坐力、伤害/自伤与质量 |
+| wand_casting* / wand_aim / magic_hud | 主副手/FOV、阵列/模型、HUD与布局 |
+| foundations / new_spells | 原编杖分色/真实V入口、抽牌控制和治疗/火把 |
+| exploration / progression | 实际结构掉落、术士、数据重载、生活卡与罗盘 |
+
+完整名称/帧数取CaptureScenes.all和assemble.SCENES，新场景两处一起更新。取景摄影棚用于对比，不代替自然地形/多人体验。
+
+### 报告与判据
+
+输出 `build/capture/out/index.html`、report.txt、各scene的meta.tsv、frames.tsv、frames/*.png、contact.png与MP4/GIF。每游戏刻抓第一渲染帧，20FPS证据不等于60/144FPS保证；高刷需原生子帧输出观察。
+
+门禁分别检查：1280×720、声明帧数/丢帧预算、真实玩法断言、最低可见覆盖、空场/尾帧零残留、实际退场/专属alpha或光强判据、运行日志。短退场保持95%→5%跨度3～10帧、单帧损失≤35%、清零前≤10%的严格规则；不能改阈值掩盖断帧。
+
+当前particle_lighting录制110帧/0丢帧，2/4断言通过：alpha动画与最终清理正常，光场仍满亮至删除，连续性两项失败；另有5条OSHI环境错误。此场景是PD缺陷复现，**不是已修复证明**。其他未过门禁见 [open](issues/open.md)。

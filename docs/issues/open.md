@@ -1,97 +1,30 @@
-# 未解决的问题（open）
+# 未解决问题
 
-> 只放**现在还没解决**的东西。修好就删掉，结论写进 [resolved.md](resolved.md)（规则见 [README.md](README.md)）。
-> 严重度：🔴 崩溃/数据损坏/明显错误玩法 ｜ 🟠 影响体验或可维护性 ｜ 🟡 清洁度问题。
+PD光照硬切与短生命周期曲线缺口集中在 [PD需求](pd-api-requests.md)，不重复维护状态。
 
----
+## 本机OSHI计数器异常
 
-## 1. 待继续开发的功能
+- 级别：验证阻塞。启动MC记录Perflib 009英文计数器读取失败、JNA参数错误及OSHI当前进程userTime/virtualSize/residentSetSize空指针；日志门禁不能通过。
+- 已核实：系统计数器备份/重建、WMI同步和PerfOS禁用字段类型修正已执行，新进程仍失败，WMI服务重启被Windows拒绝。用户选择保存工作后手动重启，不自动重启。
+- 复现：任一capture新客户端；最近particle_lighting录制仍有5条上述异常。
+- 下一步：用户重启后复验真实OSHI当前Java进程数据，再跑录制；未恢复再排查系统组件。不得过滤ERROR或篡改SystemReport。
+- 工具与证据：`tools/verify/RepairPerformanceCounters.ps1`，`build/verify/oshi/backup-*`，`run/capture/logs/latest.log`。脚本需管理员且先备份，不作为常规构建步骤。
 
-### 🟠 1.1 能量护盾 `EnergyShield`（第 26 轮按新口径重做）
+## 混合场景退场门禁
 
-> **当前口径（第 36/39/40 轮收敛后）**：真正的护盾**始终跟随玩家** —— 判定与球心都用持有者**实时位置**；
-> 不跟人的只有**白色碎片 / 格挡玻璃**（每次受击盖章在玩家当时的位置）；
-> **粉色破口轮廓跟随持有者**（第 40 轮用户口径：破口方向是相对玩家算的，轮廓留在原地就会与真正的破口错位）。
-> 结转（非缺陷）：碎片是"盖章"式的，玩家快速移动时会看到一串旧碎片；要不要让它们更快淡出由手感定。
-> 数值口径（强度 / 抗性 / 窗口预算 / 破口时长 / 原版投射物）全文见
-> [design/combat-pricing.md](../design/combat-pricing.md) §3–§4.98。
+- 级别：验证缺口。`machinegun_visual`机制6/6、可见性和零残留通过，但95%→5%跨度4帧、最大单帧覆盖下降42.2%，超35%阈值；归零前9.2%满足10%门槛。独立fireball_trail实际alpha检查通过。
+- `spell_mechanics`与`new_spells`混合多组独立生命周期，全局颜色峰值到末端的瞬退判据也曾失败，不能以玩法断言通过替代视觉通过。
+- 复现：`pwsh tools/capture/capture.ps1 -Offline -Scene machinegun_visual,spell_mechanics,new_spells`。机枪当前证据保存在 `build/capture/projectile-baseline/machinegun_visual`；原帧与meta可复核，后续录制需保留当前输出再覆盖。
+- 下一步：按真实退场事件分ROI或拆独立场景，定位头部/短尾/切痕各自的覆盖变化。保留严格门禁，不统一延长粒子寿命或放宽阈值凑通过。
+- 位置：SpellTimingScenes、SpellQualityScenes、NewSpellScene及 `tools/capture/assemble.py`。
 
-- 现状：**第 26 轮已按下列新口径实现**；表现（受击玻璃 / 打穿碎裂 / 粉色破口）见 [architecture.md](../architecture.md) §9，
-  录制产物在 `build/capture/out/energy_shield`。
-- **当前防御口径（第68轮）**：常驻展开、无耐久/HUD；抗性`4+6n`，20刻预算`6n³`；基础5MP及超抗性部分每点5MP（超出最多按2R计算）。破盾当次仍完整抵消，随后受击方向失防20～60刻；穿刺/内部来源仍绕过。只有玻璃/碎片/破口轮廓，不再叠加圆环；完整规则见combat-pricing第68轮。
-- 仍缺口 / 已明确搁置：
-  1. 它是被动法术却继承 `Modifier`、放在 `magic/modifier/`（**你已明确暂不处理**）；
-  2. 法力定价属于「法杖像 Noita 那样分等级」那一轮——现在池 3000 / 回复 1000 每秒，任何 MP 消耗都不可达。
+## 护盾主动迎弹缺少专属回归
 
-### 🟡 1.3 「持盾迎向飞来的投射物」还缺一条场景断言（第 38 轮修复的遗留）
+- 级别：验证缺口。现有seenOutside与allowInsideStart处理护盾向弹体移动后起点落在壳内的情况，但没有独立时间线证明“慢弹飞行中持盾者迎向它”仍拦截。
+- 下一步：真实慢弹、移动持盾者，断言反射/扣MP/零生命伤害；增加本来就在壳内生成的弹体应绕过的反例。
+- 位置：EnergyShield、ShieldGuard与护盾录制场景。静态靶/破口轮廓跟随不能代替该项。
 
-- 第 38 轮修的是「持盾朝攻击者走过去会被打中」：球心跟着持有者走，**壳会"迎着"弹扩张**，
-  弹在某一 tick 直接落到壳内 ⇒ `shellEntry` 的「起点在壳外」前提不成立、整发不挡。
-  修法是 `seenOutside`（曾在壳外出现过的弹照挡）+ `shellEntry(allowInsideStart = seen)`。
-- **当时的证据只到「改动无回归 + 逻辑对口」**：录制场景用的是**静止木桩**，没有"木桩朝飞来的火球移动"的时间线。
-  （第 40 轮加的「破口期内走 3 格」是另一件事：那一段验的是红色轮廓跟随，第 40 轮台账 §40.6。）
-- 待做：给 `energy_shield` 加一段 —— 先朝壳外放一发**慢速**弹，**在它飞的途中把木桩朝它移动**，
-  断言这一发仍被挡下（法力被扣、伤害数字为 0）；顺带覆盖反例「本来就生成在壳里的法术不挡」（设计口径）。
-- 相关口径：`EnergyShield.seenOutside` / `seenOutsideTtl`、[design/combat-pricing.md](../design/combat-pricing.md) §4「两个入口」。
+## NoVideo开关未传递到合成流程
 
----
-
-## 2. 性能与表现
-
-| 严重度 | 问题 | 位置 | 说明 / 建议 |
-|---|---|---|---|
-| 🟢 | `EnergyShield` 无常驻粒子，受击实色晶格；第73轮取消面心裂纹、填充降至1/4、独立剥落碎片降至约1/8，爆炸按影响范围选片，固定轮廓按飘散位移合并组，碎片独立受力 | `magic/modifier/EnergyShield.kt` | 稳态0粒子/0包；当前MC视觉以 [design/minecraft-visuals.md](../design/minecraft-visuals.md) 为准，不再追求半透明玻璃 |
-| 🟡 | **黑洞范围内的「持续轻抖」强度还没实机调过**（第 20 轮收敛后只剩这一处镜头冲击） | `BlackHole.kt` 的 `RUMBLE_MIN`/`RUMBLE_RANGE`、`client/ScreenShakeClient.kt` 的 `MAX_*_DEG` | 现在 0.05~0.13 振幅（越靠球心略强）+ 角度上限 2.6°/1.8°/1.4°：实机站在黑洞里会不会嫌晃、还是根本感觉不到，需要人上手。调参入口就是这两个常量；玩家侧可用原版「受伤视角晃动」一键关掉 |
-| 🟡 | `Move` 逐 1/16 格步进（`Laser` speed=5 → 单帧最多 80 步） | `magic/effect/geometry/Move.kt` | 逐步进是**刻意**的：为了拿到精确的接触点与接触面（方块碰撞箱 + 面法线）。已完成一次优化：实体查询由「每步一次」降为「每 tick 一次宽相位 + 子步进窄相位」；方块仍逐步检测，若日后仍嫌重可改射线求交（会牺牲面精度） |
-| 🟡 | `EnergyShield` 每 tick 遍历全场投射物 | `magic/modifier/EnergyShield.kt` | 剪枝只剩「场上无投射物直接返回」：第 26 轮的扫掠判定要看**线段**，原来的「到玩家中心距离球」粗筛（按点距离）会漏判，已删除。法术数量上量级时可考虑空间分桶/网格 |
-| 🟡 | 三个**当前无使用者**的扩展点：`Magic.onPassiveIdle`、`Magic.saveRuntimeState`/`loadRuntimeState`（+ `Wand.magicStates`）、`Magic.onUnloaded` 的既有用例 | `magic/core/Magic.kt`、`wand/Wand.kt` | 第 26 轮护盾重做后它们都没有使用者了（护盾不再有常驻球壳、也不再需要跨存档进度）。机制本身是通用钩子、文档齐全，**保留**待将来「有进度的法术 / 放下后收尾」；清理与否待定 |
-
-> 自转/淡出这类**组级编排**都用 `ParticleGroup`（客户端求值、零逐 tick 包），与 `ParticleBatch` 的分工见
-> [design/effects-api.md §0.2](../design/effects-api.md)。
-
-## 3. 本机验证环境
-
-### 🟡 3.1 OSHI 性能计数器异常导致录制总体报告失败（2026-10-08）
-
-- 现象：本机启动 MC 时记录 `Unable to locate English counter names in registry Perflib 009`，
-  OSHI 查询进程 userTime / virtualSize / residentSetSize 时又有空指针；特效场景断言均过，总体仍失败。
-- 复现：`pwsh tools/capture/capture.ps1 -Scene black_hole,gravity_field`；本轮修改前的基线也出现相同日志。
-- 影响：无法宣称录制流水线整体通过；第49轮两场及第52轮五场均1280×720、零丢帧，末尾PD粒子数为零，视觉判据通过。
-- 涉及：Windows Perflib/OSHI，`run/capture/logs/latest.log`、`tools/capture/assemble.py` 的日志门禁。
-- 2026-10-09排查：OSHI 6.9.0读取虚拟注册表`Perflib\009\Counter`返回Windows错误87（参数错误）；该语言键由Windows动态提供，不能用PowerShell的`Test-Path/Get-Item`判为“文件/键不存在”。直接WMI能查询当前进程；OSHI注册表/PDH路径只返回约128个进程，而WMI/WTS约410个，缺少当前Java PID，导致MC的SystemReport连续3次空指针。
-- 已执行：管理员权限下备份Perflib/PerfOS与原始PerfStringBackup.INI；按微软流程重建64/32位计数器、从本机原始备份恢复、同步WMI。PerfOS的禁用字段原为字符串“0”，已规范为DWORD 0。相关备份和逐次结果在`build/verify/oshi/backup-*`。
-- 复查仍失败：英文表读取错误和OSHI当前进程null未恢复；WMI服务重启被Windows拒绝，服务保持运行。不能把命令返回0当成修复完成。
-- 可审查脚本：`tools/verify/RepairPerformanceCounters.ps1`（必须管理员；先备份、只规范数值0，不关闭计数器；可选服务重启，失败也恢复原先运行的依赖服务）。官方依据见build-and-run的OSHI小节。
-- 用户已选择稍后保存工作并手动重启，本轮不自动重启。修复尝试后的63d新客户端仍记录5条OSHI异常，26项法术机制断言全过。下一步：重启后重新验证真实OSHI进程数据和runCapture；仍失败则继续系统计数器组件排障。未过滤异常、关闭日志门禁或篡改SystemReport。
-
-### 🟡 3.2 录制装配器的NoVideo参数未生效（2026-10-08）
-
-- 现象：assemble.py解析 `--no-video` 后未读取该值，依然运行ffmpeg。
-- 复现：已有录制帧时执行 `python tools/capture/assemble.py --no-video`，静态调用路径仍进入build_video/build_gif。
-- 影响：无法用文档声明的只判定/拼图模式节省装配时间；本轮使用默认视频模式，视频证据不受影响。
-- 涉及：`tools/capture/assemble.py`、`tools/capture/capture.ps1` 的NoVideo开关。
-- 下一步：将开关传入analyse并跳过视频/动图生成与对应断言，保留全部帧、像素、玩法及日志门禁。
-
-## 第74轮：混合机制录制的退场判据波动
-
-🟡 `spell_mechanics`混合场景包含同刻手动推进41次的减速弹拖尾、弹跳喷发、量子弹、激光和光束。第74轮最终录制原生检查25/25、可见性/空场/零残留通过，但全局蓝像素峰值落在第11帧，50%→5%跨度14帧，触发旧3帧瞬退门禁；此前两轮同一像素门禁通过。影响是总报告不稳定，不是法术链作用域断言失败。
-
-涉及`client/capture/SpellQualityScenes.kt`、`tools/capture/assemble.py`的spell_mechanics规则。待把混合场景按实际退场事件分ROI或分场景验证，并保留严格的独立退场判据；本轮不放宽阈值。证据：`build/capture-turn74-complete.log`及`build/capture/out/spell_mechanics`逐帧证据。
-
-
-## 第77轮：new_spells混合场景退场门禁待细分
-
-第77轮火把真实光照接通后，new_spells全局白像素50%→5%跨度10帧超过旧3帧瞬退阈值；36项原生检查、末尾零粒子及末3帧零像素通过。该场景包含锯片、火种及多组独立生命周期，当前指标不能直接归因于火把卸载。需按实际退场事件分ROI或单独场景确认；本轮保留失败，不降低门槛。涉及client/capture/NewSpellScene.kt、tools/capture/assemble.py；证据build/capture-turn77.log。
-
-第80轮补充：new_spells原生36/36与锯片可见性/旋转检查通过，但全局白像素50%→5%跨度95帧，仍不适合其多个独立生命周期。保留旧门禁失败；新增独立sawblade_falling使用实际失效事件65～85t的严格3～10帧/最大单帧下降35%/归零前10%判据，阈值未放宽。混合全局退场指标的进一步拆分仍待处理。
-
-
-第85轮：高速短寿命拖尾的PD曲线时钟问题登记在[pd-api-requests.md](pd-api-requests.md)，本模组保留原4t下限，停止1～2t支路。
-
-
-## 第85轮：机枪混合画面退场像素门禁
-
-- 现象：machinegun_visual最终6/6机制、可见覆盖、零残留通过，但混合弹体/命中/链锯的退场窗口95%→5%为4帧，最大单帧下降42.2%，高于原35%上限；归零前9.2%通过10%门槛。没有放宽阈值。
-- 影响：整体视觉报告仍失败，不能把96项机制检查通过称为全流水线通过；独立fireball_trail的实际alpha、可见性和收尾已通过。
-- 复现/证据：capture.ps1 -Offline -Scene projectile_flight,spell_chain,machinegun_visual,fireball_trail，build/capture-turn85-verified.log与out/machinegun_visual。机位稍前移保证高速短促命中可读，未修改游戏链锯特效。
-- 下一步：拆分头部退场、短尾与切痕的独立视觉覆盖，再定位超阈值来源；不能用混合总峰值替代每种效果连续性，也不能仅为通过测量延长全部粒子寿命。
+- 级别：工具缺陷。assemble解析--no-video但仍调用视频/GIF生成；已有帧时执行 `python tools/capture/assemble.py --no-video` 可复现。
+- 下一步：将开关传入analyse，跳过媒体生成及对应存在性断言，保留帧/像素/机制/日志门禁；修改前不要把该开关写成可用功能。

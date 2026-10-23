@@ -1,6 +1,6 @@
 # 编杖与法术链分色
 
-第84轮按用户要求移除悬浮编杖窗，恢复原版容器中的操作；原第83轮窗口的历史验收不再代表当前入口。
+使用原版容器内物品交互编杖，法术链直接以槽位底色区分。没有悬浮编辑窗。
 
 ## 使用
 
@@ -24,8 +24,8 @@ Wand.preview在独立的牌堆、卡牌和法力副本上调用Wand.drawChain/pa
 
 创造物品栏的光标按原版由客户端选取，因此CreativeWandEditHandler仅把右键法杖装卸交给已有EditWandPayload，不显示窗口，不接管其他物品/左键/Shift操作。服务端只接受创造玩家、真实菜单槽/wandId、注册散卡与合法数量，拒绝任意物品组件；完整菜单同步回交光标。生存玩家不能走这个专用包。
 
-WandPreviewPayload经ClientPayloadSink和RegisterClientPayloadHandlersEvent接线。协议1.3.0增加整副槽位归属；客户端/服务端同步升级，不修改原法术id、wandId和存档键。删除悬浮窗类、专用GUI贴图与帮助语言键，原tooltip继续使用原版bundle槽背景与法术物品模型。
+WandPreviewPayload经ClientPayloadSink和RegisterClientPayloadHandlersEvent接线。协议1.3.0增加整副槽位归属；客户端/服务端同步升级，不修改原法术id、wandId和存档键。tooltip使用原版bundle槽背景与法术物品模型，资源包可覆盖其引用资源。
 
 ## 验证
 
-foundations覆盖真实V键绑定/容器V事件、真实菜单右键取出/装入/替换、原滚轮同步、重复卡与独立荷载分色、零MP完整分组及预览前后编辑。原spell_chain保持76项机制回归；本轮最终证据见build-and-run第84轮。
+foundations覆盖真实V键绑定/容器V事件、真实菜单右键取出/装入/替换、原滚轮同步、重复卡与独立荷载分色、零MP完整分组及预览前后编辑。spell_chain覆盖作用域和收费语义；复现命令见 [构建与运行](../build-and-run.md)。

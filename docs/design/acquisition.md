@@ -1,6 +1,6 @@
 # 获取方式与敌对施法者
 
-第83轮扩展数据驱动、寻法与流派；详见[整合包接口](pack-integration.md)和[世界作用](world-utility.md)。第79轮实现首版“结构战利品＋敌对施法者”。核心模组承担基础战斗遭遇与获取闭环；未来附属模组可扩展敌人和结构。后续方向见[TODO](../todo.md)。
+核心模组提供“结构战利品＋敌对施法者”的获取闭环，附属模组可扩展敌人和结构。数据与接口见 [整合包](pack-integration.md)，定位和生活法术见 [世界作用](world-utility.md)。
 
 ## 1. 探索回报
 
@@ -72,4 +72,4 @@ NeoForge26.2自动发现loot_modifiers目录中的全部JSON；不再创建旧�
 
 `exploration`实机夹具通过真实`/loot`验证六类箱子、无关箱反例；检查全部已注册法术来源、144根唯一成品杖与存档还原、结构标签、真实结构元数据内追加候选及野外反例。战斗对象为真实生存玩家，检查准备、伤害、掩体、打断、原手杖唯一掉落与收场零残留。
 
-手动试用：`/loot give @s loot minecraft:chests/village/village_temple`领取入门箱奖励；`/summon primalspells:rogue_mage`生成基础配方术士。实际自然结构刷怪密度、多人体验与整套生存进度仍待人工验收，见[verify](../issues/verify.md)。构建与录像结论见[build-and-run](../build-and-run.md)第79轮。
+手动试用：`/loot give @s loot minecraft:chests/village/village_temple`领取入门箱奖励；`/summon primalspells:rogue_mage`生成基础配方术士。实际自然结构刷怪密度、多人体验与整套生存进度仍待人工验收，见[verify](../issues/verify.md)。复现入口见 [构建与运行](../build-and-run.md)。

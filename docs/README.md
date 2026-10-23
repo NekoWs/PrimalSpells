@@ -1,103 +1,64 @@
-# PrimalSpells 文档索引
+# PrimalSpells 文档
 
-> PrimalSpells 是一个 Minecraft（NeoForge）模组：**法杖 + 牌堆式法术组合**。
-> 玩家持有的法杖里装着一组法术，施法时从牌堆抽牌，把「投射物」与「修饰器」组合成一次具体法术；法术小包用于收纳法术物品，法杖编辑台用于整理法杖。
->
-> 本目录是项目的唯一权威文档来源；仓库根的 [`AGENTS.md`](../AGENTS.md) 只做路由，不重复内容。
+PrimalSpells 是 Minecraft NeoForge 魔法模组：玩家把法术卡装入法杖，以牌堆抽取、修正与触发荷载组合施法，通过结构战利品和敌对施法者获取新配方。
 
----
+`docs/` 是唯一权威说明。文档描述当前代码与明确的待办，修改历史查 Git；根目录 [AGENTS.md](../AGENTS.md) 只提供阅读路由。
 
 ## 1. 文档索引
 
-| 文档 | 内容 | 什么时候读 |
-|---|---|---|
-| [todo.md](todo.md) | 已确认的开发方向：法术链预览、整合接口、红石与非破坏性交互 | 规划后续工作 |
-| [design/spell-preview.md](design/spell-preview.md) | 原容器编杖、法术链槽位分色与V键只读预览 | 修改编杖和预览 |
-| [design/acquisition.md](design/acquisition.md) | 结构战利品、游荡术士与夺杖规则 | 修改获取方式或敌人 |
-| [design/hud.md](design/hud.md) | 图标/数字HUD、真实冷却、H键拖动缩放与本机配置 | 修改HUD或布局设置 |
-| [architecture.md](architecture.md) | 分层架构、法术对象模型、牌堆与施法流程、投射物生命周期、持久化、网络、客户端 | **第一次接触本项目**；要改核心机制、排查「为什么没生效」 |
-| [code-map.md](code-map.md) | 逐包逐文件的代码导航 + 「我要改 X → 去哪个文件」 | 知道要改什么、但不知道文件在哪 |
-| [spell-development.md](spell-development.md) | 新增投射物 / 修饰器 / 特效 / 物品 / 资源 / 语言键的完整步骤与注册点 | 要添加或修改法术内容 |
-| [build-and-run.md](build-and-run.md) | 版本矩阵、依赖、Gradle 命令、运行目录、CI、常见故障、**实机录制（§9）** | 要构建、运行、排障；**要「看一眼实机效果」** |
-| [issues/README.md](issues/README.md) | **问题台账索引**：目录分工、严重度图例、维护规则 | 踩坑前先查；登记/关闭问题时对着规则来 |
-| ↳ [issues/open.md](issues/open.md) | **仍未解决**：待续开发的功能、性能与表现问题 | 修 bug 前先看有没有已知坑 |
-| ↳ [issues/verify.md](issues/verify.md) | **待实机验证清单**（编译过了但要进游戏确认手感） | 改完视觉/手感、或每次发版前 |
-| ↳ [issues/resolved.md](issues/resolved.md) | **已解决记录**（按轮次，含历史崩溃与 PD 已闭环条目） | 想知道「当初为什么这么改」 |
-| ↳ [issues/pd-api-requests.md](issues/pd-api-requests.md) | 要提给 ParticleDrawing 的 **API 需求**（未决）+ 能力边界 | 接粒子特效、升级前置模组 |
-| [conventions.md](conventions.md) | 包结构规则、命名规则、注释语言、服务端/客户端分离、提交前检查、重构对照表 | 写任何代码之前 |
-| [design/minecraft-visuals.md](design/minecraft-visuals.md) | MC实色粒子与43张像素法术卡规范 | 修改视觉或贴图 |
-| [design/wand-casting.md](design/wand-casting.md) | 持杖法阵、角点锁印、冷却导槽、低模法杖与退场 | 修改持杖/施法表现 |
-| [design/spell-quality.md](design/spell-quality.md) | 第54轮当前质感、修饰配方继承、跨投射物反应与高配档 | 修改特效或法术联动 |
-| [design/animation-continuity.md](design/animation-continuity.md) | 动画起落/引导/视野与近场镜头冲击，含前置阻塞 | 修改动画与镜头反馈 |
-| [design/effects-api.md](design/effects-api.md) | 与 ParticleDrawing 的粒子特效 API 设计（锚点、播放时钟、资源注册） | 做特效接线、升级前置模组版本 |
-| [design/spell-expansion.md](design/spell-expansion.md) | 第52轮七张法术卡：水晶/电弧/远距/光束/斥力/冰冻，数值与组合验收 | 修改新增法术与组合 |
-| [design/field-effects.md](design/field-effects.md) | 黑洞 / 重力场的造型、生命周期、粒子预算与实机证据 | 修改区域法术视觉 |
-| [design/combat-pricing.md](design/combat-pricing.md) | **战斗数值口径**：攻击法术的伤害/施法间隔（对齐原版 DPS）、护盾的强度与抗性 | 改伤害、`delay`/`recharge`、护盾数值之前 |
-| [design/wand-tiers.md](design/wand-tiers.md) | **法杖数值口径**：六级等级曲线（法力/充能速度/施放延迟/充能时间/槽位/施放数）、蓄能型变体、完整刻与旧存档迁移、Alt 面板的展示路径 | 改法杖数值、加掉落/合成、调施法节奏之前 |
-
-第83轮新增设计：[整合包接口v1](design/pack-integration.md)、[非破坏性交互与寻法](design/world-utility.md)。可安装例包在[docs/examples/exploration-pack](examples/exploration-pack/pack.mcmeta)。
-
-## 2. 技术栈与关键事实
-
-| 项 | 值 |
+| 任务 | 文档 |
 |---|---|
-| Minecraft / NeoForge | 26.2 / 26.2.0.59 |
-| 语言 | Kotlin（主）+ Java 客户端 mixin |
-| Java / Gradle | 25（toolchain）/ 9.6.1（wrapper） |
-| modId / 包根 | `primalspells` / `work.nekow.primalspells` |
-| 关键前置 | `particledrawing`（粒子，本地 `lib/particledrawing-<particledrawing_version>.jar`，现为 `1.0.20-ALPHA`） |
-| 许可证 | GNU AGPLv3 |
+| 理解对象、抽牌、结算与持久化 | [架构](architecture.md)；改核心前必读第8节 |
+| 找实现或法术ID | [代码导航](code-map.md) |
+| 写代码、放文件、提交 | [开发约定](conventions.md) |
+| 新增或修改法术 | [法术开发](spell-development.md) |
+| 构建、排障、实机取证 | [构建与运行](build-and-run.md)；录制见第9节 |
+| 当前问题与验证边界 | [问题台账](issues/README.md) |
+| 后续开发范围 | [TODO](todo.md) |
+| 法术与护盾数值 | [战斗规则](design/combat-pricing.md) |
+| 法杖数值、单位、存档迁移 | [法杖等级](design/wand-tiers.md) |
+| 粒子API职责与接线 | [PD接入](design/effects-api.md) |
+| 视觉与动画 | [像素风格](design/minecraft-visuals.md)、[连贯性](design/animation-continuity.md)、[法术联动](design/spell-quality.md) |
+| 特定效果 | [持杖施法](design/wand-casting.md)、[模型资源](design/wand-materials.md)、[区域场](design/field-effects.md)、[特殊法术](design/spell-expansion.md) |
+| 界面 | [HUD](design/hud.md)、[编杖与预览](design/spell-preview.md) |
+| 获取与世界交互 | [探索获取](design/acquisition.md)、[生活法术与罗盘](design/world-utility.md) |
+| 整合包与附属模组 | [数据包/API契约](design/pack-integration.md)、[可安装示例](examples/exploration-pack/pack.mcmeta) |
 
-细节见 [build-and-run.md](build-and-run.md)。
+## 2. 技术栈与事实来源
 
-## 3. 仓库结构（顶层）
+Minecraft 26.2、NeoForge 26.2.0.59、Java 25、Kotlin 2.4.10、Gradle 9.6.1。版本以 `gradle.properties`、`build.gradle` 和 wrapper 配置为准。
 
-```
-PrimalSpells/
-├─ build.gradle / gradle.properties / settings.gradle   构建与版本
-├─ gradlew, gradlew.bat, gradle/wrapper/                Gradle wrapper（9.6.1）
-├─ lib/particledrawing-1.0.20-ALPHA.jar                本地前置模组 jar（版本由 gradle.properties 指定）
-├─ src/main/kotlin/work/nekow/primalspells/             模组源码（包结构见 conventions.md）
-├─ src/main/java/work/nekow/primalspells/mixin/         Java mixin
-├─ src/main/resources/                                  资源：assets（模型/贴图/语言/物品）、data（伤害类型）、META-INF
-├─ src/generated/resources/                             数据生成输出（可选）
-├─ docs/                                                本文档目录
-├─ tools/capture/                                       实机录制流水线（capture.ps1 + assemble.py，见 build-and-run.md §9）
-├─ .github/workflows/build.yml                          CI：JDK 25 + ./gradlew build
-├─ run/                                                 开发运行目录（不入库）：存档/日志/崩溃报告
-└─ build/                                               Gradle 产物与 NeoForm 缓存（不入库，体积大）
-```
+ParticleDrawing 是必需前置，锁定版本以 `gradle.properties` 与 `lib/` 为准；API只对照同版本 sources JAR。服务端决定抽牌、伤害与碰撞；客户端负责界面和表现。时间统一完整刻，回蓝按每刻；世界粒子由 PD 管理。
 
-源码分包规则与每个包的职责见 [conventions.md](conventions.md#1-包结构总览)。
+## 3. 仓库结构
 
-## 4. 术语表
+- `src/main/kotlin/work/nekow/primalspells/`：运行时代码。
+- `src/main/java/work/nekow/primalspells/mixin/`：Java mixin。
+- `src/main/resources/`：资源、语言、数据包与加载配置。
+- `tools/`：录制、资源生成和诊断工具。
+- `lib/`：当前PD主JAR与源码JAR；源码JAR不参与构建。
+- `build/`、`run/`：生成产物、开发存档与日志，不作为源码入库。
 
-| 术语 | 含义 | 主要位置 |
-|---|---|---|
-| **Magic** | 法术基类：`id`、`mana`、`delay`、`recharge`、`effects`、`lore`、生命周期钩子 | `magic/core/Magic.kt` |
-| **Projectile** | 特殊法术：不是 MC 实体，而是服务端 Kotlin 对象，靠每 tick 的 effect 驱动位置与命中 | `magic/projectile/Projectile.kt` |
-| **Modifier**（原 `Revise`） | 修饰器：施法时把自身携带的 effect 统一注入到所属法术链的全部投射物上，或改动参数（伤害/速度/弹跳…） | `magic/core/Modifier.kt`、`magic/modifier/` |
-| **Effect** | 挂在投射物上的可组合行为：几何（`Move`/`Velocity`…）、时机与结算（`Hurt`/`Explosion`/`Trigger`…）、表现（`Trajectory`） | `magic/effect/` |
-| **MagicStatus** | 投射物运行时状态：`pos`/`velocity`/`damage`/`age`/`bounces`/`hitTargets`/爆炸参数 | `magic/core/MagicStatus.kt` |
-| **EffectPhase** | 效果执行阶段（SETUP/MODIFIER/GUIDANCE/MOTION/OVERRIDE/VISUAL），决定效果谁先跑 | `magic/core/EffectPhase.kt` |
-| **Wand** | 法杖运行时对象：牌堆（`drawPile`/`hand`/`discardPile`）、法力与冷却、NBT 序列化 | `wand/Wand.kt` |
-| **牌堆 / 抽牌** | 施法时按 `cast` 预算从 `drawPile` 抽牌进 `hand`，结算后进 `discardPile`；抽牌堆空时回洗并附加 `recharge` | `wand/Wand.kt` |
-| **TriggerSpell** | 触发法术：递归抽取独立法术链组成 `payload`，命中或到期时释放；父子链修正隔离 | `magic/core/TriggerSpell.kt` |
-| **wandId / pouchId** | 物品数据组件里的唯一标识（UUID 字符串），用于把物品栈关联到服务端的 `Wand` 实例或小包内容 | `item/component/WandID.kt` |
-| **HUD** | 法杖数值条（法力/冷却） | `client/hud/` |
+## 4. 术语
 
-## 5. 推荐的阅读 / 改动路径
+| 名称 | 含义 |
+|---|---|
+| 法术卡 Magic | 注册模板的新实例，包含抽牌预算、MP与双冷却代价 |
+| 投射物 Projectile | 服务端运行的法术对象，不要求对应原版Entity |
+| 修正 Modifier | 装配同一法术链的效果；本链内与牌序无关 |
+| 荷载 payload | 触发法术独立抽取的子链，不影响父链修正 |
+| 施放延迟 delay | 下一次施放前的等待 |
+| 充能时间 recharge | 牌堆抽空并回洗后的等待 |
 
-- **我要跑起来**：`./gradlew runClient` → 失败看 [build-and-run.md](build-and-run.md#6-常见故障) 与 [issues/open.md](issues/open.md)。
-- **我要加一个法术**：先 [spell-development.md](spell-development.md)，再照抄同类实现（同类清单见 [code-map.md](code-map.md)）。
-- **我要理解施法全过程**：[architecture.md](architecture.md#3-一次施法的完整流程)。
-- **我遇到「法术没效果 / 不命中 / 不显示」**：[issues/open.md](issues/open.md) → 再看 [architecture.md](architecture.md) 对应链路。
-- **我要重命名或移动文件**：[conventions.md](conventions.md#1-包结构总览) 决定位置 → 改完必须 `./gradlew build`。
+## 5. 修改路径
+
+先读对应设计和实现，再修改；机制变更同步架构与开发指南，行为变更更新所属设计，缺陷只在问题台账维护。构建和相关验证通过后提交Git，不自动推送。
 
 ## 6. 文档维护规则
 
-1. **代码结构变化 → 同步本文档**：移动/新增/删除包或文件后，更新 [code-map.md](code-map.md) 与 [conventions.md](conventions.md#8-本次结构重构的旧--新对照迁移记录)。
-2. **新发现的问题 → 登记 [issues/open.md](issues/open.md)**，写清现象、复现、影响、涉及文件。
-3. **修好问题 → 从 [issues/open.md](issues/open.md) 删掉**，把结论回填到 [issues/resolved.md](issues/resolved.md)（规则见 [issues/README.md](issues/README.md)）。
-4. **[AGENTS.md](../AGENTS.md) 只允许放「指针」**，不得复制本文档内容；内容变化只改 docs/。
-5. 文档与代码不一致时，**以代码为准**，并立刻修文档。
+1. 文档就地更新，只描述当前行为、约束、操作与未决事项；不追加轮次、工作流水账或被覆盖方案。
+2. 每个规则只有一个权威页面，其他页面用链接引用。数值不在多个历史表格中重复维护。
+3. 修复后从 [open](issues/open.md) 移除，在 [resolved](issues/resolved.md) 按主题保留简短结论与有效回归入口；详细过程留在Git。
+4. [verify](issues/verify.md) 只保留尚未覆盖的体验/联机范围；[PD需求](issues/pd-api-requests.md) 只放未决能力，不把已解决需求原文当常驻文档。
+5. 构建、机制断言、视觉门禁和环境日志分别报告，失败不得写成通过；证据注明复现命令，生成文件不当作永久链接。
+6. 同步修正目录、链接与章节路由；不改写根AGENTS为说明正文。

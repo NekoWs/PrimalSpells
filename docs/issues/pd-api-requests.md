@@ -1,61 +1,52 @@
-# ParticleDrawing API 需求（只放**未决**）
+# ParticleDrawing API 修改需求
 
-> **本文件只放还没实现的需求。** 已闭环的条目一律在 [resolved.md](resolved.md) 附录 B
-> 「ParticleDrawing 已闭环条目」里（含当时的登记原文），本文件不保留已解决内容。
-> **政策**：见 [conventions.md](../conventions.md) §9 与 [design/effects-api.md](../design/effects-api.md) §0 ——
-> 碰到 `particledrawing` 的 API 缺陷 / 签名不符 / 能力缺失时，**不得在本模组自行另写一套实现**；
-> 应停止该接入点的尝试，把需求登记在这里，并在本次产出末尾一并列出。
->
-> **顺序（硬性）**：先写清**目标模型** → 对着 PD**现有能力**列缺口并登记 → **然后**才选临时降级
-> （并在代码注释里标明"这是降级、需求落地后删"）。先绕后记账是本项目此前最大的结构性问题。
->
-> **出现时机**：需求清单与登记**只在本次功能要求涉及 ParticleDrawing API 时**才出现
-> （特效接线、升级导致 API 变化、需求要求用它的能力）；与之无关的工作不要在这里添条目。
->
-> 当前锁定版本：见 `gradle.properties` 的 `particledrawing_version`（现为 `1.0.20-ALPHA`，
-> `lib/particledrawing-1.0.20-ALPHA.jar` 另附 `-sources.jar` 便于核对签名）。
+本页只保留未决需求。规则见 [effects-api第0节](../design/effects-api.md#0-职责与缺陷处理)：PD负责粒子通用能力，本模组不另写替代实现。当前运行依赖1.0.20-ALPHA，以下源码定位均指lib中同版本sources JAR；磁盘PD项目1.0.21的DynamicLightManager仍使用固定lightLevel，尚不具备下述光照过渡。
 
----
+## 发光粒子的光照生命周期与连续强度
 
-**当前未决：1 条。**
+**状态：未决，阻塞所有发光效果的照明过渡。** 本模组停止该接入，不自建光照缓存、客户端平滑器或逐刻整数亮度模拟，也不通过关闭光照掩盖问题。
 
----
+### 目标
 
-## 1. 已知的能力边界（不是缺陷，但接线前必须知道）
+所有照明来源在出生、持续、重定向、正常退场和删除时具有连续光强，与视觉动画处在同一时钟。包括单颗寿命曲线、Emitter子粒子、组scale/fade/表达式presence、实体锚点与主动回收。保持MC不透明硬边片元，不能强迫所有造型变成半透明才能控制光。
 
-| 项 | 现状 | 影响 | 我们的处理 |
-|---|---|---|---|
-| `EffectVarStore.getParam` 只能读回「最近一次 `setParam`/`updateVariable` 设过的值」 | 变量真实状态在客户端动画运行时里，服务端读不到 | 服务端无法用 `getParam` 查询客户端当前值 | 只把它用于「我们刚设过的值」的回读；确需读客户端真值时按本文件提需求 |
-| `.pdrawc` 动画特效尚未在 PrimalSpells 侧接线 | 播放器侧 API（含 `EffectCallbacks`/`EffectVarStore`）已具备 | 法术目前只有程序化粒子（`Trajectory`）+ 发射器，没有编辑器导出的动画 | 记为功能排期项，**不是** API 缺陷 |
-| 位置指令会清掉速度与力 | `ServerParticleEngine.takeOverPosition`：`move`/`track`/`trackAll` 一律 `velocity=0`、`accel=0` | 「位置驱动」与「速度/力驱动」不能混用在同一颗粒子上 | 同一粒子只选一种驱动方式；见 [design/effects-api.md §0.3](../design/effects-api.md) |
-| 运动指令一律解除实体锚点 | 位置（`move`/`track`）、速度（`setVelocity`/`setVelocityAll`）、力（`applyForce`/`applyForceAll`）都接管位置 | 先 `attachTo` 再给速度/力＝锚点被解掉，粒子不再跟随实体 | 1.0.11-ALPHA 起口径统一 |
-| 发射器与可移动组轴心按相邻服务器样本插值 | PD 1.0.20-ALPHA提供Movable样本和updateAnchor | 无需本侧压后一tick | Trajectory传当前位置，与track头部同相位；固定朝向结构显式Orient.WORLD |
-| **粒子「实际尺寸」不是 `scale` 本身** | `BridgeParticle`：`quadSize = scale × EDITOR_TO_MC_SCALE × texScale`；16×16 贴图 `texScale = 1` ⇒ **渲染整宽 = scale × 0.2 格** | 按「scale = 格数」估密度会偏小；要按世界格给尺寸用 `anisoWorld` | 本侧的换算：`scale = 格数 × 5`（见 `Trajectory` 的尺寸常量注释）；`anisoWorld` 口径的粒子**吃不到** `resize` |
+### 源码与实机证据
 
----
+- `api/ParticleVisual.kt`：默认lightLevel=15；`ParticleHandle.lightLevel(Int)`只有0～15整数更新，ParticleCurve无光强通道。
+- `core/client/ClientParticleEngine.getGlowingParticles()`：按存活和effectiveAlpha>0.01筛选，尺寸为零不排除。
+- `lighting/DynamicLightManager.collectSources()`：`luminance = p.lightLevel().toDouble()`，不读取实际alpha、尺寸、组presence或生命周期。fade/scale只改画面，不改变此值；remove后光源直接不再收集。
+- 同文件 `signatureOf()`用luminance.toLong，`BakedState`只保存位置，dirty sections只检测新增/移除/位移。加入连续光强后还须避免小数亮度被签名截断、静止世界网格未刷新、非发光粒子照明缓存不失效。
+- 复现：`pwsh tools/capture/capture.ps1 -Offline -Scene particle_lighting`。110/110帧、0丢帧，原生alpha为0.125、0.25、0.091时光源中心仍为15；组8t缩到零后，照明直到回收才从15一次跳到0，最大单刻差15。
+- 场景4项断言中原生alpha过渡和最终零粒子通过，光强跟随与无整级硬切两项失败。原始值在 `build/capture/out/particle_lighting/meta.tsv`，完整报告在 `build/capture/out/report.txt`；正常情况下会被下次录制覆盖，复现命令与场景源码可重建。5条既有OSHI日志是独立环境问题。
 
-## 2. 需求登记模板（新增需求时照抄）
+### 期望API与语义
 
-```
-### [需求] <一句话标题>
-- 状态：未决
-- 目标能力：<我们在 PrimalSpells 想实现的效果 + 触发场景>
-- 现有 API 为什么不够：<类 + 方法/属性 + 编译错误原文或运行现象 + 复现步骤>
-- 期望 API 形态：<签名草案（类/函数/参数/返回）；服务端还是客户端；线程与生命周期约定>
-- 影响面：<本模组受影响文件>
-- 临时降级：<降级范围 + 恢复条件；没有则写「无（该功能暂不可用）」>
-```
+由PD提供等价于以下能力的公开入口，签名为草案，不是现有API：
 
-> 需求落地后：把本条**整段搬进** [resolved.md](resolved.md) 附录 B（连同当时的原文），
-> 本文件只留标题式的一行指针都不要留 —— 保持"打开这个文件看到的全是未决项"。
+- 光强浮点乘数通道，例如 `CurveChannel.LIGHT` / `ParticleCurve.light(...)`，可在Builder、SpawnSpec、Emitter和Handle声明/覆盖；不改变片元alpha和全亮标志。
+- 组和表达式可声明光照presence，或公开统一生命周期包络，使出生、缩片/淡出和retire共享连续强度；目标值热更从当前实际值接续，不重置成满光。
+- 渲染端按分数游戏年龄求值，并处理光源退出/显式remove/寿命到期的有限收尾；空间位置、光强和可见性同帧一致，暂停冻结、换维清理。
+- 小数光强更新令静止区块及非发光粒子缓存正确失效；预算/可见性裁剪导致的光源替换也不能出现满亮开关。
 
+PD决定最终API形态；本模组只选择每种法术的光强与入/退场时长，再统一接线。不能由使用方维护光源副本来实现以上语义。
 
-## 第85轮（2026-10-23）：短寿命粒子的曲线时钟与末端退场
+### 验收与恢复条件
 
-- 状态：未决，PD 1.0.20-ALPHA；本模组停止1～2t紧凑拖尾接入，保留已有4t下限，不自建动画时钟或桥接渲染。
-- 目标模型：高速弹的单颗尾迹只存在1～2t，仍应在60/144Hz下经历尺寸入场、alpha从1连续降到0，然后销毁。生命周期内的关键帧必须能被渲染，不应只因寿命短于若干完整刻就跳过整段。
-- 现有API：ParticleLifeCurve配合ParticleCurve.alpha/scale、EmitterHandle.life/lifeCurve均存在；BridgeParticle能插值收到的外观端点，但没有收到的短寿命曲线中间/末端值无法凭空补出。
-- 源码定位：lib内sources JAR的core/client/RenderParticle.kt中ageTicks=engineMs/50，advanceEngine只每刻+50；ClientParticleEngine.frameUpdate在advance后立即移除isDead粒子；frameSyncCurves虽每帧调用，却用同一整数刻年龄取样。因此1t粒子可在下一次取样前就被删除，2t粒子也会跳过短入场与alpha=0末端。
-- 实机证据：build/capture/turn85-regression中的1～2t拖尾20Hz探针decreasing=0、minimum=0.50714284；随后RenderFrameEvent.Post逐渲染帧复验仍相同（录制日志build/capture-turn85-trail.log，归档turn85-short-tail）。变速后较长寿命拖尾的原生探针却正常，说明alpha通道接线存在且有效，不是本模组漏传曲线。
-- 需要PD修改：寿命曲线在渲染端使用与出生时刻一致的分数年龄；把运动/游戏刻推进与外观曲线采样分开。销毁顺序保证短粒子的可见中间段和零alpha/零尺寸末态正确收束，暂停与恢复仍沿游戏时钟，不能引入跨帧闪现。
-- 验收：相同声明分别使用1t、2t、4t寿命，在20/60/144FPS取0/25/50/75/接近100%寿命的实际Quad输出，验证中段可见、透明度/尺寸按声明演化、末端清零；stop后已出生粒子正常收尾，最后客户端/服务端计数均归零；重复lifeCurve覆盖不能叠乘或丢通道。
+先复验原生alpha/组退场场景，再覆盖不透明片元的独立光强曲线、表达式presence、短命Emitter子粒子、移动/静止/删除光源以及火把卸载。20/60/144FPS检查同位置连续光强与受光物体，尺寸归零不残留满光；重定向不回闪、结束光强和粒子计数均归零。每种法术保留自身时序，不统一拖长动画。
+
+影响入口：PdParticles、PixelVfx、Trajectory、WandCastingFx、Torch、ExplosionFx、BlackHoleFx、各晶体/电弧/光束/护盾表现。PD主JAR与sources JAR同步升级且上述验证通过后恢复接入。
+
+## 短寿命粒子的曲线时钟与末端退场
+
+**状态：未决。** 当前本模组保留拖尾4t下限，停止1～2t短尾接入，不自建渲染时钟。
+
+- 目标：1～2t单颗尾迹在高刷下仍显示尺寸入场、alpha连续降到0和正确末端，而不是被整数刻采样跳过。
+- 现有API：ParticleLifeCurve、EmitterHandle.life/lifeCurve可声明曲线；Bridge仅插值已经收到的端点。
+- 源码：RenderParticle.ageTicks=engineMs/50，advanceEngine每刻+50；ClientParticleEngine.frameUpdate推进后即移除isDead。frameSyncCurves每帧仍用该整数年龄，短粒子可能在有效中段/零末端前删除。
+- 证据：1～2t尾迹在客户端刻与RenderFrame.Post两种探针下，同粒子alpha下降次数均为0、最小alpha约0.507；较长寿命变速拖尾正常。观察入口为ProjectileFlightScene与CaptureScenes.fireballTrail。
+- 需要：PD使用与出生时刻一致的分数游戏年龄采样曲线，分离游戏运动与外观采样；销毁前完成可见中段和零末端，暂停/恢复不跳变。
+- 验收：1/2/4t分别在20/60/144FPS采实际Quad的RGBA和尺寸；stop只停止发射，既有粒子收尾，最终双端归零；重复lifeCurve覆盖不叠乘、不丢通道。
+
+## 登记规范
+
+每条保留目标、状态、当前API/源码或报错、最小复现、API草案、影响范围、临时限制和验收。闭环后从本页移除，将当前可用能力写入effects-api，必要修复结论合并到resolved。

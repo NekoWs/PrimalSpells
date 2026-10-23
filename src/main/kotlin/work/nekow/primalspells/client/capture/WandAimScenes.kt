@@ -86,6 +86,8 @@ object WandAimScenes {
                     8 -> ctx.player.setItemInHand(InteractionHand.MAIN_HAND,stack)
                     23 -> checkUseCallback(InteractionHand.MAIN_HAND,"main")
                     28 -> fire(ctx,"near")
+                    // 近靶可能在观察回调安装前已被高速弹命中；用真实承伤证明命中，避免回调时序误报。
+                    45 -> results["near-hit"] = dummy.totalDamage >= 5.0
                     50 -> {
                         dummy.setPos(.5,ctx.floorBlockY(0,0)+1.0,12.5)
                         ctx.player.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY)

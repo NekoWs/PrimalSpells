@@ -252,5 +252,7 @@
   "mage.primalspells.warden": "Warden",
   "mage.primalspells.arcanist": "Arcanist",
   "mage.primalspells.siege": "Siege",
-  "compass.primalspells.starter": "Villages / starter spells"
+  "compass.primalspells.starter": "Villages / starter spells",
+  "item.primalspells.aim": "Aim",
+  "lore.primalspells.aim.desc": "Passive: holding this wand projects a thin 64-block sight line and outlines the first entity on its central ray. Stops at blocks; does not predict spread, homing, or ricochets."
 }

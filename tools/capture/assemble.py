@@ -58,6 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "aim": {"length": 160, "title": "被动瞄准 / 原生目标轮廓 / 墙面截断", "metric": "white", "quiet": (0, 6), "decay": "none", "decay_reason": "实体轮廓为离散命中指示，细线的原生缩片退场由专属尺寸断言验证"},
     "homing_light": {"length": 150, "title": "六格追踪 / 弧线扫掠 / 聚光照明", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "范围/真实曲线碰撞与照明各有独立原生断言，多个发射阶段不共用全局退场峰值"},
     "particle_lighting": {"length": 110, "title": "粒子照明 / 出生与退场连续性", "metric": "blue", "quiet": (0, 6), "decay": "none", "decay_reason": "独立观察原生光场与透明度，连续性由光照数值断言验证"},
     "projectile_flight": {"length": 130, "title": "弩箭对比 / 路径追踪 / 拖尾淡出", "metric": "orange", "quiet": (0, 6), "decay": "none"},

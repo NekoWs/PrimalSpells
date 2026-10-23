@@ -96,6 +96,8 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.addListener<net.neoforged.neoforge.client.event.ScreenEvent.KeyPressed.Pre> {
             if (previewKey.matches(it.keyEvent) && it.screen is net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>) { openPreview(); it.isCanceled = true }
         }
+        ClientPayloadSink.aimTarget = { work.nekow.primalspells.client.render.AimHighlights.accept(it) }
+        NeoForge.EVENT_BUS.addListener<ClientTickEvent.Post> { work.nekow.primalspells.client.render.AimHighlights.tick() }
         ClientPayloadSink.hudImpact = { WandHudRenderer.impact(it.killed) }
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
         ClientPayloadSink.wandCast = { WandModelProperty.flash(it.wandId) }
@@ -133,6 +135,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.addListener<ClientPlayerNetworkEvent.LoggingOut> {
             // 4. 清理只增不减的客户端缓存
             work.nekow.primalspells.client.tooltip.WandPreviewCache.clear()
+            work.nekow.primalspells.client.render.AimHighlights.clear()
             WandHudRenderer.clear()
             WandModelProperty.clear()
             ScreenShakeClient.clear()

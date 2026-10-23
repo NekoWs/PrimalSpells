@@ -18,6 +18,7 @@
 | 爆炸与跨投射物联动 | `magic/effect/lifecycle/{Explosion,ExplosionFx,SpellInteractions,SpellResonance,CrystalReaction}.kt` |
 | 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，高速光脊按实际里程采样，不改写命中轨迹 |
 | 普通尾迹/特殊弹本体 | `magic/effect/visual/`；通用造型 `PixelVfx.kt` |
+| 被动瞄准 | `magic/modifier/Aim.kt`、`magic/effect/visual/AimingFx.kt`、`wand/WandAim.kt`；原版轮廓接入 `client/render/AimHighlights.kt` 与 `AimHighlightMixin` |
 | 持杖三角形/宝石出生点 | `magic/effect/visual/WandCastingFx.kt`、`wand/WandAim.kt` |
 | 模型/姿势/施法余光 | `client/render/{WandModelProperty,WandHandPose,WandArmPose}.kt`、`tools/wands/generate_models.py` |
 | HUD/布局/反馈 | `client/hud/`、`client/screen/HudEditorScreen.kt`、`network/HudImpactPayload.kt` |
@@ -53,6 +54,7 @@
 | `quadruple_cast` / 四重施放 | `magic/modifier/QuadrupleCast.kt` |
 | `quintuple_cast` / 五重施放 | `magic/modifier/QuintupleCast.kt` |
 | `reduce_recharge` / 缩短充能时间 | `magic/modifier/ReduceRecharge.kt` |
+| `aim` / 瞄准 | `magic/modifier/Aim.kt` |
 | `torch` / 火把 | `magic/modifier/Torch.kt` |
 | `sawblade` / 锯片 | `magic/projectile/Sawblade.kt` |
 | `healing_bolt` / 治疗弹 | `magic/projectile/HealingBolt.kt` |
@@ -114,4 +116,4 @@
 
 ## 4. Java mixin
 
-`src/main/java/work/nekow/primalspells/mixin/`：`WandUseAnimationMixin`取消成功施法后的重举，`ItemInHandRendererAccessor`供原生高度回归观察。只在mixin配置client列表加载，不让公共服务端类引用。
+`src/main/java/work/nekow/primalspells/mixin/`：`WandUseAnimationMixin`取消成功施法后的重举，`ItemInHandRendererAccessor`供原生高度回归观察。AimHighlightMixin仅将AimHighlights并入Minecraft原版轮廓判断。所有客户端mixin只在client列表加载，不让公共服务端类引用。

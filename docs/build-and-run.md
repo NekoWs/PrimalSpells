@@ -88,6 +88,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | 场景 | 主要覆盖 |
 |---|---|
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
+| aim | 真实被动持杖、最近实体/墙截断、原版轮廓/租约和细线原生缩片 |
 | homing_light | 前方优先/后方排除、同刻穿透换靶与接缝、64格光脊、穿刺付费冷却与十刻蓄能 |
 | projectile_flight / fireball_trail | 原版弩速对比、六格扫掠追踪、复制速度、实际alpha递减 |
 | black_hole / black_hole_moving / gravity_field / gravity_field_moving | 区域场原维度、移动跟随和收尾 |
@@ -110,4 +111,4 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 当前PD 1.0.21原生复验：particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场共302帧、0丢帧，机制与视觉门禁均通过。光照随alpha下降，组缩片退场最大单刻光强差1.875，原15→0硬切未复现。已知5条OSHI诊断按用户要求计入忽略项，不再使整体报告失败；其他日志门禁保持。所有法术入退场与短寿命高刷范围见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
 
-当前追踪/聚光复验：`homing_light,projectile_flight,spell_chain,shield_balance,recoil_light,concentrated_light_first_person`六场共184项机制检查通过，1328帧、2帧丢弃（在既定预算内），全部视觉门禁通过。命令为 `pwsh tools/capture/capture.ps1 -Offline -Scene homing_light,projectile_flight,spell_chain,shield_balance,recoil_light,concentrated_light_first_person -TimeoutSec 600`，证据在 `build/capture/out`。覆盖前方对准度优先、排除后方回锁、穿透同刻命中两名目标与切线渐入、64格/t实际位移及连续光脊、高速壳面反射、独立第一人称锁定/退场，以及既有付费/荷载/连续伤害检查。第一人称场景隔离墙面反射并在朝向断言后终止远飞弹体，墙面与护盾碰撞由另外两场验证。
+当前瞄准复验：`pwsh tools/capture/capture.ps1 -Offline -Scene aim,wand_aim -TimeoutSec 600`。两场32项机制检查、320帧、0丢帧，机制和视觉门禁均通过，证据在 `build/capture/out`。覆盖真实物品驱动被动、重复卡单束、墙面截断、最近实体切换、原版轮廓/既有发光共存、租约合并、实际PD中间缩片与卸卡零残留；持杖近远目标与副手施法保持。近靶断言读取真实累计伤害，避免高速弹先命中后安装回调的时序误报。`new_spells`的旧MP夹具与混合视觉失败单列在 [open](issues/open.md)，不计入通过范围。

@@ -58,6 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "light_boundary": {"length": 180, "title": "单光源慢移 / 区块边界 / 等价光场对照", "metric": "terrain_light", "quiet": (0, 6), "decay": "none", "decay_reason": "仅观察原生地形照明，等价光场的网格颜色应一致"},
     "spell_lighting": {"length": 220, "title": "法术全亮 / 光照修正 / 单源预算与独立荷载", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "昼夜像素与原生光场、光源数量、独立荷载分别检查"},
     "wand_design": {"length": 160, "title": "暮紫封印 / 户外低位持握 / 左右手", "metric": "violet_model", "quiet": (0, 6), "decay": "none", "decay_reason": "材质/占屏来自实际紫晶像素，装备和收杖保留原版动画；施法及粒子清理由原生断言覆盖"},
     "spell_performance": {"length": 140, "title": "原生 CPU / 分配基准", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "机制计时与真实光束展示分别取证，性能数据不设机器相关通过阈值"},
@@ -408,6 +409,10 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     # 见 `orange_mask` 的标定说明）。粉色破口判据始终独立于它。
     violet_cover = [int(violet_model_mask(f).sum()) for f in frames] if metric == "violet_model" else []
     cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"violet_model": violet_cover, "warm": warm_cover, "orange": orange_cover, "white": white_cover}.get(metric, blue_cover)
+    if metric == "terrain_light":
+        baseline = np.asarray(Image.open(frames[0]).convert("RGB"), dtype=np.int16)
+        cover = [int((np.abs(np.asarray(Image.open(f).convert("RGB"), dtype=np.int16)[200:700] - baseline[200:700]).max(axis=2) > 5).sum()) for f in frames]
+
     result["cover"] = cover
     result["blue_cover"] = blue_cover
     result["red_cover"] = red_cover
@@ -442,6 +447,15 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("空场起飞", max(cover[:2]) <= empty, f"前 2 帧特效像素 {cover[:2]}（阈值 ≤{empty}）"))
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
+
+    if scene == "light_boundary":
+        ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        before = np.asarray(Image.open(ticks[120]).convert("RGB"), dtype=np.int16)[200:700]
+        after = np.asarray(Image.open(ticks[150]).convert("RGB"), dtype=np.int16)[200:700]
+        error = np.abs(before - after).max(axis=2)
+        changed = float((error > 5).mean())
+        result["asserts"].append(("等价光场的地形照明一致", changed <= 0.01,
+            f"同位置/光强重建光源前后，地形RGB差>5的像素占比={changed:.2%}，要求≤1%"))
 
     if scene == "spell_lighting":
         ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}

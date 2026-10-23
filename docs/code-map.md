@@ -35,6 +35,7 @@
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
 | 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 法杖外观/占屏回归 | `client/capture/WandDesignScene.kt`，场景wand_design；户外主副手/左惯用手和紫晶实际像素边界 |
+| 地形照明截断复现 | `client/capture/LightBoundaryScene.kt`，场景light_boundary；纯PD源慢移及同光场地形像素对照 |
 | 法术默认光照/光修正 | `client/capture/SpellLightingScene.kt`，场景spell_lighting；目录零光源、昼夜全亮、单源预算/复制/荷载 |
 | 光照连续性复现 | `client/capture/ParticleLightingScene.kt`，场景particle_lighting |
 

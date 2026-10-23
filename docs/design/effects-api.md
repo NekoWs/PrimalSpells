@@ -60,6 +60,8 @@ DynamicLightManager读取PD原生lightIntensity(partialTick)：基础lightLevel 
 
 `spell_lighting`实际运行注册投射物目录，默认特效峰值超过一万颗时光源数为零；昼夜对照检查实际像素颜色。真实付费重复卡、同源复制、独立荷载以及光源有限退场均有原生断言。`particle_lighting`保留PD曲线/缩片原生光场检查；六个相关场景134项机制断言及画面门禁通过，1120帧零丢帧。普通拖尾逐颗透明度观察所需只读接口见[PD需求](../issues/pd-api-requests.md)。
 
+单颗移动光源的地形刷新存在已确认PD缺陷：光场索引移动但地形烘焙缓存可能不刷新，形成旧亮区或区块截断。`light_boundary`的等价光场地形门禁失败，既有光强数值通过不能代替地形照明正确性；修复要求见[PD需求](../issues/pd-api-requests.md#移动光源的地形烘焙刷新丢失光照截断)。
+
 ## 6. 升级与验证
 
 在PD项目 `D:/Backup/IDEA Projects/ParticleDrawing` 构建主JAR和sourcesJar；只有明确升级时复制二者并更新版本/下限，不能仅因磁盘源码版本较新就视为当前运行版本。项目内不修改PD源码或JAR绕过缺陷。

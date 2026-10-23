@@ -38,7 +38,7 @@ DirectDamage声明单次直接强度，实际命中走SpellDamage/SpellImpact；
 
 ## 3. 修正与阶段
 
-Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已初始化参数，onTick用于持续行为；制导在GUIDANCE写速度，碰撞由MOTION的Move完成，粒子在VISUAL读最终位置。不要在普通轨道里直接改坐标绕过碰撞。
+Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已初始化参数，onTick用于持续行为；制导在GUIDANCE写速度或声明追踪目标，碰撞由MOTION的Move完成，粒子在VISUAL读最终位置。不要在普通轨道里直接改坐标绕过碰撞。
 
 同一链的所有修正统一收集、按ID规范化装配，与放前放后无关。加法、倍率、归零分开处理，不依赖卡序；同类√N叠加使用isStackPrimary/stackScale，只由首实例计算一次。effect.clone为浅拷贝，可变集合/状态不能在投射物间共享。
 
@@ -60,7 +60,7 @@ Projectile.damageType与selfDamage分别声明，类型不自动开启自伤。�
 
 质量必须正且有限；实体可用NeoForgeData的primalspells:mass覆盖，投射物字段受MagicMass校验。引力按F/m，不能乘来源质量。后坐力只为付费直接施法排队，复制/触发不重复推施法者。
 
-蓄能投射物参考ConcentratedLight：出手锁定部署点与方向、等待20t、再恢复运动；蓄能期间不能反复跑SETUP或重建效果，释放后的碰撞仍走Move。
+蓄能投射物参考ConcentratedLight：出手锁定部署点与方向、等待10t、再恢复运动；蓄能期间不能反复跑SETUP或重建效果，释放后的碰撞仍走Move。
 
 ## 6. 粒子与资源
 

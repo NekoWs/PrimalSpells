@@ -53,5 +53,5 @@ class ConcentratedLight : Projectile() {
         lore(Lore.CHARGE_TIME, CHARGE_TICKS)
     }
 
-    companion object { const val CHARGE_TICKS = 20 }
+    companion object { const val CHARGE_TICKS = 10 }
 }

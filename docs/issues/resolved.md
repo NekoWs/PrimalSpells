@@ -9,7 +9,8 @@
 | 寿命触发 | 定时到期当刻释放；休眠水晶到期爆炸，提前死亡与expire区分 | spell_timing、crystal_lifecycle |
 | 碰撞与反射 | 普通轨道经过Move；墙反弹与实体穿刺分开，高速盾反弹在死亡/命中前完成，视觉使用真实壳面接点 | spell_chain、shield_balance |
 | 等离子束 | 默认静态，本体随位置；有效射线在墙/护盾截断，视觉与伤害共用截点，允许自伤 | expansion_plasma、spell_chain |
-| 追踪与弹速 | 扫掠预计飞行段找一格侧向范围内的目标中心，再由Move命中；基础初速超过原版弩箭 | projectile_flight |
+| 追踪与弹速 | 扫掠预计飞行段找六格侧向范围内的目标中心，Move子步连续转弯并命中；光束绘制与碰撞共用真实路径，基础初速超过原版弩箭 | homing_light、projectile_flight |
+| 汇聚之光 | 原地锁定方向蓄能10t；主芯照亮环境，释放/中断逐步熄灭，保留5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
 | MP与存档 | 当前MP封顶；空槽/牌堆保序；完整刻迁移旧秒/毫秒；复制不共享wandId | spell_mechanics、exploration、magic_hud |
 | 伤害 | 独立分类/死亡文本；正治疗恢复、负治疗伤害；按实际接受强度击退，假人无击退 | damage_mass、combat_impact、new_spells |
 | 多卡护盾 | 卡数提高抗性与立方窗口预算，破盾当次仍吸收；无常驻壳和多余圆环 | shield_balance |

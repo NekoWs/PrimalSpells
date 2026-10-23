@@ -43,8 +43,8 @@ object ShieldBalanceScene {
             prepare={ctx ->
                 val floor=ctx.floorBlockY(0,0)
                 for(x in -12..12)for(z in -12..12)for(y in floor+1..floor+10)ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
-                ctx.buildStudio(0,0,floor);ctx.setup(true,0.0,floor+5.0,-11.0,0f,12f)
-            },camera={ctx,_ -> Pose(0.0,ctx.floorBlockY(0,0)+5.0,-11.0,0f,12f)},tick={ctx,t ->
+                ctx.buildStudio(0,0,floor);ctx.setup(true,0.0,floor+4.5,-8.5,0f,16f)
+            },camera={ctx,_ -> Pose(0.0,ctx.floorBlockY(0,0)+4.5,-8.5,0f,16f)},tick={ctx,t ->
                 val floor=ctx.floorBlockY(0,0)
                 fun pig(x:Double):Pig {
                     val p=EntityTypes.PIG.create(ctx.level,EntitySpawnReason.COMMAND)!!
@@ -95,7 +95,7 @@ object ShieldBalanceScene {
                         val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                         light.caster=ctx.player;light.wand=Wand("shield-fast-$speed-$angled")
                         light.position=center.subtract(heading.scale(distance)).toVector3f();light.velocity=heading.toVector3f();light.speed=speed/Projectile.LAUNCH_SPEED_SCALE
-                        light.spell();light.status.age=20;light.tick();light.status.age++
+                        light.spell();light.status.age=work.nekow.primalspells.magic.projectile.ConcentratedLight.CHARGE_TICKS;light.tick();light.status.age++
                         val reflected=Vec3(light.status.pos);val velocity=Vec3(light.status.velocity)
                         record(t,"fast-light-reflects-alive-$speed-$angled",light.alive && light.status.hitTargets==0 && light.status.bounces==5 && holder.health==1000f && !shield(ws).breached && velocity.dot(heading)<-speed*0.99 && reflected.distanceTo(center)>1.7,"alive=${light.alive} hits=${light.status.hitTargets} pos=$reflected velocity=$velocity health=${holder.health}")
                         ws.tick(holder,ctx.level)
@@ -112,7 +112,7 @@ object ShieldBalanceScene {
                         val start=center.add(ox,oy,-3.0)
                         val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                         light.caster=ctx.player;light.wand=Wand("shield-graze");light.position=start.toVector3f();light.velocity=Vector3f(0f,0f,1f);light.speed=speed/Projectile.LAUNCH_SPEED_SCALE
-                        light.spell();light.status.age=20;light.tick()
+                        light.spell();light.status.age=work.nekow.primalspells.magic.projectile.ConcentratedLight.CHARGE_TICKS;light.tick()
                         val contact=light.shieldReflectionPoint
                         val expected=center.add(ox,oy,-kotlin.math.sqrt(1.7*1.7-ox*ox-oy*oy))
                         val normal=contact?.subtract(center)?.normalize()
@@ -170,7 +170,7 @@ object ShieldBalanceScene {
                     val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
                     p.position=center.add(1.2,0.0,-7.0).toVector3f();p.velocity=Vector3f(0f,0f,1f);p.spell();MagicManager.add(p);grazingLight=p
                 }
-                if(t in 105..125 && grazingContact==null && grazingLight?.shieldReflectionPoint!=null)grazingContact=grazingLight!!.shieldReflectionPoint
+                if(t in 100..120 && grazingContact==null && grazingLight?.shieldReflectionPoint!=null)grazingContact=grazingLight!!.shieldReflectionPoint
                 if(t==115)grazingLight?.alive=false
                 if(t==130) {
                     val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)

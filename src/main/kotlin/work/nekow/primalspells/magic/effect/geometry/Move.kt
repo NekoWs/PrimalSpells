@@ -6,6 +6,8 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
+import org.joml.Quaternionf
+import kotlin.math.acos
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -19,7 +21,7 @@ import work.nekow.primalspells.magic.effect.BaseEffect
  * 并以 1/16 格子的步长扫掠检测实体与方块碰撞。
  *
  * 阶段：[EffectPhase.MOTION] —— 这是每个 tick **唯一**推进 `status.pos` 的地方。
- * 想在积分之后绝对定位的效果必须声明 [EffectPhase.OVERRIDE]（如 `SelfOrbit`）。
+ * 轨道/追踪在GUIDANCE提供输入，Move扫掠实际弧线；离散跃迁才使用OVERRIDE自行命中。
  *
  * **命中语义（常被误认成 bug，实为特性）**：投射物停在实体体内时，碰撞检测每个 tick
  * 都会再次命中同一实体，命中回调可被反复触发。穿刺玩法（`Piercing` 把 `maxHitTargets`
@@ -46,9 +48,13 @@ class Move(
         val movement = Vector3f(status.velocity).mul(scale)
         status.velocity = Vector3f(movement)
         val startPos = Vector3f(status.pos)
-        val newPos = Vector3f(movement).add(startPos)
+        val path = planFlight(startPos, movement)
+        val newPos = path.lastOrNull()?.position ?: Vector3f(startPos)
+        projectile.flightPath += Vec3(startPos)
 
         if (!projectile.collisionEnabled || (throughBlocks && hitRadius <= 0.0)) {
+            projectile.flightPath += path.map { Vec3(it.position) }
+            path.lastOrNull()?.let { status.velocity = Vector3f(it.velocity) }
             status.pos = newPos
             return
         }
@@ -58,9 +64,14 @@ class Move(
         if (level != null) {
             val distance = movement.length()
             if (distance > 0f) {
-                val stepVec = Vector3f(movement).div(distance)
-                val stepSize = 1F / 16
-                val steps = maxOf(1, ceil(distance / stepSize).toInt())
+                // 弯曲轨迹可能离开首尾包围盒；所有实际子步都参与宽相位。
+                val sweptPath = AABB(
+                    min(startPos.x, path.minOf { it.position.x }).toDouble(),
+                    min(startPos.y, path.minOf { it.position.y }).toDouble(),
+                    min(startPos.z, path.minOf { it.position.z }).toDouble(),
+                    max(startPos.x, path.maxOf { it.position.x }).toDouble(),
+                    max(startPos.y, path.maxOf { it.position.y }).toDouble(),
+                    max(startPos.z, path.maxOf { it.position.z }).toDouble())
 
                 // 宽相位（每个 tick 一次）：把整段位移扫掠包围盒内的实体先筛出来，
                 // 子步进只在这份小候选集上做精确判定。
@@ -68,10 +79,7 @@ class Move(
                 // 这里只把「每步一次全维度实体查询」降为「每 tick 一次」。
                 // 额外外扩 1 格：容忍候选实体自身在 1 tick 内的移动，避免快速目标从快照中漏掉。
                 val candidates: List<Entity> = if (checkEntities) {
-                    val swept = AABB(
-                        min(status.pos.x, newPos.x).toDouble(), min(status.pos.y, newPos.y).toDouble(), min(status.pos.z, newPos.z).toDouble(),
-                        max(status.pos.x, newPos.x).toDouble(), max(status.pos.y, newPos.y).toDouble(), max(status.pos.z, newPos.z).toDouble(),
-                    ).inflate(hitRadius + ENTITY_SWEEP_MARGIN)
+                    val swept = sweptPath.inflate(hitRadius + ENTITY_SWEEP_MARGIN)
                     level.getEntities(null, swept) { projectile.canHarm(it) }
                 } else {
                     emptyList()
@@ -79,22 +87,26 @@ class Move(
 
                 // 球壳半径大于实体本体；斜擦球壳也必须在本刻视觉之前反射。
                 val shieldHolders = if (checkEntities && projectile.maxHitTargets >= 0) {
-                    val shellSweep = AABB(Vec3(startPos), Vec3(newPos)).inflate(2.7)
+                    val shellSweep = sweptPath.inflate(2.7)
                     level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity::class.java, shellSweep) {
                         it.isAlive && it !== caster && work.nekow.primalspells.magic.core.ShieldGuard.hasShield(it)
                     }
                 } else emptyList()
 
                 var prevPos = Vector3f(startPos)
-                for (i in 1..steps) {
-                    val t = min(i * stepSize, distance)
-                    val checkPos = Vector3f(stepVec).mul(t).add(startPos)
+                for (step in path) {
+                    val checkPos = step.position
+                    if (projectile.guidance != null) status.velocity = Vector3f(step.velocity)
                     // 离开枪口所在的施法者碰撞箱后才允许返弹自伤，避免刚出手就撞自己。
                     if (!caster.boundingBox.inflate(hitRadius).contains(Vec3(checkPos))) leftCaster = true
 
                     for (holder in shieldHolders) {
-                        if (work.nekow.primalspells.magic.core.ShieldGuard.interceptSegment(level, holder, projectile, prevPos, checkPos)) return
+                        if (work.nekow.primalspells.magic.core.ShieldGuard.interceptSegment(level, holder, projectile, prevPos, checkPos)) {
+                            projectile.flightPath += projectile.shieldReflectionPoint ?: Vec3(status.pos)
+                            return
+                        }
                     }
+                    projectile.flightPath += Vec3(checkPos)
 
                     if (checkEntities) {
                         val px = checkPos.x.toDouble()
@@ -148,6 +160,40 @@ class Move(
             }
         }
         status.pos = newPos
+    }
+
+    private data class FlightStep(val position: Vector3f, val velocity: Vector3f)
+
+    /** 保持本刻路程和速度，按曲率限幅逐子步转向；中点方向积分使前后切线连续。 */
+    private fun planFlight(start: Vector3f, movement: Vector3f): List<FlightStep> {
+        val distance = movement.length()
+        if (!distance.isFinite() || distance <= 0f) return emptyList()
+        val steps = maxOf(1, ceil(distance / (1f / 16)).toInt())
+        val heading = Vector3f(movement).div(distance)
+        val position = Vector3f(start)
+        val guidance = projectile.guidance
+        return (1..steps).map { index ->
+            val step = min(index / 16f, distance) - min((index - 1) / 16f, distance)
+            val next = Vector3f(heading)
+            if (guidance != null && guidance.strength > 0f) {
+                val aim = guidance.target.subtract(Vec3(position)).toVector3f()
+                val remaining = aim.length()
+                if (remaining > 1e-6f) {
+                    aim.div(remaining)
+                    val angle = acos(heading.dot(aim).coerceIn(-1f, 1f))
+                    if (angle > 1e-6f) {
+                        // 远处舒展成弧，近目标缩小转弯半径，避免持续绕靶不命中。
+                        val radius = (remaining * 0.6f).coerceIn(0.3f, 4f) / guidance.strength
+                        // 极多复制修正也不能在单个子步翻转180度，避免中点方向退化为零。
+                        val fraction = (min(step / radius, 0.2f) / angle).coerceIn(0f, 1f)
+                        Quaternionf().slerp(Quaternionf().rotationTo(heading, aim), fraction).transform(next).normalize()
+                    }
+                }
+            }
+            position.add(Vector3f(heading).add(next).normalize().mul(step))
+            heading.set(next)
+            FlightStep(Vector3f(position), Vector3f(heading).mul(distance))
+        }
     }
 
     /** 用「进入 AABB 的参数 t」求碰撞面法线：取三个轴中最晚进入（最大 t）的那一轴作为面朝向。 */

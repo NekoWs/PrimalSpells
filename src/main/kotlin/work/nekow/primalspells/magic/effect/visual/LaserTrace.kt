@@ -12,12 +12,11 @@ class LaserTrace : BaseEffect() {
     override fun onActive() { previous = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble()) }
     override fun onTick() {
         val end = Vec3(status.pos.x.toDouble(), status.pos.y.toDouble(), status.pos.z.toDouble())
-        val distance = previous.distanceTo(end)
-        if (distance > 0.01) {
+        val samples = FlightTrace.sample(projectile, previous, end, 0.0625)
+        if (samples.isNotEmpty()) {
             val manager = ParticleManager.of(caster.level())
-            val count = (distance / 0.0625).toInt().coerceIn(2, 192)
             for (layer in 0..1) {
-                val specs = (0..count).map { i -> ParticleSpawnSpec().position(previous.lerp(end, i.toDouble()/count))
+                val specs = samples.map { sample -> ParticleSpawnSpec().position(sample.position)
                     .color(if (layer == 0) Color.ofInt(63,172,246) else Color.ofInt(225,249,255))
                     .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if (layer == 0) 0.125f else 0.0625f,
                         if (layer == 0) 0.125f else 0.0625f).glowing(true).additive(false))

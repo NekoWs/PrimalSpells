@@ -50,7 +50,11 @@ class ConcentratedLightFx : BaseEffect() {
             ParticleSpawnSpec().position(p).color(if(i==0 || i in 41..49 || i%5==0) Color.ofInt(255,250,220) else Color.ofInt(246,193,66))
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(if(i==0) 0.125f else 0.0625f,if(i==0) 0.125f else 0.0625f)
                     .glowing(true).additive(false))
-                .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(3,1,EasingType.EASE_OUT))
+                // 主芯承担真实照明，其余棱片保持全亮，避免几十颗满级光源同时开关。
+                .glowing(true).lightLevel(if(i==0)15 else 0)
+                .lifetime(-1).sizeCurve(CurveKey.at(0,0),CurveKey.at(2,1,EasingType.EASE_OUT))
+                .lightCurve(CurveKey.at(0,0),CurveKey.at(2,0.25),
+                    CurveKey.at(ConcentratedLight.CHARGE_TICKS,1,EasingType.EASE_IN))
         }))
             chargeRest = points(1.0)
             // 位置只由track接管；出生尺寸仍由PD寿命曲线逐帧播放。
@@ -68,26 +72,28 @@ class ConcentratedLightFx : BaseEffect() {
             releaseRecoil(pm, charge!!);charge=null
             releaseFlash(pm)
         }
-        val end=projectile.shieldReflectionPoint ?: point();val distance=previous.distanceTo(end)
-        if(distance>0.001) {
-            val count=(distance/0.125).toInt().coerceIn(2,192)
-            val direction=end.subtract(previous).normalize()
-            val side=direction.cross(Vec3(0.0,1.0,0.0)).let{if(it.lengthSqr()<1e-8)Vec3(1.0,0.0,0.0)else it.normalize()}
+        val end=projectile.shieldReflectionPoint ?: point()
+        val samples=FlightTrace.sample(projectile,previous,end,0.125)
+        if(samples.isNotEmpty()) {
             // 白色光脊与金色侧线在空间上分开，实色片元不共面覆盖。
-            val specs=(0..2).flatMap { layer -> (0..count).map { i ->
+            val specs=(0..2).flatMap { layer -> samples.mapIndexed { i, sample ->
+                val side=sample.direction.cross(Vec3(0.0,1.0,0.0)).let{if(it.lengthSqr()<1e-8)Vec3(1.0,0.0,0.0)else it.normalize()}
                 val size=if(layer==0)0.25f else 0.09375f
                 val offset=if(layer==0)Vec3.ZERO else side.scale(if(layer==1)0.1875 else -0.1875)
                 val life=12+i%3
-                ParticleSpawnSpec().position(previous.lerp(end,i.toDouble()/count).add(offset))
+                ParticleSpawnSpec().position(sample.position.add(offset))
                     .color(if(layer==0)Color.ofInt(255,253,233)else Color.ofInt(255,204,88))
                     .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(size,size).glowing(true).additive(false))
+                    .glowing(true).lightLevel(if(layer==0 && i%8==0)12 else 0)
                     .lifetime(life).sizeCurve(CurveKey.at(0,0),CurveKey.at(0.5,1),CurveKey.at(2,1),CurveKey.at(life,0,EasingType.EASE_OUT))
+                    .lightCurve(CurveKey.at(0,0),CurveKey.at(1,0.8),CurveKey.at(3,0.5),CurveKey.at(life,0))
             } }
             specs.chunked(256).forEach { pm.spawnAll(it) }
         }
         previous=end
     }
     override fun onDie() {
+        charge?.handles()?.forEach { it.lightIntensity(0f,4) }
         manager?.let { PixelVfx.retireBatch(it,charge,point(),4) };charge=null
     }
 
@@ -96,6 +102,7 @@ class ConcentratedLightFx : BaseEffect() {
         val forward = projectile.launchDirection
         val handles = batch.handles().toList()
         handles.forEachIndexed { i, handle ->
+            handle.lightIntensity(0f,5,EasingType.EASE_OUT)
             val rest = chargeRest[i]
             val offset = rest.subtract(origin)
             val radial = offset.subtract(forward.scale(offset.dot(forward)))
@@ -109,7 +116,7 @@ class ConcentratedLightFx : BaseEffect() {
     }
 
     private fun releaseFlash(pm: ParticleManager) {
-        val forward=Vec3(status.velocity).normalize()
+        val forward=projectile.launchDirection
         val side=forward.cross(Vec3(0.0,1.0,0.0)).let{if(it.lengthSqr()<1e-8)Vec3(1.0,0.0,0.0)else it.normalize()}
         val up=side.cross(forward).normalize()
         val velocities=arrayListOf<Vec3>()
@@ -122,7 +129,9 @@ class ConcentratedLightFx : BaseEffect() {
             ParticleSpawnSpec().position(previous.add(radial.scale(0.1)))
                 .color(if(i%4==0)Color.ofInt(255,253,233)else Color.ofInt(255,214,112))
                 .visual(ParticleVisual().style(ParticleStyle.SQUARE).anisoWorld(0.0625f,0.0625f).glowing(true).additive(false))
+                .glowing(true).lightLevel(if(i==0)14 else 0)
                 .lifetime(life).sizeCurve(CurveKey.at(0,0),CurveKey.at(1,1),CurveKey.at(3,1),CurveKey.at(life,0,EasingType.EASE_IN_OUT))
+                .lightCurve(CurveKey.at(0,0),CurveKey.at(1,1),CurveKey.at(3,0.65),CurveKey.at(life,0))
         }
         ParticleBatch(pm).also{it.addAll(pm.spawnAll(specs));it.setVelocityAll(velocities)}
     }

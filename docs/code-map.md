@@ -16,6 +16,7 @@
 | 护盾判定/反射点 | `magic/core/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
 | 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |
 | 爆炸与跨投射物联动 | `magic/effect/lifecycle/{Explosion,ExplosionFx,SpellInteractions,SpellResonance,CrystalReaction}.kt` |
+| 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，不改写命中轨迹 |
 | 普通尾迹/特殊弹本体 | `magic/effect/visual/`；通用造型 `PixelVfx.kt` |
 | 持杖三角形/宝石出生点 | `magic/effect/visual/WandCastingFx.kt`、`wand/WandAim.kt` |
 | 模型/姿势/施法余光 | `client/render/{WandModelProperty,WandHandPose,WandArmPose}.kt`、`tools/wands/generate_models.py` |
@@ -27,6 +28,7 @@
 | 数据重载/API/事件 | `integration/{PackRules,SpellApi,SpellEvents}.kt` |
 | PD管理器/共享spawn | `util/PdParticles.kt`；PD能力问题只记台账 |
 | 录制/诊断 | `client/capture/CaptureDriver.kt`、CaptureScenes及各Scene；`tools/capture/{capture.ps1,diagnostics.ps1,assemble.py}` |
+| 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 光照连续性复现 | `client/capture/ParticleLightingScene.kt`，场景particle_lighting |
 
 ## 2. 法术ID与实现

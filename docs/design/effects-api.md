@@ -58,6 +58,8 @@ DynamicLightManager读取PD原生lightIntensity(partialTick)：基础lightLevel 
 
 新增公开入口：ParticleCurve.light / Builder、SpawnSpec、Emitter的lightCurve；ParticleVisual.lightIntensity设置静态乘数，ParticleHandle.lightIntensity(multiplier, durationTicks, easing)从当前实际光强接续。LIGHT仅影响照明，不改变片元alpha或全亮。
 
+汇聚之光在SpawnSpec显式登记glowing/lightLevel：主芯15级光照与10t LIGHT曲线，其他棱片免环境光但不承担光源；光脊分段布置12级光源、排光14级，均按曲线收尾。释放/取消时主芯用lightIntensity从当前值退到零。
+
 显式remove仍立即移除光源；需要正常退场的调用方必须先用尺寸/alpha/LIGHT曲线或lightIntensity缓动到零，再回收。没有曲线的固定尺寸粒子不会因升级自动获得入退场动画。光源预算裁剪和所有法术完整覆盖仍需应用层验收，不能仅凭接口出现宣称全局闪烁已消除。
 
 ## 6. 升级与验证

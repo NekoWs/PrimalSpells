@@ -68,18 +68,22 @@ object ProjectileFlightScene {
                     arrows.forEach { it.discard() }; ctx.player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY)
                 }
                 if (t == 20 || t == 30) {
-                    val offset = if (t == 20) 0.9 else 1.1
+                    val offset = if (t == 20) 5.9 else 6.1
                     val target = ctx.spawnDummy(-5.0 + offset, floor + 2.0, 2.0)
                     val start = Vec3(-5.0, target.boundingBox.center.y, 0.0)
                     val p = shot(ctx, start, Vector3f(0f, 0f, 1f), listOf("homing"))
                     val before = p.status.velocity.length()
                     p.tick()
                     if (t == 20) {
-                        record(t, "swept-homing-acquires-between-tick-endpoints", p.status.velocity.x > 0.1f && target.totalDamage == 5.0,
+                        record(t, "swept-homing-acquires-between-tick-endpoints", p.guidance != null && p.status.velocity.x > 0.1f,
                             "velocity=${p.status.velocity} damage=${target.totalDamage}")
                         record(t, "homing-does-not-accelerate-projectile", p.status.velocity.length() <= before + 1e-5f, "before=$before after=${p.status.velocity.length()}")
-                    } else record(t, "homing-stays-within-one-block-of-flight-path", p.status.velocity.x == 0f && target.totalDamage == 0.0,
+                    } else record(t, "homing-stays-within-six-blocks-of-flight-path", p.status.velocity.x == 0f && target.totalDamage == 0.0,
                         "velocity=${p.status.velocity} damage=${target.totalDamage}")
+                    if (t == 20) {
+                        repeat(12) { if (p.alive) { p.tick(); p.status.age++ } }
+                        record(t, "expanded-homing-actually-hits", target.totalDamage == 5.0, "damage=${target.totalDamage}")
+                    }
                     p.alive = false; p.die(); target.discard()
                 }
                 if (t == 40) {

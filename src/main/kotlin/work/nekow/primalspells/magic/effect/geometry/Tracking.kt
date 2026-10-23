@@ -7,12 +7,10 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import org.joml.Quaternionf
-import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 
-/** 沿本刻飞行段短距锁定实体中心；只旋转速度，位置与命中仍由Move扫掠。 */
+/** 沿预计飞行段锁定实体中心；只声明目标与转向强度，由Move连续转弯和扫掠命中。 */
 class Tracking(
     val range: Float,
     val strength: Float
@@ -28,7 +26,7 @@ class Tracking(
         val center = Vec3(status.pos)
         val speed = status.velocity.length().toDouble()
         if (!speed.isFinite() || speed < 1e-8) return
-        // 起点附近的球形查询会漏掉两刻之间擦身而过的目标。范围仍为1格，沿真实位移段扫掠。
+        // 高速弹不能只查刻起点；沿预计位移段寻找目标，已锁定目标优先保留。
         val movement = Vec3(status.velocity).scale(1.0 / (1.0 + projectile.dragCoeff * speed))
         val end = center.add(movement)
         val distanceSquared = movement.lengthSqr()
@@ -47,12 +45,8 @@ class Tracking(
         if (target != null && target !== lastTarget) level.playSound(null, center.x, center.y, center.z,
             SoundEvents.SCULK_CLICKING, SoundSource.NEUTRAL, 0.2f, 1.6f)
         lastTarget = target
-        if (target == null || status.velocity.lengthSquared() < 1e-8f) return
-        val aim = target.boundingBox.center.subtract(center).toVector3f()
-        if (aim.lengthSquared() < 1e-8f) return
-        val heading = Vector3f(status.velocity).normalize()
-        val rotation = Quaternionf().rotationTo(heading, aim.normalize())
-        // strength 是每刻转向比例；用旋转而非相加加速度，不改变弹速，也不会越吸越快。
-        Quaternionf().slerp(rotation, (strength * stackScale).coerceIn(0f, 1f)).transform(status.velocity)
+        if (target == null) return
+        projectile.guidance = work.nekow.primalspells.magic.projectile.Projectile.Guidance(
+            target.boundingBox.center, (strength * stackScale).coerceAtLeast(0f))
     }
 }

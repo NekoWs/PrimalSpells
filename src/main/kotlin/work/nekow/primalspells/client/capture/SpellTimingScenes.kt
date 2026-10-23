@@ -114,7 +114,7 @@ object SpellTimingScenes {
                 else -> emptyList()
             }})
     }
-    /** 连续80刻真实机枪：观察密集命中，核对粒子驻留量、切痕变化及一格追踪边界。 */
+    /** 连续80刻真实机枪：观察密集命中，核对粒子驻留量、切痕变化及六格弧线追踪边界。 */
     fun machinegun(): Scene {
         val name="machinegun_visual"
         lateinit var gun: Wand
@@ -127,7 +127,7 @@ object SpellTimingScenes {
         fun record(t:Int,id:String,ok:Boolean,detail:String) {
             checks.getOrPut(t){arrayListOf()}.add(Check(name,t,id,ok,detail))
         }
-        return Scene(name,"高频触发机枪 / 随机弧刃 / 一格追踪",24,170,
+        return Scene(name,"高频触发机枪 / 随机弧刃 / 六格弧线追踪",24,170,
             prepare={ctx ->
                 val floor=ctx.floorBlockY(0,0)
                 for(x in -12..12) for(z in -12..12) for(y in floor+1..floor+10)
@@ -164,7 +164,7 @@ object SpellTimingScenes {
                         val turned=p.status.velocity.x>0.1f
                         p.alive=false;p.die();dummy.discard();return turned
                     }
-                    record(t,"homing-one-block-radius",probe(0.9) && !probe(1.1),"0.9 inside / 1.1 outside")
+                    record(t,"homing-six-block-radius",probe(5.9) && !probe(6.1),"5.9 inside / 6.1 outside")
                 }
                 if(t==169) {
                     record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}")

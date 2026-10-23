@@ -58,11 +58,12 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "homing_light": {"length": 150, "title": "六格追踪 / 弧线扫掠 / 聚光照明", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "范围/真实曲线碰撞与照明各有独立原生断言，多个发射阶段不共用全局退场峰值"},
     "particle_lighting": {"length": 110, "title": "粒子照明 / 出生与退场连续性", "metric": "blue", "quiet": (0, 6), "decay": "none", "decay_reason": "独立观察原生光场与透明度，连续性由光照数值断言验证"},
     "projectile_flight": {"length": 130, "title": "弩箭对比 / 路径追踪 / 拖尾淡出", "metric": "orange", "quiet": (0, 6), "decay": "none"},
     "progression": {"length": 240, "title": "数据包 / 安全世界作用 / 寻法 / 精英", "metric": "wand", "quiet": (0, 6), "decay": "none"},
     "foundations": {"length": 260, "title": "只读抽牌树 / 真实网络预览", "metric": "wand", "quiet": (0, 6), "decay": "none"},
-    "machinegun_visual": {"length": 170, "title": "连续机枪 / 随机弧刃 / 一格追踪", "metric": "white", "white_roi": (540, 415, 800, 550), "quiet": (0, 6), "short_exit": True, "decay": "gradual", "fade_window": (86, 105)},
+    "machinegun_visual": {"length": 170, "title": "连续机枪 / 随机弧刃 / 六格追踪", "metric": "white", "white_roi": (540, 415, 800, 550), "quiet": (0, 6), "short_exit": True, "decay": "gradual", "fade_window": (86, 105)},
     "spell_chain": {"length": 400, "title": "束壳截点 / 穿刺触发 / 强追踪 / 机枪 / 假人统计", "metric": "blue", "quiet": (0, 6), "decay": "collapse"},
     "wand_aim": {"metric": "wand", "length": 160, "title": "近远准星命中 / 副手 / 遮挡 / 稳定握持", "decay": "gradual", "quiet": (0, 8), "fade_window": (129, 159)},
     "wand_casting_first_person": {"metric": "wand", "length": 220, "title": "第一视角低模持杖 / 常驻符印与冷却", "decay": "gradual", "quiet": (0, 8), "fade_window": (187, 216)},

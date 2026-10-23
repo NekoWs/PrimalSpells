@@ -98,8 +98,8 @@ object WandHudPainter {
     private fun feedback(g: GuiGraphicsExtractor, f: WandHudFrame, scale: Double) {
         val cx = 45; val cy = 29
         for (impact in f.impacts) {
-            impact.previous?.let { impactStar(g, it, cx, cy, scale, f.presence) }
-            impactStar(g, impact, cx, cy, scale, f.presence)
+            impact.previous?.let { impactMarker(g, it, cx, cy, scale, f.presence) }
+            impactMarker(g, impact, cx, cy, scale, f.presence)
         }
         // 受击弧位于外圈；折线缺口与晶齿保留像素魔法感。
         val hurt = f.hurtAlpha * f.presence
@@ -120,28 +120,15 @@ object WandHudPainter {
         }
     }
 
-    /** 每个目标是一枚完整小星芒，最长七像素；不复用准星中心，避免并发笔画连成虚线。 */
-    private fun impactStar(g: GuiGraphicsExtractor, impact: HudImpactFrame, cx: Int, cy: Int, scale: Double, presence: Double) {
+    /** 围绕原版准星的四段短线；命中紫白、击杀红色，共用清晰的中心留空。 */
+    private fun impactMarker(g: GuiGraphicsExtractor, impact: HudImpactFrame, cx: Int, cy: Int, scale: Double, presence: Double) {
         val alpha = impact.alpha * presence
         if (alpha <= 0.003) return
-        val (dx, dy) = impact.center(scale)
-        val x = cx + dx; val y = cy + dy
         val core = if (impact.killed) 0xFFFFB1BA.toInt() else WHITE
-        val color = if (impact.killed) 0xFFFF4B64.toInt() else PURPLE
-        rect(g, x, y, 1, 1, core, alpha)
-        val length = ceil(3 * impact.draw).toInt()
-        for (arm in 0..3) for (d in 1..length) {
-            val sx = if (arm < 2) 1 else -1
-            val sy = if (arm % 2 == 0) 1 else -1
-            val (px, py) = if (impact.killed) sx * d to sy * d else when (arm) {
-                0 -> d to 0; 1 -> 0 to d; 2 -> -d to 0; else -> 0 to -d
-            }
-            val thickness = if (d == 1) 2 else 1
-            val width = if (impact.killed || arm % 2 == 1) thickness else 1
-            val height = if (impact.killed || arm % 2 == 0) thickness else 1
-            rect(g, x + px - if (px < 0) width - 1 else 0,
-                y + py - if (py < 0) height - 1 else 0, width, height, color, alpha)
+        val color = if (impact.killed) 0xFFFF4B64.toInt() else 0xFFE0CFFF.toInt()
+        for (stroke in impact.strokes(scale)) {
+            rect(g, cx + stroke.x, cy + stroke.y, stroke.width, stroke.height,
+                if (stroke.core) core else color, alpha)
         }
     }
-
 }

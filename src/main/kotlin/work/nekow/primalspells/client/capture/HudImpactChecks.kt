@@ -66,17 +66,21 @@ object HudImpactChecks {
                 "duration=$duration finalAlpha=${samples.last().alpha}")
             queue.clear()
         }
-        val centers = (0..7).map { HudImpactFrame(it.toLong(), false, it, 1.0, 1.0, 0.0).center(1.0) }
-        record("mini-stars-have-separate-non-radial-centers", centers.indices.all { i ->
-            centers.indices.all { j -> i == j || hypot((centers[i].first - centers[j].first).toDouble(),
-                (centers[i].second - centers[j].second).toDouble()) >= 8.0 }
-        }, "first eight centers=$centers")
-        record("mini-stars-fit-and-protect-crosshair-at-all-scales", listOf(0.6, 1.0, 2.5).all { scale ->
-            (0..127).all { slot -> listOf(0.0, 1.0).all { spread ->
-                val (x, y) = HudImpactFrame(slot.toLong(), false, slot, 1.0, 1.0, spread).center(scale)
-                (max(abs(x), abs(y)) - 3) * scale >= 10.0 && max(abs(x), abs(y)) + 3 <= ceil(10 / scale) + 12
-            } }
-        }, "128 positions, entry/exit, scales=60/100/250%")
+        val markers = (0..2).map { HudImpactFrame(it.toLong(), false, it, 1.0, 1.0, 0.0).strokes(1.0) }
+        record("fps-markers-share-crosshair-and-differ-by-angle", markers.distinct().size == 3 && markers.all { strokes ->
+            strokes.count { it.core } == 4 && strokes.any { it.x > 0 && it.y > 0 } &&
+                strokes.any { it.x < 0 && it.y < 0 } && strokes.any { it.x < 0 && it.y > 0 } &&
+                strokes.any { it.x > 0 && it.y < 0 }
+        }, "three targets, four diagonal arms each")
+        record("fps-markers-fit-and-protect-crosshair-at-all-scales", listOf(0.6, 1.0, 2.5).all { scale ->
+            (0..127).all { slot -> listOf(0.0, 1.0).all { spread -> listOf(false, true).all { killed ->
+                HudImpactFrame(slot.toLong(), killed, slot, 1.0, 1.0, spread).strokes(scale).all { stroke ->
+                    (stroke.x until stroke.x + stroke.width).all { x -> (stroke.y until stroke.y + stroke.height).all { y ->
+                        max(abs(x), abs(y)) * scale >= 10.0 && max(abs(x), abs(y)) <= ceil(10 / scale) * 1.42 + 10
+                    } }
+                }
+            } } }
+        }, "128 markers, entry/exit, hit/kill, scales=60/100/250%")
         return checks
     }
 }

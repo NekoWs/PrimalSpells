@@ -548,17 +548,17 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         front = int(feedback_mask(77, red=True)[270:310, 610:670].sum())
         result["asserts"].append(("准心不再重复显示充能菱框", max(idle) == 0, f"静止/充能窗口紫色像素={idle}"))
         result["asserts"].append(("真实命中魔法十字可见", hit >= 50, f"中心紫色覆盖={hit}"))
-        result["asserts"].append(("真实击杀显示独立红色小斜十字", len(components(kill)) == 1 and int(kill.sum()) >= 50,
-            f"完整红色标记={len(components(kill))}，红色覆盖={int(kill.sum())}"))
+        result["asserts"].append(("真实击杀显示准心四角红色斜十字", len(components(kill)) == 4 and int(kill.sum()) >= 50,
+            f"红色短线={len(components(kill))}，红色覆盖={int(kill.sum())}"))
         result["asserts"].append(("真实受击方向弧可见", right >= 10 and left == 0 and front >= 10,
             f"右/左/前向红色覆盖={right}/{left}/{front}"))
-        # 反馈已改成局部完整小星芒；按实际中心外移验收，不要求四臂绕原版准星展开。
+        # 四段短线共用准星中心；用最外侧笔画半径检查有限外移。
         radii = []
         for t in (61, 64, 66):
             ys, xs = np.where(marker_mask(t, red=True)[260:460, 540:740])
-            radii.append(float(np.hypot(np.mean(xs) - 100, np.mean(ys) - 100)) if len(xs) else 0.0)
-        result["asserts"].append(("小星芒平滑向外移动", 0 < radii[0] <= radii[1] <= radii[2] and radii[2] > radii[0],
-            f"标记中心距离={radii}"))
+            radii.append(int(np.max(np.maximum(np.abs(xs - 100), np.abs(ys - 100)))) if len(xs) else 0.0)
+        result["asserts"].append(("FPS短线有限外移", 0 < radii[0] <= radii[1] <= radii[2] and radii[2] > radii[0],
+            f"笔画外围半径={radii}"))
         protected = [int(marker_mask(t)[336:384, 616:664].sum())
                      for t in (*range(56, 70), *range(94, 100))]
         result["asserts"].append(("命中和击杀与原版准星留空", max(protected) == 0,
@@ -566,16 +566,16 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         single = components(marker_mask(57)[260:460, 540:740])
         triple = components(marker_mask(95)[260:460, 540:740])
         double_kill = components(marker_mask(98, red=True)[260:460, 540:740])
-        result["asserts"].append(("同一目标连击只有完整小星芒且无碎点", len(single) == 1 and single[0][0] >= 50,
+        result["asserts"].append(("同一目标连击只有四条FPS短线且无碎点", len(single) == 4 and min((size for size, _ in single), default=0) >= 18,
             f"同一目标16次连击后标记面积={single}"))
-        result["asserts"].append(("不同目标才显示多个独立标记", len(triple) == 3 and len(double_kill) == 2,
-            f"三目标命中/两目标击杀完整标记数={len(triple)}/{len(double_kill)}"))
+        result["asserts"].append(("不同目标才增加反馈笔画", len(triple) == 12 and len(double_kill) == 8,
+            f"三目标命中/两目标击杀短线数={len(triple)}/{len(double_kill)}"))
         boxes = [box for _, box in triple]
-        centers = [((x0 + x1) / 2, (y0 + y1) / 2) for x0, y0, x1, y1 in boxes]
-        area = abs(float(np.linalg.det(np.array([[x, y, 1] for x, y in centers])))) if len(centers) == 3 else 0
-        result["asserts"].append(("星芒短小且不排成虚线", len(boxes) == 3 and area > 100 and
+        quadrants = [sum((x0 + x1 > 200) == right and (y0 + y1 > 200) == down
+                         for x0, y0, x1, y1 in boxes) for right in (False, True) for down in (False, True)]
+        result["asserts"].append(("反馈围绕原版准星且保持短小", len(boxes) == 12 and quadrants == [3, 3, 3, 3] and
             all(x1 - x0 + 1 <= 24 and y1 - y0 + 1 <= 24 for x0, y0, x1, y1 in boxes),
-            f"三个独立包围框={boxes}，中心三角形双面积={area:.1f}"))
+            f"每象限笔画数={quadrants}，各笔画包围框={boxes}"))
         delta = feedback_delta(97)[260:460, 540:740]
         r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
         simultaneous = [int(((b > 15) & (b - g > 10) & (b - r > 5)).sum()),

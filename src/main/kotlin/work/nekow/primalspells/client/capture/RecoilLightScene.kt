@@ -83,7 +83,7 @@ object RecoilLightScene {
                     repeat(ConcentratedLight.CHARGE_TICKS){light.status.age=it;light.tick()}
                     record(t,"charge-window-no-premature-shot",light.awaitingRelease && light.status.pos==start && light.status.velocity.length()==0f,"pos=${light.status.pos} awaiting=${light.awaitingRelease}")
                     light.status.age=ConcentratedLight.CHARGE_TICKS;light.tick()
-                    record(t,"release-at-charge-end-with-fast-flight",light.releasedAtAge==ConcentratedLight.CHARGE_TICKS && !light.awaitingRelease && abs(light.status.velocity.length()-6f)<1e-5,"age=${light.releasedAtAge} velocity=${light.status.velocity}")
+                    record(t,"release-at-charge-end-with-fast-flight",light.releasedAtAge==ConcentratedLight.CHARGE_TICKS && !light.awaitingRelease && abs(light.status.velocity.length()-ConcentratedLight.FLIGHT_SPEED)<1e-5,"age=${light.releasedAtAge} velocity=${light.status.velocity}")
                     repeat(30){light.status.age++;light.tick()}
                     record(t,"long-range-over-140-blocks",light.status.pos.distance(start)>140f && light.alive,"distance=${light.status.pos.distance(start)}")
                     light.alive=false;light.die()
@@ -101,7 +101,7 @@ object RecoilLightScene {
                     beam=shot("concentrated_light") as ConcentratedLight;beam!!.maxAge=70;MagicManager.add(beam!!)
                 }
                 if(t==56)record(t,"runtime-charge-stays-visible-at-muzzle",beam!!.awaitingRelease && abs(beam!!.status.pos.z+5)<0.001,"age=${beam!!.status.age} pos=${beam!!.status.pos}")
-                if(t==67)record(t,"runtime-beam-reflects",!beam!!.awaitingRelease && beam!!.status.bounces in 0..4 && abs(beam!!.status.velocity.length()-6f)<1e-5,"age=${beam!!.status.age} remainingBounces=${beam!!.status.bounces} pos=${beam!!.status.pos} velocity=${beam!!.status.velocity}")
+                if(t==62)record(t,"runtime-beam-reflects",!beam!!.awaitingRelease && beam!!.status.bounces in 0..4 && abs(beam!!.status.velocity.length()-ConcentratedLight.FLIGHT_SPEED)<1e-5,"age=${beam!!.status.age} remainingBounces=${beam!!.status.bounces} pos=${beam!!.status.pos} velocity=${beam!!.status.velocity}")
                 if(t==180)MagicManager.projectiles.forEach{it.alive=false}
             },checksAt={ctx,t ->
                 if(t==219){record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}
@@ -133,7 +133,9 @@ object RecoilLightScene {
             tick={ctx,t ->
                 if(t==8)ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,stack)
                 if(t==28)cast=wand.spell(ctx.player)
-                if(t==30){val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand};anchor=p?.status?.pos?.let{Vector3f(it)};direction=p?.launchDirection}
+                if(t==30){val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand};anchor=p?.status?.pos?.let{Vector3f(it)};direction=p?.launchDirection;p?.collisionEnabled=false}
+                // 本场隔离朝向锁定与首人称退场，墙面/护盾反弹由独立场景检查。
+                if(t==41)MagicManager.projectiles.filter{it.wand===wand}.forEach{it.alive=false}
                 if(t==100){ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);ctx.player.inventory.setItem(7,net.minecraft.world.item.ItemStack.EMPTY);MagicManager.projectiles.forEach{it.alive=false}}
             },finish={ctx ->
                 ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);ctx.player.inventory.setItem(7,net.minecraft.world.item.ItemStack.EMPTY)

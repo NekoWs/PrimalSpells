@@ -15,7 +15,8 @@ object FlightTrace {
         if (points.size < 2) return emptyList()
         val lengths = points.zipWithNext { a, b -> a.distanceTo(b) }
         val length = lengths.sum()
-        val count = ceil(length / spacing).toInt().coerceIn(1, 192)
+        // 高速聚光一刻可跨64格，仍保留八分之一格光脊，避免旧上限把激光拉成断续点线。
+        val count = ceil(length / spacing).toInt().coerceIn(1, 4096)
         var segment = 0
         var passed = 0.0
         return (0..count).map { index ->

@@ -34,11 +34,13 @@ object HomingLightScene {
             checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail))
         }
         fun shot(ctx: CaptureDriver.SceneCtx, id: String, start: Vec3, homing: Int = 1,
-                 extras: List<String> = emptyList()): Projectile {
+                 extras: List<String> = emptyList(), flightSpeed: Float? = null): Projectile {
             val p = MagicManager.create(id) as Projectile
             SpellAssembly.apply(p, (List(homing) { "homing" } + extras).map { MagicManager.create(it) as Modifier })
             p.caster = ctx.player; p.wand = Wand("homing-light-$id")
-            p.position = start.toVector3f(); p.velocity = Vector3f(0f, 0f, 1f); p.spell()
+            p.position = start.toVector3f(); p.velocity = Vector3f(0f, 0f, 1f)
+            if (flightSpeed != null) p.speed = flightSpeed / Projectile.LAUNCH_SPEED_SCALE
+            p.spell()
             return p
         }
         return Scene(name, "六格追踪 / 实际弧线路径 / 聚光照明", 24, 150,
@@ -52,6 +54,43 @@ object HomingLightScene {
             }, camera = { _, _ -> Pose(9.0, floor + 12.0, -12.0, 39f, 30f) },
             tick = { ctx, t ->
                 if (t == 8) {
+                    val aimOrigin = Vec3(0.0, floor + 8.0, -8.0)
+                    val rear = ctx.spawnDummy(0.0, floor + 7.0, -9.0)
+                    val ahead = ctx.spawnDummy(0.0, rear.y, -3.0)
+                    val lateral = ctx.spawnDummy(2.5, rear.y, -6.0)
+                    val picker = shot(ctx, "fireball", Vec3(aimOrigin.x, ahead.boundingBox.center.y, aimOrigin.z))
+                    picker.collisionEnabled = false; picker.status.velocity.set(0f, 0f, 0.5f); picker.tick()
+                    record(t, "forward-alignment-beats-nearer-rear-and-side-targets", picker.guidance?.target == ahead.boundingBox.center,
+                        "selected=${picker.guidance?.target} ahead=${ahead.boundingBox.center}")
+                    ahead.discard(); lateral.discard()
+                    picker.tick()
+                    record(t, "rear-only-target-does-not-cause-u-turn", picker.guidance == null && picker.status.velocity.z > 0f,
+                        "guidance=${picker.guidance} velocity=${picker.status.velocity}")
+                    picker.alive = false; picker.die(); rear.discard()
+
+                    val first = ctx.spawnDummy(0.0, floor + 7.0, -4.0)
+                    val second = ctx.spawnDummy(1.5, first.y, 3.0)
+                    val chainStart = Vec3(0.0, first.boundingBox.center.y, -8.0)
+                    val chain = shot(ctx, "concentrated_light", chainStart, extras = listOf("piercing")) as ConcentratedLight
+                    chain.status.age = ConcentratedLight.CHARGE_TICKS; chain.tick()
+                    val contact = chain.flightPath.indexOfFirst { first.boundingBox.inflate(chain.hitRadius).contains(it) }
+                    val join = chain.flightPath.drop((contact - 2).coerceAtLeast(0)).take(12)
+                        .zipWithNext { a, b -> b.subtract(a) }.filter { it.lengthSqr() > 1e-10 }.map { it.normalize() }
+                    val joinAngle = join.zipWithNext().maxOfOrNull { (a, b) -> acos(a.dot(b).coerceIn(-1.0, 1.0)) } ?: 0.0
+                    record(t, "instant-light-pierces-and-seeks-next-target-in-same-tick", first.totalDamage > 0.0 && second.totalDamage > 0.0,
+                        "damage=${first.totalDamage}/${second.totalDamage} speed=${chain.status.velocity.length()}")
+                    record(t, "handoff-preserves-tangent-and-blends-turn-in", contact >= 0 && join.size >= 8 && joinAngle < 0.025,
+                        "contact=$contact maxJoinAngle=$joinAngle")
+                    chain.alive = false; chain.die(); first.discard(); second.discard()
+
+                    val straight = shot(ctx, "concentrated_light", aimOrigin, homing = 0) as ConcentratedLight
+                    straight.collisionEnabled = false; straight.status.age = ConcentratedLight.CHARGE_TICKS; straight.tick()
+                    val trace = FlightTrace.sample(straight, aimOrigin, Vec3(straight.status.pos), 0.125)
+                    record(t, "laser-speed-and-dense-continuous-trace", abs(Vec3(straight.status.pos).distanceTo(aimOrigin) - 64.0) < 0.001 &&
+                        trace.size >= 513 && trace.zipWithNext().all { (a, b) -> a.position.distanceTo(b.position) <= 0.126 },
+                        "distance=${Vec3(straight.status.pos).distanceTo(aimOrigin)} samples=${trace.size}")
+                    straight.alive = false; straight.die()
+
                     for ((range, copies, expected) in listOf(Triple(5.9, 1, true), Triple(6.1, 1, false), Triple(8.0, 2, true))) {
                         val dummy = ctx.spawnDummy(-3.0 + range, floor + 2.0, 1.0)
                         val p = shot(ctx, "fireball", Vec3(-3.0, dummy.boundingBox.center.y, 0.0), copies)
@@ -79,7 +118,7 @@ object HomingLightScene {
                     val sampled = FlightTrace.sample(reference, start, path.last(), 0.125)
                     record(t, "flight-and-light-trace-are-curved", path.maxOf(::chordGap) > 0.25 && sampled.maxOf { chordGap(it.position) } > 0.25,
                         "sweepGap=${path.maxOf(::chordGap)} traceSamples=${sampled.size}")
-                    record(t, "substep-turns-are-continuous-with-speed-conserved", bend < 0.22 && abs(reference.status.velocity.length() - 6f) < 1e-4,
+                    record(t, "substep-turns-are-continuous-with-speed-conserved", bend < 0.22 && abs(reference.status.velocity.length() - ConcentratedLight.FLIGHT_SPEED) < 1e-4,
                         "maxAngle=$bend velocity=${reference.status.velocity}")
                     val blocker = path.map(BlockPos::containing).distinct().firstOrNull { block ->
                         !AABB(block).contains(start) && AABB(block).clip(start, path.last()).isEmpty
@@ -103,7 +142,7 @@ object HomingLightScene {
                         val origin = Vec3(-8.0, floor + 8.0, -6.0)
                         val victim = ctx.spawnDummy(origin.x + offset.x, origin.y + offset.y, origin.z + offset.z)
                         victim.setPos(victim.x, origin.y + offset.y - victim.bbHeight / 2.0, victim.z)
-                        val pierce = shot(ctx, "concentrated_light", origin, extras = listOf("piercing")) as ConcentratedLight
+                        val pierce = shot(ctx, "concentrated_light", origin, extras = listOf("piercing"), flightSpeed = 6f) as ConcentratedLight
                         pierce.status.age = ConcentratedLight.CHARGE_TICKS
                         repeat(16) { if (pierce.alive && victim.totalDamage == 0.0) { pierce.tick(); pierce.status.age++ } }
                         val crossed = victim.totalDamage > 0.0
@@ -135,7 +174,7 @@ object HomingLightScene {
                             // 在未经过的目标上重新制导，不能因跳过旧目标而关闭整个追踪修正。
                             val next = ctx.spawnDummy(origin.x + 1.0, victim.y, origin.z + 5.0)
                             pierce.status.pos.set(origin.x.toFloat(), victim.boundingBox.center.y.toFloat(), (origin.z + 3.0).toFloat())
-                            pierce.status.velocity.set(0f, 0f, 6f)
+                            pierce.status.velocity.set(0f, 0f, ConcentratedLight.FLIGHT_SPEED)
                             repeat(12) { if (pierce.alive && next.totalDamage == 0.0) { pierce.tick(); pierce.status.age++ } }
                             record(t, "piercing-can-seek-another-target", next.totalDamage > 0.0, "damage=${next.totalDamage}")
                             next.discard()

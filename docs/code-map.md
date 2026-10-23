@@ -16,7 +16,7 @@
 | 护盾判定/反射点 | `magic/core/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
 | 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |
 | 爆炸与跨投射物联动 | `magic/effect/lifecycle/{Explosion,ExplosionFx,SpellInteractions,SpellResonance,CrystalReaction}.kt` |
-| 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，不改写命中轨迹 |
+| 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，高速光脊按实际里程采样，不改写命中轨迹 |
 | 普通尾迹/特殊弹本体 | `magic/effect/visual/`；通用造型 `PixelVfx.kt` |
 | 持杖三角形/宝石出生点 | `magic/effect/visual/WandCastingFx.kt`、`wand/WandAim.kt` |
 | 模型/姿势/施法余光 | `client/render/{WandModelProperty,WandHandPose,WandArmPose}.kt`、`tools/wands/generate_models.py` |

@@ -57,6 +57,8 @@ abstract class Projectile: Magic() {
         val target: net.minecraft.world.phys.Vec3,
         val strength: Float,
         val targetBounds: net.minecraft.world.phys.AABB,
+        /** 实际完成的制导里程；换靶从零起接入曲率，预排路径不能提前推进它。 */
+        var travelled: Float = 0f,
     )
     var guidance: Guidance? = null
     /** 本刻真正经过的扫掠点；光束表现沿此路径绘制，不用首尾直线冒充弧形命中。 */

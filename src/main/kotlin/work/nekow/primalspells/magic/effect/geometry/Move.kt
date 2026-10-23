@@ -48,13 +48,15 @@ class Move(
         val movement = Vector3f(status.velocity).mul(scale)
         status.velocity = Vector3f(movement)
         val startPos = Vector3f(status.pos)
-        val path = planFlight(startPos, movement)
+        var plannedGuidance = projectile.guidance
+        var path = planFlight(startPos, movement)
         val newPos = path.lastOrNull()?.position ?: Vector3f(startPos)
         projectile.flightPath += Vec3(startPos)
 
         if (!projectile.collisionEnabled || (throughBlocks && hitRadius <= 0.0)) {
             projectile.flightPath += path.map { Vec3(it.position) }
             path.lastOrNull()?.let { status.velocity = Vector3f(it.velocity) }
+            plannedGuidance?.let { it.travelled = path.lastOrNull()?.guidanceTravel ?: it.travelled }
             status.pos = newPos
             return
         }
@@ -64,8 +66,9 @@ class Move(
         if (level != null) {
             val distance = movement.length()
             if (distance > 0f) {
-                // 弯曲轨迹可能离开首尾包围盒；所有实际子步都参与宽相位。
-                val sweptPath = AABB(
+                // 制导可能在穿透后换靶，宽相位覆盖本刻全部可达范围；普通弹使用实际路径包围盒。
+                val sweptPath = if (plannedGuidance != null) AABB.ofSize(Vec3(startPos),
+                    distance * 2.0, distance * 2.0, distance * 2.0) else AABB(
                     min(startPos.x, path.minOf { it.position.x }).toDouble(),
                     min(startPos.y, path.minOf { it.position.y }).toDouble(),
                     min(startPos.z, path.minOf { it.position.z }).toDouble(),
@@ -94,9 +97,16 @@ class Move(
                 } else emptyList()
 
                 var prevPos = Vector3f(startPos)
-                for (step in path) {
+                var index = 0
+                var travelled = 0f
+                while (index < path.size) {
+                    val step = path[index++]
+                    travelled += step.distance
                     val checkPos = step.position
-                    if (projectile.guidance != null) status.velocity = Vector3f(step.velocity)
+                    if (plannedGuidance != null) {
+                        status.velocity = Vector3f(step.velocity)
+                        plannedGuidance.travelled = step.guidanceTravel
+                    }
                     // 离开枪口所在的施法者碰撞箱后才允许返弹自伤，避免刚出手就撞自己。
                     if (!caster.boundingBox.inflate(hitRadius).contains(Vec3(checkPos))) leftCaster = true
 
@@ -126,7 +136,6 @@ class Move(
                         if (!projectile.alive || !projectile.motionEnabled) return
                     }
 
-                    if (throughBlocks) { prevPos = Vector3f(checkPos); continue }
                     val blockPos = BlockPos(
                         floor(checkPos.x).toInt(),
                         floor(checkPos.y).toInt(),
@@ -134,7 +143,7 @@ class Move(
                     )
                     val state = level.getBlockState(blockPos)
                     val shape = state.getCollisionShape(level, blockPos)
-                    if (!shape.isEmpty) {
+                    if (!throughBlocks && !shape.isEmpty) {
                         val rx = (checkPos.x - blockPos.x).toDouble()
                         val ry = (checkPos.y - blockPos.y).toDouble()
                         val rz = (checkPos.z - blockPos.z).toDouble()
@@ -156,23 +165,34 @@ class Move(
                         }
                     }
                     prevPos = Vector3f(checkPos)
+                    if (projectile.guidance !== plannedGuidance) {
+                        // 穿透当刻换靶，保留当前切线与全速，只重排剩余路程；宽相位已覆盖任意转向。
+                        plannedGuidance = projectile.guidance
+                        path = planFlight(checkPos, status.velocity, (distance - travelled).coerceAtLeast(0f))
+                        index = 0
+                    }
                 }
+                status.pos = prevPos
+                return
             }
         }
         status.pos = newPos
     }
 
-    private data class FlightStep(val position: Vector3f, val velocity: Vector3f)
+    private data class FlightStep(val position: Vector3f, val velocity: Vector3f,
+        val distance: Float, val guidanceTravel: Float)
 
     /** 保持本刻路程和速度，按曲率限幅逐子步转向；中点方向积分使前后切线连续。 */
-    private fun planFlight(start: Vector3f, movement: Vector3f): List<FlightStep> {
-        val distance = movement.length()
-        if (!distance.isFinite() || distance <= 0f) return emptyList()
+    private fun planFlight(start: Vector3f, movement: Vector3f, distance: Float = movement.length()): List<FlightStep> {
+        val speed = movement.length()
+        if (!distance.isFinite() || distance <= 0f || speed <= 0f) return emptyList()
         val steps = maxOf(1, ceil(distance / (1f / 16)).toInt())
-        val heading = Vector3f(movement).div(distance)
+        val heading = Vector3f(movement).div(speed)
         val position = Vector3f(start)
         val guidance = projectile.guidance
         val arrival = guidance?.targetBounds?.inflate(hitRadius)
+        var guidanceTravel = guidance?.travelled ?: 0f
+        val blendDistance = guidance?.target?.distanceTo(Vec3(start))?.times(0.25)?.coerceIn(0.2, 1.5) ?: 1.5
         var arrived = false
         return (1..steps).map { index ->
             val step = min(index / 16f, distance) - min((index - 1) / 16f, distance)
@@ -191,14 +211,17 @@ class Move(
                         val turnStrength = guidance.strength * (1f + precision * (2f / 3f))
                         val radius = (remaining * 0.6f).coerceIn(0.3f, 4f) / turnStrength
                         // 极多复制修正也不能在单个子步翻转180度，避免中点方向退化为零。
-                        val fraction = (min(step / radius, 0.2f) / angle).coerceIn(0f, 1f)
+                        val blend = (guidanceTravel / blendDistance).coerceIn(0.0, 1.0).toFloat()
+                        val ease = blend * blend * (3f - 2f * blend)
+                        val fraction = (min(step / radius * ease, 0.2f) / angle).coerceIn(0f, 1f)
                         Quaternionf().slerp(Quaternionf().rotationTo(heading, aim), fraction).transform(next).normalize()
                     }
                 }
             }
             position.add(Vector3f(heading).add(next).normalize().mul(step))
             heading.set(next)
-            FlightStep(Vector3f(position), Vector3f(heading).mul(distance))
+            guidanceTravel += step
+            FlightStep(Vector3f(position), Vector3f(heading).mul(speed), step, guidanceTravel)
         }
     }
 

@@ -37,6 +37,7 @@ object HudSawScene {
         var floor = 0
         var wand: Wand? = null
         var target: LivingEntity? = null
+        val burstTargets = arrayListOf<LivingEntity>()
         var attacker: work.nekow.primalspells.entity.TestDummyEntity? = null
         var oldLayout: HudLayout? = null
         fun record(t: Int, id: String, ok: Boolean, detail: String) {
@@ -55,6 +56,7 @@ object HudSawScene {
                 val width = mc.window.guiScaledWidth; val height = mc.window.guiScaledHeight
                 if (t == 0) { oldLayout = HudSettings.current.duplicate(); HudSettings.save(HudLayout(damageDirection = true)) }
                 if (t == 3) {
+                    checks.getOrPut(t) { arrayListOf() }.addAll(HudImpactChecks.run(name, t))
                     val sample = SyncWandStatsPayload("fps-hud", 68.0, 100.0, 4.0, 12.0, 1, 8.0, 24.0, 0.0, 8.0, 24.0, 6)
                     fun run(step: Double): WandHudFrame {
                         WandHudRenderer.clear(); WandHudRenderer.frame(sample, 0.0)
@@ -84,8 +86,15 @@ object HudSawScene {
                 }
                 if (t == 57 || t == 62) {
                     val f = WandHudRenderer.snapshot()
-                    record(t, "accepted-damage-reaches-hud-$t", f != null && if (t == 57) f.hit > 0 else
-                        f.killAlpha > 0, "frame=$f")
+                    record(t, "accepted-damage-reaches-hud-$t", f != null && f.impacts.any {
+                        it.killed == (t == 62) && it.alpha > 0
+                    }, "frame=$f")
+                }
+                if (t == 95 || t == 98) {
+                    val events = WandHudRenderer.snapshot()?.impacts.orEmpty()
+                    record(t, "real-same-tick-damage-preserves-each-feedback-$t",
+                        events.count { !it.killed } == 3 && events.count { it.killed } == if (t == 95) 0 else 2,
+                        "events=$events")
                 }
                 if (t == 70 || t == 77) {
                     val f = WandHudRenderer.snapshot()
@@ -200,15 +209,30 @@ object HudSawScene {
                     active.spell(ctx.player)
                 }
                 if (t == 90) requireNotNull(wand).status.mana = 100.0
+                if (t == 93) {
+                    repeat(3) { i ->
+                        EntityTypes.COW.create(ctx.level, EntitySpawnReason.COMMAND)?.also {
+                            it.setPos(15.0 + i * 2, floor + 1.0, 8.0); it.isNoAi = true
+                            ctx.level.addFreshEntity(it); burstTargets += it
+                        }
+                    }
+                    record(t, "real-three-hits-in-one-tick", burstTargets.size == 3 && burstTargets.all {
+                        SpellImpact.hurt(ctx.level, it, ctx.player, 2.0, Vec3.ZERO)
+                    }, "targets=${burstTargets.size}")
+                }
+                if (t == 96) record(t, "real-two-kills-in-one-tick", burstTargets.take(2).count {
+                    SpellImpact.hurt(ctx.level, it, ctx.player, 100.0, Vec3.ZERO) && !it.isAlive
+                } == 2, "kills=2")
                 if (t == 130) {
                     target?.discard()
+                    burstTargets.forEach { it.discard() }
                     attacker?.discard()
                     ctx.player.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY)
                     ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == 199) record(t, "hud-scene-cleans-world-effects", ParticleManager.of(ctx.level).getEngine().particleCount() == 0 &&
                     ProjectileRuntime.projectiles.isEmpty(), "particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
-            }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> target?.discard(); attacker?.discard(); ctx.command("difficulty peaceful"); Minecraft.getInstance().execute {
+            }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> target?.discard(); burstTargets.forEach { it.discard() }; attacker?.discard(); ctx.command("difficulty peaceful"); Minecraft.getInstance().execute {
                 Minecraft.getInstance().gui.setScreen(null); oldLayout?.let { HudSettings.save(it) }; WandHudRenderer.clear()
             } })
     }
@@ -228,7 +252,7 @@ object HudSawScene {
                 ctx.setup(true, 0.0, floor + 3.0, -4.0, 0f, 8f)
                 ctx.command("gamemode spectator @a")
                 caster = ctx.spawnDummy(-8.0, floor + 1.0, -5.0)
-            }, camera = { _, _ -> Pose(shot?.status?.pos?.x?.toDouble() ?: 0.0, floor + 3.0, -4.0, 0f, 8f) }, tick = { ctx, t ->
+            }, camera = { _, _ -> Pose(shot?.status?.pos?.x ?: 0.0, floor + 3.0, -4.0, 0f, 8f) }, tick = { ctx, t ->
                 fun record(id: String, ok: Boolean, detail: String) { checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail)) }
                 if (t == 10) {
                     shot = (SpellRegistry.create("sawblade") as Projectile).also {

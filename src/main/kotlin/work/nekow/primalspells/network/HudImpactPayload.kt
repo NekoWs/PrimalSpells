@@ -6,7 +6,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
 import work.nekow.primalspells.PrimalSpells
 
-/** 服务端确认的法术命中/击杀，只发送给施法玩家；客户端每刻合并显示。 */
+/** 服务端确认的一次法术命中或击杀，只发送给施法玩家；客户端逐次独立显示。 */
 data class HudImpactPayload(val killed: Boolean) : CustomPacketPayload {
     companion object {
         val ID = CustomPacketPayload.Type<HudImpactPayload>(Identifier.fromNamespaceAndPath(PrimalSpells.MODID, "hud_impact"))

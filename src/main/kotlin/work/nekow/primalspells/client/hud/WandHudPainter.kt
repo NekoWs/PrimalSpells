@@ -10,8 +10,7 @@ data class WandHudFrame(
     val delayProgress: Double = 1.0, val rechargeProgress: Double = 1.0,
     val manaBlocked: Boolean = false, val presence: Double = 1.0,
     val delayAlpha: Double = 0.0, val rechargeAlpha: Double = 0.0,
-    val hit: Double = 0.0, val killAlpha: Double = 0.0,
-    val killDraw: Double = 1.0, val killSpread: Double = 0.0,
+    val impacts: List<HudImpactFrame> = emptyList(),
     val hurtAngle: Double? = null, val hurtAlpha: Double = 0.0,
 )
 
@@ -100,33 +99,31 @@ object WandHudPainter {
         val cx = 45; val cy = 29
         // 原版准星占中心15×15GUI像素；缩小反馈时也保留至少两像素空隙。
         val inner = ceil(10 / scale).toInt()
-        val kill = f.killAlpha * f.presence
-        val hit = if (f.killAlpha > 0.003) 0.0 else f.hit * f.presence
-        // 短尖芒内侧两像素、外端一像素；保留准星空隙，不叠加描边。
-        if (hit > 0.003) {
-            val reach = inner + 3
-            val offset = (2 * (1 - f.hit)).roundToInt()
-            for (sign in listOf(-1, 1)) for (d in inner..reach) {
-                val color = if (d == inner) WHITE else PURPLE
-                val thickness = if (d < inner + 2) 2 else 1
-                rect(g, cx + sign * (d + offset), cy, 1, thickness, color, hit)
-                rect(g, cx, cy + sign * (d + offset), thickness, 1, color, hit)
-            }
-            for (sign in listOf(-1, 1)) {
-                rect(g, cx + sign * (reach + offset + 3), cy, 1, 1, PURPLE, hit)
-                rect(g, cx, cy + sign * (reach + offset + 3), 1, 1, PURPLE, hit)
-            }
-        }
-        // 击杀只显示红色斜十字，不显示数字或连杀计数。
-        if (kill > 0.003) {
-            val end = inner - 1 + floor(4 * f.killDraw).toInt()
-            val offset = (9 * f.killSpread).roundToInt()
-            for (sx in listOf(-1, 1)) for (sy in listOf(-1, 1)) for (d in inner..end) {
-                val thickness = if (d < inner + 2) 2 else 1
-                // 厚端沿斜向对称落位，最外两格保持单像素尖端。
-                rect(g, cx + sx * (d + offset) - if (sx < 0) thickness - 1 else 0,
-                    cy + sy * (d + offset) - if (sy < 0) thickness - 1 else 0, thickness, thickness,
-                    if (d == inner) 0xFFFFB1BA.toInt() else 0xFFFF4B64.toInt(), kill)
+        // 三条短径向轨道，更多并发沿切向交错；位置出生即固定，不挤走旧动画。
+        for (impact in f.impacts) {
+            val alpha = impact.alpha * f.presence
+            val group = impact.slot / 3
+            val tangent = (group + 1) / 2 * 3 * if (group % 2 == 0) -1 else 1
+            val start = inner + impact.slot % 3 * 5 + (4 * impact.spread).roundToInt()
+            val length = ceil(4 * impact.draw).toInt()
+            for (arm in 0..3) for (step in 0 until length) {
+                val d = start + step
+                val thickness = if (step < 2) 2 else 1
+                val sx = if (arm < 2) 1 else -1
+                val sy = if (arm % 2 == 0) 1 else -1
+                val (x, y) = if (impact.killed) sx * d + sy * tangent to sy * d - sx * tangent
+                    else when (arm) {
+                        0 -> d to tangent; 1 -> -tangent to d
+                        2 -> -d to -tangent; else -> tangent to -d
+                    }
+                val color = if (impact.killed) {
+                    if (step == 0) 0xFFFFB1BA.toInt() else 0xFFFF4B64.toInt()
+                } else if (step == 0) WHITE else PURPLE
+                // 每臂只有连续的短尖芒，无独立碎点、外框或光晕。
+                val width = if (impact.killed || arm % 2 == 1) thickness else 1
+                val height = if (impact.killed || arm % 2 == 0) thickness else 1
+                rect(g, cx + x - if (x < 0) width - 1 else 0,
+                    cy + y - if (y < 0) height - 1 else 0, width, height, color, alpha)
             }
         }
         // 受击弧位于外圈；折线缺口与晶齿保留像素魔法感。

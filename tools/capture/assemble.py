@@ -514,6 +514,27 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             rgb = np.asarray(Image.open(tick_frames[t]).convert("RGB"), dtype=np.int16)
             r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
             return ((r > 150) & (g < 145) & (b > 40) & (r - b > 60)) if red else ((r > 100) & (b > 170) & (b - r > 20) & (b - g > 35))
+        baseline = np.asarray(Image.open(tick_frames[54]).convert("RGB"), dtype=np.int16)
+        def feedback_delta(t):
+            # 同一机位的空场相减，退场末段不能用峰值色阈值误判为已消失。
+            return np.asarray(Image.open(tick_frames[t]).convert("RGB"), dtype=np.int16) - baseline
+        def components(mask):
+            pending = set(zip(*np.where(mask)))
+            sizes = []
+            while pending:
+                stack = [pending.pop()]
+                size = 0
+                while stack:
+                    y, x = stack.pop()
+                    size += 1
+                    for dy in (-1, 0, 1):
+                        for dx in (-1, 0, 1):
+                            point = y + dy, x + dx
+                            if point in pending:
+                                pending.remove(point)
+                                stack.append(point)
+                sizes.append(size)
+            return sizes
         idle = [int(feedback_mask(t)[300:420, 580:700].sum()) for t in (24, 27, 39)]
         hit = max(int(feedback_mask(t)[310:410, 590:690].sum()) for t in (56, 57, 58))
         kill = feedback_mask(62, red=True)
@@ -530,14 +551,41 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             f"右/左/前向红色覆盖={right}/{left}/{front}"))
         # 前半程描出笔画，后半程径向移走，验证实际像素而不是只读取动画参数。
         radii = []
-        for t in (61, 62, 64):
-            ys, xs = np.where(feedback_mask(t, red=True)[300:420, 580:700])
+        for t in (61, 64, 66):
+            delta = feedback_delta(t)[300:420, 580:700]
+            r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
+            ys, xs = np.where((r > 15) & (r - g > 10) & (r - b > 10))
             radii.append(int(np.max(np.maximum(np.abs(xs - 60), np.abs(ys - 60)))) if len(xs) else 0)
         result["asserts"].append(("击杀从中心画出并向外散开", 0 < radii[0] < radii[1] < radii[2], f"斜十字半径={radii}"))
         protected = [int((feedback_mask(t) | feedback_mask(t, red=True))[336:384, 616:664].sum())
-                     for t in range(56, 70)]
+                     for t in (*range(56, 70), *range(94, 100))]
         result["asserts"].append(("命中和击杀与原版准星留空", max(protected) == 0,
             f"准星外围保护区最大彩色像素={max(protected)}"))
+        single = components(feedback_mask(57)[260:460, 540:740])
+        triple = components(feedback_mask(95)[260:460, 540:740])
+        double_kill = components(feedback_mask(98, red=True)[260:460, 540:740])
+        result["asserts"].append(("命中无消散碎点", len(single) == 4 and min(single, default=0) >= 18,
+            f"单次命中四臂连通面积={single}"))
+        result["asserts"].append(("同刻多目标各有独立可见星芒", len(triple) == 12 and len(double_kill) == 8,
+            f"三次命中/两次击杀笔画数量={len(triple)}/{len(double_kill)}"))
+        delta = feedback_delta(97)[260:460, 540:740]
+        r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
+        simultaneous = [int(((b > 15) & (b - g > 10) & (b - r > 5)).sum()),
+                        int(((r > 15) & (r - g > 10) & (r - b > 10)).sum())]
+        result["asserts"].append(("击杀不遮掉其它命中", min(simultaneous) >= 50,
+            f"同时在场紫色/红色像素={simultaneous}"))
+        energy = []
+        for t in range(61, 68):
+            delta = feedback_delta(t)[260:460, 540:740]
+            energy.append(int(np.maximum(delta[..., 0] - delta[..., 2], 0).sum()))
+        peak = max(energy)
+        first95 = next((i for i, v in enumerate(energy) if v <= peak * 0.95), len(energy))
+        first5 = next((i for i, v in enumerate(energy) if v <= peak * 0.05), len(energy))
+        span = first5 - first95
+        drop = max((a - b) / max(peak, 1) for a, b in zip(energy, energy[1:]))
+        prezero = energy[-2] / max(peak, 1)
+        result["asserts"].append(("击杀笔画连续淡出到零", 3 <= span <= 10 and drop <= 0.35 and prezero <= 0.1 and energy[-1] == 0,
+            f"原生红色能量={energy}，95→5%跨度={span}帧，最大损失={drop:.1%}，清零前={prezero:.1%}"))
 
     if scene == "new_spells":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}

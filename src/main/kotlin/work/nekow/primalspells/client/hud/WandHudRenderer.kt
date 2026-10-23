@@ -26,10 +26,7 @@ object WandHudRenderer {
     private var hurtAlpha = 0.0
     private var displayedMana = 0.0
     private var lastFrame: WandHudFrame? = null
-    private var hitAt = -1000.0
-    private var killAt = -1000.0
-    private var hitUntil = -1000.0
-    private var killUntil = -1000.0
+    private val impacts = HudImpactAnimations()
 
     /** tooltip与录制检查共用的服务端快照。 */
     fun getStats(wandId: String) = statsMap[wandId]
@@ -37,22 +34,13 @@ object WandHudRenderer {
     fun snapshot(): WandHudFrame? = lastFrame
     /** 网络入口记录本地接收时间，冷却子帧外推不会依赖包发送频率。 */
     fun putStats(payload: SyncWandStatsPayload) { statsMap[payload.wandId] = payload; received[payload.wandId] = clock() }
-    /** 真正接受的法术伤害回报；每刻多次命中合并成一个有限标记。 */
-    fun impact(killed: Boolean) {
-        val now = clock()
-        if (now >= hitUntil) hitAt = now
-        hitUntil = now + 6
-        if (killed) {
-            if (now >= killUntil) { killAt = now; killUntil = now + 10 }
-            // 已散开的笔画继续离场；不能延长结束时间把它们瞬间拉回中心。
-            else if (killUntil - now >= 6) killUntil = now + 10
-        }
-    }
+    /** 真正接受的法术伤害回报；每次通知独立播放，不覆盖或延长其它反馈。 */
+    fun impact(killed: Boolean) { impacts.add(killed, clock()) }
     /** 退出世界时清缓存与动画，不清本机布局。 */
     fun clear() {
         statsMap.clear(); received.clear(); identity = null; lastTime = Double.NaN; lastFrame = null
         presence = 0.0; delayAlpha = 0.0; rechargeAlpha = 0.0; hurtAlpha = 0.0
-        hitAt = -1000.0; killAt = -1000.0; hitUntil = -1000.0; killUntil = -1000.0
+        impacts.clear()
     }
     private fun clock(): Double {
         val mc = Minecraft.getInstance()
@@ -77,10 +65,11 @@ object WandHudRenderer {
         }
         fun approach(value: Double, target: Double, ticks: Double) = value + (target - value) * (1 - exp(-dt / ticks))
         presence = approach(presence, if (s != null) 1.0 else 0.0, 1.3)
+        val feedback = impacts.sample(now).takeIf { HudSettings.current.hitFeedback } ?: emptyList()
         if (s == null) {
             val previous = lastFrame ?: return null
             if (presence < 0.01) { identity = null; lastFrame = null; return null }
-            return previous.copy(presence = presence).also { lastFrame = it }
+            return previous.copy(presence = presence, impacts = feedback).also { lastFrame = it }
         }
         val elapsed = (now - (received[s.wandId] ?: now)).coerceIn(0.0, 20.0)
         val delay = max(0.0, s.currentDelay - elapsed)
@@ -93,14 +82,10 @@ object WandHudRenderer {
         val settings = HudSettings.current
         val player = Minecraft.getInstance().player
         hurtAlpha = approach(hurtAlpha, (player?.hurtTime ?: 0) / 10.0, 0.8)
-        fun pulse(start: Double, end: Double): Double = min((now - start) / 0.6, (end - now) / 2).coerceIn(0.0, 1.0)
         return WandHudFrame(displayedMana.coerceIn(0.0, s.maxMana.coerceAtLeast(0.0)), s.maxMana,
             delay, recharge, progress(delay, s.lastDelay), progress(recharge, s.lastRecharge),
             manaBlocked = s.manaBlocked, presence = presence, delayAlpha = delayAlpha, rechargeAlpha = rechargeAlpha,
-            hit = if (settings.hitFeedback) pulse(hitAt, hitUntil) else 0.0,
-            killAlpha = if (settings.hitFeedback) min((now - killAt) / 0.6, (killUntil - now) / 6).coerceIn(0.0, 1.0) else 0.0,
-            killDraw = ((now - killAt) / 2).coerceIn(0.0, 1.0),
-            killSpread = (1 - (killUntil - now) / 6).coerceIn(0.0, 1.0),
+            impacts = feedback,
             hurtAngle = if (settings.damageDirection && player != null) Math.toRadians(player.hurtDir.toDouble() - 180) else null,
             hurtAlpha = hurtAlpha,
         ).also { lastFrame = it }

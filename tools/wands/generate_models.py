@@ -13,13 +13,20 @@ OUT = ASSETS / 'models/item'
 GRIP_SOURCE = ROOT / 'src/main/kotlin/work/nekow/primalspells/wand/WandGrip.kt'
 TEXTURE = 'primalspells:item/wand_dusk'
 PALETTE = {
-    'obsidian': (39, 34, 48), 'edge': (61, 51, 75),
-    'ivory': (221, 215, 203), 'ivory_edge': (165, 156, 155),
-    'gold': (168, 136, 73), 'grip': (71, 43, 83), 'wrap': (91, 57, 103),
-    'gem': (142, 63, 222), 'gem_light': (215, 147, 255), 'gem_dark': (75, 28, 125),
-    'rune': (194, 124, 249),
+    'obsidian': (38, 33, 47), 'edge': (77, 65, 91),
+    'ivory': (222, 210, 193), 'ivory_edge': (154, 143, 143), 'ivory_light': (249, 239, 218),
+    'gold': (190, 151, 83), 'gold_light': (241, 214, 154), 'gold_dark': (102, 76, 42),
+    'grip': (65, 35, 77), 'wrap': (100, 58, 115),
+    'gem': (146, 49, 221), 'gem_light': (206, 130, 255), 'gem_dark': (79, 22, 135),
+    'gem_core': (233, 185, 255), 'gem_vein': (255, 228, 255),
+    'rune': (189, 112, 248),
 }
 TILES = {name: i for i, name in enumerate(PALETTE)}
+ATLAS_SIZE = 128
+TILE_SIZE = 16
+ATLAS_COLUMNS = ATLAS_SIZE // TILE_SIZE
+MODEL_YAW = -20
+
 
 
 def grip_constant(name):
@@ -35,9 +42,13 @@ class Mesh:
         self.lines = ['# Dusk seal wand; sixteen model units per block', 'mtllib wand.mtl']
         self.vertices = 0
         self.faces = 0
+        self.groups = {}
 
     def group(self, name):
-        self.lines.append('g ' + name)
+        # NeoForge按组名建立部件表；重复束环/封印片不能覆盖同名的前一块。
+        index = self.groups.get(name, 0)
+        self.groups[name] = index + 1
+        self.lines.append(f'g {name}_{index}')
 
     def face(self, points, material):
         # 极点/封盖用真实三角形，不把重复顶点写成退化四边形。
@@ -53,34 +64,34 @@ class Mesh:
         if length < 1e-8:
             return
         normal = [c/length for c in normal]
+        # 亮态仍使用同一块基底UV，不能在施法时跳到另一种材质纹理。
         tile = TILES.get(material.split('_glow')[0], TILES['gem'])
-        # 发光材质共享原宝石贴图，只改变材质色阶。
-        if material.startswith('gem_glow'):
-            tile = TILES['gem' + ('_light' if material.endswith('_light') else '_dark' if material.endswith('_dark') else '')]
-        x, y = tile % 4, tile // 4
+        x, y = tile % ATLAS_COLUMNS, tile // ATLAS_COLUMNS
         uv = [(0, 1), (1, 1), (1, 0), (0, 0)]
         self.lines.append('usemtl ' + material)
         for point, (a, b) in zip(points, uv):
             self.lines += [
                 'v ' + ' '.join(f'{c/16:.7f}' for c in point),
-                f'vt {(x*16+0.5+a*15)/64:.7f} {1-(y*16+0.5+b*15)/64:.7f}',
+                f'vt {(x*TILE_SIZE+0.5+a*(TILE_SIZE-1))/ATLAS_SIZE:.7f} {1-(y*TILE_SIZE+0.5+b*(TILE_SIZE-1))/ATLAS_SIZE:.7f}',
                 'vn ' + ' '.join(f'{c:.7f}' for c in normal),
             ]
         self.lines.append('f ' + ' '.join(f'{self.vertices+j+1}/{self.vertices+j+1}/{self.vertices+j+1}' for j in range(len(points))))
         self.vertices += len(points)
         self.faces += 1
 
-    def lathe(self, name, profile, material, sides=8, cx=8, cz=8, rotation=0):
+    def lathe(self, name, profile, material, sides=8, cx=8, cz=8, rotation=0, trim=None):
         self.group(name)
         for (y0, r0), (y1, r1) in zip(profile, profile[1:]):
             for j in range(sides):
                 a, b = (j+.5)*math.tau/sides+rotation, (j+1.5)*math.tau/sides+rotation
                 mat = [material, material+'_light', material, material+'_dark'][j % 4] if material == 'gem' or material.startswith('gem_glow') else material
+                if trim and r0 > 0 and r1 > 0 and r0 != r1:
+                    mat = trim
                 self.face([(cx+r*math.cos(t), y, cz+r*math.sin(t))
                            for y, r, t in [(y0,r0,a),(y1,r1,a),(y1,r1,b),(y0,r0,b)]], mat)
 
-    def prism(self, name, polygon, front, back, material, edge=None, tilt=0, pivot=(8, 0), yaw=0):
-        """有厚度的平面轮廓；凹多边形耳切，保持托架内侧与外侧面法线一致。"""
+    def prism(self, name, polygon, front, back, material, edge=None, tilt=0, pivot=(8, 0), yaw=0, bevel=0, rim=None):
+        """封闭挤出并切出真实倒角；凹轮廓先内缩，随后对端面耳切。"""
         self.group(name)
         polygon = list(polygon)
         area = sum(a[0]*b[1]-b[0]*a[1] for a,b in zip(polygon, polygon[1:]+polygon[:1]))
@@ -96,27 +107,42 @@ class Mesh:
             dz = z-8
             return (pivot[0]+x*math.cos(yaw)+dz*math.sin(yaw), y+pivot[1], 8-x*math.sin(yaw)+dz*math.cos(yaw))
 
-        indices = list(range(len(polygon)))
-        while len(indices) > 3:
-            for i, b in enumerate(indices):
-                a, c = indices[i-1], indices[(i+1) % len(indices)]
-                if cross(polygon[a],polygon[b],polygon[c]) <= 1e-9:
+        def inset(points, distance):
+            result=[]
+            for i,b in enumerate(points):
+                a,c=points[i-1],points[(i+1)%len(points)]
+                u=(b[0]-a[0],b[1]-a[1]);v=(c[0]-b[0],c[1]-b[1])
+                ul,vl=math.hypot(*u),math.hypot(*v)
+                n0=(-u[1]/ul,u[0]/ul);n1=(-v[1]/vl,v[0]/vl)
+                denom=1+n0[0]*n1[0]+n0[1]*n1[1]
+                if denom < 1e-6:
+                    raise ValueError('Invalid bevel corner: '+name)
+                result.append((b[0]+distance*(n0[0]+n1[0])/denom,b[1]+distance*(n0[1]+n1[1])/denom))
+            return result
+
+        cap=inset(polygon,bevel) if bevel else polygon
+        indices=list(range(len(cap)))
+        triangles=[]
+        while len(indices)>3:
+            for i,b in enumerate(indices):
+                a,c=indices[i-1],indices[(i+1)%len(indices)]
+                if cross(cap[a],cap[b],cap[c])<=1e-9:
                     continue
-                if any(all(cross(polygon[u],polygon[v],polygon[p]) >= -1e-9 for u,v in [(a,b),(b,c),(c,a)])
-                       for p in indices if p not in (a,b,c)):
+                if any(all(cross(cap[u],cap[v],cap[p])>=-1e-9 for u,v in [(a,b),(b,c),(c,a)]) for p in indices if p not in (a,b,c)):
                     continue
-                tri = [polygon[a],polygon[b],polygon[c]]
-                self.face([transform(p,front) for p in reversed(tri)],material)
-                self.face([transform(p,back) for p in tri],material)
-                indices.pop(i)
-                break
+                triangles.append((a,b,c));indices.pop(i);break
             else:
-                raise ValueError('Invalid polygon: ' + name)
-        tri = [polygon[i] for i in indices]
-        self.face([transform(p,front) for p in reversed(tri)],material)
-        self.face([transform(p,back) for p in tri],material)
-        for a,b in zip(polygon,polygon[1:]+polygon[:1]):
-            self.face([transform(a,front),transform(b,front),transform(b,back),transform(a,back)],edge or material)
+                raise ValueError('Invalid polygon: '+name)
+        triangles.append(tuple(indices))
+        for tri in triangles:
+            self.face([transform(cap[i],front) for i in reversed(tri)],material)
+            self.face([transform(cap[i],back) for i in tri],material)
+        for i,a in enumerate(polygon):
+            j=(i+1)%len(polygon);b=polygon[j]
+            self.face([transform(a,front+bevel),transform(b,front+bevel),transform(b,back-bevel),transform(a,back-bevel)],edge or material)
+            if bevel:
+                self.face([transform(a,front+bevel),transform(cap[i],front),transform(cap[j],front),transform(b,front+bevel)],rim or material)
+                self.face([transform(a,back-bevel),transform(b,back-bevel),transform(cap[j],back),transform(cap[i],back)],rim or material)
 
     def plate(self, name, cx, cy, width, height, depth, material, **kwargs):
         b = min(width, height) * .18
@@ -129,88 +155,137 @@ class Mesh:
 
 
 def create_texture():
-    # 16px一块材质，粗颗粒、固定色阶；不使用照片、噪点渐变或半透明。
-    image = Image.new('RGBA', (64,64), (255,255,255,255))
-    draw = ImageDraw.Draw(image)
-    rng = random.Random(9471)
-    for name, index in TILES.items():
-        ox, oy = index % 4 * 16, index // 4 * 16
-        if name.startswith('gem'):
-            for y in range(0,16,4):
-                for x in range(0,16,4):
-                    gray = [207,231,255][((x//4)+(y//4)*2) % 3]
-                    draw.rectangle((ox+x,oy+y,ox+x+3,oy+y+3),fill=(gray,gray,gray,255))
-        elif name == 'rune':
-            # 小方印整体浮刻，几何负责轮廓，纹理保持纯色清晰。
-            draw.rectangle((ox,oy,ox+15,oy+15),fill=(255,255,255,255))
-        else:
-            base = 245 if name in ('ivory','ivory_edge','gold') else 235
-            draw.rectangle((ox,oy,ox+15,oy+15),fill=(base,base,base,255))
-            for _ in range(12):
-                x,y=rng.randrange(0,14,2),rng.randrange(0,14,2)
-                gray = rng.choice([211,225,255])
-                draw.rectangle((ox+x,oy+y,ox+x+1,oy+y+1),fill=(gray,gray,gray,255))
+    # 材质各有自己的大色块结构；亮边由造型和明确色阶承担，不用统一棋盘噪点。
+    image=Image.new('RGBA',(ATLAS_SIZE,ATLAS_SIZE),(255,255,255,255))
+    draw=ImageDraw.Draw(image)
+    rng=random.Random(9471)
+    for name,index in TILES.items():
+        ox,oy=index%ATLAS_COLUMNS*TILE_SIZE,index//ATLAS_COLUMNS*TILE_SIZE
+        def rect(box,gray):
+            draw.rectangle(tuple(v+(ox if i%2==0 else oy) for i,v in enumerate(box)),fill=(gray,gray,gray,255))
+        def polygon(points,gray):
+            draw.polygon([(ox+x,oy+y) for x,y in points],fill=(gray,gray,gray,255))
+        rect((0,0,15,15),245)
+        if name=='gem_vein':
+            rect((0,0,15,15),255)
+        elif name=='gem_core':
+            rect((0,0,15,15),248)
+            polygon([(0,0),(8,0),(3,15),(0,15)],255)
+            polygon([(8,0),(15,8),(15,15),(3,15)],240)
+        elif name.startswith('gem'):
+            rect((0,0,15,15),212)
+            polygon([(0,0),(8,0),(4,9),(0,15)],252)
+            polygon([(8,0),(15,0),(15,11),(4,9)],232)
+            polygon([(4,9),(15,11),(15,15),(0,15)],180)
+        elif name.startswith('ivory'):
+            rect((0,0,15,1),255);rect((0,2,1,15),252)
+            rect((2,13,15,15),211);rect((13,2,15,12),224)
+            for _ in range(7):
+                x,y=rng.randrange(2,12,2),rng.randrange(3,12,2)
+                rect((x,y,x+1,y+1),rng.choice([218,229,252]))
+        elif name.startswith('gold'):
+            rect((0,0,15,2),255);rect((0,3,15,4),239)
+            rect((0,11,15,12),207);rect((0,13,15,15),180)
+        elif name in ('grip','wrap'):
+            rect((0,0,15,2),255);rect((0,13,15,15),187)
+            polygon([(0,7),(0,10),(15,3),(15,0)],220)
+        elif name!='rune':
+            rect((0,0,2,15),255);rect((13,0,15,15),184)
+            rect((4,0,5,15),233);rect((0,13,15,15),213)
     target=ASSETS/'textures/item/wand_dusk.png'
     target.parent.mkdir(parents=True,exist_ok=True)
     image.save(target)
+
+
+def binding(mesh,name,y,radius=.95):
+    mesh.lathe(name,[(y,0),(y,radius-.14),(y+.10,radius),(y+.37,radius),(y+.48,radius-.14),(y+.48,0)],'gold',trim='gold_light')
+    mesh.lathe(name+'_dark_seam',[(y+.18,radius+.005),(y+.25,radius+.005)],'gold_dark')
 
 
 def static_body():
     mesh=Mesh()
     mesh.lathe('obsidian_spine',[(-3,0),(-2.5,.6),(7,.6),(8,.7),(18.8,.6),(19.2,0)],'obsidian')
     mesh.lathe('plum_grip',[(0,0),(0,.8),(.4,.88),(5.9,.88),(6.4,.8),(6.4,0)],'grip')
-    for y in (0,6.4,8.8,18.6):
-        mesh.lathe('muted_gold_binding',[(y,0),(y,.95),(y+.28,.95),(y+.45,.73),(y+.45,0)],'gold')
-    for y in (1.2,2.5,3.8,5.1):
-        mesh.lathe('wide_grip_wrap',[(y,.88),(y+.28,.96),(y+.48,.88)],'wrap')
-    mesh.lathe('pommel_socket',[(-2.7,0),(-2.7,.84),(-1.8,.84),(-1.8,0)],'gold')
-    # 下端反向短封印：小紫晶嵌入黑曜斜切尾锥，呼应杖首。
-    mesh.prism('obsidian_pommel',[(7.1,-2.8),(8,-4.8),(8.9,-2.8),(8.65,-1.75),(7.35,-1.75)],7.45,8.55,'obsidian','edge')
-    mesh.lathe('pommel_inset',[(-4.05,0),(-3.3,.38),(-2.75,0)],'gem',4)
-    # 开放式不对称托架：骨白折臂只占左边，黑曜脊柱在另一边，保留晶体周围负空间。
-    mesh.prism('ivory_seal_crown',[(7.4,18.9),(5.9,21.0),(5.9,22.0),(6.9,23.15),(7.05,25.9),(8.15,26.75),(8.6,26.75),
-                                  (7.85,25.5),(7.75,22.85),(6.7,21.65),(6.7,21.25),(8.15,19.6)],7.55,8.45,'ivory','ivory_edge')
-    mesh.prism('obsidian_crown_spine',[(8.35,19.0),(9.75,21.2),(9.75,23.55),(8.95,25.95),(9.35,26.5),
-                                     (10.45,23.65),(10.45,20.95),(9.0,18.8)],7.6,8.4,'obsidian','edge')
-    mesh.lathe('crystal_neck',[ (18.4,0),(18.4,1.02),(18.8,1.02),(19.3,.76),(19.3,0)],'gold')
+    for y in (0,6.4,8.8):
+        binding(mesh,'chamfered_gold_binding',y)
+    # 真正跨棱面的斜缠握带，区别于一圈圈圆柱束环。
+    mesh.group('diagonal_plum_wrap')
+    for row in range(4):
+        for j in range(8):
+            a,b=(j+.5)*math.tau/8,(j+1.5)*math.tau/8
+            ya=.45+row*1.32+j/8*.9;yb=ya+.9/8
+            mesh.face([(8+.918*math.cos(angle),y,8+.918*math.sin(angle)) for angle,y in [(a,ya),(a,ya+.67),(b,yb+.67),(b,yb)]], 'wrap' if j%3 else 'grip')
+    binding(mesh,'pommel_socket',-2.7,.91)
+    mesh.prism('obsidian_pommel',[(7.02,-2.7),(8,-4.8),(8.98,-2.7),(8.65,-1.65),(7.35,-1.65)],7.4,8.6,'obsidian','edge',bevel=.13,rim='edge')
+    mesh.lathe('pommel_inset',[(-4.05,0),(-3.3,.40),(-2.6,0)],'gem',4)
+    # 宽窄变化、真实倒角和内侧暗边让折臂成为立体零件，而非平面套圈。
+    mesh.prism('ivory_seal_crown',[(7.45,18.9),(5.68,21.22),(5.68,22.16),(6.94,23.26),(7.10,25.98),(8.22,26.75),(8.74,26.75),
+                                  (7.98,25.42),(7.86,22.85),(6.58,21.64),(6.62,21.33),(8.18,19.62)],7.40,8.60,'ivory','ivory_edge',bevel=.13,rim='ivory_light')
+    mesh.prism('obsidian_crown_spine',[(8.35,19.0),(9.78,21.2),(9.78,23.55),(8.95,25.95),(9.35,26.5),
+                                     (10.52,23.65),(10.52,20.95),(9.0,18.8)],7.46,8.54,'obsidian','edge',bevel=.10,rim='edge')
+    binding(mesh,'lower_crystal_collar',18.28,1.05)
+    binding(mesh,'upper_crystal_collar',19.08,.91)
+    # 颈部插片形成上下错层，不把主晶重新关进四面笼架。
+    mesh.plate('neck_socket',8,18.05,1.45,.85,1.28,'obsidian',edge='edge',bevel=.10)
     return mesh
 
 
 def seal_modules(frame):
     mesh=Mesh()
     phase=frame*math.tau/32
-    # 仅三枚封印片低幅呼吸/偏转；主体和主晶不动，不影响发射点。
-    for i,(cy,tilt,width) in enumerate([(11.7,-.16,2.85),(14.1,.18,3.10),(16.35,-.13,2.75)]):
-        bob=.08*math.sin(phase+i*.65)
-        yaw=.055*math.sin(phase+i*.7)
+    # 封印片收成斜向分层的短簇；轻微呼吸不能破坏层次或发射锚点。
+    for i,(cy,tilt,width) in enumerate([(13.35,-.20,2.65),(15.0,.18,3.05),(16.65,-.18,2.80)]):
+        bob=.065*math.sin(phase+i*.65)
+        yaw=.05*math.sin(phase+i*.7)
         pivot=(8,cy+bob)
-        mesh.plate('seal_tablet',8,cy+bob,width,.88,1.50,'ivory',edge='ivory_edge',tilt=tilt,pivot=pivot,yaw=yaw)
-        # 符印置于正反两面，随封印片同轴变换，不另挂粒子。
+        mesh.plate('seal_shadow_base',8,cy+bob-.31,width-.28,.68,1.25,'ivory_edge',tilt=tilt,pivot=pivot,yaw=yaw,bevel=.07)
+        mesh.plate('chamfered_seal_tablet',8,cy+bob,width,1.08,1.65,'ivory',edge='ivory_edge',tilt=tilt,pivot=pivot,yaw=yaw,bevel=.095,rim='ivory_light')
         for front in (True,False):
-            z0,z1=(7.205,7.245) if front else (8.755,8.795)
-            mesh.prism('obsidian_rune_socket',[(7.68,cy+bob-.29),(8.32,cy+bob-.29),(8.32,cy+bob+.29),(7.68,cy+bob+.29)],
-                       z0,z1,'obsidian',tilt=tilt,pivot=pivot,yaw=yaw)
-            z0,z1=(7.18,7.195) if front else (8.805,8.82)
-            diamond=[(8,cy+bob-.19),(8.19,cy+bob),(8,cy+bob+.19),(7.81,cy+bob)]
-            mesh.prism('violet_seal',diamond,z0,z1,'rune',tilt=tilt,pivot=pivot,yaw=yaw)
-        mesh.lathe('seal_spacer',[(cy-.78,0),(cy-.78,.76),(cy-.52,.76),(cy-.52,0)],'gold')
+            z0,z1=(7.125,7.16) if front else (8.84,8.875)
+            mesh.prism('inset_rune_socket',[(7.64,cy+bob-.34),(8.36,cy+bob-.34),(8.36,cy+bob+.34),(7.64,cy+bob+.34)],z0,z1,'obsidian','edge',tilt=tilt,pivot=pivot,yaw=yaw,bevel=.025)
+            z0,z1=(7.095,7.11) if front else (8.89,8.905)
+            # 方印外框包住中间暗芯，在小尺寸下也保留“封印”而非钻石贴纸的形状。
+            for k in range(4):
+                points=[(-.24,-.24),(.24,-.24),(.24,.24),(-.24,.24)]
+                a,b=points[k],points[(k+1)%4]
+                ai,bi=(a[0]*.61,a[1]*.61),(b[0]*.61,b[1]*.61)
+                polygon=[(8+x,cy+bob+y) for x,y in [a,b,bi,ai]]
+                mesh.prism('violet_square_seal',polygon,z0,z1,'rune',tilt=tilt,pivot=pivot,yaw=yaw)
+            mesh.prism('seal_inner_facet',[(8,cy+bob-.105),(8.105,cy+bob),(8,cy+bob+.105),(7.895,cy+bob)],z0-.005,z1+.005,'gem_core',tilt=tilt,pivot=pivot,yaw=yaw)
+        binding(mesh,'tablet_spacer',cy-.96,.77)
     return mesh
 
 
 def crystal(glow):
     mesh=Mesh()
-    material='gem' if glow==0 else f'gem_glow{glow}'
-    if glow:
-        for suffix in ('','_light','_dark'):
-            rgb=PALETTE['gem'+suffix]
-            PALETTE[material+suffix]=tuple(round(v+(255-v)*glow/15*.62) for v in rgb)
+    def material(base):
+        if glow==0:
+            return base
+        name=base+f'_glow{glow}'
+        rgb=PALETTE[base]
+        PALETTE[name]=tuple(round(v+(255-v)*glow/15*.58) for v in rgb)
+        return name
     y=grip_constant('GEM_MODEL_Y')
-    mesh.lathe('faceted_amethyst',[(y-2.7,0),(y-.5,1.12),(y+.55,1.02),(y+2.7,0)],material,6)
+    top=(8.03,y+2.7,8.02);bottom=(7.97,y-2.7,7.98)
+    ring=[(6.94,y,8),(8,y,7.18),(9.06,y,8),(8,y,8.82)]
+    mesh.group('cut_amethyst_facets')
+    # 直接把晶面切成互不重叠的色阶区，亮脉属于表面本身，避免贴面深度冲突。
+    boundary=[(1,0,0),(.57,.43,0),(.43,.57,0),(0,1,0),(0,.55,.45),(0,.45,.55),(0,0,1),(.45,0,.55),(.55,0,.45)]
+    center=(.31,.35,.34)
+    for i,a in enumerate(ring):
+        b=ring[(i+1)%4]
+        for half,(tri,base) in enumerate([((a,top,b),['gem_light','gem','gem_dark','gem'][i]),((a,b,bottom),['gem','gem_dark','gem','gem_light'][i])]):
+            def point(weights):
+                return tuple(sum(tri[j][k]*weights[j] for j in range(3)) for k in range(3))
+            for part,weights in enumerate(boundary):
+                next_weights=boundary[(part+1)%len(boundary)]
+                face_material='gem_vein' if part==1 else 'gem_core' if part in (0,3,4,6,7) else 'gem_light' if part==5 else base
+                mesh.face([point(weights),point(next_weights),point(center)],material(face_material))
     return mesh
 
 
 def display(rotation,translation,scale):
-    return {'rotation':rotation,'translation':translation,'scale':[scale]*3}
+    return {'rotation':rotation,'translation':translation,'scale':[scale]*3,'right_rotation':[0,MODEL_YAW,0]}
 
 
 def write_resources():
@@ -223,7 +298,7 @@ def write_resources():
         crystal(glow).write(OUT/f'wand_crystal_{glow}.obj')
     materials=[]
     for name,rgb in PALETTE.items():
-        ka='1 1 1' if name.startswith('gem_glow') or name=='rune' else '.25 .25 .25' if name.startswith('gem') else '0 0 0'
+        ka='1 1 1' if '_glow' in name or name in ('rune','gem_vein') else '.9 .9 .9' if name=='gem_core' else '.75 .75 .75' if name.startswith('gem') else '0 0 0'
         materials+=['newmtl '+name,'Kd '+' '.join(f'{v/255:.6f}' for v in rgb),'Ka '+ka,'map_Kd base','']
     (OUT/'wand.mtl').write_text('\n'.join(materials),encoding='utf-8')
     # 从宝石世界出生点反解原版手持变换，缩放/倾斜之后仍与发射口对齐。

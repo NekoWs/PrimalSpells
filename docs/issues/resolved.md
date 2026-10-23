@@ -20,7 +20,7 @@
 | 多卡护盾 | 卡数提高抗性与立方窗口预算，破盾当次仍吸收；无常驻壳和多余圆环 | shield_balance |
 | 黑洞 | 高质量互吸缓慢、静态源不碰撞、原维度持续结算，创造飞行免吸 | damage_mass、spell_stability |
 | 晶体 | 外向晶面、多角可读、临爆加速白闪和爆碎 | crystal_lifecycle、sawblade_falling |
-| 持杖与模型 | 暮紫封印开放折臂/骨白封印片/紫晶，低位持握，原生idle/施法余光；共用尺寸校准出生点，长按不减速、成功使用不重举 | wand_design、wand_casting、wand_aim |
+| 持杖与模型 | 暮紫封印倒角折臂/错落厚封印片/切面紫晶，重复OBJ零件唯一组名避免覆盖；低位持握，原生idle/施法余光；共用尺寸校准出生点，长按不减速、成功使用不重举 | wand_design、wand_casting、wand_aim |
 | 脚下法阵 | 实时跟实体、独立慢自转；透明出生，PD首次接管原子同步，正常退场等原生完成 | pd_api、wand_casting |
 | HUD | 尊重原版隐藏界面状态；无重复充能准心；短尖芒命中、径向绘制/外散击杀与方向受击；本机布局拖动缩放 | magic_hud |
 | 原编杖 | 原容器滚轮/右键，V只读分色；创造专用包校验，生存原版协议 | foundations |

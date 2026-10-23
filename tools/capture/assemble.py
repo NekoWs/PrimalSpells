@@ -452,6 +452,13 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             lower_side = len(xs) >= 100 and bounds[1] >= 350 and (bounds[0] >= 800 if right else bounds[2] <= 480)
             result["asserts"].append((f"低位紫晶与中央视野留空-{tick}", lower_side and centered == 0,
                 f"紫晶范围={bounds}，中央覆盖={centered}，要求模型位于下半屏外侧"))
+            rgb = np.asarray(Image.open(ticks[tick]).convert("RGB"), dtype=np.int16)
+            roi = rgb[350:505, 850:1080] if right else rgb[350:505, 210:450]
+            r, g, b = roi.transpose(2, 0, 1)
+            # 原生世界色调映射会压低255材质值；取实际粉白折光色域，排除深紫底色。
+            highlights = int(((r >= 170) & (b >= 190) & (g >= 125) & (r > g * 1.08) & (b >= r)).sum())
+            result["asserts"].append((f"晶面折光与亮脉实际可见-{tick}", highlights >= 40,
+                f"晶体独立区域亮折光像素={highlights}，要求≥40，排除天空/骨白折臂"))
         missing = [line for line in log_lines if "Missing texture" in line and "primalspells:item/wand" in line]
         result["asserts"].append(("暮紫封印图集完整", not missing, f"缺失贴图={len(missing)}"))
 

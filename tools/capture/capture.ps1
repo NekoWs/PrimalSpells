@@ -7,6 +7,7 @@
 
       pwsh tools/capture/capture.ps1                  # 三个场景全录
       pwsh tools/capture/capture.ps1 -Scene black_hole # 只录一个（逗号分隔可多个）
+      pwsh tools/capture/capture.ps1 -Offline        # 使用本机已缓存依赖
       pwsh tools/capture/capture.ps1 -SkipBuild        # 跳过 gradlew build
       pwsh tools/capture/capture.ps1 -NoVideo          # 只判定 + 拼图，不调 ffmpeg
 
@@ -25,6 +26,7 @@
 param(
     [string]$Scene = "all",
     [switch]$SkipBuild,
+    [switch]$Offline,
     [switch]$NoVideo,
     # 客户端录制的最长等待秒数：超过就杀掉游戏进程并以失败退出。
     # 为什么必须有：客户端一旦崩溃/卡死就不会自己退出，流水线会一直挂着（第 29 轮实测）。
@@ -40,8 +42,11 @@ Write-Host "[capture] 仓库根目录：$root"
 # 1) 先过一遍完整构建（含 0 warning 口径）：录制跑的是刚构建出来的类
 if (-not $SkipBuild) {
     Write-Host "[capture] ./gradlew build ..."
-    & .\gradlew.bat build --console=plain
-    if ($LASTEXITCODE -ne 0) { Write-CaptureFailure $root @{ Reason="构建失败（退出码$LASTEXITCODE）"; CrashReport=$null }; exit 1 }
+    New-Item -ItemType Directory -Path (Join-Path $root 'build/capture') -Force | Out-Null
+    $buildFlags = @('build', '--console=plain')
+    if ($Offline) { $buildFlags += '--offline' }
+    & .\gradlew.bat @buildFlags 2>&1 | Tee-Object -FilePath (Join-Path $root 'build/capture/build.log')
+    if ($LASTEXITCODE -ne 0) { Write-CaptureFailure $root @{ Reason="构建失败（退出码$LASTEXITCODE）"; CrashReport=$null; Logs=@('build/capture/build.log') }; exit 1 }
 }
 
 # 2) 清场：录制世界每次重建成固定种子，输出目录清空（避免新旧帧混在一起）
@@ -56,8 +61,10 @@ Remove-Item -LiteralPath (Join-Path $root 'build/capture/failure.json') -ErrorAc
 # 3) 真客户端录制（驱动会在录完后自己退出）
 #    ⚠️ 超时护栏：客户端崩溃/卡死时不会自己退出，必须由这里兜底杀掉（否则流水线会一直挂着）。
 Write-Host "[capture] ./gradlew runCapture -Pcapture=$Scene ...（超时 $TimeoutSec 秒）"
+$runFlags = @("runCapture", "--no-daemon", "--console=plain", "-Pcapture=$Scene")
+if ($Offline) { $runFlags += '--offline' }
 $gradle = Start-Process -FilePath ".\gradlew.bat" `
-    -ArgumentList @("runCapture", "--no-daemon", "--console=plain", "-Pcapture=$Scene") `
+    -ArgumentList $runFlags `
     -NoNewWindow -PassThru -RedirectStandardOutput "build/capture/gradle.log" -RedirectStandardError "build/capture/gradle.stderr.log"
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
 while (-not $gradle.WaitForExit(1000)) {

@@ -17,7 +17,7 @@
 
 ---
 
-**当前未决：0 条。**
+**当前未决：1 条。**
 
 ---
 
@@ -48,3 +48,14 @@
 
 > 需求落地后：把本条**整段搬进** [resolved.md](resolved.md) 附录 B（连同当时的原文），
 > 本文件只留标题式的一行指针都不要留 —— 保持"打开这个文件看到的全是未决项"。
+
+
+## 第85轮（2026-10-23）：短寿命粒子的曲线时钟与末端退场
+
+- 状态：未决，PD 1.0.20-ALPHA；本模组停止1～2t紧凑拖尾接入，保留已有4t下限，不自建动画时钟或桥接渲染。
+- 目标模型：高速弹的单颗尾迹只存在1～2t，仍应在60/144Hz下经历尺寸入场、alpha从1连续降到0，然后销毁。生命周期内的关键帧必须能被渲染，不应只因寿命短于若干完整刻就跳过整段。
+- 现有API：ParticleLifeCurve配合ParticleCurve.alpha/scale、EmitterHandle.life/lifeCurve均存在；BridgeParticle能插值收到的外观端点，但没有收到的短寿命曲线中间/末端值无法凭空补出。
+- 源码定位：lib内sources JAR的core/client/RenderParticle.kt中ageTicks=engineMs/50，advanceEngine只每刻+50；ClientParticleEngine.frameUpdate在advance后立即移除isDead粒子；frameSyncCurves虽每帧调用，却用同一整数刻年龄取样。因此1t粒子可在下一次取样前就被删除，2t粒子也会跳过短入场与alpha=0末端。
+- 实机证据：build/capture/turn85-regression中的1～2t拖尾20Hz探针decreasing=0、minimum=0.50714284；随后RenderFrameEvent.Post逐渲染帧复验仍相同（录制日志build/capture-turn85-trail.log，归档turn85-short-tail）。变速后较长寿命拖尾的原生探针却正常，说明alpha通道接线存在且有效，不是本模组漏传曲线。
+- 需要PD修改：寿命曲线在渲染端使用与出生时刻一致的分数年龄；把运动/游戏刻推进与外观曲线采样分开。销毁顺序保证短粒子的可见中间段和零alpha/零尺寸末态正确收束，暂停与恢复仍沿游戏时钟，不能引入跨帧闪现。
+- 验收：相同声明分别使用1t、2t、4t寿命，在20/60/144FPS取0/25/50/75/接近100%寿命的实际Quad输出，验证中段可见、透明度/尺寸按声明演化、末端清零；stop后已出生粒子正常收尾，最后客户端/服务端计数均归零；重复lifeCurve覆盖不能叠乘或丢通道。

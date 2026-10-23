@@ -393,3 +393,8 @@ HUD状态/绘制/配置放`client/hud/{WandHudRenderer,WandHudPainter,HudLayout}
 ## 第84轮编杖回退落位
 
 删除client/input/WandEditorOverlay.kt及textures/gui/sprites/wand_editor资源，不迁移窗口。原输入SpellSlotScrollHandler、ClientContainerDragHandler和WandItem装卸继续使用；新增client/input/CreativeWandEditHandler.kt仅接创造物品栏原右键，新增client/tooltip/WandPreviewCache.kt缓存最近悬停的服务端分色结果。WandPreviewScreen保留独立只读入口并简化为槽位分色；EditWandPayload仅用于创造光标同步，生存走原版协议。协议1.3.0增加WandPreview.Slot，不变更存档。第83轮落位记录中的悬浮窗已失效，以本节为准。
+
+
+## 第85轮验证落位
+
+新增client/capture/ProjectileFlightScene.kt，验证实际原版弩发射、普通弹与复制体速度、飞行段1格追踪、真实命中及PD原生客户端透明度递减。运行时只改原geometry/Tracking与visual/Trajectory，曲线继续交给PD，不新增渲染器或粒子模拟器。没有旧→新类迁移。

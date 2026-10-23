@@ -57,6 +57,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "projectile_flight": {"length": 130, "title": "弩箭对比 / 路径追踪 / 拖尾淡出", "metric": "orange", "quiet": (0, 6), "decay": "none"},
     "progression": {"length": 240, "title": "数据包 / 安全世界作用 / 寻法 / 精英", "metric": "wand", "quiet": (0, 6), "decay": "none"},
     "foundations": {"length": 260, "title": "只读抽牌树 / 真实网络预览", "metric": "wand", "quiet": (0, 6), "decay": "none"},
     "machinegun_visual": {"length": 170, "title": "连续机枪 / 随机弧刃 / 一格追踪", "metric": "white", "white_roi": (540, 415, 800, 550), "quiet": (0, 6), "short_exit": True, "decay": "gradual", "fade_window": (86, 105)},
@@ -103,15 +104,15 @@ SCENES = {
         "decay": "instant",
     },
     # 火球拖尾（第 43 轮）：跟拍一颗飞行中的火球，看 Noita 式的分层火花尾迹。
-    # 粒子是**橙黄加法混合**的火花，用 `orange` 判据（`warm` 会漏掉一半以上的火花，见 orange_mask）。
-    # 退场：火球 t≈30 撞墙消失，余烬寿命错开（8~26 tick）陆续到点 —— 是**逐帧衰减**，用 gradual。
+    # 第85轮提速后使用白热色阶，按白色本体判可见性；透明度连续性读取真实PD逐颗粒子。
+    # 高速短尾可在1～2刻内自然结束，不能要求整场覆盖量必须跨4刻。
     "fireball_trail": {
         "length": 72,
         "title": "火球拖尾：白热核 + 沿轨迹的符文余痕（跟拍）",
-        "metric": "orange",
+        "metric": "white",
         "fade_window": (33, 65),
         "fade_min_peak_ratio": 0.0004, # 退场碎屑独立于遮挡前弹体，368px最低可读覆盖；主体门槛不变
-        "decay": "gradual",
+        "decay": "alpha",
     },
     "energy_shield": {
         "length": 528,
@@ -521,6 +522,10 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         result["asserts"].append(("短促退场连续且无末帧硬切",
             3 <= extent <= 10 and largest <= fade_peak * .35 and last <= fade_peak * .10,
             f"95%→5%跨{extent}帧，最大单帧丢失{largest/max(1,fade_peak):.1%}，归零前覆盖{last/max(1,fade_peak):.1%}；要求3–10帧/≤35%/≤10%"))
+    elif spec.get("decay") == "alpha":
+        alpha_checks = [ok for name, ok in checks if name == "trail-alpha-decreases"]
+        result["asserts"].append(("实际尾迹逐颗连续淡出", len(alpha_checks) == 1 and alpha_checks[0],
+            "读取原生PD粒子逐帧透明度；高速尾迹短寿命不以整场50%覆盖量跨4刻代替"))
     elif spec.get("decay", "gradual") in ("gradual", "collapse"):
         result["asserts"].append(
             ("实色结构解体/颗粒分批结束" if spec.get("decay") == "collapse" else "退场是渐变而非闪现",

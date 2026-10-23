@@ -101,7 +101,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(ProgressionScene.scene(), FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
+    fun all(): List<Scene> = listOf(ProjectileFlightScene.scene(), ProgressionScene.scene(), FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -624,6 +624,21 @@ object CaptureScenes {
     private fun fireballTrail(): Scene = run {
         val name = "fireball_trail"
         var wand: Wand? = null
+        val previousAlpha = java.util.IdentityHashMap<work.nekow.particledrawing.core.client.RenderParticle, Float>()
+        val alphaFalls = java.util.concurrent.atomic.AtomicInteger()
+        val sampling = java.util.concurrent.atomic.AtomicBoolean()
+        var minimumAlpha = 1f
+        // 高速尾迹仅活1～2t，必须在渲染帧采样；20Hz检查会跳过同一颗粒子的整个淡出段。
+        val sampler = java.util.function.Consumer<net.neoforged.neoforge.client.event.RenderFrameEvent.Post> {
+            if (sampling.get()) ClientParticleEngine.instance()?.getGlowingParticles()?.forEach { p ->
+                val alpha = p.effectiveAlpha()
+                if (alpha in 0.01f..0.98f) {
+                    minimumAlpha = minOf(minimumAlpha, alpha)
+                    previousAlpha[p]?.let { if (alpha < it - 0.02f) alphaFalls.incrementAndGet() }
+                    previousAlpha[p] = alpha
+                }
+            }
+        }
         Scene(
             name = name,
             title = "火球拖尾：白热核 + 沿轨迹的符文余痕（跟拍）",
@@ -635,12 +650,28 @@ object CaptureScenes {
             moveCamera = true,
             camera = { ctx, t -> trailCam(ctx, t) },
             prepare = { ctx ->
+                net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(sampler)
                 val floorY = ctx.floorBlockY(CX, CZ)
                 // 清掉前序场景留下的内部墙，固定死亡tick不应被旧摄影棚提前拦截。
                 for (x in CX-TRAIL_STUDIO_HALF..CX+TRAIL_STUDIO_HALF) for (z in CZ-TRAIL_STUDIO_HALF..CZ+TRAIL_STUDIO_HALF)
                     for (y in floorY+1..floorY+TRAIL_STUDIO_HEIGHT)
                         ctx.level.setBlock(net.minecraft.core.BlockPos(x,y,z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2)
                 ctx.buildStudio(CX, CZ, floorY, half = TRAIL_STUDIO_HALF, wallHeight = TRAIL_STUDIO_HEIGHT)
+                // 默认弹速提升后延长真实摄影棚；保留实际飞行速度与固定死亡刻，不让旧前墙提前截断拖尾。
+                val black = net.minecraft.world.level.block.Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState()
+                for (z in CZ - 110 until CZ - TRAIL_STUDIO_HALF) {
+                    for (x in CX - TRAIL_STUDIO_HALF..CX + TRAIL_STUDIO_HALF)
+                        ctx.level.setBlock(net.minecraft.core.BlockPos(x, floorY, z), black, 2)
+                    for (y in floorY + 1..floorY + TRAIL_STUDIO_HEIGHT) {
+                        ctx.level.setBlock(net.minecraft.core.BlockPos(CX - TRAIL_STUDIO_HALF, y, z), black, 2)
+                        ctx.level.setBlock(net.minecraft.core.BlockPos(CX + TRAIL_STUDIO_HALF, y, z), black, 2)
+                    }
+                }
+                for (x in CX - TRAIL_STUDIO_HALF + 1 until CX + TRAIL_STUDIO_HALF)
+                    for (y in floorY + 1 until floorY + TRAIL_STUDIO_HEIGHT) {
+                        ctx.level.setBlock(net.minecraft.core.BlockPos(x, y, CZ - TRAIL_STUDIO_HALF), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2)
+                        ctx.level.setBlock(net.minecraft.core.BlockPos(x, y, CZ - 110), black, 2)
+                    }
                 ctx.setup(
                     spectator = true,
                     // 站在 +Z 侧、面朝 -Z（yaw 180）：火球沿 -Z 平射，尾迹留在 +Z 一侧的空中
@@ -658,6 +689,7 @@ object CaptureScenes {
                 ctx.log("$name prepared: floorY=$floorY castZ=${CZ + TRAIL_CAST_OFFSET}")
             },
             start = { ctx ->
+                sampling.set(true)
                 val floorY = ctx.floorBlockY(CX, CZ)
                 // 施法点 = 眼睛高度；`placeForCast` 不发包（服务端权威），机位仍然由 camera() 给
                 ctx.placeForCast(CX + 0.5, floorY + 1.0 + EYE_HEIGHT, CZ + TRAIL_CAST_OFFSET)
@@ -692,6 +724,7 @@ object CaptureScenes {
                     ctx.log("trail: bolt released at t=$t (尾迹开始逐颗消散)")
                 }
             },
+            finish = { _ -> sampling.set(false); net.neoforged.neoforge.common.NeoForge.EVENT_BUS.unregister(sampler); previousAlpha.clear() },
             checksAt = { ctx, t ->
                 when (t) {
                     // 飞出十几 tick 之后，尾迹应当已经积累出一整条（每 tick 6~11 颗 × 十几 tick）
@@ -702,6 +735,8 @@ object CaptureScenes {
                             "客户端 PD 粒子 = ${pdClientParticleCount()}（尾迹累积，应 ≥$TRAIL_MIN_PARTICLES）",
                         ),
                     )
+                    32 -> listOf(Check(name, t, "trail-alpha-decreases", alphaFalls.get() > 2 && minimumAlpha < 0.4f,
+                        "decreasing=${alphaFalls.get()} minimum=$minimumAlpha"))
                     TRAIL_TICKS - 3 -> listOf(
                         Check(
                             name, t, "trail-cleaned-up",

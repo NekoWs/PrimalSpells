@@ -145,6 +145,7 @@ Kotlin 编译器手工编译「目标文件 + 一个同语义的最小替身」�
 pwsh tools/capture/capture.ps1                      # 三个场景全录（约 1 分钟）
 pwsh tools/capture/capture.ps1 -Scene black_hole    # 只录一个（逗号分隔可多个）
 pwsh tools/capture/capture.ps1 -SkipBuild           # 跳过前置的 gradlew build
+pwsh tools/capture/capture.ps1 -Offline             # 使用已缓存依赖，构建与启动均离线
 pwsh tools/capture/capture.ps1 -NoVideo             # 只判定 + 拼图，不调 ffmpeg
 
 # 等价的手工两步：
@@ -632,3 +633,16 @@ diagnostics.ps1是可独立验证的只读诊断辅助。PowerShell语法解析�
 首轮foundations 33/33和spell_chain 76/76均通过，零丢帧，保存于`build/capture/turn84-initial`，日志`build/capture-turn84-initial.log`；随后只为新增创造和箱子操作重跑foundations。最终42＋76共118项原生检查通过，采用260＋400共660帧。人工查看175t预览确认同链底色、荷载异色、选槽细边；之后仅缩短英文帮助句避免文本裁切。第83轮最终悬浮窗证据另存`build/capture/turn83-editor-verified`，属于已撤销方案的历史记录。
 
 全部场景画面/帧数/媒体门禁通过；总体报告仍因既有5条OSHI/Perflib异常失败，未过滤异常、未修改门槛、未自动重启电脑。协议1.3.0增加服务端槽位归属，联机双方需同步更新；存档格式不变。
+
+
+## 第85轮：拖尾渐淡、弩速基准与路径追踪（2026-10-23）
+
+本轮`gradlew.bat --offline build --console=plain`成功，无Kotlin警告。普通联网构建遇仓库检查长时间等待，改用已有依赖缓存；录制脚本新增Offline开关，同时传给构建和runCapture，不改依赖版本。构建失败单独保存build/capture/build.log并只引用本次日志，避免误贴上轮MC输出；build/verify/capture-diagnostics-v85验证独立失败日志、原生命令非零退出码与脚本语法。
+
+最终隐藏录制projectile_flight、machinegun_visual、spell_chain、fireball_trail，共772帧、零丢帧，96/96项原生检查通过（9＋6＋76＋5）。证据build/capture/out，日志build/capture-turn85-verified.log。实际原版弩use入口发射箭速约3.17；基础火花弹4.0，首刻阻尼后3.922，复制仍4.0；路径侧距0.9格被追踪并真实造成5HP伤害，1.1格不锁定，锁定不额外加速，零速度保持有限。
+
+ProjectileFlightScene观察真实PD粒子变速后透明度下降；独立拖尾逐RenderFrameEvent.Post采样，32t时decreasing=3002、minimum=0.2359673，末尾服务端/客户端粒子严格归零。已查看飞行段与火花弹跟拍画面。提速后色阶达到既有白热档，旧orange色域漏掉主体；拖尾改用原有white色域，最低覆盖量不变，曲线门禁改为原生逐粒alpha下降，不能要求1～2刻尾迹的整场50%覆盖量跨4刻。摄影棚沿真实飞行方向延长，保留实际速度与33t死亡事件。法术链唯一旧夹具数值1.6更新为新加速弹8.0，其余76项机制语义保持。
+
+曾尝试把尾迹寿命下限改为1t，20Hz及逐渲染帧原生探针都仅见minimum=0.50714284、同颗透明度无递减；核对PD源码确认整数刻年龄和先删除后取样的短寿命缺口。按政策停止该支路，保留原4t下限，登记pd-api-requests，不实现本侧动画时钟。历史证据分别保存在turn85-first-native、turn85-regression和turn85-short-tail，最终只使用4t版本作为交付证据。
+
+projectile_flight、spell_chain与fireball_trail的画面/媒体门禁PASS。machinegun_visual仍有一项短促退场门禁失败：95%→5%跨4帧，最大单帧下降42.2%（上限35%），归零前9.2%（上限10%）；已登记issues/open。总报告还保留5条既有OSHI/Perflib异常，没有过滤系统错误或宣称全绿。

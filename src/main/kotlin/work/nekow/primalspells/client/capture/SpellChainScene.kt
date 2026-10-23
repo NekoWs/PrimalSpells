@@ -121,7 +121,7 @@ object SpellChainScene {
                     val multicastCarrier=multicastPayload.single() as TriggerFireball
                     val childShots=multicastCarrier.payload.filterIsInstance<Projectile>()
                     multicastCarrier.hitBlock(multicastCarrier.status.pos,Vector3f(0f,0f,1f));MagicManager.tick()
-                    record(t,"payload-multicast-shares-only-local-modifiers",childShots.size==2 && childShots.all{it.modifiers.keys==setOf("double_cast","speed_boost") && it.status.damage==5.0 && abs(it.status.velocity.length()-1.6f)<1e-5},"children=${childShots.map{it.modifiers to it.status.damage}}")
+                    record(t,"payload-multicast-shares-only-local-modifiers",childShots.size==2 && childShots.all{it.modifiers.keys==setOf("double_cast","speed_boost") && it.status.damage==5.0 && abs(it.status.velocity.length()-8f)<1e-5},"children=${childShots.map{Triple(it.modifiers,it.status.damage,it.status.velocity.length())}}")
                     val (_,twoTriggers)=castCards(listOf("double_cast","trigger_fireball","freeze_charge","fireball","trigger_fireball","damage_boost","fireball"))
                     val carriers=twoTriggers.filterIsInstance<TriggerFireball>()
                     record(t,"sibling-payloads-are-independent",carriers.size==2 && carriers.all{it.modifiers.keys==setOf("double_cast")} && carriers.map{it.payload.filterIsInstance<Modifier>().map{card->card.id}}==listOf(listOf("freeze_charge"),listOf("damage_boost")),"carriers=${carriers.map{it.payload.map{card->card.id}}}")

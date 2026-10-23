@@ -466,3 +466,10 @@ HUD准心不再绘制充能菱框/进度条，只呈现紫白命中十字、红�
 ## 第83轮生活卡与获取接入
 
 新增法术除物品/图标/双语资源外，还应进入数据包loot_profiles的散卡或成品配方，使全部注册法术有实际来源。当前65种均可获取。生活法术示例在immobile/UtilityPulse与SurveyPulse/ItemPull/FeatherWard；逐目标发integration.SpellEvents.UtilityAction，再调用原版受权限约束的入口，不用生活卡绕过拾取事件或修改世界方块。整合接口、动态获取池及存档兼容见design/pack-integration，定位见design/world-utility。
+
+
+## 第85轮：速度与拖尾接线
+
+Projectile.speed是相对初速系数，最终普通发射为输入方向×speed×Projectile.LAUNCH_SPEED_SCALE（当前8）。基础火花弹0.5对应4格/t，默认dragCoeff=0.005；特殊离散跃迁/近战脉冲的系数独立归一化。复制子弹使用SpellAssembly.launch抵消基础速度和速度修正的重复倍率，不直接把当前速度再当作单位方向乘一次。
+
+新增普通飞行弹优先复用Trajectory：硬边方粒，完整ParticleLifeCurve同时含SCALE与ALPHA；变速时以lifeCurve覆盖两个通道。不要只覆盖缩放后丢失淡出，也不要连续追加相同曲线。用户本轮要求的透明度例外仅限尾迹，其他特效继续按minecraft-visuals规范。

@@ -25,7 +25,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** 实色方粒拖尾；头部与里程发射器共用相邻运动样本，PD负责插值、尺寸曲线和寿命。 */
+/** 硬边方粒拖尾，沿寿命收细并淡出；头部和发射器共用相邻样本，曲线由PD求值。 */
 class Trajectory(
     val color: Color,
     val intensity: Float = 1f,
@@ -159,18 +159,14 @@ class Trajectory(
         strength: Float,
     ) {
         if (intensity <= 0f || strength <= 0f || length <= 0.0) return
-        // 寿命 = (length ÷ 速度) ÷ 可见占比：**length 是"肉眼可见的那一段"的格数**。
-        // 末段约 15% 寿命是淡出区（设计要求"末尾完全消失"），实测"可见/名义 ≈ 0.85"（第 48 轮）。
+        // 按目标长度和当前速度估算寿命；沿用4t下限，高速余痕会更长，避免PD短寿命曲线跳采样。
         val life = (length / speed / TRAIL_VISIBLE_FRACTION).roundToInt()
             .coerceIn(TRAIL_LIFE_MIN, TRAIL_LIFE_MAX)
         val anchor = Anchor.Movable(pos, velocity)
         val current = emitter
         if (current != null) {
             if (life != emitterLife) {
-                current.life(life).lifeCurve(ParticleLifeCurve.of(ParticleCurve.scale(
-                    CurveKey.at(0, 0f), CurveKey.at(0.75, 1f, EasingType.EASE_OUT),
-                    CurveKey.at(life * 0.65, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
-                    CurveKey.at(life, 0f, EasingType.EASE_IN_OUT))))
+                current.life(life).lifeCurve(trailCurve(life))
                 emitterLife = life
             }
             current.updateAnchor(anchor) // 每 tick 挪锚点（PD 侧只在变化时发包）
@@ -181,24 +177,25 @@ class Trajectory(
             .jitter(0.035)
             .spacing(TRAIL_SPACING)                                   // 每0.125格一颗
             .life(life)
-            .color(hotColor(headHot))          // 固定色阶，alpha始终为1
+            .color(hotColor(headHot))          // 出生实色；透明度只沿单颗尾迹的寿命淡出。
             .scale(TRAIL_SCALE_HEAD * (1 + 0.1f * projectile.modifiers.values.sum()) * projectile.areaScale.toFloat())                                  // 出生0.3125格
             .glowing(true)
             .additive(false)
             // 尺寸乘数沿寿命线性收缩，世界尺寸从0.3125格降至0.0625格。
             // ⚠️ 别在前段加陡降（曾经用过「前 1/3 寿命掉到 55%」）：那会在本体与尾迹之间留一道
             // 尺寸台阶，实机反馈「本体明显比后面的拖尾要大，要之前的连续感」。要连续就线性、从同一尺寸起铺。
-            .sizeCurve(
-                CurveKey.at(0, 0f),
-                CurveKey.at(0.75, 1f, EasingType.EASE_OUT),
-                CurveKey.at(life * 0.65, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD),
-                CurveKey.at(life, 0f, EasingType.EASE_IN_OUT),
-            )
-            // 实色颗粒按寿命缩小；不添加透明度曲线。
+            .lifeCurve(trailCurve(life))
             .maxAlive(TRAIL_MAX_ALIVE)
             .spawn()
         emitterLife = life
     }
+
+    /** 完整替换两个通道，速度变化时不会丢失淡出或把曲线反复相乘。 */
+    private fun trailCurve(life: Int): ParticleLifeCurve = ParticleLifeCurve.of(
+        ParticleCurve.scale(CurveKey.at(0, 0), CurveKey.at(minOf(0.75, life * 0.2), 1, EasingType.EASE_OUT),
+            CurveKey.at(life * 0.65, TRAIL_SCALE_TAIL / TRAIL_SCALE_HEAD), CurveKey.at(life, 0, EasingType.EASE_IN_OUT)),
+        ParticleCurve.alpha(CurveKey.at(0, 1), CurveKey.at(life * 0.35, 0.7),
+            CurveKey.at(life * 0.7, 0.25), CurveKey.at(life, 0, EasingType.EASE_IN_OUT)))
 
     // =====================================================================================
     // ③ 细碎符文 / 静止场 / 死亡补撒：一次性撒点，批量下发
@@ -357,6 +354,7 @@ class Trajectory(
         const val TRAIL_BLOCKS = 3.5
 
         const val TRAIL_VISIBLE_FRACTION = 0.85
+        // 保留原4t下限；PD 1.0.20短寿命曲线跳采样的问题见docs/issues/pd-api-requests.md。
         const val TRAIL_LIFE_MIN = 4
         const val TRAIL_LIFE_MAX = 40
 

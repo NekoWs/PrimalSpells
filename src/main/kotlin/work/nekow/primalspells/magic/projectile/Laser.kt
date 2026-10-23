@@ -12,7 +12,7 @@ class Laser: Projectile() {
         recoil = 0.015
         damageType = work.nekow.primalspells.magic.core.SpellDamageType.ENERGY
         mana = 10.0
-        speed = 5f
+        speed = 1.25f
         delay = -10
         recharge = -15
         maxAge = 1

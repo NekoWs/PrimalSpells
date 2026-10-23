@@ -12,7 +12,7 @@ import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 
-/** 短距锁定实体中心：数值修饰后旋转当前速度，目标有效时持续锁住，由Move执行碰撞。 */
+/** 沿本刻飞行段短距锁定实体中心；只旋转速度，位置与命中仍由Move扫掠。 */
 class Tracking(
     val range: Float,
     val strength: Float
@@ -20,16 +20,29 @@ class Tracking(
     override val phase = EffectPhase.GUIDANCE
     private var lastTarget: LivingEntity? = null
 
+    override fun onActive() { lastTarget = null }
+
     override fun onTick() {
-        if (!projectile.alive || !isStackPrimary) return
+        if (!projectile.alive || !projectile.motionEnabled || !isStackPrimary) return
         val level = caster.level() as? ServerLevel ?: return
         val center = Vec3(status.pos)
+        val speed = status.velocity.length().toDouble()
+        if (!speed.isFinite() || speed < 1e-8) return
+        // 起点附近的球形查询会漏掉两刻之间擦身而过的目标。范围仍为1格，沿真实位移段扫掠。
+        val movement = Vec3(status.velocity).scale(1.0 / (1.0 + projectile.dragCoeff * speed))
+        val end = center.add(movement)
+        val distanceSquared = movement.lengthSqr()
         val reach = (range * stackScale).toDouble()
+        fun pathDistanceSquared(entity: LivingEntity): Double {
+            val offset = entity.boundingBox.center.subtract(center)
+            val progress = (offset.dot(movement) / distanceSquared).coerceIn(0.0, 1.0)
+            return entity.boundingBox.center.distanceToSqr(center.add(movement.scale(progress)))
+        }
         fun valid(entity: LivingEntity) = entity !== caster && entity.isAlive && !entity.isRemoved &&
             !caster.isAlliedTo(entity) && !(entity is Player && (entity.isCreative || entity.isSpectator)) &&
-            entity.boundingBox.center.distanceToSqr(center) <= reach * reach
+            pathDistanceSquared(entity) <= reach * reach
         val target = lastTarget?.takeIf(::valid) ?: level.getEntitiesOfClass(LivingEntity::class.java,
-            AABB.ofSize(center, reach * 2, reach * 2, reach * 2), ::valid)
+            AABB(center, end).inflate(reach), ::valid)
             .minByOrNull { it.boundingBox.center.distanceToSqr(center) }
         if (target != null && target !== lastTarget) level.playSound(null, center.x, center.y, center.z,
             SoundEvents.SCULK_CLICKING, SoundSource.NEUTRAL, 0.2f, 1.6f)

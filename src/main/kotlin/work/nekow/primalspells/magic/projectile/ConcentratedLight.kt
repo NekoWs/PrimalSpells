@@ -19,7 +19,7 @@ class ConcentratedLight : Projectile() {
 
     init {
         mana = 90.0; delay = 70; recharge = 20; maxAge = 80
-        speed = 3f; dragCoeff = 0f; hitRadius = 0.15
+        speed = 0.75f; dragCoeff = 0f; hitRadius = 0.15
         maxBounces = 5; bounceScaler.set(1f,1f,1f)
         recoil = 0.06; recoilOnCast = true; mass = 2.0; status.damage = 36.0
         damageType = SpellDamageType.ENERGY

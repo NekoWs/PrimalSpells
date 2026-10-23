@@ -15,7 +15,7 @@ class Chainsaw : Projectile() {
         mana = 1.0
         recharge = -3
         maxAge = 1
-        speed = 1.2f
+        speed = 0.24f
         dragCoeff = 0f
         hitRadius = 0.45
         status.damage = 2.0

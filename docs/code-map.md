@@ -1,5 +1,7 @@
 # 代码导航（code-map）
 
+第85轮：飞行初速总倍率在`magic/projectile/Projectile.kt`；路径短距追踪在`magic/effect/geometry/Tracking.kt`，拖尾完整寿命曲线在`magic/effect/visual/Trajectory.kt`。`client/capture/ProjectileFlightScene.kt`验证真实弩箭速度、飞行段索敌/命中及原生PD透明度。
+
 第83轮整合：`integration/{PackRules,SpellApi,SpellEvents}.kt`为资源重载/公共入口/事件；`entity/MageSchool.kt`为流派与战术；`item/SpellCompassItem.kt`为真实结构定位；`magic/projectile/immobile/{UtilityPulse,SurveyPulse,ItemPull,FeatherWard}.kt`为生活法术。`client/capture/ProgressionScene.kt`验证事件权限、拾取、合成/定位、精英和真实数据包热重载。
 
 第84轮：`wand/WandPreview.kt`/`Wand.preview()`给出真实抽牌预览与整副槽位归属；`client/tooltip/{WandSpellTooltip,WandPreviewCache}.kt`显示链底色，`client/screen/WandPreviewScreen.kt`为V键只读槽位预览；`client/input/CreativeWandEditHandler.kt`仅转交创造模式原右键装卸。悬浮窗及专用GUI资源已移除，生存编杖走原版协议；网络保留WandPreviewPayload、创造专用EditWandPayload及原SelectSpellSlotPayload。交互见[设计](design/spell-preview.md)。

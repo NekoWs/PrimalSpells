@@ -17,7 +17,8 @@ function Write-CaptureFailure {
     param([Parameter(Mandatory)][string]$Workspace, [Parameter(Mandatory)][hashtable]$Failure)
     $output = Join-Path $Workspace 'build/capture'
     New-Item -ItemType Directory -Path $output -Force | Out-Null
-    $logs = @('run/capture/logs/latest.log','build/capture/gradle.log','build/capture/gradle.stderr.log') |
+    $logNames = if ($Failure.ContainsKey('Logs')) { $Failure.Logs } else { @('run/capture/logs/latest.log','build/capture/gradle.log','build/capture/gradle.stderr.log') }
+    $logs = $logNames |
         ForEach-Object { Join-Path $Workspace $_ } | Where-Object { Test-Path -LiteralPath $_ }
     $record = [ordered]@{ status='failed'; reason=$Failure.Reason; crashReport=$Failure.CrashReport; logs=@($logs); timeUtc=[DateTime]::UtcNow.ToString('o') }
     $record | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output 'failure.json') -Encoding utf8

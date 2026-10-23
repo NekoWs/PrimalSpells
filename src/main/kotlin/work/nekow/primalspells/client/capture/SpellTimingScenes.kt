@@ -132,14 +132,14 @@ object SpellTimingScenes {
                 val floor=ctx.floorBlockY(0,0)
                 for(x in -12..12) for(z in -12..12) for(y in floor+1..floor+10)
                     ctx.level.setBlock(BlockPos(x,y,z),Blocks.AIR.defaultBlockState(),2)
-                ctx.buildStudio(0,0,floor);ctx.setup(true,4.0,floor+4.0,-8.0,28f,10f)
+                ctx.buildStudio(0,0,floor);ctx.setup(true,3.0,floor+3.0,-6.0,28f,10f)
                 source=ctx.spawnDummy(0.0,floor+1.0,-5.0)
                 source.yRot=0f;source.xRot=0f
                 target=ctx.spawnDummy(0.0,floor+1.0,0.0)
                 gun=Wand("continuous-trigger-gun");gun.delayTickCount=10.0;gun.rechargeTickCount=20.0
                 gun.magics+=listOf("double_cast","trigger_fireball","mana_injection","omnidirectional_scatter","chainsaw").map{MagicManager.create(it)!!}
                 gun.load();gun.status.mana=10000.0
-            },camera={ctx,_ -> Pose(4.0,ctx.floorBlockY(0,0)+4.0,-8.0,28f,10f)},
+            },camera={ctx,_ -> Pose(3.0,ctx.floorBlockY(0,0)+3.0,-6.0,28f,10f)},
             tick={ctx,t ->
                 if(t in 8..87) { if(gun.spell(source))rounds++;gun.tick() }
                 for(p in MagicManager.projectiles) {

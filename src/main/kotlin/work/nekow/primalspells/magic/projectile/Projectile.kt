@@ -99,7 +99,7 @@ abstract class Projectile: Magic() {
 
     lateinit var position: Vector3f
     lateinit var velocity: Vector3f
-    var dragCoeff: Float = 0.02f
+    var dragCoeff: Float = 0.005f
     var speed: Float = 1f
     var hitRadius: Double = 0.0
     var throughBlocks: Boolean = false
@@ -218,6 +218,6 @@ abstract class Projectile: Magic() {
 
     companion object {
         /** 全部发射入口共用；子弹继承当前速度时须抵消此倍率。 */
-        const val LAUNCH_SPEED_SCALE = 1.6f
+        const val LAUNCH_SPEED_SCALE = 8f
     }
 }

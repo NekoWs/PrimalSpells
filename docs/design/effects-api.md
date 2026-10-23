@@ -1,6 +1,6 @@
 # 播放器模组特效 API 设计方案（ParticleDrawing × PrimalSpells）
 
-> 第53轮已改为MC实色硬边方粒；下面早期柔光/alpha渐隐说明仅供历史参考，当前规范见 [minecraft-visuals.md](minecraft-visuals.md)。
+> 第53轮已改为MC实色硬边方粒；下面早期柔光/alpha渐隐说明仅供历史参考，当前规范见 [minecraft-visuals.md](minecraft-visuals.md)。第85轮用户新增拖尾淡出，尾迹alpha曲线是当前明确例外。
 ## 0. 硬性政策：ParticleDrawing 的问题一律「停下 + 提需求」，**不得自行另写一套**（§0 优先于本文其余内容）
 
 > **改能量/爆炸类特效前先看 `.refs/explosion-vfx/`**：用户提供的目标观感（8 帧参考 + 逐帧说明 + 相位拆解；本地目录、不入库）。这些历史外观能力已补齐；第62轮已接入组缩放接续与移动锚点插值；未决需求见 [../issues/pd-api-requests.md](../issues/pd-api-requests.md)。
@@ -800,3 +800,10 @@ SawbladeFx与Torch复用实体getter/热更变量编排，透明出生，表达�
 ## 第78轮：PD 1.0.20接线
 
 首次接管与显式snap现在原子同步外观两端。原生Bridge夹具先初始化首份尺寸，再测试后续tick插值，不能再把出生后的第一次同步当作连续插值。法阵presence8刻、等离子束presence6刻改用retire默认2刻余量，由PD完成协议负责离线兜底；本侧不保留这些组的固定销毁倒计时。
+
+
+## 第85轮：拖尾寿命淡出（2026-10-23）
+
+复用PD 1.0.20-ALPHA的ParticleLifeCurve.of、ParticleCurve.alpha/scale与EmitterHandle.lifeCurve。Trajectory出生与寿命变化时设置同一完整曲线，透明度在0/35%/70%/100%寿命取1/0.7/0.25/0，缩放仍独立收细；更新覆盖而非追加，变速不会丢alpha或叠乘到通道上限。
+
+保留既有4t寿命下限，入场点取min(0.75t,寿命×20%)，避免关键帧倒序。曾尝试1～2t的紧凑高速尾迹，实机与源码确认PD短寿命曲线跳采样，已停止该接入点并登记pd-api-requests；不在本模组补时钟或替代渲染。保留硬边方形和非加法混合，不修改头部本体、爆炸或护盾的alpha规则。4t以上的现有通路能正常渐淡，高速尾迹的世界长度随速度增加。

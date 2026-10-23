@@ -84,3 +84,14 @@
 第77轮火把真实光照接通后，new_spells全局白像素50%→5%跨度10帧超过旧3帧瞬退阈值；36项原生检查、末尾零粒子及末3帧零像素通过。该场景包含锯片、火种及多组独立生命周期，当前指标不能直接归因于火把卸载。需按实际退场事件分ROI或单独场景确认；本轮保留失败，不降低门槛。涉及client/capture/NewSpellScene.kt、tools/capture/assemble.py；证据build/capture-turn77.log。
 
 第80轮补充：new_spells原生36/36与锯片可见性/旋转检查通过，但全局白像素50%→5%跨度95帧，仍不适合其多个独立生命周期。保留旧门禁失败；新增独立sawblade_falling使用实际失效事件65～85t的严格3～10帧/最大单帧下降35%/归零前10%判据，阈值未放宽。混合全局退场指标的进一步拆分仍待处理。
+
+
+第85轮：高速短寿命拖尾的PD曲线时钟问题登记在[pd-api-requests.md](pd-api-requests.md)，本模组保留原4t下限，停止1～2t支路。
+
+
+## 第85轮：机枪混合画面退场像素门禁
+
+- 现象：machinegun_visual最终6/6机制、可见覆盖、零残留通过，但混合弹体/命中/链锯的退场窗口95%→5%为4帧，最大单帧下降42.2%，高于原35%上限；归零前9.2%通过10%门槛。没有放宽阈值。
+- 影响：整体视觉报告仍失败，不能把96项机制检查通过称为全流水线通过；独立fireball_trail的实际alpha、可见性和收尾已通过。
+- 复现/证据：capture.ps1 -Offline -Scene projectile_flight,spell_chain,machinegun_visual,fireball_trail，build/capture-turn85-verified.log与out/machinegun_visual。机位稍前移保证高速短促命中可读，未修改游戏链锯特效。
+- 下一步：拆分头部退场、短尾与切痕的独立视觉覆盖，再定位超阈值来源；不能用混合总峰值替代每种效果连续性，也不能仅为通过测量延长全部粒子寿命。

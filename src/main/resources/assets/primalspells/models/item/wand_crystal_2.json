@@ -7,42 +7,42 @@
   "emissive_ambient": true,
   "ambientocclusion": false,
   "textures": {
-    "particle": "minecraft:block/white_concrete",
-    "base": "minecraft:block/white_concrete"
+    "particle": "primalspells:item/wand_dusk",
+    "base": "primalspells:item/wand_dusk"
   },
   "display": {
     "firstperson_righthand": {
       "rotation": [
         0,
         0,
-        0
+        12.0
       ],
       "translation": [
-        -2.88,
-        0,
+        0.961104,
+        -2.3180838,
         -2.08
       ],
       "scale": [
-        0.8,
-        0.8,
-        0.8
+        0.6,
+        0.6,
+        0.6
       ]
     },
     "firstperson_lefthand": {
       "rotation": [
         0,
         0,
-        0
+        12.0
       ],
       "translation": [
-        -2.88,
-        0,
+        0.961104,
+        -2.3180838,
         -2.08
       ],
       "scale": [
-        0.8,
-        0.8,
-        0.8
+        0.6,
+        0.6,
+        0.6
       ]
     },
     "thirdperson_righthand": {
@@ -53,13 +53,13 @@
       ],
       "translation": [
         0,
-        2.5,
+        2.2,
         0
       ],
       "scale": [
-        0.5,
-        0.5,
-        0.5
+        0.44,
+        0.44,
+        0.44
       ]
     },
     "thirdperson_lefthand": {
@@ -70,24 +70,24 @@
       ],
       "translation": [
         0,
-        2.5,
+        2.2,
         0
       ],
       "scale": [
-        0.5,
-        0.5,
-        0.5
+        0.44,
+        0.44,
+        0.44
       ]
     },
     "gui": {
       "rotation": [
-        15,
-        -35,
-        -30
+        10,
+        -25,
+        -26
       ],
       "translation": [
         0,
-        -3.2,
+        -3.1,
         0
       ],
       "scale": [

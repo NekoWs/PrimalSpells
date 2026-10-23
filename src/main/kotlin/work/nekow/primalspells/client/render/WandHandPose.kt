@@ -1,5 +1,6 @@
 package work.nekow.primalspells.client.render
 
+import work.nekow.primalspells.wand.WandGrip
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
 import net.minecraft.client.player.LocalPlayer
@@ -22,7 +23,7 @@ object WandHandPose : IClientItemExtensions {
         val worldFov = Minecraft.getInstance().gameRenderer.mainCamera().fov.toDouble().coerceIn(30.0, 150.0)
         val ratio = tan(Math.toRadians(35.0)) / tan(Math.toRadians(worldFov / 2))
         val side = if (arm == HumanoidArm.RIGHT) 1.0 else -1.0
-        poseStack.translate(side * 0.38 * (ratio - 1), 0.25 * (ratio - 1), 0.0)
+        poseStack.translate(side * WandGrip.SIDE * (ratio - 1), WandGrip.UP * (ratio - 1), 0.0)
         // 保留原版装备/挥击变换；本类不改粒子或服务端的出生点。
         return false
     }

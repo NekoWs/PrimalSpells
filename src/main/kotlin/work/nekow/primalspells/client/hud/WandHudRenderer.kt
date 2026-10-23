@@ -110,7 +110,7 @@ object WandHudRenderer {
     fun onRenderHud(event: RenderGuiLayerEvent.Post) {
         if (event.name != VanillaGuiLayers.CROSSHAIR) return
         val mc = Minecraft.getInstance()
-        if (mc.gui.screen() is HudEditorScreen || mc.player?.isSpectator == true) return
+        if (mc.gui.hud.isHidden() || mc.gui.screen() is HudEditorScreen || mc.player?.isSpectator == true) return
         val now = clock(); val frame = frame(held(), now) ?: return
         val layout = HudSettings.current
         for (element in HudElement.entries) WandHudPainter.drawElement(event.guiGraphics, element,

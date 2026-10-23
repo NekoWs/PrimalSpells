@@ -7,6 +7,7 @@ import net.minecraft.world.entity.HumanoidArm
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
+import work.nekow.primalspells.wand.WandGrip
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.wand.Wand
 import java.util.UUID
@@ -16,9 +17,6 @@ import kotlin.math.sin
 /** 持杖法阵、常驻符印和宝石施法；逐帧轨迹、退场及成员寿命交给PD。 */
 object WandCastingFx {
     const val EQUIP_TICKS = 8
-    private const val GEM_FORWARD = 0.85
-    private const val GEM_UP = 0.25
-    private const val GEM_SIDE = 0.38
     private val states = hashMapOf<UUID, Held>()
     // 只保留有限退场会话，便于登出/跨维度立即取消；粒子成员和销毁调度仍由PD管理。
     private val retiring = ArrayList<Held>()
@@ -168,7 +166,7 @@ object WandCastingFx {
     private fun handOffset(player: ServerPlayer, wand: Wand): Double {
         val main = player.mainHandItem.item is WandItem && WandItem.getWand(player.mainHandItem) === wand
         val usingOffhand = player.isUsingItem && player.usedItemHand == net.minecraft.world.InteractionHand.OFF_HAND
-        val side = if (player.mainArm == HumanoidArm.RIGHT) -GEM_SIDE else GEM_SIDE
+        val side = if (player.mainArm == HumanoidArm.RIGHT) -WandGrip.SIDE else WandGrip.SIDE
         return if (main && !usingOffhand) side else -side
     }
 
@@ -224,7 +222,7 @@ object WandCastingFx {
         return (EQUIP_TICKS - (held.level.gameTime - held.started)).coerceIn(0, EQUIP_TICKS.toLong()).toInt()
     }
 
-    /** 模型宝石位于视线右上方，施法和迸发共用同一相机正交基；副手/左惯用手镜像。 */
+    /** 模型宝石位于视线右下方，施法和迸发共用同一相机正交基；副手/左惯用手镜像。 */
     fun origin(caster: Entity, wand: Wand): Vec3 {
         val player = caster as? ServerPlayer
         if (player == null || selected(player) !== wand) return caster.eyePosition.add(0.0, -0.1, 0.0)
@@ -232,7 +230,7 @@ object WandCastingFx {
         val forward = caster.lookAngle
         val up = Vec3(sin(yaw) * forward.y, kotlin.math.sqrt((1-forward.y*forward.y).coerceAtLeast(0.0)), -cos(yaw)*forward.y)
         val side = handOffset(player, wand)
-        return caster.eyePosition.add(forward.scale(GEM_FORWARD)).add(up.scale(GEM_UP))
+        return caster.eyePosition.add(forward.scale(WandGrip.FORWARD)).add(up.scale(WandGrip.UP))
             .add(cos(yaw)*side, 0.0, sin(yaw)*side)
     }
 

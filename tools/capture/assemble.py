@@ -58,6 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "wand_design": {"length": 160, "title": "暮紫封印 / 户外低位持握 / 左右手", "metric": "violet_model", "quiet": (0, 6), "decay": "none", "decay_reason": "材质/占屏来自实际紫晶像素，装备和收杖保留原版动画；施法及粒子清理由原生断言覆盖"},
     "spell_performance": {"length": 140, "title": "原生 CPU / 分配基准", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "机制计时与真实光束展示分别取证，性能数据不设机器相关通过阈值"},
     "collision_precision": {"length": 140, "title": "高速反弹 / 双精度接点 / 连续余程", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "多次真实发射分别退场，机制读取实际扫掠与接触回调"},
     "homing_light": {"length": 150, "title": "六格追踪 / 弧线扫掠 / 聚光照明", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "范围/真实曲线碰撞与照明各有独立原生断言，多个发射阶段不共用全局退场峰值"},
@@ -204,6 +205,13 @@ def wand_mask(path: Path) -> "np.ndarray":
     a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     return (g > 150) & (b > 160) & (g > b * 0.80) & ((b - r) > 40)
+
+
+def violet_model_mask(path: Path) -> "np.ndarray":
+    # 户外天空/草木不属于紫晶色域，不用世界蓝色像素冒充模型可见性。
+    a = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (b > 90) & (b > r * 1.12) & (r > g * 1.35)
 
 
 def white_spell_mask(path: Path) -> "np.ndarray":
@@ -385,7 +393,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
 
     # 只读取本场判据使用的色域，避免每个新增持杖取景都重复解码五遍整段录制。
     metric = spec.get("metric", "blue")
-    blue_cover = [int(blue_mask(f).sum()) for f in frames] if metric not in ("wand", "warm", "orange", "white") else []
+    blue_cover = [int(blue_mask(f).sum()) for f in frames] if metric not in ("wand", "warm", "orange", "white", "violet_model") else []
     red_cover = [int(red_mask(f).sum()) for f in frames] if "breach" in spec or "breach_fade" in spec else []
     # 第一人称蓄能取杖首上方，排除收杖后原版裸手的肤色；保留同样的可见性/退场门槛。
     warm_roi = spec.get("warm_roi")
@@ -397,7 +405,8 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     # 标准判据（空场起飞 / 真的渲染 / 退场 / 静止窗口）用哪一个像素判据：默认蓝（冷色粒子），
     # 爆炸场景声明 `metric: warm`（饱和暖色）；火球拖尾声明 `metric: orange`（加法混合的橙黄火花，
     # 见 `orange_mask` 的标定说明）。粉色破口判据始终独立于它。
-    cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"warm": warm_cover, "orange": orange_cover, "white": white_cover}.get(metric, blue_cover)
+    violet_cover = [int(violet_model_mask(f).sum()) for f in frames] if metric == "violet_model" else []
+    cover = [int(wand_mask(f).sum()) for f in frames] if metric == "wand" else {"violet_model": violet_cover, "warm": warm_cover, "orange": orange_cover, "white": white_cover}.get(metric, blue_cover)
     result["cover"] = cover
     result["blue_cover"] = blue_cover
     result["red_cover"] = red_cover
@@ -432,6 +441,19 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["asserts"].append(("空场起飞", max(cover[:2]) <= empty, f"前 2 帧特效像素 {cover[:2]}（阈值 ≤{empty}）"))
     result["asserts"].append(("特效确实渲染", peak >= total_px * MIN_PEAK_RATIO, f"峰值 {peak} 像素 @帧 {peak_idx}"))
     result["asserts"].append(("退场无残留", max(cover[-3:]) <= empty, f"末 3 帧 {cover[-3:]}（阈值 ≤{empty}）"))
+
+    if scene == "wand_design":
+        ticks = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
+        for tick, right in ((26, True), (66, False), (118, False)):
+            mask = violet_model_mask(ticks[tick])
+            ys, xs = np.where(mask)
+            bounds = (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())) if len(xs) else (0, 0, 0, 0)
+            centered = int(mask[200:460, 480:800].sum())
+            lower_side = len(xs) >= 100 and bounds[1] >= 350 and (bounds[0] >= 800 if right else bounds[2] <= 480)
+            result["asserts"].append((f"低位紫晶与中央视野留空-{tick}", lower_side and centered == 0,
+                f"紫晶范围={bounds}，中央覆盖={centered}，要求模型位于下半屏外侧"))
+        missing = [line for line in log_lines if "Missing texture" in line and "primalspells:item/wand" in line]
+        result["asserts"].append(("暮紫封印图集完整", not missing, f"缺失贴图={len(missing)}"))
 
     if scene == "magic_hud":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}

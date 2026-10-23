@@ -3,6 +3,7 @@ package work.nekow.primalspells.magic.effect.geometry
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
@@ -17,8 +18,17 @@ class Tracking(
 ) : BaseEffect() {
     override val phase = EffectPhase.GUIDANCE
     private var lastTarget: LivingEntity? = null
+    // 仅跳过制导选靶，不去重真实碰撞/帧伤；方块反弹后允许重新制导。
+    private var passedTargets = hashSetOf<java.util.UUID>()
 
-    override fun onActive() { lastTarget = null }
+    override fun onActive() { lastTarget = null; passedTargets = hashSetOf() }
+
+    override fun onHitEntity(target: Entity) {
+        passedTargets += target.uuid
+        if (target === lastTarget && projectile.alive) { lastTarget = null; projectile.guidance = null }
+    }
+
+    override fun onHitBlock(pos: org.joml.Vector3f) { passedTargets.clear() }
 
     override fun onTick() {
         if (!projectile.alive || !projectile.motionEnabled || !isStackPrimary) return
@@ -36,7 +46,7 @@ class Tracking(
             val progress = (offset.dot(movement) / distanceSquared).coerceIn(0.0, 1.0)
             return entity.boundingBox.center.distanceToSqr(center.add(movement.scale(progress)))
         }
-        fun valid(entity: LivingEntity) = entity !== caster && entity.isAlive && !entity.isRemoved &&
+        fun valid(entity: LivingEntity) = entity !== caster && entity.uuid !in passedTargets && entity.isAlive && !entity.isRemoved &&
             !caster.isAlliedTo(entity) && !(entity is Player && (entity.isCreative || entity.isSpectator)) &&
             pathDistanceSquared(entity) <= reach * reach
         val target = lastTarget?.takeIf(::valid) ?: level.getEntitiesOfClass(LivingEntity::class.java,
@@ -47,6 +57,6 @@ class Tracking(
         lastTarget = target
         if (target == null) return
         projectile.guidance = work.nekow.primalspells.magic.projectile.Projectile.Guidance(
-            target.boundingBox.center, (strength * stackScale).coerceAtLeast(0f))
+            target.boundingBox.center, (strength * stackScale).coerceAtLeast(0f), target.boundingBox)
     }
 }

@@ -33,9 +33,10 @@ object HomingLightScene {
         fun record(t: Int, id: String, ok: Boolean, detail: String) {
             checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail))
         }
-        fun shot(ctx: CaptureDriver.SceneCtx, id: String, start: Vec3, homing: Int = 1): Projectile {
+        fun shot(ctx: CaptureDriver.SceneCtx, id: String, start: Vec3, homing: Int = 1,
+                 extras: List<String> = emptyList()): Projectile {
             val p = MagicManager.create(id) as Projectile
-            SpellAssembly.apply(p, List(homing) { MagicManager.create("homing") as Modifier })
+            SpellAssembly.apply(p, (List(homing) { "homing" } + extras).map { MagicManager.create(it) as Modifier })
             p.caster = ctx.player; p.wand = Wand("homing-light-$id")
             p.position = start.toVector3f(); p.velocity = Vector3f(0f, 0f, 1f); p.spell()
             return p
@@ -73,6 +74,8 @@ object HomingLightScene {
                     }
                     val directions = path.zipWithNext { a, b -> b.subtract(a).normalize() }
                     val bend = directions.zipWithNext().maxOf { (a, b) -> acos(a.dot(b).coerceIn(-1.0, 1.0)) }
+                    val entryBend = directions.take(10).zipWithNext().maxOf { (a, b) -> acos(a.dot(b).coerceIn(-1.0, 1.0)) }
+                    record(t, "gentler-long-range-steering", entryBend < 0.023, "entryMaxAngle=$entryBend")
                     val sampled = FlightTrace.sample(reference, start, path.last(), 0.125)
                     record(t, "flight-and-light-trace-are-curved", path.maxOf(::chordGap) > 0.25 && sampled.maxOf { chordGap(it.position) } > 0.25,
                         "sweepGap=${path.maxOf(::chordGap)} traceSamples=${sampled.size}")
@@ -92,7 +95,68 @@ object HomingLightScene {
                     repeat(12) { if (hit.alive) { hit.tick(); hit.status.age++ } }
                     record(t, "curved-light-actually-hits-entity-center", dummy.totalDamage == 36.0, "damage=${dummy.totalDamage}")
                     hit.alive = false; hit.die(); dummy.discard()
+
+                    // 真正穿透后，当前刻余程保持接触切线；之后不能回锁已穿过的目标。
+                    for ((index, offset) in listOf(Vec3(0.0, 0.0001, 2.0), Vec3(1.5, 0.15, 4.0),
+                            Vec3(5.5, 0.0, 2.0), Vec3(0.25, -0.4, 0.8)).withIndex()) {
+                        // 高处隔离地面反弹；墙面反射回归由独立场景负责。
+                        val origin = Vec3(-8.0, floor + 8.0, -6.0)
+                        val victim = ctx.spawnDummy(origin.x + offset.x, origin.y + offset.y, origin.z + offset.z)
+                        victim.setPos(victim.x, origin.y + offset.y - victim.bbHeight / 2.0, victim.z)
+                        val pierce = shot(ctx, "concentrated_light", origin, extras = listOf("piercing")) as ConcentratedLight
+                        pierce.status.age = ConcentratedLight.CHARGE_TICKS
+                        repeat(16) { if (pierce.alive && victim.totalDamage == 0.0) { pierce.tick(); pierce.status.age++ } }
+                        val crossed = victim.totalDamage > 0.0
+                        val points = pierce.flightPath.toList()
+                        val contact = points.indexOfFirst { victim.boundingBox.inflate(pierce.hitRadius).contains(it) }
+                        val exit = points.drop((contact + 1).coerceAtLeast(0)).zipWithNext { a, b -> b.subtract(a) }
+                            .filter { it.lengthSqr() > 1e-10 }.map { it.normalize() }
+                        val turnAfterHit = exit.zipWithNext().maxOfOrNull { (a, b) -> acos(a.dot(b).coerceIn(-1.0, 1.0)) } ?: 0.0
+                        record(t, "piercing-hits-and-exits-tangentially-$index", crossed && pierce.alive && pierce.status.bounces == 5 && contact >= 0 && turnAfterHit < 0.002,
+                            "damage=${victim.totalDamage} contact=$contact exitBend=$turnAfterHit velocity=${pierce.status.velocity} bounces=${pierce.status.bounces} target=${victim.boundingBox.center} pos=${pierce.status.pos}")
+                        val heading = Vec3(pierce.status.velocity).normalize()
+                        val speed = pierce.status.velocity.length()
+                        pierce.collisionEnabled = false
+                        var unlocked = true
+                        val guidanceHistory = arrayListOf<String>()
+                        repeat(3) { pierce.tick(); pierce.status.age++; unlocked = unlocked && pierce.guidance == null; guidanceHistory += "${pierce.guidance}" }
+                        record(t, "piercing-does-not-return-or-gain-speed-$index", crossed && unlocked &&
+                            Vec3(pierce.status.velocity).normalize().dot(heading) > 0.99999 && abs(pierce.status.velocity.length() - speed) < 1e-4,
+                            "unlocked=$unlocked velocity=${pierce.status.velocity} originalSpeed=$speed target=${victim.boundingBox.center} guidance=$guidanceHistory")
+                        if (index == 0 && crossed) {
+                            // 回到真实重叠区，证明不再选靶并没有变成伤害去重。
+                            pierce.collisionEnabled = true; pierce.status.pos.set(victim.boundingBox.center.toVector3f())
+                            pierce.status.velocity.set(0f, 0f, 0.01f)
+                            val before = victim.totalDamage
+                            pierce.tick(); pierce.status.age++; val first = victim.totalDamage
+                            pierce.tick(); pierce.status.age++
+                            record(t, "piercing-still-damages-on-consecutive-ticks", first > before && victim.totalDamage > first,
+                                "damage=$before/$first/${victim.totalDamage}")
+                            // 在未经过的目标上重新制导，不能因跳过旧目标而关闭整个追踪修正。
+                            val next = ctx.spawnDummy(origin.x + 1.0, victim.y, origin.z + 5.0)
+                            pierce.status.pos.set(origin.x.toFloat(), victim.boundingBox.center.y.toFloat(), (origin.z + 3.0).toFloat())
+                            pierce.status.velocity.set(0f, 0f, 6f)
+                            repeat(12) { if (pierce.alive && next.totalDamage == 0.0) { pierce.tick(); pierce.status.age++ } }
+                            record(t, "piercing-can-seek-another-target", next.totalDamage > 0.0, "damage=${next.totalDamage}")
+                            next.discard()
+                        }
+                        pierce.alive = false; pierce.die(); victim.discard()
+                    }
+
+                    val recipes = listOf(listOf("fireball") to 1.0, listOf("piercing", "fireball") to 11.0,
+                        listOf("fireball", "piercing") to 11.0, listOf("piercing", "piercing", "fireball") to 21.0,
+                        listOf("piercing", "chainsaw") to 0.0)
+                    recipes.forEachIndexed { index, (cards, expected) ->
+                        // 两张投射物预算将尾部修正也纳入当前链，避免把下一链误当牌序差异。
+                        val wand = Wand("pierce-delay-$index"); wand.cast = 2
+                        wand.innate += cards.map { requireNotNull(MagicManager.create(it)) }; wand.load(); wand.status.mana = wand.mana
+                        val plan = wand.preview()
+                        val cast = wand.spell(ctx.player)
+                        record(t, "piercing-cooldown-through-real-cast-$index", cast && plan.delay == expected && wand.status.delay == expected,
+                            "cards=$cards preview=${plan.delay} real=${wand.status.delay} expected=$expected")
+                    }
                 }
+                if (t == 9) MagicManager.projectiles.filter { it.wand.id.startsWith("pierce-delay-") }.forEach { it.alive = false }
                 if (t == 40) {
                     val dummy = ctx.spawnDummy(1.0, floor + 2.0, 8.0)
                     target = dummy

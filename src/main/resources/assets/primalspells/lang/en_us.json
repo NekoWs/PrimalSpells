@@ -61,7 +61,7 @@
   "lore.primalspells.extended_lifetime.desc": "Extends the spell's lifetime.",
   "lore.primalspells.piercing.desc": "Unlimited piercing and self damage; returning projectiles can hit their caster.",
   "lore.primalspells.bounce_explosion.desc": "Causes the spell to explode on each bounce.",
-  "lore.primalspells.homing.desc": "Locks onto a creature within 6 blocks of its flight path and curves smoothly toward its center without changing speed.",
+  "lore.primalspells.homing.desc": "Smoothly homes along a broad curve toward entity centers within 6 blocks of its flight path. After piercing, continues toward new targets without gaining speed.",
   "lore.primalspells.bounce_duplicate.desc": "Duplicates the spell on each bounce.",
   "lore.primalspells.gradual_accelerate.desc": "Starts slow and gradually accelerates.",
   "lore.primalspells.gradual_decelerate.desc": "Starts fast and gradually decelerates.",

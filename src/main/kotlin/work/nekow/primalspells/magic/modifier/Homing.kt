@@ -9,6 +9,6 @@ class Homing : Modifier() {
     init {
         mana = 4.0
         delay = 0
-        effects += Tracking(range = 6.0f, strength = 1.0f)
+        effects += Tracking(range = 6.0f, strength = 0.6f)
     }
 }

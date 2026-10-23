@@ -53,7 +53,11 @@ abstract class Projectile: Magic() {
     var shieldReflectionPoint: net.minecraft.world.phys.Vec3? = null
 
     /** 本刻制导目标快照；GUIDANCE声明，Move在真实碰撞子步中连续转向。 */
-    data class Guidance(val target: net.minecraft.world.phys.Vec3, val strength: Float)
+    data class Guidance(
+        val target: net.minecraft.world.phys.Vec3,
+        val strength: Float,
+        val targetBounds: net.minecraft.world.phys.AABB,
+    )
     var guidance: Guidance? = null
     /** 本刻真正经过的扫掠点；光束表现沿此路径绘制，不用首尾直线冒充弧形命中。 */
     val flightPath = arrayListOf<net.minecraft.world.phys.Vec3>()

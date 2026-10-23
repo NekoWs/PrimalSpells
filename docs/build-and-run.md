@@ -88,7 +88,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | 场景 | 主要覆盖 |
 |---|---|
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
-| homing_light | 六格索敌、真实弧线/实体与方块命中、十刻蓄能与照明退场 |
+| homing_light | 六格柔和追踪、穿透后切线/换靶/帧伤、穿刺付费冷却、十刻蓄能与照明退场 |
 | projectile_flight / fireball_trail | 原版弩速对比、六格扫掠追踪、复制速度、实际alpha递减 |
 | black_hole / black_hole_moving / gravity_field / gravity_field_moving | 区域场原维度、移动跟随和收尾 |
 | energy_shield / shield_balance / spell_chain | 护盾预算/接点/束截断/穿刺荷载/同链作用域 |
@@ -110,4 +110,4 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 当前PD 1.0.21原生复验：particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场共302帧、0丢帧，机制与视觉门禁均通过。光照随alpha下降，组缩片退场最大单刻光强差1.875，原15→0硬切未复现。已知5条OSHI诊断按用户要求计入忽略项，不再使整体报告失败；其他日志门禁保持。所有法术入退场与短寿命高刷范围见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
 
-当前追踪/聚光复验：`homing_light,projectile_flight,spell_chain,recoil_light,shield_balance`五场机制与视觉门禁通过，第一人称场景修正取景后独立复验通过；六场共163项玩法断言、1330帧、0丢帧。命令为 `pwsh tools/capture/capture.ps1 -Offline -Scene homing_light,projectile_flight,spell_chain,recoil_light,shield_balance,concentrated_light_first_person -TimeoutSec 600`；首五场证据在 `build/capture/homing-light-six-scenes`，第一人称最终证据在 `build/capture/out`。六格边界、曲线偏离首尾直线、真实碰撞、速度守恒、10t部署蓄能、实际光照升亮/清零与原方向释放均有原生断言。
+当前追踪/穿刺复验：`homing_light,projectile_flight,spell_chain`三场共115项机制检查、680帧、0丢帧，机制与视觉门禁均通过。命令为 `pwsh tools/capture/capture.ps1 -Offline -Scene homing_light,projectile_flight,spell_chain -TimeoutSec 600`，证据在 `build/capture/out`。覆盖六格边界、减弱远段转向后实际命中、曲线方块碰撞、四组穿透切线/无回锁/速度守恒、后续换靶、连续帧伤，以及穿刺延迟的同链牌序/多卡叠加/链锯归零和真实付费预览一致。近距穿透检查在高处隔离地面反弹，真实墙面反弹仍保留；聚光10t原地蓄能与光照升亮/清零继续通过。

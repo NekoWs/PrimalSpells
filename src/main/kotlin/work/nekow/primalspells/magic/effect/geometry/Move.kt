@@ -172,18 +172,24 @@ class Move(
         val heading = Vector3f(movement).div(distance)
         val position = Vector3f(start)
         val guidance = projectile.guidance
+        val arrival = guidance?.targetBounds?.inflate(hitRadius)
+        var arrived = false
         return (1..steps).map { index ->
             val step = min(index / 16f, distance) - min((index - 1) / 16f, distance)
             val next = Vector3f(heading)
-            if (guidance != null && guidance.strength > 0f) {
+            // 在真正进入目标碰撞范围后保持切线；不能把本刻剩余路径预排成绕中心的回头小圈。
+            if (arrival?.contains(Vec3(position)) == true) arrived = true
+            if (guidance != null && guidance.strength > 0f && !arrived) {
                 val aim = guidance.target.subtract(Vec3(position)).toVector3f()
                 val remaining = aim.length()
                 if (remaining > 1e-6f) {
                     aim.div(remaining)
                     val angle = acos(heading.dot(aim).coerceIn(-1f, 1f))
                     if (angle > 1e-6f) {
-                        // 远处舒展成弧，近目标缩小转弯半径，避免持续绕靶不命中。
-                        val radius = (remaining * 0.6f).coerceIn(0.3f, 4f) / guidance.strength
+                        // 远处使用较弱制导舒展弧线，三格内渐增末段修正，避免减弱后只绕靶不命中。
+                        val precision = (1f - remaining / 3f).coerceIn(0f, 1f)
+                        val turnStrength = guidance.strength * (1f + precision * (2f / 3f))
+                        val radius = (remaining * 0.6f).coerceIn(0.3f, 4f) / turnStrength
                         // 极多复制修正也不能在单个子步翻转180度，避免中点方向退化为零。
                         val fraction = (min(step / radius, 0.2f) / angle).coerceIn(0f, 1f)
                         Quaternionf().slerp(Quaternionf().rotationTo(heading, aim), fraction).transform(next).normalize()

@@ -31,4 +31,4 @@ WandArmPose负责第三人称手持，WandHandPose补偿FOV与原版物品投影
 
 wand_casting及其第一/第三视角、宽FOV变体、wand_aim检查预热、跟随、自转、状态时序、模型余光、主副手瞄准和持物高度。冷却只在地面阵列及HUD表示，准心不重复显示菱形/进度条。
 
-PD首次接管和变量完成回报已接入；未决光照与短粒子问题见 [PD需求](../issues/pd-api-requests.md)，不保留已失效的旧前置限制。
+PD首次接管、变量完成回报和光强包络已接入；所有法术覆盖及短寿命高刷范围见 [待验证](../issues/verify.md)。

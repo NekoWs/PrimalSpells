@@ -18,4 +18,4 @@
 
 区域场首tick捕获level，不能追读已跨维度施法者的新世界。吸引/下压力属于玩法，成员簿记、位置积分、插值和曲线属于PD； API规则见 [effects-api](effects-api.md)。
 
-black_hole、black_hole_moving、gravity_field、gravity_field_moving检查真实施法、移动跟随、入退场和零残留；spell_stability覆盖双场持续运动与大批量速度通路。自然地形/多人压力验收见 [verify](../issues/verify.md)。光照生命周期仍被PD缺口阻塞，不把尺寸收束写成光场平滑。
+black_hole、black_hole_moving、gravity_field、gravity_field_moving检查真实施法、移动跟随、入退场和零残留；spell_stability覆盖双场持续运动与大批量速度通路。自然地形/多人压力验收见 [verify](../issues/verify.md)。PD已使尺寸收束同步影响光强；复杂场景与高刷照明仍需按实际输出验收。

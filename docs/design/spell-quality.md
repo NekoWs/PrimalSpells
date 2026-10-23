@@ -34,4 +34,4 @@ SpellAssembly统一装配同链修正，按ID规范化，无牌序语义。独�
 
 冰/热弹相遇产生蒸汽反应；黑洞吞普通弹储能并在结束释放，场源不互吞；爆炸按强度推离附近魔法弹。所有反应限同维度，盾抵消的伤害不能冻结。
 
-机制与数值见 [战斗规则](combat-pricing.md)、[特殊法术](spell-expansion.md)。原生玩法、实际视觉与清理分别验收；particle_lighting仍证明PD光照有硬切，机枪等混合退场未过项见 [open](../issues/open.md)。
+机制与数值见 [战斗规则](combat-pricing.md)、[特殊法术](spell-expansion.md)。原生玩法、实际视觉与清理分别验收；particle_lighting已验证基础光照收束，所有法术的显式生命周期覆盖与机枪等混合退场未过项见 [open](../issues/open.md)。

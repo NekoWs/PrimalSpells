@@ -6,7 +6,7 @@ PD是粒子成员管理、运动积分、锚点、渲染插值、寿命曲线、
 
 遇到API缺陷或能力缺失，**停止该接入点并登记需求，不在本模组自建替代实现**。禁止复制播放器、手写插值时钟、维护另一套粒子寿命或光照平滑缓存。先明确目标模型，再核对当前sources JAR，最后记录缺口、验收和恢复条件；规则见 [开发约定第9节](../conventions.md#9-外部依赖政策particledrawing)。
 
-当前依赖为1.0.20-ALPHA，实际版本取 `gradle.properties`；主JAR与sources JAR必须匹配。未决项仅在 [PD需求](../issues/pd-api-requests.md) 维护。改爆炸前查看本地参考 `.refs/explosion-vfx/`，它不入库。
+当前依赖为1.0.21-ALPHA，实际版本取 `gradle.properties`；主JAR与sources JAR必须匹配。未决项仅在 [PD需求](../issues/pd-api-requests.md) 维护。改爆炸前查看本地参考 `.refs/explosion-vfx/`，它不入库。
 
 ## 1. 选用哪种API
 
@@ -36,9 +36,9 @@ ParticleVisual定义贴图、UV、广告牌/方向、各向异性尺寸、混合
 
 `scale`是编辑器单位，16px贴图整宽约 `scale × 0.2` 格；按世界格声明用 `anisoWorld`。各向异性世界尺寸不能假定由单一resize按格数改写，使用相应尺寸/组倍率API。
 
-`ParticleLifeCurve`的通道是ALPHA、SCALE、RED、GREEN、BLUE；同通道多条曲线相乘，总计最多8条。`.sizeCurve/alphaCurve`是追加；重复热更必须用 `.lifeCurve(ParticleLifeCurve.of(...))`覆盖完整通道集合，避免不断叠乘或丢掉另一通道。
+`ParticleLifeCurve`的通道是ALPHA、SCALE、RED、GREEN、BLUE、LIGHT；同通道多条曲线相乘，总计最多8条。`.sizeCurve/alphaCurve`是追加；重复热更必须用 `.lifeCurve(ParticleLifeCurve.of(...))`覆盖完整通道集合，避免不断叠乘或丢掉另一通道。
 
-拖尾在spawn和life热更时都声明SCALE与ALPHA；保留4t最低寿命。1～2t样本/末端缺口见 [未决需求](../issues/pd-api-requests.md#短寿命粒子的曲线时钟与末端退场)。不要改本侧渲染时钟来弥补。
+拖尾在spawn和life热更时都声明SCALE与ALPHA，当前视觉仍保留4t最低寿命。PD按出生partialTick计算分数年龄并逐帧采样曲线；1～2t拖尾的完整实机验收见 [待验证范围](../issues/verify.md)，不因升级直接改变既有尾长。
 
 ## 4. 出生与回收
 
@@ -54,10 +54,14 @@ ParticleVisual定义贴图、UV、广告牌/方向、各向异性尺寸、混合
 
 Builder的glowing/lightLevel还决定客户端光源索引，不能只在visual内声明就假定已登记；`spawnParticle`封装会同步这两个字段，直接Builder调用也必须遵守。
 
-当前DynamicLightManager直接取固定lightLevel，alpha只在0.01阈值决定是否入选，尺寸/组presence不参与照明。因此淡出、缩片、retire都不能保证光场平滑。光照过渡接入已停止，**不能把给所有粒子加alpha或关闭所有光源称为修复**；原生复现与API要求见 [光照生命周期](../issues/pd-api-requests.md#发光粒子的光照生命周期与连续强度)。
+DynamicLightManager读取PD原生lightIntensity(partialTick)：基础lightLevel × 静态乘数 × LIGHT曲线 × alpha × 尺寸包络，再叠加热更接续偏移。已有缩片、fade和表达式presence会同时收束照明，不改变硬边实色风格。光场签名与静止区块重建按1/16级光强更新，受光粒子缓存随光场版本失效。
+
+新增公开入口：ParticleCurve.light / Builder、SpawnSpec、Emitter的lightCurve；ParticleVisual.lightIntensity设置静态乘数，ParticleHandle.lightIntensity(multiplier, durationTicks, easing)从当前实际光强接续。LIGHT仅影响照明，不改变片元alpha或全亮。
+
+显式remove仍立即移除光源；需要正常退场的调用方必须先用尺寸/alpha/LIGHT曲线或lightIntensity缓动到零，再回收。没有曲线的固定尺寸粒子不会因升级自动获得入退场动画。光源预算裁剪和所有法术完整覆盖仍需应用层验收，不能仅凭接口出现宣称全局闪烁已消除。
 
 ## 6. 升级与验证
 
 在PD项目 `D:/Backup/IDEA Projects/ParticleDrawing` 构建主JAR和sourcesJar；只有明确升级时复制二者并更新版本/下限，不能仅因磁盘源码版本较新就视为当前运行版本。项目内不修改PD源码或JAR绕过缺陷。
 
-构建与录制见 [构建指南](../build-and-run.md)。`pd_api`观察原生track/Bridge/受光缓存/完成回报，`particle_lighting`检查alpha与组缩片时真实光场的过渡；缺陷未修前后者按原阈值失败。观察器不提供替代渲染或光照。
+构建与录制见 [构建指南](../build-and-run.md)。`pd_api`观察原生track/Bridge/受光缓存/完成回报，`particle_lighting`检查alpha与组缩片时真实光场的过渡，阈值不因升级调整。观察器不提供替代渲染或光照。

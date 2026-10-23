@@ -84,4 +84,4 @@ PackRules校验数据包后原子发布池/等级快照，新数值仅作用于�
 
 法术世界表现使用 `wand.pdParticles(level)` 获取原维度管理器，保证非玩家施法也有粒子。ParticleGroup用于刚性造型/表达式编排，ParticleBatch用于独立运动成员，Emitter用于逐渲染帧拖尾；不自建集合或插值器。
 
-PD原生首次外观原子接管、变量终点完成回报和退场retire已接入。透明出生与零尺寸表达式共同防止切杖先闪满尺寸。尺寸/alpha曲线不能等同动态光照曲线；当前短寿命采样和光照连续性缺口见 [PD需求](issues/pd-api-requests.md)。完整 API 使用见 [effects-api](design/effects-api.md)。
+PD原生首次外观原子接管、变量终点完成回报和退场retire已接入。透明出生与零尺寸表达式共同防止切杖先闪满尺寸。PD 1.0.21按分数年龄采样，并将尺寸/alpha包络与独立LIGHT通道共同用于照明；完整法术覆盖与高刷短尾见 [待验证范围](issues/verify.md)。完整 API 使用见 [effects-api](design/effects-api.md)。

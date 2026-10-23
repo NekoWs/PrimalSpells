@@ -554,10 +554,10 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             f"右/左/前向红色覆盖={right}/{left}/{front}"))
         # 四段短线共用准星中心；用最外侧笔画半径检查有限外移。
         radii = []
-        for t in (61, 64, 66):
+        for t in (60, 62, 64):
             ys, xs = np.where(marker_mask(t, red=True)[260:460, 540:740])
             radii.append(int(np.max(np.maximum(np.abs(xs - 100), np.abs(ys - 100)))) if len(xs) else 0.0)
-        result["asserts"].append(("FPS短线有限外移", 0 < radii[0] <= radii[1] <= radii[2] and radii[2] > radii[0],
+        result["asserts"].append(("FPS短线有限外移", 0 < radii[0] < radii[1] < radii[2],
             f"笔画外围半径={radii}"))
         protected = [int(marker_mask(t)[336:384, 616:664].sum())
                      for t in (*range(56, 70), *range(94, 100))]
@@ -568,17 +568,19 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         double_kill = components(marker_mask(98, red=True)[260:460, 540:740])
         result["asserts"].append(("同一目标连击只有四条FPS短线且无碎点", len(single) == 4 and min((size for size, _ in single), default=0) >= 18,
             f"同一目标16次连击后标记面积={single}"))
-        result["asserts"].append(("不同目标才增加反馈笔画", len(triple) == 12 and len(double_kill) == 8,
-            f"三目标命中/两目标击杀短线数={len(triple)}/{len(double_kill)}"))
+        result["asserts"].append(("多目标反馈允许同形重叠", len(triple) == 4 and len(double_kill) == 4,
+            f"三目标命中/两目标击杀重叠后短线数={len(triple)}/{len(double_kill)}；独立目标数由真实网络断言检查"))
         boxes = [box for _, box in triple]
-        quadrants = [sum((x0 + x1 > 200) == right and (y0 + y1 > 200) == down
-                         for x0, y0, x1, y1 in boxes) for right in (False, True) for down in (False, True)]
-        result["asserts"].append(("反馈围绕原版准星且保持短小", len(boxes) == 12 and quadrants == [3, 3, 3, 3] and
+        cardinal = sum(abs((x0 + x1) / 2 - 100) <= 3 or abs((y0 + y1) / 2 - 100) <= 3
+                       for x0, y0, x1, y1 in boxes)
+        result["asserts"].append(("命中固定正十字且保持短小", len(boxes) == 4 and cardinal == 4 and
             all(x1 - x0 + 1 <= 24 and y1 - y0 + 1 <= 24 for x0, y0, x1, y1 in boxes),
-            f"每象限笔画数={quadrants}，各笔画包围框={boxes}"))
+            f"轴向短线={cardinal}，各笔画包围框={boxes}"))
         delta = feedback_delta(97)[260:460, 540:740]
         r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
-        simultaneous = [int(((b > 15) & (b - g > 10) & (b - r > 5)).sum()),
+        yy, xx = np.indices(r.shape)
+        hit_axes = (np.abs(xx - 100) <= 4) | (np.abs(yy - 100) <= 4)
+        simultaneous = [int(((delta.max(axis=2) > 5) & hit_axes).sum()),
                         int(((r > 15) & (r - g > 10) & (r - b > 10)).sum())]
         result["asserts"].append(("击杀不遮掉其它命中", min(simultaneous) >= 50,
             f"同时在场紫色/红色像素={simultaneous}"))

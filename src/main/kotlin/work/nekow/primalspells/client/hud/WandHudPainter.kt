@@ -120,15 +120,18 @@ object WandHudPainter {
         }
     }
 
-    /** 围绕原版准星的四段短线；命中紫白、击杀红色，共用清晰的中心留空。 */
+    /** 正十字命中、斜十字击杀；GUI矩阵保留小数位，硬边短线持续移动，不逐格停顿。 */
     private fun impactMarker(g: GuiGraphicsExtractor, impact: HudImpactFrame, cx: Int, cy: Int, scale: Double, presence: Double) {
         val alpha = impact.alpha * presence
         if (alpha <= 0.003) return
         val core = if (impact.killed) 0xFFFFB1BA.toInt() else WHITE
         val color = if (impact.killed) 0xFFFF4B64.toInt() else 0xFFE0CFFF.toInt()
         for (stroke in impact.strokes(scale)) {
-            rect(g, cx + stroke.x, cy + stroke.y, stroke.width, stroke.height,
-                if (stroke.core) core else color, alpha)
+            g.pose().pushMatrix()
+            g.pose().translate((cx + stroke.x).toFloat(), (cy + stroke.y).toFloat())
+                .scale(stroke.width.toFloat(), stroke.height.toFloat())
+            g.fill(0, 0, 1, 1, tint(if (stroke.core) core else color, alpha))
+            g.pose().popMatrix()
         }
     }
 }

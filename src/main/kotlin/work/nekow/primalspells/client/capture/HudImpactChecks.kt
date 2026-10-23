@@ -22,26 +22,26 @@ object HudImpactChecks {
         queue.clear()
         repeat(3) { queue.add(it, false, 0.0) }
         val targets = queue.sample(1.0)
-        record("different-targets-have-independent-stars", targets.size == 3 && targets.map { it.slot }.distinct().size == 3,
+        record("different-targets-have-independent-stars", targets.size == 3 && targets.map { it.targetId }.distinct().size == 3,
             "targets=$targets")
         val beforeKill = queue.sample(4.0)
         queue.add(0, true, 4.0)
         val promoted = queue.sample(4.0)
         val kill = promoted.single { it.targetId == 0 }
         record("kill-promotes-target-without-adding-marker", promoted.size == 3 && kill.killed &&
-            kill.id == beforeKill[0].id && kill.slot == beforeKill[0].slot && kill.spread == beforeKill[0].spread &&
+            kill.id == beforeKill[0].id && kill.spread == beforeKill[0].spread &&
             kill.previous == beforeKill[0] && kill.alpha == 0.0, "promoted=$kill")
         record("promotion-keeps-other-targets-unchanged", promoted.drop(1) == beforeKill.drop(1), "other=${promoted.drop(1)}")
         val continuing = queue.sample(4.4)
         queue.add(0, true, 4.4)
         record("duplicate-kill-does-not-restart", continuing == queue.sample(4.4), "same target duplicate")
         record("promotion-crossfades-continuously", queue.sample(4.4).single { it.killed }.let {
-            it.alpha > 0.0 && it.previous != null && it.previous.alpha in 0.0..beforeKill[0].alpha
+            it.alpha > 0.0 && it.previous != null && it.previous.alpha in 0.0..beforeKill[0].alpha && it.previous.spread > beforeKill[0].spread
         } && queue.sample(5.0).single { it.killed }.previous == null, "transition=0.8t")
         record("impacts-no-backlog-after-hidden-hud", queue.sample(100.0).isEmpty(), "jump=100t")
         repeat(128) { queue.add(it, it % 3 == 0, 100.0) }
         val burst = queue.sample(101.0)
-        record("different-target-burst-keeps-every-target", burst.size == 128 && burst.map { it.slot }.distinct().size == 128,
+        record("different-target-burst-keeps-every-target", burst.size == 128 && burst.map { it.id }.distinct().size == 128,
             "targets=${burst.size}")
         queue.clear()
         var singleTarget = true
@@ -66,21 +66,32 @@ object HudImpactChecks {
                 "duration=$duration finalAlpha=${samples.last().alpha}")
             queue.clear()
         }
-        val markers = (0..2).map { HudImpactFrame(it.toLong(), false, it, 1.0, 1.0, 0.0).strokes(1.0) }
-        record("fps-markers-share-crosshair-and-differ-by-angle", markers.distinct().size == 3 && markers.all { strokes ->
-            strokes.count { it.core } == 4 && strokes.any { it.x > 0 && it.y > 0 } &&
-                strokes.any { it.x < 0 && it.y < 0 } && strokes.any { it.x < 0 && it.y > 0 } &&
-                strokes.any { it.x > 0 && it.y < 0 }
-        }, "three targets, four diagonal arms each")
-        record("fps-markers-fit-and-protect-crosshair-at-all-scales", listOf(0.6, 1.0, 2.5).all { scale ->
-            (0..127).all { slot -> listOf(0.0, 1.0).all { spread -> listOf(false, true).all { killed ->
-                HudImpactFrame(slot.toLong(), killed, slot, 1.0, 1.0, spread).strokes(scale).all { stroke ->
-                    (stroke.x until stroke.x + stroke.width).all { x -> (stroke.y until stroke.y + stroke.height).all { y ->
-                        max(abs(x), abs(y)) * scale >= 10.0 && max(abs(x), abs(y)) <= ceil(10 / scale) * 1.42 + 10
-                    } }
+        for (killed in listOf(false, true)) {
+            val markers = (0..2).map { HudImpactFrame(it.toLong(), killed, 1.0, 1.0, 0.0).strokes(1.0) }
+            record("fixed-${if (killed) "diagonal-kill" else "cardinal-hit"}-overlaps", markers.distinct().size == 1 && markers.all { strokes ->
+                strokes.count { it.core } == 4 && strokes.all { stroke ->
+                    if (killed) abs(abs(stroke.x + stroke.width / 2) - abs(stroke.y + stroke.height / 2)) < 1e-8
+                    else abs(stroke.x + stroke.width / 2) < 1 || abs(stroke.y + stroke.height / 2) < 1
                 }
-            } } }
-        }, "128 markers, entry/exit, hit/kill, scales=60/100/250%")
+            }, "three target animations, identical fixed geometry")
+            queue.clear(); queue.add(1, killed, 0.0)
+            val duration = if (killed) 8 else 6
+            val movement = (0 until duration * 16).map { queue.sample(it / 16.0).single().spread }
+            record("no-hold-in-${if (killed) "kill" else "hit"}-motion", movement.zipWithNext().all { (a, b) -> b > a },
+                "strict outward motion at 320Hz from birth to end")
+        }
+        record("fractional-stroke-entry-and-motion", HudImpactFrame(0, false, 1.0, 0.12, 0.01).strokes(1.0).first().let {
+            it.x != floor(it.x) && it.width in 0.0..1.0 && it.width != floor(it.width)
+        }, "subpixel travel and fractional stroke length")
+        record("fixed-markers-protect-crosshair-at-all-scales", listOf(0.6, 1.0, 2.5).all { scale ->
+            listOf(0.0, 0.5, 1.0, 2.0).all { spread -> listOf(false, true).all { killed ->
+                HudImpactFrame(0, killed, 1.0, 1.0, spread).strokes(scale).all { stroke ->
+                    val nearX = min(abs(stroke.x), abs(stroke.x + stroke.width))
+                    val nearY = min(abs(stroke.y), abs(stroke.y + stroke.height))
+                    max(nearX, nearY) * scale >= 10.0 && stroke.width <= 2.0 && stroke.height <= 2.0
+                }
+            } }
+        }, "full entry/exit and kill handoff, scales=60/100/250%")
         return checks
     }
 }

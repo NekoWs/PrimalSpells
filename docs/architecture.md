@@ -2,7 +2,20 @@
 
 ## 1. 总体分层
 
-`PrimalSpells` 注册公共事件与网络，`registry/` 注册内容。`Wand`负责抽牌/付费/冷却，`MagicManager`推进服务端投射物；`BaseEffect`实现运动、命中和表现接线。`WandManager`与SavedData保存法杖权威状态。客户端负责输入、HUD、模型与只读预览，PD负责世界粒子。
+`PrimalSpells`是装配入口：先由`ModSpells`填充通用`SpellRegistry`，再创建物品与挂载事件、网络。`SpellRuntimeEvents`把世界生命周期交给`ProjectileRuntime`，不让工厂目录持有世界状态。
+
+`Wand`只持有权威配置/运行状态、装卸和每刻维护；抽牌、付费、实际发射、预览展示与NBT分别有独立实现。客户端负责输入、HUD、模型和展示缓存；世界粒子的动画、插值与光照由PD负责。本项目是按职责分包的单个Gradle模块，不将持有caster/wand引用的协作对象描述成完全独立模块。
+
+| 边界 | 实现与唯一职责 |
+|---|---|
+| 内容目录 | `registry/ModSpells`选择内置卡；`magic/core/SpellRegistry`提供只读工厂表与新实例创建，拒绝重复ID |
+| 抽牌树 | `wand/WandDeck`解析预算、控制牌与独立荷载，并管理弃牌/回洗；状态仍只存一份于Wand |
+| 付费事务 | `wand/CastTransaction`递归付费、记录接受的卡，并统一结算回洗费用、双冷却与链锯归零 |
+| 实际施法 | `wand/WandCasting`检查门槛/事件，装配并发射付费弹体，最后通知表现与AfterCast |
+| 只读预览 | `wand/WandPreviewBuilder`克隆牌堆，在同一解析器/事务上观察作用域与结果，不激活效果 |
+| 存档边界 | `wand/WandPersistence`集中NBT键、旧单位兼容、空槽/牌堆和卡自身状态恢复顺序 |
+| 世界运行时 | `magic/runtime/ProjectileRuntime`推进弹体、反应与延迟动作；停服清空在场及待加入对象 |
+| 网络边界 | `network/ModNetworking`注册协议；`WandRequestHandler`在写入前校验服务端菜单/身份/权限 |
 
 具体文件见 [代码导航](code-map.md)，端分离与目录见 [约定](conventions.md)。
 
@@ -23,10 +36,10 @@
 ## 3. 施法与抽牌
 
 1. `WandItem`/公共SpellApi调用 `Wand.tick/spell`，检查装备预热、双冷却、施法者和BeforeCast事件。
-2. `drawChain`从drawPile抽取一条树；cast预算消耗于投射物，多重施放增加预算；触发牌立即独立抽取荷载。
-3. `payChain`按链收集修正并结算成功付费牌。每张牌收费一次，荷载费用计入整次施法，不写进父投射物。
-4. `castHand`将本链修正统一装入本链投射物，设置caster/wand/杖首出生点/准星方向，激活后加入pendingAdd。荷载等触发时才释放，不重新抽牌或扣蓝。
-5. 汇总双冷却；任意成功付费链锯清零整次施放延迟，与牌序无关。所有抽到的实体牌进弃牌堆，抽空后才回洗并加recharge。
+2. `WandDeck.draw`从drawPile抽取一条树；cast预算消耗于投射物，多重施放增加预算；触发牌立即独立抽取荷载。
+3. `CastTransaction.pay`按链收集修正并结算成功付费牌。每张牌收费一次，荷载费用计入整次施法，不写进父投射物。
+4. `WandCasting`将本链修正统一装入本链投射物，设置caster/wand/杖首出生点/准星方向，激活后加入pendingAdd。荷载等触发时才释放，不重新抽牌或扣蓝。
+5. `CastTransaction.finish`汇总双冷却并弃牌/回洗；任意成功付费链锯清零整次施放延迟，与牌序无关。所有抽到的实体牌进弃牌堆，抽空后才回洗并加recharge。
 
 同链修正没有排列先后语义，按ID规范化装配；加值、倍率、归零需按规定阶段实现。父链的散射、穿刺、冻结、增伤和速度不自动传入独立荷载。根链和荷载费用都影响本次法杖事务。
 
@@ -34,7 +47,7 @@
 
 ## 4. 投射物循环与命中
 
-`ServerTickEvent.Pre → MagicManager.tick()`：处理冻结；遍历存活弹体并按阶段tick，age加1；寿命耗尽的当刻先onExpire，再标记死亡。已死亡对象在循环开头执行die/onDie并移除；pendingAdd最后统一加入，避免遍历中修改列表。随后处理跨投射物反应与Deferred有限动作。联动每刻预取反应元数据，只有水晶/黑洞或冰火互补组合才枚举；普通弹彼此、冻结弹彼此不全配对，保留原先i/j结算顺序。
+`ServerTickEvent.Pre → SpellRuntimeEvents → ProjectileRuntime.tick()`：处理冻结；遍历存活弹体并按阶段tick，age加1；寿命耗尽的当刻先onExpire，再标记死亡。已死亡对象在循环开头执行die/onDie并移除；pendingAdd最后统一加入，避免遍历中修改列表。随后处理跨投射物反应与Deferred有限动作。停服由`ProjectileRuntime.clear`统一清空在场列表、pendingAdd、冻结与延迟队列，待加入对象不能进入下一个集成服务器世界。联动每刻预取反应元数据，只有水晶/黑洞或冰火互补组合才枚举；普通弹彼此、冻结弹彼此不全配对，保留原先i/j结算顺序。
 
 激活按EffectPhase.activeOrder，SETUP先写出生和初速，MODIFIER随后改数值。每刻顺序：`MODIFIER → GUIDANCE → MOTION → OVERRIDE → VISUAL`。普通轨道在GUIDANCE改速度，追踪声明目标与曲率强度；Move在真实子步转向/扫掠并记录本刻flightPath，光束表现读取该路径与最终接点。
 
@@ -52,7 +65,7 @@ Move阻尼一次后，以最多1/16格分段积分弧线，每段解析求线段
 
 物品的WAND_ID指向WandManager内存实例及WandSavedData；WAND_SPELLS是展示副本，WAND_SELECTED_SLOT是编辑选择。小包内容与选择直接保存在物品组件。
 
-法杖保存数值、法力/冷却、固定槽位、三牌堆与可选magic_states。空槽占位、未知/已删除法术保留空位，不前移后续牌。magic_states按法术ID索引，重复ID共享状态；loadRuntimeState只能读取自身字段，不能依赖尚未设置的caster/wand。
+`Wand.saveTag/fromTag`委托`WandPersistence`；保存数值、法力/冷却、固定槽位、三牌堆与可选magic_states。空槽占位、未知/已删除法术保留空位，不前移后续牌。magic_states按法术ID索引，重复ID共享状态；loadRuntimeState只能读取自身字段，不能依赖尚未设置的caster/wand。
 
 WandManager通过背包tick及主动施法markHeld确认任意实体持有者；周期回收闲置内存实例前先落盘，get按需懒加载，存档条目不因无人持有删除。服务器换世界先清实例和持有记录。投射物不跨存档存活。
 
@@ -60,9 +73,9 @@ WandManager通过背包tick及主动施法markHeld确认任意实体持有者；
 
 ## 6. 网络与整合
 
-公共网络协议1.5.0。S→C数值、命中反馈、成功施法模型通知、镜头冲击和预览结果经ClientPayloadSink分发。C→S选槽/预览校验实际菜单与背包中的身份和范围；创造专用编辑包只接受创造玩家和合法散卡，生存走原版PICKUP。
+公共协议版本统一定义在`ModNetworking.PROTOCOL_VERSION`，当前1.5.0。S→C数值、命中反馈、成功施法模型通知、镜头冲击和预览结果经ClientPayloadSink分发。C→S选槽/预览校验实际菜单与背包中的身份和范围；创造专用编辑包只接受创造玩家和合法散卡，生存走原版PICKUP。
 
-预览在隔离牌堆/卡牌/法力副本上调用同一draw/pay/discard，不运行施法钩子、不影响原杖。整副配置分色只观察drawChain，不付费、不回洗；按卡牌对象身份标记槽，重复ID不合并。
+`WandPreviewBuilder`在隔离牌堆/卡牌/法力副本上调用同一WandDeck与CastTransaction，不运行施法钩子、不影响原杖。整副配置分色只观察WandDeck.draw，不付费、不回洗；按卡牌对象身份标记槽，重复ID不合并。
 
 PackRules校验数据包后原子发布池/等级快照，新数值仅作用于新杖。SpellApi与公共事件的线程、取消及兼容契约见 [整合接口](design/pack-integration.md)。
 
@@ -91,3 +104,11 @@ PackRules校验数据包后原子发布池/等级快照，新数值仅作用于�
 法术世界表现使用 `wand.pdParticles(level)` 获取原维度管理器，保证非玩家施法也有粒子。ParticleGroup用于刚性造型/表达式编排，ParticleBatch用于独立运动成员，Emitter用于逐渲染帧拖尾；不自建集合或插值器。
 
 PD原生首次外观原子接管、变量终点完成回报和退场retire已接入。透明出生与零尺寸表达式共同防止切杖先闪满尺寸。PD 1.0.21按分数年龄采样，并将尺寸/alpha包络与独立LIGHT通道共同用于照明；完整法术覆盖与高刷短尾见 [待验证范围](issues/verify.md)。完整 API 使用见 [effects-api](design/effects-api.md)。
+
+## 10. 扩展边界与自动检查
+
+增加卡只扩展内容类与ModSpells，不往目录类增加tick/事件；改抽牌进入WandDeck，改费用/冷却进入CastTransaction，不能为预览再复制一份结算。NBT兼容只在WandPersistence维护，不因内部类拆分变更ID、键或协议。公共外部入口仍为SpellApi；Wand的spell/preview/saveTag/fromTag入口保持。
+
+`gradle/architecture.gradle`的checkArchitecture随check/build执行：公共侧禁止导入客户端，core禁止导入具体卡和内容注册，抽牌/付费禁止导入PD、表现与网络。它检查Kotlin显式import，不是完整的字节码依赖证明；全限定调用和反射仍需代码审查。实机foundations额外覆盖注册/物品表一致、重复ID拒绝、存档游标/单位恢复、预览只读和弹体插入/到期/清理顺序；progression保留真实外部事件取消与公共API验证。
+
+当前重构回归：`foundations,spell_chain,progression,exploration,spell_performance,collision_precision,homing_light,shield_balance`八场306项机制检查通过，1804帧、16丢帧均在原预算内，视觉与日志门禁通过。证据在`build/capture/architecture-suite/`；独立性能复测在`build/capture/out/spell_performance/`。源码依赖检查另用违规公共侧/核心导入验证确实拒绝构建，删除探针后通过；图标生成器覆盖全部65个注册ID。构建无单元测试源，这些通过项来自原生场景与依赖检查。

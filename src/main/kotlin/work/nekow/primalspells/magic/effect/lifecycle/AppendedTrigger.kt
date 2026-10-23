@@ -5,6 +5,7 @@ import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.*
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.HitResult
 import work.nekow.primalspells.util.HitType
 
@@ -33,7 +34,7 @@ class AppendedTrigger : BaseEffect() {
             SpellAssembly.apply(shot, modifiers)
             shot.caster = caster; shot.wand = wand
             shot.position = Vector3d(pos); shot.velocity = Vector3f(dir)
-            shot.spell(); MagicManager.add(shot)
+            shot.spell(); ProjectileRuntime.add(shot)
         }
     }
 }

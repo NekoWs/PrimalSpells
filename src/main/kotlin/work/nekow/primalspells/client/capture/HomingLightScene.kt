@@ -1,5 +1,8 @@
 package work.nekow.primalspells.client.capture
 
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
+import kotlin.math.acos
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
@@ -10,18 +13,16 @@ import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.particledrawing.core.client.ClientParticleEngine
 import work.nekow.particledrawing.lighting.DynamicLightManager
 import work.nekow.primalspells.entity.TestDummyEntity
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.SpellAssembly
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.visual.FlightTrace
 import work.nekow.primalspells.magic.projectile.ConcentratedLight
 import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.wand.Wand
-import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
-import kotlin.math.acos
+import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.wand.Wand
 
 /** 实际曲线碰撞、六格索敌、十刻蓄能和PD世界照明的独立回归与取景。 */
 object HomingLightScene {
@@ -38,8 +39,8 @@ object HomingLightScene {
         }
         fun shot(ctx: CaptureDriver.SceneCtx, id: String, start: Vec3, homing: Int = 1,
                  extras: List<String> = emptyList(), flightSpeed: Float? = null): Projectile {
-            val p = MagicManager.create(id) as Projectile
-            SpellAssembly.apply(p, (List(homing) { "homing" } + extras).map { MagicManager.create(it) as Modifier })
+            val p = SpellRegistry.create(id) as Projectile
+            SpellAssembly.apply(p, (List(homing) { "homing" } + extras).map { SpellRegistry.create(it) as Modifier })
             p.caster = ctx.player; p.wand = Wand("homing-light-$id")
             p.position = start.toPosition(); p.velocity = Vector3f(0f, 0f, 1f)
             if (flightSpeed != null) p.speed = flightSpeed / Projectile.LAUNCH_SPEED_SCALE
@@ -199,20 +200,20 @@ object HomingLightScene {
                     recipes.forEachIndexed { index, (cards, expected) ->
                         // 两张投射物预算将尾部修正也纳入当前链，避免把下一链误当牌序差异。
                         val wand = Wand("pierce-delay-$index"); wand.cast = 2
-                        wand.innate += cards.map { requireNotNull(MagicManager.create(it)) }; wand.load(); wand.status.mana = wand.mana
+                        wand.innate += cards.map { requireNotNull(SpellRegistry.create(it)) }; wand.load(); wand.status.mana = wand.mana
                         val plan = wand.preview()
                         val cast = wand.spell(ctx.player)
                         record(t, "piercing-cooldown-through-real-cast-$index", cast && plan.delay == expected && wand.status.delay == expected,
                             "cards=$cards preview=${plan.delay} real=${wand.status.delay} expected=$expected")
                     }
                 }
-                if (t == 9) MagicManager.projectiles.filter { it.wand.id.startsWith("pierce-delay-") }.forEach { it.alive = false }
+                if (t == 9) ProjectileRuntime.projectiles.filter { it.wand.id.startsWith("pierce-delay-") }.forEach { it.alive = false }
                 if (t == 40) {
                     val dummy = ctx.spawnDummy(1.0, floor + 2.0, 8.0)
                     target = dummy
                     lightPoint = Vec3(-4.0, dummy.boundingBox.center.y, -8.0)
                     display = (shot(ctx, "concentrated_light", lightPoint) as ConcentratedLight)
-                        .also(MagicManager::add)
+                        .also(ProjectileRuntime::add)
                 }
                 if (t == 47) {
                     val beam = checkNotNull(display)
@@ -231,7 +232,7 @@ object HomingLightScene {
                     record(t, "runtime-guided-beam-hits", dummy.totalDamage == 36.0, "damage=${dummy.totalDamage}")
                     dummy.discard()
                 }
-                if (t == 120) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 120) ProjectileRuntime.projectiles.forEach { it.alive = false }
             }, clientTick = { _, t ->
                 if (t in 40..100) ClientParticleEngine.instance()?.let { engine ->
                     DynamicLightManager.renderDynamicLights(engine)
@@ -241,7 +242,7 @@ object HomingLightScene {
                 if (t == 149) {
                     record(t, "light-and-particles-cleaned", light[100] == 0.0 && ParticleManager.of(ctx.level).getEngine().particleCount() == 0,
                         "light=${light[100]} particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
-                    record(t, "projectiles-cleaned", MagicManager.projectiles.isEmpty(), "remaining=${MagicManager.projectiles.size}")
+                    record(t, "projectiles-cleaned", ProjectileRuntime.projectiles.isEmpty(), "remaining=${ProjectileRuntime.projectiles.size}")
                 }
                 checks[t].orEmpty()
             }, finish = { target?.discard() })

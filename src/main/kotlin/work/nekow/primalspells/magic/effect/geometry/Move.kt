@@ -1,6 +1,7 @@
 package work.nekow.primalspells.magic.effect.geometry
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
+import kotlin.math.*
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
@@ -9,14 +10,13 @@ import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.chunk.LevelChunk
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import org.joml.Vector3f
 import org.joml.Quaternionf
-import kotlin.math.*
+import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.ShieldGuard
 import work.nekow.primalspells.magic.effect.BaseEffect
-import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.magic.effect.lifecycle.ShieldGuard
 import work.nekow.primalspells.util.toPosition
+import work.nekow.primalspells.util.toVec3
 
 /**
  * 唯一的普通位置积分器：双精度世界坐标，1/16格曲线分段，每段解析求真实接点。

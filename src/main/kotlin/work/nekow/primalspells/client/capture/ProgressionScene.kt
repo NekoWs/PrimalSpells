@@ -1,6 +1,7 @@
 package work.nekow.primalspells.client.capture
 
 import com.google.gson.JsonParser
+import java.util.UUID
 import net.minecraft.core.BlockPos
 import net.minecraft.core.component.DataComponents
 import net.minecraft.util.RandomSource
@@ -9,10 +10,10 @@ import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.item.DyeColor
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.item.DyeColor
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import net.neoforged.bus.api.SubscribeEvent
@@ -21,11 +22,11 @@ import work.nekow.primalspells.entity.*
 import work.nekow.primalspells.integration.*
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.loot.*
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.lifecycle.*
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.*
 import work.nekow.primalspells.wand.*
-import java.util.UUID
 
 /** 公共事件真实取消/伤害、原版拾取权限、实际结构罗盘及精英原杖掉落。 */
 object ProgressionScene {
@@ -49,7 +50,7 @@ object ProgressionScene {
         var originalStats: Wand? = null
         fun wand(vararg ids: String): ItemStack = ItemStack(ModItems.WAND.get()).also { stack ->
             val w = WandManager[WandManager.createWand(stack)]
-            w.magics += ids.map { MagicManager.create(it)!! }; w.load(); w.status.mana = w.mana
+            w.magics += ids.map { SpellRegistry.create(it)!! }; w.load(); w.status.mana = w.mana
             stack.set(ModItems.WAND_SPELLS, ids.toList() + List(w.size - ids.size) { "" })
         }
         return Scene("progression", "数据包 / 安全世界作用 / 寻法 / 流派精英", 24, 240, showHud = true,
@@ -63,7 +64,7 @@ object ProgressionScene {
                 if (t == 8) {
                     val rules = PackRules.current
                     check("real-data-reload-loaded-profiles-and-tiers", rules.tiers.size == 6 && SpellLootProfile.RAIDERS.eliteLoadouts.isNotEmpty() && "item_pull" in SpellLootProfile.STARTER.cards, "profiles=${rules.profiles.size}; tiers=${rules.tiers.size}")
-                    check("all-spells-have-data-rewards", SpellLootProfile.entries.flatMap { it.cards + it.loadouts.flatten() }.toSet() == MagicManager.registry.keys, MagicManager.registry.size)
+                    check("all-spells-have-data-rewards", SpellLootProfile.entries.flatMap { it.cards + it.loadouts.flatten() }.toSet() == SpellRegistry.factories.keys, SpellRegistry.factories.size)
                     val invalid = JsonParser.parseString("""{"min_tier":1,"max_tier":1,"cards":["missing_spell"],"loadouts":[["fireball"]]}""").asJsonObject
                     check("unknown-data-spell-rejected-without-changing-rules", runCatching { PackRules.parseProfile("test:invalid", invalid) }.isFailure && PackRules.current === rules, "snapshot unchanged")
                     val caster = EntityTypes.ZOMBIE.create(ctx.level, EntitySpawnReason.COMMAND)!!
@@ -82,7 +83,7 @@ object ProgressionScene {
                     FrozenStatus.freeze(caster, 20); FrozenStatus.shatter(caster)
                     check("freeze-enter-and-exit-events", probe.states == 2 && !FrozenStatus.isFrozen(caster), probe.states)
                     caster.discard()
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == 25) {
                     fun item(x: Double, z: Double, type: net.minecraft.world.item.Item) = ItemEntity(ctx.level, x, floor + 2.0, z, ItemStack(type)).also { it.setNoPickUpDelay(); ctx.level.addFreshEntity(it) }
@@ -144,7 +145,7 @@ object ProgressionScene {
                     val drops = ctx.level.getEntitiesOfClass(ItemEntity::class.java, AABB(-15.0, floor.toDouble(), -15.0, 15.0, floor + 10.0, 15.0))
                     check("elite-drops-original-wand-and-one-reward-card", drops.count { it.item.item is WandItem && it.item.get(ModItems.WAND_ID)?.wandId == eliteId } == 1 && drops.count { ModItems.spellIdOf(it.item.item) != null } == 1, drops.map { it.item })
                     drops.forEach { it.discard() }; mages.forEach { it.discard() }
-                    MagicManager.projectiles.forEach { it.alive = false }; FrozenStatus.clear()
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }; FrozenStatus.clear()
                     ctx.player.removeAllEffects()
                 }
                 if (t == 115) {
@@ -165,7 +166,7 @@ object ProgressionScene {
                     ctx.command("datapack disable \"file/capture-api\"")
                 }
                 if (t == 215) check("real-datapack-disable-restores-defaults", SpellLootProfile.byKey("capture:probe") == null && PackRules.current.tiers[1]?.mana == 80.0, PackRules.current.tiers[1]?.mana)
-                if (t == 235) check("cleanup-leaves-no-projectiles-or-particles", MagicManager.projectiles.isEmpty() && work.nekow.particledrawing.api.ParticleManager.of(ctx.level).getEngine().particleCount() == 0, MagicManager.projectiles.size)
+                if (t == 235) check("cleanup-leaves-no-projectiles-or-particles", ProjectileRuntime.projectiles.isEmpty() && work.nekow.particledrawing.api.ParticleManager.of(ctx.level).getEngine().particleCount() == 0, ProjectileRuntime.projectiles.size)
             }, checksAt = { _, t -> checks[t].orEmpty() }, finish = { ctx ->
                 NeoForge.EVENT_BUS.unregister(probe); mages.forEach { it.discard() }; ctx.player.removeAllEffects(); ctx.command("difficulty peaceful")
             })

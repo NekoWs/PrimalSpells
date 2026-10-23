@@ -1,5 +1,7 @@
 package work.nekow.primalspells.magic.modifier
 
+import kotlin.math.max
+import kotlin.math.sqrt
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.projectile.FireworkRocketEntity
@@ -19,20 +21,15 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
-import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.particledrawing.core.easing.EasingType
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
-import work.nekow.primalspells.magic.effect.lifecycle.Explosion
 import work.nekow.primalspells.magic.effect.lifecycle.DirectDamage
+import work.nekow.primalspells.magic.effect.lifecycle.Explosion
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.Lore
-import work.nekow.primalspells.util.PD_IMMORTAL
 import work.nekow.primalspells.util.Polyhedra
 import work.nekow.primalspells.util.pdParticles
 import work.nekow.primalspells.wand.Wand
-import kotlin.math.max
-import kotlin.math.sqrt
 
 /**
  * 手持法杖的常驻玻璃护盾：平时不可见，受击面板显形/碎裂，破口跟随持有者。
@@ -229,8 +226,8 @@ class EnergyShield : Modifier() {
         val shellCenter = shellCenter(holder)
 
         // 自家法术：场上没有投射物就跳过这一段（剪枝）
-        if (MagicManager.projectiles.isNotEmpty()) {
-            for (p in MagicManager.projectiles) {
+        if (ProjectileRuntime.projectiles.isNotEmpty()) {
+            for (p in ProjectileRuntime.projectiles) {
                 if (!p.alive) continue
                 if (p.caster === holder) continue      // 自己施放的法术不弹（出生在面前，否则出生即被弹回）
                 if (p.maxHitTargets < 0) continue      // 穿透：完全无视护盾

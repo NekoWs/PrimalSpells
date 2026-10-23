@@ -12,7 +12,7 @@ glowing用于魔法核心/边界免环境光，烟尘等保留世界受光。造
 
 已注册卡采用32×32逻辑像素、最近邻放大至64×64，无抗锯齿，alpha仅0/255，有限色板。边框和主体对应类别/机制，抽牌类使用卡牌数量/抽取箭头等语义，不直接使用Noita素材。
 
-`python tools/spells/generate_icons.py` 重建资源及预览 `build/verify/spell-icons-mc.png`；同时检查64px与16px物品栏可读性。注册数量以MagicManager为准，不保留旧卡总数标题。
+`python tools/spells/generate_icons.py` 重建资源及预览 `build/verify/spell-icons-mc.png`；同时检查64px与16px物品栏可读性。注册数量以ModSpells/SpellRegistry为准，不保留旧卡总数标题。
 
 ## 模型与界面
 

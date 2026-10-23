@@ -1,5 +1,7 @@
 package work.nekow.primalspells.client.capture
 
+import kotlin.math.abs
+import kotlin.random.Random
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
@@ -7,16 +9,15 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.geometry.SweptCollision
 import work.nekow.primalspells.magic.projectile.ConcentratedLight
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
 import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.wand.Wand
-import kotlin.math.abs
-import kotlin.random.Random
 
 /** 实际高速反弹/薄形状/命中排序回归；解析几何也覆盖负坐标与世界边缘。 */
 object CollisionPrecisionScene {
@@ -29,7 +30,7 @@ object CollisionPrecisionScene {
         }
         fun light(ctx: CaptureDriver.SceneCtx, start: Vec3, direction: Vec3, visual: Boolean = false,
                   flightSpeed: Float = ConcentratedLight.FLIGHT_SPEED): ConcentratedLight {
-            val p = MagicManager.create("concentrated_light") as ConcentratedLight
+            val p = SpellRegistry.create("concentrated_light") as ConcentratedLight
             if (!visual) p.effects.removeIf { it.phase == EffectPhase.VISUAL }
             p.caster = ctx.player; p.wand = Wand("precision")
             p.position = start.toPosition(); p.velocity = direction.normalize().toVector3f()
@@ -53,7 +54,7 @@ object CollisionPrecisionScene {
             }, camera = { _, _ -> Pose(0.5, floor + 15.0, 0.5, 0f, 90f) },
             tick = { ctx, t ->
                 if (t == 8) {
-                    record(t, "aim-passive-is-removed", MagicManager.create("aim") == null, "unregistered aim")
+                    record(t, "aim-passive-is-removed", SpellRegistry.create("aim") == null, "unregistered aim")
                     val casterCenter = ctx.player.boundingBox.center
                     val self = light(ctx, casterCenter, Vec3(1.0, 0.0, 0.0), flightSpeed = 2f)
                     self.selfDamage = true; self.tick()
@@ -91,7 +92,7 @@ object CollisionPrecisionScene {
                         "border=$borderChunk pos=${boundary.status.pos} start=$borderStart")
                     boundary.alive=false; boundary.die()
                     fun reactionShot(freeze: Int): Projectile {
-                        val p = MagicManager.create("fireball") as Projectile
+                        val p = SpellRegistry.create("fireball") as Projectile
                         p.effects.removeIf { it.phase==EffectPhase.VISUAL }
                         p.caster=ctx.player; p.wand=Wand("ordered-reaction")
                         p.position=Vec3(0.0,floor+10.0,0.0).toPosition(); p.velocity=Vector3f(0f,0f,1f)
@@ -154,7 +155,7 @@ object CollisionPrecisionScene {
                     val length = p.flightPath.zipWithNext { a, b -> a.distanceTo(b) }.sum()
                     record(t, "all-remaining-time-survives-multiple-bounces", p.alive && p.status.bounces < 95 && abs(length - 64) < 2e-4,
                         "distance=$length bounces=${100 - p.status.bounces} speed=${p.status.velocity.length()}")
-                    val crystal = MagicManager.create("dormant_crystal") as Projectile
+                    val crystal = SpellRegistry.create("dormant_crystal") as Projectile
                     crystal.caster = ctx.player; crystal.wand = Wand("precision-crystal")
                     crystal.position = p.status.pos.toVec3().subtract(Vec3(p.status.velocity).scale(0.5)).toPosition()
                     crystal.velocity = Vector3f(0f, 0f, 1f); crystal.spell()
@@ -238,9 +239,9 @@ object CollisionPrecisionScene {
                     val p = light(ctx, Vec3(-2.75, floor + 6.0, -2.5), Vec3(1.0, 0.015, 0.51 + t * 0.003), true)
                     // 录下真实部署、蓄能、五次反射及余辉，不能用预画路径代替Move。
                     p.status.age = 0
-                    MagicManager.add(p)
+                    ProjectileRuntime.add(p)
                 }
-                if (t == 116) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 116) ProjectileRuntime.projectiles.forEach { it.alive = false }
             }, checksAt = { _, t -> checks.remove(t) ?: emptyList() })
     }
 }

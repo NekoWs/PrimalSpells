@@ -1,22 +1,14 @@
 package work.nekow.primalspells.wand
 
+import kotlin.math.min
 import net.minecraft.nbt.CompoundTag
-import net.minecraft.nbt.ListTag
-import net.minecraft.nbt.StringTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import work.nekow.particledrawing.api.ParticleManager
-import kotlin.math.max
-import kotlin.math.min
 import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.magic.core.Magic
-import work.nekow.primalspells.magic.core.MagicManager
-import work.nekow.primalspells.magic.core.Modifier
-import work.nekow.primalspells.magic.core.TriggerSpell
-import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.util.toVec3
-import work.nekow.primalspells.util.toPosition
 
+/** 法杖权威状态与装卸/每刻维护；解析、事务、发射、预览和NBT各有独立实现。 */
 class Wand(var id: String) {
     val innate = arrayListOf<Magic>()
 
@@ -32,7 +24,7 @@ class Wand(var id: String) {
     var delayTickCount: Double = 0.0
         set(value) { field = kotlin.math.ceil(value.coerceAtLeast(0.0)) }
 
-    /** **充能时间**（刻）：抽牌堆抽空之后的重装时间，见 [reloadIfNeeded] */
+    /** **充能时间**（刻）：抽牌堆抽空之后的重装时间，见 [WandDeck] */
     var rechargeTickCount: Double = 0.0
         set(value) { field = kotlin.math.ceil(value.coerceAtLeast(0.0)) }
 
@@ -55,18 +47,9 @@ class Wand(var id: String) {
     val loadedMagics = arrayListOf<Magic>()
 
     /**
-     * 法术**运行期状态**容器：法术 id → 该法术在这根法杖上的状态 NBT。
-     *
-     * 由 [saveTag] 在序列化时**先清空再重建**（逐个问 [loadedMagics] 里的法术要一份，
-     * 见 [Magic.saveRuntimeState]），由 [fromTag] 读档时经 [Magic.loadRuntimeState] 逐个回灌；
-     * 具体存什么由法术自己决定（例如 `EnergyShield` 存当前耐久与破盾暂停剩余 tick）。
-     *
-     * ⚠️ 键是**法术 id**，不是槽位：[magics] 里同一个法术 id 可以出现多次（重复卡），
-     * 这些重复卡在存档层面**共享同一份**运行期状态 —— 保存时后写的覆盖先写的，
-     * 读档时同一份值回灌给所有同 id 的卡。对当前唯一的用户（`EnergyShield`）这正是想要的语义：
-     * 一根法杖上的多张护盾卡**共用一个耐久池**（容量 = 每张上限 × 卡数、只出一层球壳），
-     * 由第一张卡负责结算、其余卡每 tick 把它的值镜像过来（见 `EnergyShield.onInventoryTick`）。
-     * 若将来出现「每张卡各自计时」的法术，需要把键从法术 id 换成槽位索引。
+     * 法术ID到运行状态NBT；保存时由已装载卡的saveRuntimeState重建，读档后回灌。
+     * 重复ID共享一份状态，后写覆盖先写；独立槽位计时不能使用此键模型。
+     * 当前护盾破口是短命状态，不写入存档。
      */
     val magicStates = hashMapOf<String, CompoundTag>()
 
@@ -132,277 +115,11 @@ class Wand(var id: String) {
         discardPile.clear()
     }
 
-    /**
-     * 进行一次施法：检查 delay/recharge 是否就绪，然后抽牌并执行。
-     *
-     * @param caster 施法者实体
-     * @return true 如果施法成功，false 如果因 delay/recharge 被阻止
-     */
-    fun spell(caster: Entity): Boolean {
-        // 持有者记录入口 2/2：任何实体主动施法都算一次「确认持有」。
-        // 手持法杖的**生物**不走 WandItem.inventoryTick 的被动驱动路径，只能在这里补记，
-        // 否则 WandManager 的回收判定会把它当成无人持有；玩家两处都会记，重复写同一张表无副作用。
-        WandManager.markHeld(WandID(id), caster.uuid, caster.level().gameTime)
-        status.failedReason.clear()
-        if (!work.nekow.primalspells.magic.effect.visual.WandCastingFx.ready(caster, this)) {
-            status.failedReason.add("Equip charge")
-            return false
-        }
-        if (status.delay > 0.0) {
-            status.failedReason.add("Delay ${fmt(status.delay)}/${fmt(delayTicks())}")
-            return false
-        }
-        if (status.recharge > 0.0) {
-            status.failedReason.add("Recharge ${fmt(status.recharge)}/${fmt(rechargeTicks())}")
-            return false
-        }
-        if (net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.BeforeCast(caster, this)).isCanceled) return false
-        val manaBefore = status.mana
-        status.delay = 0.0
-        status.recharge = 0.0
-        val chain = drawChain(cast)
-        val result = castHand(caster, chain)
-        // 冷却属于整次抽牌事务；荷载只贡献卡牌费用，不改写父投射物的参数。
-        status.delay = (if (result.resetDelay) 0.0 else max(status.delay,
-            (delayTicks() + result.delayReduction).coerceAtLeast(0.0))).coerceAtLeast(0.0)
-        status.recharge = status.recharge.coerceAtLeast(0.0)
-        status.lastDelay = status.delay
-        status.lastRecharge = status.recharge
-        work.nekow.primalspells.magic.effect.visual.WandCastingFx.cooldownsChanged(caster, this)
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.AfterCast(caster, id, manaBefore, status.mana, status.delay, status.recharge))
-        return true
-    }
+    /** 服务端真实施法，预览与此入口共用抽牌、付费和冷却规则。 */
+    fun spell(caster: Entity): Boolean = WandCasting.cast(this, caster)
 
-    private data class CastResult(val resetDelay: Boolean, val delayReduction: Double)
-
-    /**
-     * 深度优先抽取一条链：触发牌先预留完整荷载，再继续父链预算。
-     * 本轮手牌不回洗；荷载不从弃牌堆绕回，避免抽到自身。
-     * trace仅供只读槽位分色观察原卡和作用域，正常施放不安装观察器。
-     */
-    private fun drawChain(budget: Int, wrapping: Boolean = true,
-                          trace: ((Magic, String) -> Unit)? = null, scope: String = "root"): ArrayList<Magic> {
-        var remaining = budget
-        var allowWrap = wrapping
-        val chain = arrayListOf<Magic>()
-        fun take(): Magic? {
-            val pile = when {
-                drawPile.isNotEmpty() -> drawPile
-                allowWrap && discardPile.isNotEmpty() -> discardPile
-                else -> return null
-            }
-            return pile.removeFirst().also { hand += it; trace?.invoke(it, scope) }.clone()
-        }
-        fun shots(cards: List<Magic>): List<Projectile> = cards.flatMap {
-            when (it) {
-                is Projectile -> listOf(it)
-                is work.nekow.primalspells.magic.core.DrawAction -> shots(it.expanded)
-                else -> emptyList()
-            }
-        }
-        fun prepare(card: Magic): Int {
-            val action = card as? work.nekow.primalspells.magic.core.DrawAction
-            if (action == null) {
-                if (card is TriggerSpell) card.payload += drawChain(card.triggerCast, false, trace, if (trace == null) scope else "$scope/hit${hand.size}")
-                return card.cast - 1
-            }
-            when (action.kind) {
-                work.nekow.primalspells.magic.core.DrawAction.Kind.ALL -> {
-                    // 只抽当前剩余牌；耗尽后剩余多重施放预算也不能绕回旧弃牌。
-                    allowWrap = false
-                    action.expanded += drawChain(Int.MAX_VALUE, false, trace, scope)
-                    return -1
-                }
-                work.nekow.primalspells.magic.core.DrawAction.Kind.DIVIDE -> {
-                    val next = take() ?: return -1
-                    val cost = prepare(next)
-                    repeat(action.copies) { action.expanded += work.nekow.primalspells.magic.core.SpellAssembly.copyCard(next) }
-                    // 复制修正只复制效果，不把它的继续抽牌重复N次。
-                    return cost
-                }
-                else -> {
-                    val carrier = drawChain(1, false, trace, scope)
-                    val targets = shots(carrier)
-                    if (targets.isNotEmpty()) {
-                        val payload = drawChain(1, false, trace, if (trace == null) scope else "$scope/${action.kind.name.lowercase()}${hand.size}")
-                        targets.forEach { it.addedTriggers += work.nekow.primalspells.magic.core.AppendedPayload(
-                            action.kind, ArrayList(payload.map(work.nekow.primalspells.magic.core.SpellAssembly::copyCard))) }
-                        // Noita追加系列：寻找载体途中经过的普通修正免费，抽牌控制仍付费。
-                        fun waive(cards: List<Magic>) {
-                            cards.forEach { card -> when(card) {
-                                is Modifier -> card.mana = 0.0
-                                is work.nekow.primalspells.magic.core.DrawAction -> waive(card.expanded)
-                                else -> Unit
-                            } }
-                        }
-                        waive(carrier)
-                    }
-                    action.expanded += carrier
-                    return -1
-                }
-            }
-        }
-        while (remaining > 0) {
-            val instance = take() ?: break
-            chain += instance
-            remaining += prepare(instance)
-        }
-        return chain
-    }
-
-    /** 同一链先收集修正，荷载递归独立付费；每张被接受的牌只结算一次费用。 */
-    private fun payChain(chain: List<Magic>, result: MutableCastResult): ArrayList<Magic> {
-        val paid = arrayListOf<Magic>()
-        fun expand(cards: List<Magic>): List<Magic> {
-            // 同层普通回蓝修正先结算，放在控制牌前后均能支付该控制牌。
-            val refunds = cards.filterIsInstance<Modifier>().filter { it.mana < 0.0 }.sortedBy { it.id }
-            refunds.forEach { if (consumeMana(it)) { paid += it; result.account(it) } }
-            return cards.filter { it !in refunds }.flatMap { card ->
-                if (card is work.nekow.primalspells.magic.core.DrawAction) {
-                    if (consumeMana(card)) { result.account(card); expand(card.expanded) } else emptyList()
-                } else listOf(card)
-            }
-        }
-        val expanded = expand(chain)
-        for (modifier in expanded.filterIsInstance<Modifier>().sortedWith(compareBy<Modifier> { it.mana >= 0.0 }.thenBy { it.id })) {
-            if (consumeMana(modifier)) { paid += modifier; result.account(modifier) }
-        }
-        for (shot in expanded.filterIsInstance<Projectile>()) {
-            if (!consumeMana(shot)) continue
-            paid += shot
-            result.account(shot)
-            if (shot is TriggerSpell) {
-                val payload = payChain(shot.payload.toList(), result)
-                shot.payload.clear()
-                shot.payload += payload
-            }
-            shot.addedTriggers.forEach { trigger ->
-                val payload = payChain(trigger.cards.toList(), result)
-                trigger.cards.clear(); trigger.cards += payload
-            }
-        }
-        return paid
-    }
-
-    private class MutableCastResult {
-        val accepted = arrayListOf<Magic>()
-        var resetDelay = false
-        var delay = 0.0
-        var recharge = 0.0
-        var delayReduction = 0.0
-        fun account(card: Magic) {
-            accepted += card
-            delay += card.delay
-            recharge += card.recharge
-            delayReduction += min(0.0, card.delay.toDouble())
-            resetDelay = resetDelay || card.resetsCastDelay
-        }
-    }
-
-    /** 各链的修正只装配到本链投射物；荷载留到触发时独立装配。 */
-    private fun castHand(caster: Entity, chain: List<Magic>): CastResult {
-        val result = MutableCastResult()
-        val paid = payChain(chain, result)
-        val modifiers = paid.filterIsInstance<Modifier>()
-        var castVisualPlayed = false
-        for (p in paid.filterIsInstance<Projectile>()) {
-            work.nekow.primalspells.magic.core.SpellAssembly.apply(p, modifiers)
-            p.caster = caster
-            p.wand = this
-            p.position = work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(caster, this).toPosition()
-            p.velocity = WandAim.direction(caster, p.position.toVec3()).toVector3f()
-            p.castFromWand = true
-            p.spell()
-            p.queueCastRecoil()
-            if (!castVisualPlayed) {
-                work.nekow.primalspells.magic.effect.visual.WandCastingFx.cast(caster, this)
-                castVisualPlayed = true
-            }
-            MagicManager.add(p)
-        }
-        status.delay = result.delay
-        status.recharge = result.recharge
-        // 全部链完成后才允许回洗，避免同次施法重复抽取刚支付的牌。
-        discard()
-        return CastResult(result.resetDelay, result.delayReduction)
-    }
-
-    /** 只读预览：在独立牌堆/法力副本上复用drawChain、payChain和冷却结算，不激活任何效果。 */
-    fun preview(): WandPreview {
-        val copy = Wand(id)
-        copy.mana = mana; copy.charge = charge; copy.cast = cast; copy.size = size
-        copy.delayTickCount = delayTickCount; copy.rechargeTickCount = rechargeTickCount
-        copy.status.mana = status.mana
-        copy.drawPile += drawPile.map { it.clone() }
-        copy.discardPile += discardPile.map { it.clone() }
-        copy.loadedMagics += loadedMagics.map { it.clone() }
-        val chain = copy.drawChain(cast)
-        data class Draft(val card: Magic, val scope: String, val depth: Int, val kind: String, val modifiers: List<String>)
-        val draft = arrayListOf<Draft>()
-        var scopeIndex = 0
-        fun visit(cards: List<Magic>, scope: String, depth: Int) {
-            fun flat(xs: List<Magic>): List<Magic> = xs.flatMap {
-                if (it is work.nekow.primalspells.magic.core.DrawAction) flat(it.expanded) else listOf(it)
-            }
-            val modifiers = flat(cards).filterIsInstance<Modifier>().map { it.id }
-            cards.forEach { card ->
-                val kind = when (card) {
-                    is work.nekow.primalspells.magic.core.DrawAction -> card.kind.name.lowercase()
-                    is Modifier -> "modifier"
-                    else -> "projectile"
-                }
-                draft += Draft(card, scope, depth, kind, modifiers)
-                if (card is work.nekow.primalspells.magic.core.DrawAction) visit(card.expanded, scope, depth + 1)
-                if (card is TriggerSpell) visit(card.payload, "$scope/hit${scopeIndex++}", depth + 1)
-                if (card is Projectile) card.addedTriggers.forEach {
-                    visit(it.cards, "$scope/${it.kind.name.lowercase()}${scopeIndex++}", depth + 1)
-                }
-            }
-        }
-        visit(chain, "root", 0)
-        val accounting = MutableCastResult()
-        val paid = copy.payChain(chain, accounting)
-        copy.status.delay = accounting.delay; copy.status.recharge = accounting.recharge
-        copy.discard()
-        val delay = (if (accounting.resetDelay) 0.0 else max(copy.status.delay,
-            (delayTicks() + accounting.delayReduction).coerceAtLeast(0.0))).coerceAtLeast(0.0)
-        val reasons = copy.status.failedReason.toMutableList()
-        if (status.delay > 0) reasons += "Delay ${fmt(status.delay)}t"
-        if (status.recharge > 0) reasons += "Recharge ${fmt(status.recharge)}t"
-        if (paid.none { it is Projectile }) reasons += "No payable projectile"
-        return WandPreview(draft.take(4096).map {
-            WandPreview.Row(it.card.id, it.scope, it.depth, it.kind, it.card.mana,
-                it.card in accounting.accepted, draft.filter { m -> m.scope == it.scope && m.card is Modifier && m.card in accounting.accepted }.map { m -> m.card.id })
-        }, copy.status.mana, delay, copy.status.recharge.coerceAtLeast(0.0), reasons,
-            paid.count { it is Projectile }, previewSlots())
-    }
-
-    /** 整副配置分色复用同一抽牌器，仅观察原卡被抽入哪个作用域，不付费、不回洗、不执行效果。 */
-    private fun previewSlots(): List<WandPreview.Slot> {
-        val copy = Wand(id)
-        val sources = java.util.IdentityHashMap<Magic, Int>()
-        magics.forEachIndexed { index, card -> card?.clone()?.let { sources[it] = index; copy.drawPile += it } }
-        val slots = MutableList(maxOf(size, magics.size)) { i -> WandPreview.Slot(magics.getOrNull(i)?.id.orEmpty(), "") }
-        var chain = 0
-        while (copy.drawPile.isNotEmpty()) {
-            copy.drawChain(cast.coerceAtLeast(1), false, { source, scope ->
-                sources[source]?.let { i -> slots[i] = WandPreview.Slot(source.id, scope) }
-            }, "chain${chain++}")
-            // 下一条链只看余下配置，不把此前抽牌再次排回队列。
-            copy.hand.clear()
-        }
-        return slots
-    }
-
-    /**
-     * 以文本形式显示触发法术内容
-     */
-    internal fun renderTriggers(p: Magic, effects: Boolean = false): String {
-        fun toString(magic: Magic): String =
-            "${magic::class.simpleName.toString()}[${magic.effects.joinToString(",") { it::class.simpleName.toString() }}]"
-        if (p !is TriggerSpell) return toString(p)
-        return "${toString(p)}(${p.payload.map { renderTriggers(it) }.joinToString(separator = " + ") { it }})"
-    }
+    /** 独立副本上的只读预览，不执行任何玩法钩子。 */
+    fun preview(): WandPreview = WandPreviewBuilder.build(this)
 
     /**
      * 检查并消耗法术所需法力。
@@ -421,7 +138,7 @@ class Wand(var id: String) {
     }
 
     /** 恢复旧版本超额法力，并使付费/回蓝遵守同一法力池上限。 */
-    private fun clampMana() {
+    internal fun clampMana() {
         status.mana = (status.mana.takeIf { it.isFinite() } ?: 0.0).coerceIn(0.0, mana.coerceAtLeast(0.0))
     }
 
@@ -439,25 +156,6 @@ class Wand(var id: String) {
         if (status.mana < amount) return false
         status.mana -= amount
         return true
-    }
-
-    private fun discard() {
-        discardPile += hand
-        discardPile += discarded
-        hand.clear()
-        // 并入后必须清空暂存表：否则每次施法都会把历史上所有被丢弃的卡**重复**并进弃牌堆，
-        // 弃牌堆会无界膨胀（并随 restorePiles 一起写进存档）。
-        discarded.clear()
-        reloadIfNeeded()
-    }
-
-    private fun reloadIfNeeded() {
-        if (drawPile.isEmpty() && discardPile.isNotEmpty()) {
-            status.recharge += rechargeTicks()
-            drawPile.clear()
-            discardPile.clear()
-            drawPile.addAll(loadedMagics)
-        }
     }
 
     /**
@@ -513,179 +211,14 @@ class Wand(var id: String) {
 
     private var lastPassiveTick: Long = -1
 
-    /**
-     * 将法杖完整状态序列化为 NBT。
-     *
-     * 除属性与法术槽（`innate`/`magics`，空槽写空串保序）外，还写出：
-     * - `magic_states`：法术运行期状态（法术 id → NBT，见 [magicStates]）；
-     * - `draw_pile` / `hand` / `discard_pile`：三条牌堆的法术 id 序列。
-     *
-     * 后两者是「内存实例可被回收 + 懒加载」不丢状态的前提，见 [WandManager] 的 KDoc。
-     *
-     * @return 包含所有属性、法术列表、法术运行期状态与牌堆的 CompoundTag
-     */
-    fun saveTag(): CompoundTag {
-        val tag = CompoundTag()
-        tag.putString("id", id)
-        tag.putDouble("mana", mana)
-        tag.putInt("delay_ticks", delayTicks().toInt())
-        tag.putInt("recharge_ticks", rechargeTicks().toInt())
-        tag.putDouble("charge_tick", charge)
-        tag.putInt("cast", cast)
-        tag.putInt("size", size)
-        tag.putDouble("status_mana", status.mana)
-        tag.putDouble("status_delay", status.delay)
-        tag.putDouble("status_recharge", status.recharge)
-        val innateList = ListTag()
-        innate.forEach { innateList.add(StringTag.valueOf(it.id)) }
-        tag.put("innate", innateList)
-        val magicsList = ListTag()
-        // 固定写满到 max(size, 已用槽数)：空槽写成空串占位，
-        // 否则读档时后面的法术会整体前移，装到错误的槽位上。
-        val slotCount = maxOf(size, magics.size, 1)
-        for (i in 0 until slotCount) {
-            magicsList.add(StringTag.valueOf(magics.getOrNull(i)?.id ?: ""))
-        }
-        tag.put("magics", magicsList)
-        // 法术运行期状态：逐个问 loadedMagics（innate + magics）要一份，按法术 id 落盘。
-        // 先清空再重建 —— 容器始终只反映「当前装在这根杖上」的法术：法术被取下、或法术自己不写内容时，
-        // 都不会留下上一轮的陈旧条目（否则那些状态会跟着存档一直漂）。
-        // 重复卡（同一 id 出现多次）在容器里天然合并成一份，所以下面按容器写列表、而不是按卡写。
-        magicStates.clear()
-        loadedMagics.forEach { magic ->
-            val state = CompoundTag()
-            magic.saveRuntimeState(state)
-            if (!state.isEmpty) magicStates[magic.id] = state
-        }
-        val stateList = ListTag()
-        // 按 id 排序：落盘结果不依赖哈希顺序，便于比对存档差异
-        magicStates.entries.sortedBy { it.key }.forEach { (magicId, state) ->
-            val entry = CompoundTag()
-            entry.putString("id", magicId)
-            entry.put("state", state)
-            stateList.add(entry)
-        }
-        tag.put("magic_states", stateList)
-        // 牌堆：只存法术 id 序列（法术实例本身是一次性的，不入库）。
-        // 必须存：WandManager 会把无人持有的法杖内存实例回收掉、之后按需从存档懒加载，
-        // 不存牌堆就会变成「放下再捡起 = 重新洗牌」。
-        tag.put("draw_pile", pileTag(drawPile))
-        tag.put("hand", pileTag(hand))
-        tag.put("discard_pile", pileTag(discardPile))
-        return tag
-    }
-
-    /**
-     * 把一张牌堆序列化成法术 id 列表。
-     *
-     * @param pile 牌堆（[drawPile] / [hand] / [discardPile]），顺序即抽牌顺序
-     */
-    private fun pileTag(pile: List<Magic>): ListTag {
-        val list = ListTag()
-        pile.forEach { list.add(StringTag.valueOf(it.id)) }
-        return list
-    }
-
-    /**
-     * 把法术 id 列表还原成法术实例。
-     *
-     * id 已不在注册表里的牌直接跳过：法术被移除后旧存档仍可读，等价于那张牌消失。
-     */
-    private fun magicsFrom(list: ListTag): List<Magic> =
-        list.mapNotNull { MagicManager.create((it as StringTag).asString().get()) }
-
-    /**
-     * 读档：把 [magicStates] 里的状态回灌给 [loadedMagics] 里对应 id 的实例。
-     *
-     * 必须在 [load] 之后调用（要先有实例），且此时 `wand`/`caster`/`status` 都还没被设置 ——
-     * 这正是 [Magic.loadRuntimeState] 里禁止访问它们的约定所对应的时机。
-     */
-    private fun applyMagicStates(tag: CompoundTag) {
-        magicStates.clear()
-        tag.getListOrEmpty("magic_states").forEach { element ->
-            val entry = element as? CompoundTag ?: return@forEach
-            val id = entry.getStringOr("id", "")
-            if (id.isNotEmpty()) magicStates[id] = entry.getCompoundOrEmpty("state")
-        }
-        loadedMagics.forEach { magic ->
-            magicStates[magic.id]?.let { magic.loadRuntimeState(it) }
-        }
-    }
-
-    /**
-     * 读档：按 id 还原三条牌堆。
-     *
-     * 存档里没有这些键时（旧存档、或新建的空法杖）保持 [load] 重建出来的初始牌堆；
-     * 这样既兼容旧档，也不会让「编辑法术槽」后的重建逻辑失效。
-     *
-     * [discarded]（一次施法内部的暂存表）不入库：它的内容在每次施法末尾已经并进 [discardPile]，
-     * 存了反而会在恢复后再并一次。
-     */
-    private fun restorePiles(tag: CompoundTag) {
-        if (!tag.contains("draw_pile")) return
-        val draw = magicsFrom(tag.getListOrEmpty("draw_pile"))
-        val inHand = magicsFrom(tag.getListOrEmpty("hand"))
-        val discard = magicsFrom(tag.getListOrEmpty("discard_pile"))
-        // 兜底：三条牌堆都空、但法杖明明装着法术 —— 这种状态恢复出来会让法杖永远抽不到牌，
-        // 按存档异常处理，退回 load() 重建的初始牌堆（宁可重新洗牌，也不要一把锁死的杖）。
-        if (draw.isEmpty() && inHand.isEmpty() && discard.isEmpty() && loadedMagics.isNotEmpty()) return
-        drawPile.clear()
-        drawPile += draw
-        hand.clear()
-        hand += inHand
-        discardPile.clear()
-        discardPile += discard
-    }
+    /** 保存法杖配置、运行状态和牌堆游标；不改变现有NBT格式。 */
+    fun saveTag(): CompoundTag = WandPersistence.save(this)
 
     companion object {
         /** 服务端固定20刻/秒；仅供旧存档边界换算。 */
         const val TICKS_PER_SECOND = 20.0
 
-        /** 冷却诊断字符串使用完整刻 */
-        private fun fmt(v: Double): String = v.toInt().toString()
-
-        /**
-         * 从 NBT 反序列化重建法杖对象。
-         *
-         * 顺序有讲究：先按 `innate`/`magics` 建实例并 [load]（含牌堆初始重建），
-         * 再回灌法术运行期状态（[applyMagicStates]），最后按存档覆盖牌堆（[restorePiles]）。
-         *
-         * @param tag 包含法杖序列化数据的 CompoundTag
-         * @return 已初始化并 load() 过的 Wand 实例
-         */
-        fun fromTag(tag: CompoundTag): Wand {
-            val wand = Wand(tag.getStringOr("id", ""))
-            wand.mana = tag.getDoubleOr("mana", 0.0)
-            // 新存档刻优先；旧秒/毫秒只在读档边界换算，旧delay整数本来就是刻。
-            fun readTicks(name: String): Double = kotlin.math.ceil(tag.getDoubleOr(name + "_ticks",
-                if (tag.contains(name + "_sec")) tag.getDoubleOr(name + "_sec", 0.0) * 20
-                else if (tag.contains(name + "_ms")) tag.getDoubleOr(name + "_ms", 0.0) / 50
-                else tag.getDoubleOr(name, 0.0)).coerceAtLeast(0.0))
-            wand.delayTickCount = readTicks("delay")
-            wand.rechargeTickCount = readTicks("recharge")
-            wand.charge = tag.getDoubleOr("charge_tick", tag.getDoubleOr("charge", 0.0) / 20.0)
-            wand.cast = tag.getIntOr("cast", 1)
-            wand.size = tag.getIntOr("size", 9)
-            wand.status.mana = tag.getDoubleOr("status_mana", 0.0)
-            wand.clampMana()
-            wand.status.delay = kotlin.math.ceil(tag.getDoubleOr("status_delay", 0.0).coerceAtLeast(0.0))
-            wand.status.recharge = kotlin.math.ceil(tag.getDoubleOr("status_recharge", 0.0).coerceAtLeast(0.0))
-            tag.getListOrEmpty("innate").forEach {
-                MagicManager.create((it as StringTag).asString().get())?.let { m -> wand.innate += m }
-            }
-            tag.getListOrEmpty("magics").forEach {
-                // 空串 = 空槽占位，必须原样保留，保证槽位索引不变
-                val id = (it as StringTag).asString().get()
-                wand.magics += if (id.isEmpty()) null else MagicManager.create(id)
-            }
-            return wand.also {
-                it.load()
-                // 运行期状态要在 load() 之后（要先有 loadedMagics 里的实例可灌），
-                // 且在任何施法/被动驱动之前：此刻 wand/caster 还是未初始化的 lateinit，
-                // 所以钩子里不得访问它们（见 Magic.loadRuntimeState 的约定）。
-                it.applyMagicStates(tag)
-                it.restorePiles(tag)
-            }
-        }
+        /** 兼容旧单位与空槽位置，恢复顺序统一由持久化边界维护。 */
+        fun fromTag(tag: CompoundTag): Wand = WandPersistence.load(tag)
     }
 }

@@ -23,12 +23,12 @@
 
 | 工作负载 | 优化前中位耗时 | 优化后中位耗时 | 优化前/后分配 |
 |---|---:|---:|---:|
-| 32发直线64格/t | 8.296 ms | 2.216 ms | 36.906 / 3.861 MiB |
-| 32发制导64格/t | 9.933 ms | 3.047 ms | 35.686 / 3.801 MiB |
-| 512发普通弹联动 | 1.707 ms | 0.201 ms | <0.001 / 0.016 MiB |
-| 512发冻结弹联动 | 未采集 | 0.149 ms | 未采集 / 0.082 MiB |
+| 32发直线64格/t | 8.296 ms | 3.126 ms | 36.906 / 3.858 MiB |
+| 32发制导64格/t | 9.933 ms | 3.572 ms | 35.686 / 3.798 MiB |
+| 512发普通弹联动 | 1.707 ms | 0.257 ms | <0.001 / 0.016 MiB |
+| 512发冻结弹联动 | 未采集 | 0.136 ms | 未采集 / 0.082 MiB |
 
-优化前为a833fca运行时加同一测量场景，原始数据在build/capture/performance-baseline/spell_performance/performance.tsv；优化后在build/capture/out/spell_performance/performance.tsv。机器负载/JIT会影响数值，比较相同条件的中位数，不给不同硬件设伪精确通用门槛。
+优化前为a833fca运行时加同一测量场景，原始数据在build/capture/performance-baseline/spell_performance/performance.tsv；当前运行时拆分后的独立复测在build/capture/out/spell_performance/performance.tsv。拆分前同机记录在build/capture/before-architecture/spell_performance/performance.tsv；直线/制导分配仍约3.8MiB，耗时样本有波动，不能据此宣称架构拆分带来性能提升。机器负载/JIT会影响数值，比较相同条件的中位数，不给不同硬件设伪精确通用门槛。
 
 ## 复现与保真验证
 
@@ -36,7 +36,7 @@
 pwsh tools/capture/capture.ps1 -Offline -Scene spell_performance,collision_precision,homing_light,projectile_flight,spell_chain,recoil_light,shield_balance,wand_aim,crystal_lifecycle -TimeoutSec 600
 ```
 
-当前九场255项机制检查、1770帧、零丢帧，相关机制与视觉门禁均通过。
+上面的命令覆盖运动与性能回归。当前运行时拆分后的八场306项机制检查及视觉门禁通过；独立性能复测4项检查、140帧、零丢帧通过。完整范围和证据见[架构验证](../architecture.md#10-扩展边界与自动检查)。
 
 后台启动规则见[构建指南](../build-and-run.md)。先归档out再运行以保留基线。性能场景输出逐样本performance.tsv，不把FPS/录帧数量当服务器计时。collision_precision覆盖薄形状、拼缝、墙角、斜反射、实际路径联动与反应先后；另验证未加载区块不生成、到未知边界不穿透/伪命中、高空虚空不误停。
 

@@ -2,25 +2,27 @@
 
 package work.nekow.primalspells.client.capture
 
+import kotlin.math.abs
 import net.minecraft.core.BlockPos
 import net.minecraft.tags.DamageTypeTags
 import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.EntityTypes
-import net.minecraft.world.entity.animal.pig.Pig
 import net.minecraft.world.entity.ai.attributes.Attributes
+import net.minecraft.world.entity.animal.pig.Pig
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.core.*
-import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.magic.effect.lifecycle.*
-import work.nekow.primalspells.registry.ModDamageTypes
 import work.nekow.primalspells.entity.TestDummyEntity
-import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
+import work.nekow.primalspells.magic.effect.lifecycle.*
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
+import work.nekow.primalspells.registry.ModDamageTypes
 import work.nekow.primalspells.util.toPosition
-import kotlin.math.abs
+import work.nekow.primalspells.wand.Wand
 
 /** 真原版生物验证伤害/抗性/自伤与暗核，避免测试木桩免伤/免击退掩盖原版固定推力。 */
 object CombatImpactScene {
@@ -49,8 +51,8 @@ object CombatImpactScene {
                     ctx.level.addFreshEntity(p);pigs+=p;return p
                 }
                 fun shot(id:String,at:Vec3,mods:List<String> = emptyList(),caster:net.minecraft.world.entity.Entity=ctx.player):Projectile {
-                    val p=MagicManager.create(id) as Projectile
-                    SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
+                    val p=SpellRegistry.create(id) as Projectile
+                    SpellAssembly.apply(p,mods.map { SpellRegistry.create(it) as Modifier })
                     p.caster=caster;p.wand=Wand("impact-$t-$id");p.position=at.toPosition();p.velocity=Vector3f(0f,0f,1f)
                     p.spell();return p
                 }
@@ -78,7 +80,7 @@ object CombatImpactScene {
                     val blastOwner=pig(0.0,4.0);val before=blastOwner.health
                     Explosion.customExplode(blastOwner,blastOwner.boundingBox.center.add(1.0,0.0,0.0).toVector3f(),2f,12.0)
                     record(t,"explosion-real-self-damage-and-outward-push",blastOwner.health<before && blastOwner.deltaMovement.x<0,"health=${blastOwner.health} velocity=${blastOwner.deltaMovement}")
-                    record(t,"explosive-cards-expose-self-damage",listOf("small_explosion","large_explosion","dormant_crystal","black_hole").all{(MagicManager.create(it) as Projectile).selfDamage},"all explosive/crystal/black-hole cards")
+                    record(t,"explosive-cards-expose-self-damage",listOf("small_explosion","large_explosion","dormant_crystal","black_hole").all{(SpellRegistry.create(it) as Projectile).selfDamage},"all explosive/crystal/black-hole cards")
                     listOf(base,boosted,safeShot,piercingShot).forEach { it.alive=false;it.die() }
                     pigs.forEach { it.discard() };pigs.clear()
                     val explosiveMod=shot("fireball",Vec3(10.0,floor+5.0,-5.0),listOf("bounce_explosion"))
@@ -92,7 +94,7 @@ object CombatImpactScene {
                     val longer=shot("chain_bolt",Vec3(0.0,floor+5.0,-6.0),listOf("extended_lifetime"))
                     val longerArc=longer.effects.filterIsInstance<ChainArc>().single()
                     repeat(longer.maxAge){longer.tick();longer.status.age++}
-                    val lifetime=MagicManager.create("extended_lifetime")!!
+                    val lifetime=SpellRegistry.create("extended_lifetime")!!
                     record(t,"lifetime-25-ticks-40-mana-5-delay",longer.maxAge==40 && longerArc.jumpsMade==11 && lifetime.mana==40.0 && lifetime.delay==5,"age=${longer.maxAge} jumps=${longerArc.jumpsMade} mana=${lifetime.mana} delay=${lifetime.delay}")
                     longer.alive=false;longer.die()
                     val targets=listOf(pig(-1.0,7.0,floor+5.0),pig(0.0,7.0,floor+5.0),pig(1.0,7.0,floor+5.0))
@@ -123,17 +125,17 @@ object CombatImpactScene {
                 if(t==125) {
                     owner=pig(0.0,0.0);pulled=pig(3.0,0.0)
                     hole=shot("black_hole",owner!!.boundingBox.center,caster=owner!!)
-                    hole!!.maxAge=65;MagicManager.add(hole!!)
+                    hole!!.maxAge=65;ProjectileRuntime.add(hole!!)
                 }
                 if(t==127) record(t,"black-hole-pull-fivefold",pulled!!.deltaMovement.x< -0.15,"velocity=${pulled!!.deltaMovement}")
                 if(t==137) {
                     record(t,"black-hole-core-hurts-caster-repeatedly",owner!!.health<=88f,"health=${owner!!.health}")
                     record(t,"core-damage-does-not-kick-outward",owner!!.deltaMovement.length()<0.03,"velocity=${owner!!.deltaMovement}")
                 }
-                if(t==210){pigs.forEach{it.discard()};pigs.clear();MagicManager.projectiles.forEach{it.alive=false}}
+                if(t==210){pigs.forEach{it.discard()};pigs.clear();ProjectileRuntime.projectiles.forEach{it.alive=false}}
             },checksAt={ctx,t ->
                 if(t==259) {
-                    record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}")
+                    record(t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}")
                     record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                 }
                 checks[t].orEmpty()

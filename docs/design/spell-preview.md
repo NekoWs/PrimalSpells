@@ -12,9 +12,9 @@ V保留为独立只读预览：在容器中悬停法杖按V，或在世界中手
 
 ## 权威语义
 
-Wand.preview在独立的牌堆、卡牌和法力副本上调用Wand.drawChain/payChain/discard，不执行spell/onActive/世界钩子，不改变原杖MP、冷却或牌堆。下一次施法的结算预览仍保留展开树数据，界面展示简化为槽位背景。
+Wand.preview委托WandPreviewBuilder，在独立的牌堆、卡牌和法力副本上调用WandDeck与CastTransaction，不执行spell/onActive/世界钩子，不改变原杖MP、冷却或牌堆。下一次施法的结算预览仍保留展开树数据，界面展示简化为槽位背景。
 
-整副配置的分色同样复用drawChain：从配置首槽开始，在隔离副本上依次观察每条链，禁止回洗、不付费，不随当前MP或已施放到哪一张而改变颜色。抽牌器的可选trace只观察原卡所属作用域，不改变实际抽牌逻辑。复制单卡、全量施放和追加荷载均走原语义；按卡牌对象身份关联槽位，不按法术ID猜测，重复卡牌也能正确区分。
+整副配置的分色同样复用WandDeck.draw：从配置首槽开始，在隔离副本上依次观察每条链，禁止回洗、不付费，不随当前MP或已施放到哪一张而改变颜色。抽牌器的可选trace只观察原卡所属作用域，不改变实际抽牌逻辑。复制单卡、全量施放和追加荷载均走原语义；按卡牌对象身份关联槽位，不按法术ID猜测，重复卡牌也能正确区分。
 
 客户端WandPreviewCache只保留最近悬停的一根杖，每10t最多一次请求，服务端限流5t；换杖/装卸时清掉旧颜色，仅接受法术槽列表与当前配置完全一致的响应，登出清空。不在客户端另写解析器。4096行/槽位为网络上限；正常法杖最多18槽。
 
@@ -24,7 +24,7 @@ Wand.preview在独立的牌堆、卡牌和法力副本上调用Wand.drawChain/pa
 
 创造物品栏的光标按原版由客户端选取，因此CreativeWandEditHandler仅把右键法杖装卸交给已有EditWandPayload，不显示窗口，不接管其他物品/左键/Shift操作。服务端只接受创造玩家、真实菜单槽/wandId、注册散卡与合法数量，拒绝任意物品组件；完整菜单同步回交光标。生存玩家不能走这个专用包。
 
-WandPreviewPayload经ClientPayloadSink和RegisterClientPayloadHandlersEvent接线。当前协议1.5.0，包含整副槽位归属；客户端/服务端同步升级，不修改原法术id、wandId和存档键。tooltip使用原版bundle槽背景与法术物品模型，资源包可覆盖其引用资源。
+WandPreviewPayload由ModNetworking注册，经ClientPayloadSink和RegisterClientPayloadHandlersEvent接线，服务端校验集中在WandRequestHandler。当前协议1.5.0，包含整副槽位归属；客户端/服务端同步升级，不修改原法术id、wandId和存档键。tooltip使用原版bundle槽背景与法术物品模型，资源包可覆盖其引用资源。
 
 ## 验证
 

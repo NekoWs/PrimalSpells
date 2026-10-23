@@ -2,9 +2,10 @@ package work.nekow.primalspells.util
 
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 
 /**
- * 服务端**延迟一次性动作**队列：把「N tick 之后要发生的那一下」排进去，由 `MagicManager` 每 tick 推。
+ * 服务端**延迟一次性动作**队列：把「N tick 之后要发生的那一下」排进去，由 `ProjectileRuntime` 每 tick 推。
  *
  * ## 为什么需要它
  *
@@ -59,7 +60,7 @@ object Deferred {
     }
 
     /**
-     * 由 `MagicManager.tick()` 每 tick 调用。
+     * 由 `ProjectileRuntime.tick()` 每 tick 调用。
      *
      * ⚠️ **分两步走**：先把本轮到期的任务从队列里摘出来，执行放到摘完之后 ——
      * 任务体自己还会排新任务（黑洞退场就是「整壳塌缩 → 排反弹小球 → 排收尾」三拍连排），
@@ -86,7 +87,7 @@ object Deferred {
         }
     }
 
-    /** 服务端停机时清空（`MagicManager` 的 `ServerStoppingEvent` 里调）。 */
+    /** 服务端停机时清空（`ProjectileRuntime` 的 `ServerStoppingEvent` 里调）。 */
     fun clear() {
         tasks.clear()
     }

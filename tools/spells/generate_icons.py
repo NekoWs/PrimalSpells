@@ -218,7 +218,7 @@ def icon(name):
 
 
 def registered_ids():
-    classes = re.findall(r'register \{ (\w+)\(\) }', (MAGIC/'core/MagicManager.kt').read_text(encoding='utf-8'))
+    classes = re.findall(r'register \{ (\w+)\(\) }', (ROOT/'src/main/kotlin/work/nekow/primalspells/registry/ModSpells.kt').read_text(encoding='utf-8'))
     result=[]
     for cls in classes:
         path=next(p for p in MAGIC.rglob(cls+'.kt'))

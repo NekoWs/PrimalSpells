@@ -1,5 +1,6 @@
 package work.nekow.primalspells.item
 
+import java.util.*
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
@@ -16,12 +17,11 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.neoforged.neoforge.network.PacketDistributor
 import work.nekow.primalspells.item.component.WandID
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.network.SyncWandStatsPayload
+import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
-import java.util.*
-import work.nekow.primalspells.registry.ModItems
 
 class WandItem(properties: Properties) : Item(properties.component(
     net.minecraft.core.component.DataComponents.USE_EFFECTS,
@@ -206,7 +206,7 @@ class WandItem(properties: Properties) : Item(properties.component(
     private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, id: String): work.nekow.primalspells.magic.core.Magic? {
         while (wand.magics.size <= target) wand.magics.add(null)
         val existing = wand.magics.getOrNull(target)
-        wand.magics[target] = MagicManager.create(id)!!
+        wand.magics[target] = SpellRegistry.create(id)!!
         wand.load(); tickSync(stack)
         return existing
     }

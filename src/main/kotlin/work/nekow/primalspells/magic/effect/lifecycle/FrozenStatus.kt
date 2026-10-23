@@ -1,14 +1,14 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
-import net.minecraft.server.level.ServerLevel
 import net.minecraft.resources.Identifier
-import net.minecraft.world.entity.ai.attributes.Attributes
-import net.minecraft.world.entity.ai.attributes.AttributeModifier
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.ai.attributes.AttributeModifier
+import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 
-/** 短命服务端冰冻状态；由 MagicManager 推进，退出世界时清空，不修改原有药水效果。 */
+/** 短命服务端冰冻状态；由 ProjectileRuntime 推进，退出世界时清空，不修改原有药水效果。 */
 object FrozenStatus {
     private data class State(val target: LivingEntity, val level: ServerLevel, var until: Long, val shell: ParticleGroup)
     private val FREEZE_ID = Identifier.fromNamespaceAndPath("primalspells", "frozen_speed")

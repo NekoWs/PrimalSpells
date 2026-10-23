@@ -17,7 +17,7 @@ import work.nekow.primalspells.item.SpellPouchItem
 import work.nekow.primalspells.item.TestDummyItem
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.item.component.WandID.Companion.TYPE
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.wand.WandTier
 import work.nekow.primalspells.wand.WandVariant
 
@@ -53,7 +53,7 @@ class ModItems {
                     output.accept(SPELL_POUCH)
                     output.accept(TEST_DUMMY)
                     // 同类沿注册顺序排列，避免HashMap导致每种法术散落在不同位置。
-                    MagicManager.registry.entries.sortedBy { (_, factory) ->
+                    SpellRegistry.factories.entries.sortedBy { (_, factory) ->
                         val magic = factory()
                         when {
                             magic.needInventory -> 4
@@ -175,7 +175,7 @@ class ModItems {
         }
 
         init {
-            MagicManager.registry.forEach { (key, _) ->
+            SpellRegistry.factories.forEach { (key, _) ->
                 ITEMS.registerItem(key) { props ->
                     Item(props.stacksTo(1))
                 }.also { item ->

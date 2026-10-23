@@ -1,0 +1,41 @@
+// 源码依赖护栏：由check/build执行，不依赖额外的Python或测试运行环境。
+tasks.register('checkArchitecture') {
+    group = 'verification'
+    description = '检查公共侧、核心抽象与抽牌事务的依赖边界'
+    inputs.files(fileTree('src/main/kotlin') { include '**/*.kt' })
+
+    doLast {
+        def violations = []
+        inputs.files.files.sort().each { source ->
+            def path = source.path.replace('\\', '/')
+            def isClient = path.contains('/primalspells/client/')
+            def isCore = path.contains('/magic/core/')
+            def isSettlement = source.name in ['WandDeck.kt', 'CastTransaction.kt']
+            source.readLines('UTF-8').eachWithIndex { line, index ->
+                def match = line =~ /^import\s+([\w.*]+)/
+                if (!match.find()) return
+                def dependency = match.group(1)
+                def reason = null
+                if (!isClient && (dependency.startsWith('net.minecraft.client.') ||
+                        dependency.startsWith('work.nekow.primalspells.client.'))) {
+                    reason = '公共侧不能依赖客户端'
+                } else if (isCore && (dependency.startsWith('work.nekow.primalspells.registry.') ||
+                        dependency.startsWith('work.nekow.primalspells.magic.modifier.') ||
+                        dependency.startsWith('work.nekow.primalspells.magic.action.') ||
+                        (dependency.startsWith('work.nekow.primalspells.magic.projectile.') &&
+                                dependency != 'work.nekow.primalspells.magic.projectile.Projectile'))) {
+                    reason = '核心抽象不能导入具体法术或内容注册'
+                } else if (isSettlement && (dependency.startsWith('work.nekow.particledrawing.') ||
+                        dependency.startsWith('work.nekow.primalspells.network.') ||
+                        dependency.startsWith('work.nekow.primalspells.magic.effect.visual.'))) {
+                    reason = '抽牌与付费不能依赖表现或网络'
+                }
+                if (reason != null) violations.add("${source.name}:${index + 1} ${reason}: ${dependency}")
+            }
+        }
+        if (!violations.isEmpty()) throw new GradleException(violations.join('\n'))
+        logger.lifecycle('架构依赖检查通过')
+    }
+}
+
+tasks.named('check').configure { dependsOn('checkArchitecture') }

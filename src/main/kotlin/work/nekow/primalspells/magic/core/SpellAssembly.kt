@@ -1,7 +1,7 @@
 package work.nekow.primalspells.magic.core
 
-import work.nekow.primalspells.magic.projectile.Projectile
 import kotlin.math.pow
+import work.nekow.primalspells.magic.projectile.Projectile
 
 /** 本次施法的修饰配方；继承时重建效果实例，不复制运行中effect或重复乘已结算的数值。 */
 object SpellAssembly {
@@ -25,7 +25,7 @@ object SpellAssembly {
 
     /** 同源复制体继承非生成型修饰器；独立触发荷载不调用此入口。 */
     fun inherit(parent: Projectile, child: Projectile) {
-        val mods = inheritableOrder(parent).map { MagicManager.create(it) as Modifier }
+        val mods = inheritableOrder(parent).map { SpellRegistry.create(it) as Modifier }
         apply(child, mods)
     }
 
@@ -54,7 +54,7 @@ object SpellAssembly {
         parent.payload.forEach { card ->
             val copied = copyCard(card)
             if (card is Projectile && copied is Projectile) {
-                apply(copied, card.modifierOrder.map { MagicManager.create(it) as Modifier })
+                apply(copied, card.modifierOrder.map { SpellRegistry.create(it) as Modifier })
             }
             child.payload += copied
         }

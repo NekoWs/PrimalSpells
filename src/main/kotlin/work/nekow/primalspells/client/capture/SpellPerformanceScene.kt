@@ -1,21 +1,22 @@
 package work.nekow.primalspells.client.capture
 
 import com.sun.management.ThreadMXBean
+import java.io.File
+import java.lang.management.ManagementFactory
 import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.geometry.Move
 import work.nekow.primalspells.magic.effect.lifecycle.SpellInteractions
 import work.nekow.primalspells.magic.projectile.ConcentratedLight
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
 import work.nekow.primalspells.wand.Wand
-import java.io.File
-import java.lang.management.ManagementFactory
 
 /** 固定原生世界负载；物理与联动分别计时/计分配，不把帧率当服务器耗时。 */
 object SpellPerformanceScene {
@@ -40,7 +41,7 @@ object SpellPerformanceScene {
             }
         }
         fun shot(ctx: CaptureDriver.SceneCtx, index: Int): Projectile {
-            val p = MagicManager.create("fireball") as Projectile
+            val p = SpellRegistry.create("fireball") as Projectile
             p.effects.removeIf { it.phase == EffectPhase.VISUAL }
             p.caster = ctx.player; p.wand = Wand("performance-$index")
             p.position = Vec3(0.125, floor + 8.25, -10.125).toPosition()
@@ -79,13 +80,13 @@ object SpellPerformanceScene {
                     inert.forEach { it.status.freezeTicks = 0 }
                 }
                 if (t in listOf(52, 80)) {
-                    val p = MagicManager.create("concentrated_light") as ConcentratedLight
+                    val p = SpellRegistry.create("concentrated_light") as ConcentratedLight
                     p.caster = ctx.player; p.wand = Wand("performance-display")
                     p.position = Vec3(-6.0, floor + 5.0, -5.0).toPosition()
                     p.velocity = Vector3f(1f, 0f, 0.4f).normalize()
-                    p.spell(); MagicManager.add(p)
+                    p.spell(); ProjectileRuntime.add(p)
                 }
-                if (t == 115) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 115) ProjectileRuntime.projectiles.forEach { it.alive = false }
             }, checksAt = { _, t ->
                 if (t == 139) measured.map { (task, values) ->
                     Check(name, t, "$task-samples", values.size == 17 && values.all { it.isFinite() && it > 0 },

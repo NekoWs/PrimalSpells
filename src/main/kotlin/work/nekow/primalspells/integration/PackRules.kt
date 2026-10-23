@@ -10,7 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.AddServerReloadListenersEvent
 import net.neoforged.neoforge.event.server.ServerStoppedEvent
 import work.nekow.primalspells.loot.SpellLootProfile
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 
 /** 原子重载：任何非法条目使本次重载失败，不能把半份配置发布给运行中的世界。 */
 object PackRules {
@@ -47,8 +47,8 @@ object PackRules {
     }
     /** 同一校验器用于重载与实机反例；未知法术不能在玩家开箱时才炸掉。 */
     fun parseProfile(key: String, j: JsonObject): SpellLootProfile {
-        fun cards(name: String): List<String> = j.getAsJsonArray(name).map { it.asString.also { id -> require(id in MagicManager.registry) { "Unknown spell $id in $key/$name" } } }
-        fun recipes(name: String) = j.getAsJsonArray(name)?.map { row -> row.asJsonArray.map { it.asString.also { id -> require(id in MagicManager.registry) { "Unknown spell $id in $key/$name" } } }.also { require(it.isNotEmpty() && it.size <= 18) } }.orEmpty()
+        fun cards(name: String): List<String> = j.getAsJsonArray(name).map { it.asString.also { id -> require(id in SpellRegistry.factories) { "Unknown spell $id in $key/$name" } } }
+        fun recipes(name: String) = j.getAsJsonArray(name)?.map { row -> row.asJsonArray.map { it.asString.also { id -> require(id in SpellRegistry.factories) { "Unknown spell $id in $key/$name" } } }.also { require(it.isNotEmpty() && it.size <= 18) } }.orEmpty()
         val lo = j.integer("min_tier", 1, 6); val hi = j.integer("max_tier", lo, 6)
         val pool = cards("cards"); val loadouts = recipes("loadouts"); val elite = recipes("elite_loadouts")
         require(pool.isNotEmpty() && pool.size <= 4096 && loadouts.isNotEmpty() && loadouts.size <= 256 && elite.size <= 256)

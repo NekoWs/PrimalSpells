@@ -1,34 +1,34 @@
 package work.nekow.primalspells.client.capture
 
 import net.minecraft.core.BlockPos
-import net.minecraft.core.component.DataComponents
 import net.minecraft.core.SectionPos
-import net.minecraft.resources.ResourceKey
-import net.minecraft.resources.Identifier
-import net.minecraft.world.level.ChunkPos
-import net.minecraft.world.level.biome.MobSpawnSettings
-import net.minecraft.world.entity.EntityTypes
-import net.minecraft.util.random.Weighted
+import net.minecraft.core.component.DataComponents
 import net.minecraft.core.registries.Registries
+import net.minecraft.resources.Identifier
+import net.minecraft.resources.ResourceKey
 import net.minecraft.util.RandomSource
+import net.minecraft.util.random.Weighted
+import net.minecraft.util.random.WeightedList
 import net.minecraft.world.entity.EntitySpawnReason
+import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.MobCategory
+import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.item.DyeColor
 import net.minecraft.world.item.Items
+import net.minecraft.world.level.ChunkPos
+import net.minecraft.world.level.biome.MobSpawnSettings
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.event.level.LevelEvent
-import net.minecraft.util.random.WeightedList
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.RogueMageEntity
-import net.minecraft.world.entity.ai.attributes.Attributes
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.loot.SpellLoot
 import work.nekow.primalspells.loot.SpellLootProfile
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModEntities
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
@@ -60,7 +60,7 @@ object ExplorationScene {
                 }
                 if (t == 8) {
                     val pool = SpellLootProfile.entries.flatMap { it.cards + it.loadouts.flatten() }.toSet()
-                    record("all-registered-spells-have-valid-reward-sources", pool == MagicManager.registry.keys, "pool=${pool.size} registry=${MagicManager.registry.size}")
+                    record("all-registered-spells-have-valid-reward-sources", pool == SpellRegistry.factories.keys, "pool=${pool.size} registry=${SpellRegistry.factories.size}")
                     val ids = hashSetOf<String>()
                     var valid = true
                     var charged = 0
@@ -162,12 +162,12 @@ object ExplorationScene {
                     ctx.command("gamemode spectator @a")
                     ctx.player.getAttribute(Attributes.MAX_HEALTH)!!.baseValue = 20.0
                     ctx.player.health = 20f
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == 239) {
                     record("combat-does-not-break-floor", (-3..3).all { x -> (-5..6).all { z -> ctx.level.getBlockState(BlockPos(x, floor, z)).`is`(Blocks.CONCRETE.pick(DyeColor.BLACK)) } }, "floor intact")
-                    record("scene-cleans-particles-and-projectiles", MagicManager.projectiles.isEmpty() && ParticleManager.of(ctx.level).getEngine().particleCount() == 0,
-                        "shots=${MagicManager.projectiles.size} particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
+                    record("scene-cleans-particles-and-projectiles", ProjectileRuntime.projectiles.isEmpty() && ParticleManager.of(ctx.level).getEngine().particleCount() == 0,
+                        "shots=${ProjectileRuntime.projectiles.size} particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                 }
             }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> mage?.discard(); ctx.command("gamemode spectator @a"); ctx.command("difficulty peaceful"); ctx.player.getAttribute(Attributes.MAX_HEALTH)!!.baseValue = 20.0; ctx.player.health = 20f })
     }

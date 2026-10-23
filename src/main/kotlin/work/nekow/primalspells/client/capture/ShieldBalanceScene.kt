@@ -16,14 +16,16 @@ import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.lifecycle.*
 import work.nekow.primalspells.magic.modifier.EnergyShield
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
+import work.nekow.primalspells.util.toPosition
+import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
-import work.nekow.primalspells.util.toVec3
-import work.nekow.primalspells.util.toPosition
 
 /** 原版受伤验证破盾当次保护、卡数预算和法力，再用左右双靶记录真实碎片表现。 */
 object ShieldBalanceScene {
@@ -38,7 +40,7 @@ object ShieldBalanceScene {
         fun shield(wand:Wand)=wand.loadedMagics.first{it is EnergyShield} as EnergyShield
         fun equip(holder:net.minecraft.world.entity.LivingEntity,count:Int):Wand {
             val stack=ItemStack(ModItems.WAND.get());val w=WandManager[WandManager.createWand(stack)]
-            repeat(count){w.magics+=MagicManager.create("energy_shield")};w.load();w.mana=10000.0;w.status.mana=10000.0;w.charge=0.0
+            repeat(count){w.magics+=SpellRegistry.create("energy_shield")};w.load();w.mana=10000.0;w.status.mana=10000.0;w.charge=0.0
             holder.setItemInHand(InteractionHand.MAIN_HAND,stack);w.tick(holder,holder.level() as net.minecraft.server.level.ServerLevel)
             return w
         }
@@ -54,7 +56,7 @@ object ShieldBalanceScene {
                     p.setPos(x,floor+3.0,0.0);p.setNoGravity(true);p.setNoAi(true);p.getAttribute(Attributes.MAX_HEALTH)!!.baseValue=1000.0;p.health=1000f;ctx.level.addFreshEntity(p);return p
                 }
                 fun incoming(holder:net.minecraft.world.entity.LivingEntity,damage:Double,mods:List<String> = emptyList()):Projectile {
-                    val p=MagicManager.create("fireball") as Projectile;SpellAssembly.apply(p,mods.map{MagicManager.create(it) as Modifier})
+                    val p=SpellRegistry.create("fireball") as Projectile;SpellAssembly.apply(p,mods.map{SpellRegistry.create(it) as Modifier})
                     p.caster=ctx.player;p.wand=Wand("shield-probe");p.status.damage=damage
                     val center=holder.boundingBox.center
                     p.position=center.add(0.0,0.0,-4.0).toPosition();p.velocity=Vector3f(0f,0f,1f);p.spell()
@@ -95,7 +97,7 @@ object ShieldBalanceScene {
                         val center=holder.boundingBox.center
                         val heading=if(angled)Vec3(2.0,0.0,6.0).normalize() else Vec3(0.0,0.0,1.0)
                         val distance=if(speed>12f)10.0 else 3.6
-                        val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
+                        val light=SpellRegistry.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                         light.caster=ctx.player;light.wand=Wand("shield-fast-$speed-$angled")
                         light.position=center.subtract(heading.scale(distance)).toPosition();light.velocity=heading.toVector3f();light.speed=speed/Projectile.LAUNCH_SPEED_SCALE;light.throughBlocks=true
                         light.spell();light.status.age=work.nekow.primalspells.magic.projectile.ConcentratedLight.CHARGE_TICKS;light.tick();light.status.age++
@@ -113,7 +115,7 @@ object ShieldBalanceScene {
                         val holder=pig(6.0);val ws=equip(holder,8)
                         val center=holder.position().add(0.0,holder.bbHeight*0.55,0.0)
                         val start=center.add(ox,oy,-3.0)
-                        val light=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
+                        val light=SpellRegistry.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                         light.caster=ctx.player;light.wand=Wand("shield-graze");light.position=start.toPosition();light.velocity=Vector3f(0f,0f,1f);light.speed=speed/Projectile.LAUNCH_SPEED_SCALE;light.throughBlocks=true
                         light.spell();light.status.age=work.nekow.primalspells.magic.projectile.ConcentratedLight.CHARGE_TICKS;light.tick()
                         val contact=light.shieldReflectionPoint
@@ -126,7 +128,7 @@ object ShieldBalanceScene {
                         light.alive=false;light.die();holder.discard()
                     }
                     val chainHolder=pig(6.0);val chainWand=equip(chainHolder,8)
-                    val chain=MagicManager.create("chain_bolt") as Projectile
+                    val chain=SpellRegistry.create("chain_bolt") as Projectile
                     chain.caster=ctx.player;chain.wand=Wand("shield-chain");chain.position=chainHolder.boundingBox.center.add(0.0,0.0,-2.8).toPosition();chain.velocity=Vector3f(0f,0f,1f);chain.spell()
                     chain.status.age=4;chain.tick()
                     record(t,"chain-shield-reflection-keeps-outgoing-drift",chain.alive && chain.status.hitTargets==0 && chain.status.velocity.z<0 && chainHolder.health==1000f && chainWand.status.mana==9995.0,"velocity=${chain.status.velocity} health=${chainHolder.health} mana=${chainWand.status.mana}")
@@ -163,15 +165,15 @@ object ShieldBalanceScene {
                 if(t in listOf(70,74,78,140)) {
                     if(t==140)eight.status.mana=0.0
                     for(holder in listOf(left!!,right!!)) {
-                        val p=MagicManager.create("fireball") as Projectile;p.caster=ctx.player;p.wand=Wand("shield-runtime");p.status.damage=36.0
-                        p.position=Vector3d((holder.x).toDouble(), (floor+1.8f).toDouble(), (-6f).toDouble());p.velocity=Vector3f(0f,0f,1f);p.speed=3f;p.maxAge=30;p.spell();MagicManager.add(p)
+                        val p=SpellRegistry.create("fireball") as Projectile;p.caster=ctx.player;p.wand=Wand("shield-runtime");p.status.damage=36.0
+                        p.position=Vector3d((holder.x).toDouble(), (floor+1.8f).toDouble(), (-6f).toDouble());p.velocity=Vector3f(0f,0f,1f);p.speed=3f;p.maxAge=30;p.spell();ProjectileRuntime.add(p)
                     }
                 }
                 if(t==90) {
-                    val p=MagicManager.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
+                    val p=SpellRegistry.create("concentrated_light") as work.nekow.primalspells.magic.projectile.ConcentratedLight
                     p.caster=ctx.player;p.wand=Wand("grazing-visual")
                     val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
-                    p.position=center.add(1.2,0.0,-7.0).toPosition();p.velocity=Vector3f(0f,0f,1f);p.spell();MagicManager.add(p);grazingLight=p
+                    p.position=center.add(1.2,0.0,-7.0).toPosition();p.velocity=Vector3f(0f,0f,1f);p.spell();ProjectileRuntime.add(p);grazingLight=p
                 }
                 if(t in 100..120 && grazingContact==null && grazingLight?.shieldReflectionPoint!=null) {
                     val center=right!!.position().add(0.0,right!!.bbHeight*0.55,0.0)
@@ -185,10 +187,10 @@ object ShieldBalanceScene {
                 }
                 if(t==84)record(t,"runtime-one-breaks-eight-remains-intact",shield(one).breached && !shield(eight).breached && eight.status.mana<10000.0,"one=${shield(one).breached} eight=${shield(eight).breached} mana=${eight.status.mana}")
                 if(t==147)record(t,"runtime-eight-breaks-after-mana-depletion",shield(eight).breached,"breached=${shield(eight).breached}")
-                if(t==200)MagicManager.projectiles.forEach{it.alive=false}
+                if(t==200)ProjectileRuntime.projectiles.forEach{it.alive=false}
                 if(t==220){left?.discard();right?.discard()}
             },checksAt={ctx,t ->
-                if(t==249){record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}
+                if(t==249){record(t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}
                 if(t==249)for(id in listOf("native-held-wand-input-keeps-speed","held-wand-can-sprint","native-other-item-slowdown-unchanged")) {
                     val result=clientResults[id] ?: (false to "client callback did not finish")
                     record(t,id,result.first,result.second)

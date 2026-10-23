@@ -5,8 +5,8 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.HitResult
 import work.nekow.primalspells.util.HitType
 
@@ -117,13 +117,13 @@ class CrystalReaction : BaseEffect() {
     companion object {
         /** 在实际爆炸范围内激活水晶；无递归、不会激活别的维度。 */
         fun notifyExplosion(level: ServerLevel, center: Vec3, radius: Double) {
-            MagicManager.projectiles.filter { it.alive && it.caster.level() === level &&
+            ProjectileRuntime.projectiles.filter { it.alive && it.caster.level() === level &&
                 Vec3(it.status.pos.x.toDouble(), it.status.pos.y.toDouble(), it.status.pos.z.toDouble()).distanceToSqr(center) <= radius * radius
             }.forEach { p -> p.effects.filterIsInstance<CrystalReaction>().forEach { it.arm() } }
         }
         /** 专用引爆术只激活该施法者在十六格内布置的水晶。 */
         fun detonateOwned(source: net.minecraft.world.entity.Entity, center: Vec3, detonator: work.nekow.primalspells.magic.projectile.Projectile? = null) {
-            MagicManager.projectiles.filter { it.alive && it.caster === source &&
+            ProjectileRuntime.projectiles.filter { it.alive && it.caster === source &&
                 Vec3(it.status.pos.x.toDouble(), it.status.pos.y.toDouble(), it.status.pos.z.toDouble()).distanceToSqr(center) <= 256.0 * (detonator?.areaScale ?: 1.0) * (detonator?.areaScale ?: 1.0)
             }.forEach { p ->
                 if (detonator != null) work.nekow.primalspells.magic.core.SpellAssembly.reinforce(detonator, p)

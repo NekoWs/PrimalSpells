@@ -6,14 +6,16 @@
 
 | 要改什么 | 入口 |
 |---|---|
-| 抽牌、作用域、MP、双冷却 | `wand/Wand.kt`、`magic/core/{DrawAction,SpellAssembly}.kt` |
-| 只读预览/整副分色 | `wand/WandPreview.kt`、Wand.preview/previewSlots、`client/tooltip/WandPreviewCache.kt`、`client/screen/WandPreviewScreen.kt` |
+| 抽牌、作用域、MP、双冷却 | `wand/{Wand,WandDeck,CastTransaction,WandCasting}.kt`、`magic/core/{DrawAction,SpellAssembly}.kt` |
+| 只读预览/整副分色 | `wand/WandPreview.kt`、`wand/WandPreviewBuilder.kt`、`client/tooltip/WandPreviewCache.kt`、`client/screen/WandPreviewScreen.kt` |
 | 原容器编杖/小包 | `item/{WandItem,SpellPouchItem}.kt`、`client/input/{SpellSlotScrollHandler,ClientContainerDragHandler,CreativeWandEditHandler}.kt` |
-| 法杖创建/保存/持有者 | `wand/{WandTier,WandManager,WandSavedData}.kt`，WandStats定义在WandTier.kt |
-| 法术注册 | `magic/core/MagicManager.kt`；物品由 `registry/ModItems.kt` 自动创建 |
+| 法杖创建/保存/持有者 | `wand/{WandTier,WandPersistence,WandManager,WandSavedData}.kt`，WandStats定义在WandTier.kt |
+| 法术注册 | `registry/ModSpells.kt`、`magic/core/SpellRegistry.kt`；物品由 `registry/ModItems.kt` 自动创建 |
+| 弹体循环/停服清理 | `magic/runtime/ProjectileRuntime.kt`、`event/SpellRuntimeEvents.kt` |
+| 网络注册/服务端请求 | `network/{ModNetworking,WandRequestHandler}.kt` |
 | 运动、反弹、追踪 | `magic/effect/geometry/{Move,SweptCollision,Tracking,Bounce,ConstantAcceleration}.kt` |
 | 命中/伤害/击退/冻结 | `magic/effect/lifecycle/{SpellDamage,SpellImpact,DirectDamage,FrozenStatus}.kt` |
-| 护盾判定/反射点 | `magic/core/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
+| 护盾判定/反射点 | `magic/effect/lifecycle/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
 | 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |
 | 爆炸与跨投射物联动 | `magic/effect/lifecycle/{Explosion,ExplosionFx,SpellInteractions,SpellResonance,CrystalReaction}.kt` |
 | 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，高速光脊按实际里程采样，不改写命中轨迹 |
@@ -27,6 +29,7 @@
 | 罗盘/生活卡 | `item/SpellCompassItem.kt`、`magic/projectile/immobile/{SurveyPulse,ItemPull,FeatherWard}.kt` |
 | 数据重载/API/事件 | `integration/{PackRules,SpellApi,SpellEvents}.kt` |
 | PD管理器/共享spawn | `util/PdParticles.kt`；PD能力问题只记台账 |
+| 架构边界/持久化回归 | `gradle/architecture.gradle`随build执行；`client/capture/ArchitectureChecks.kt`由foundations运行 |
 | 录制/诊断 | `client/capture/CaptureDriver.kt`、CaptureScenes及各Scene；`tools/capture/{capture.ps1,diagnostics.ps1,assemble.py}` |
 | 性能回归 | `client/capture/SpellPerformanceScene.kt`，场景spell_performance；真实Move/联动耗时与线程分配，输出performance.tsv |
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
@@ -35,7 +38,7 @@
 
 ## 2. 法术ID与实现
 
-此表对照MagicManager注册工厂；显示名称不改变持久化ID。数值见 [战斗规则](design/combat-pricing.md)，新增流程见 [法术开发](spell-development.md)。
+此表对照ModSpells注册工厂；显示名称不改变持久化ID。数值见 [战斗规则](design/combat-pricing.md)，新增流程见 [法术开发](spell-development.md)。
 
 | ID / 名称 | 实现 |
 |---|---|

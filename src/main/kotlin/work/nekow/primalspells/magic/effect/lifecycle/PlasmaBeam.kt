@@ -9,6 +9,7 @@ import org.joml.Vector3d
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
 
 /** 移动束源发出六格持续光束；最终位置求值、碰墙截断，每 tick 结算且最多选四个目标。 */
@@ -48,11 +49,11 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
                 val to = end.toPosition()
                 status.velocity.set(end.subtract(start).toVector3f())
                 val shields = world.getEntitiesOfClass(LivingEntity::class.java, AABB(start, end).inflate(2.7)) {
-                    it.isAlive && work.nekow.primalspells.magic.core.ShieldGuard.hasShield(it)
-                }.mapNotNull { holder -> work.nekow.primalspells.magic.core.ShieldGuard.segmentEntry(holder, from, to)
+                    it.isAlive && ShieldGuard.hasShield(it)
+                }.mapNotNull { holder -> ShieldGuard.segmentEntry(holder, from, to)
                     ?.let { holder to it.distanceToSqr(start) } }.sortedBy { it.second }
                 for ((holder, _) in shields) {
-                    if (work.nekow.primalspells.magic.core.ShieldGuard.interceptSegment(world, holder, projectile, from, to)) {
+                    if (ShieldGuard.interceptSegment(world, holder, projectile, from, to)) {
                         end = projectile.shieldReflectionPoint ?: end
                         blocked = true
                         break
@@ -71,7 +72,7 @@ class PlasmaBeam : BaseEffect(), DirectDamage {
             if (name.startsWith("s")) core.setVariableInterpolated(name, value.toString(), 1)
         }
         if (status.age % 4 == 0) {
-            SpellInteractions.beam(projectile, start, end, work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
+            SpellInteractions.beam(projectile, start, end, ProjectileRuntime.projectiles.toList())
             work.nekow.primalspells.magic.effect.visual.PixelVfx.burst(ParticleManager.of(world), end,
                 Color.ofInt(120, 227, 255), if (blocked) 8 else 32, 0.12, 8, 0.006)
         }

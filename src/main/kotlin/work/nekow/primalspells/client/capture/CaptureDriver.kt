@@ -1,7 +1,9 @@
 package work.nekow.primalspells.client.capture
 
-import net.minecraft.client.Minecraft
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import net.minecraft.client.CameraType
+import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
 import net.minecraft.client.tutorial.TutorialSteps
 import net.minecraft.core.BlockPos
@@ -28,10 +30,8 @@ import net.neoforged.neoforge.common.NeoForge
 import org.lwjgl.glfw.GLFW
 import org.slf4j.LoggerFactory
 import work.nekow.primalspells.entity.TestDummyEntity
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModEntities
-import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 实机录制驱动 —— 「进游戏把真实表现录下来」的那台摄像机。
@@ -551,11 +551,11 @@ object CaptureDriver {
         /**
          * 场景公共准备：清上一场景残留 + 冻结时间/天气 + 禁怪 + 设游戏模式 + 传送。
          *
-         * 残留清理用「把投射物标记为死亡」而不是直接删：`MagicManager.tick` 会替我们调 `onDie`，
+         * 残留清理用「把投射物标记为死亡」而不是直接删：`ProjectileRuntime.tick` 会替我们调 `onDie`，
          * 于是退场动画照常播完（这正是在测的路径）。
          */
         fun setup(spectator: Boolean, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) {
-            MagicManager.projectiles.forEach { it.alive = false }
+            ProjectileRuntime.projectiles.forEach { it.alive = false }
             command("gamerule advance_time false")
             command("gamerule advance_weather false")
             command("gamerule spawn_mobs false")

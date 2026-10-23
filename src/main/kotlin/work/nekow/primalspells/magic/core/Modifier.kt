@@ -3,9 +3,9 @@ package work.nekow.primalspells.magic.core
 import work.nekow.primalspells.magic.effect.BaseEffect
 
 /**
- * 修饰器基类：描述「对投射物做哪些修正」，自身不进 [MagicManager.projectiles]、不参与 tick。
+ * 修饰器基类：描述「对投射物做哪些修正」，自身不进入弹体循环、不参与 tick。
  *
- * 装配流程：`Wand.castHand` 把修饰器手牌里的效果克隆后**追加**进投射物的 `effects`
+ * 装配流程：`WandCasting` 把修饰器手牌里的效果克隆后**追加**进投射物的 `effects`
  * （见 [Modifier.effects]），随后随投射物一起 `spell()` / `tick()`。
  *
  * ## 硬性约定：修饰器之间**没有先后顺序**

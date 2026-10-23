@@ -1,5 +1,8 @@
 package work.nekow.primalspells.client.capture
 
+import java.util.IdentityHashMap
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow
@@ -10,15 +13,13 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.core.client.ClientParticleEngine
 import work.nekow.particledrawing.core.client.RenderParticle
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.SpellAssembly
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
-import java.util.IdentityHashMap
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import work.nekow.primalspells.wand.Wand
 
 /** 实机比较原版弩箭、验证高速掠过索敌，以及真实发射器的逐粒透明度与变速更新。 */
 object ProjectileFlightScene {
@@ -36,8 +37,8 @@ object ProjectileFlightScene {
             checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail))
         }
         fun shot(ctx: CaptureDriver.SceneCtx, position: Vec3, direction: Vector3f, mods: List<String> = emptyList()): Projectile {
-            val p = MagicManager.create("fireball") as Projectile
-            SpellAssembly.apply(p, mods.map { MagicManager.create(it) as Modifier })
+            val p = SpellRegistry.create("fireball") as Projectile
+            SpellAssembly.apply(p, mods.map { SpellRegistry.create(it) as Modifier })
             p.caster = ctx.player; p.wand = Wand("flight-$position")
             p.position = position.toPosition(); p.velocity = direction; p.spell()
             return p
@@ -95,14 +96,14 @@ object ProjectileFlightScene {
                 }
                 if (t == 60) {
                     display = shot(ctx, Vec3(-12.0, floor + 3.0, 0.0), Vector3f(1f, 0f, 0f)).also {
-                        it.maxAge = 26; MagicManager.add(it)
+                        it.maxAge = 26; ProjectileRuntime.add(it)
                     }
                 }
                 // 外部受力可改变速度；验证发射器热更新寿命后仍保留alpha通道，而不是只验证静态曲线。
                 if (t == 63) display?.status?.velocity?.set(0.45f, 0f, 0f)
                 if (t == 100) record(t, "real-trail-particles-fade-after-speed-change", alphaFalls.get() > 2 && faded.get() > 2 && (alphaSamples["minimum"] ?: 1.0) < 0.4,
                     "decreasing=${alphaFalls.get()} faded=${faded.get()} minimum=${alphaSamples["minimum"]}")
-                if (t == 125) record(t, "projectiles-cleaned", MagicManager.projectiles.isEmpty(), "remaining=${MagicManager.projectiles.size}")
+                if (t == 125) record(t, "projectiles-cleaned", ProjectileRuntime.projectiles.isEmpty(), "remaining=${ProjectileRuntime.projectiles.size}")
             }, clientTick = { _, t ->
                 if (t in 64..90) ClientParticleEngine.instance()?.getGlowingParticles()?.forEach { p ->
                     val alpha = p.effectiveAlpha()

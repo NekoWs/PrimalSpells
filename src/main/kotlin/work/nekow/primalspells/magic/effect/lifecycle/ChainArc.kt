@@ -1,21 +1,21 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import java.util.ArrayDeque
+import java.util.UUID
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.PixelVfx
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toVec3
-import java.util.ArrayDeque
-import java.util.UUID
 
 /** Noita式分段魔弹：慢漂移，第4/7/10/14刻寻敌跃迁；无目标前跳，只检查落点地形，避开最近两次目标。 */
 class ChainArc : BaseEffect(), DirectDamage {
@@ -59,7 +59,7 @@ class ChainArc : BaseEffect(), DirectDamage {
         val end = target?.boundingBox?.center ?: start.add(heading.scale(radius * 0.625))
         status.pos.set(end.x, end.y, end.z)
         PixelVfx.arc(ParticleManager.of(world), start, end)
-        SpellInteractions.beam(projectile, start, end, MagicManager.projectiles.toList())
+        SpellInteractions.beam(projectile, start, end, ProjectileRuntime.projectiles.toList())
         val block = BlockPos.containing(end)
         if (!world.getBlockState(block).getCollisionShape(world, block).isEmpty && !projectile.throughBlocks) {
             projectile.hitBlock(Vector3d(status.pos), Vector3f(heading.x.toFloat(),heading.y.toFloat(),heading.z.toFloat()).negate())

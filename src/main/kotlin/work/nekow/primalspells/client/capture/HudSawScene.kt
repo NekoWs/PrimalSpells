@@ -1,14 +1,16 @@
 package work.nekow.primalspells.client.capture
 
-import net.minecraft.client.Minecraft
-import net.minecraft.client.KeyMapping
 import com.mojang.blaze3d.platform.InputConstants
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
+import net.minecraft.client.KeyMapping
+import net.minecraft.client.Minecraft
+import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.input.MouseButtonInfo
-import net.minecraft.client.input.KeyEvent
-import net.minecraft.world.entity.EquipmentSlot
-import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.EntitySpawnReason
+import net.minecraft.world.entity.EntityTypes
+import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
@@ -18,14 +20,13 @@ import org.lwjgl.glfw.GLFW
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.client.hud.*
 import work.nekow.primalspells.client.screen.HudEditorScreen
-import work.nekow.primalspells.magic.core.MagicManager
-import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.lifecycle.SpellImpact
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.*
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 
 /** 真实HUD同步/按键/编辑器输入/落盘与自然下坠、地面反弹的实机回归。 */
 object HudSawScene {
@@ -138,7 +139,7 @@ object HudSawScene {
                 if (t == 130) oldLayout?.let { HudSettings.save(it) }
             }, tick = { ctx, t ->
                 if (t == 5) {
-                    val refund = MagicManager.create("mana_injection")!!
+                    val refund = SpellRegistry.create("mana_injection")!!
                     val w = Wand("refund-cap").also { it.mana = 100.0; it.charge = 0.0 }
                     w.status.mana = 99.0
                     record(t, "refund-caps-near-full", w.consumeMana(refund) && w.status.mana == 100.0, "mana=${w.status.mana}")
@@ -159,17 +160,17 @@ object HudSawScene {
                         listOf("trigger_fireball", "mana_injection", "fireball"))) {
                         val chain = Wand("refund-chain-$ids").also {
                             it.mana = 35.0; it.status.mana = 35.0; it.charge = 0.0
-                            it.magics += ids.map { id -> MagicManager.create(id)!! }; it.load()
+                            it.magics += ids.map { id -> SpellRegistry.create(id)!! }; it.load()
                         }
                         record(t, "real-chain-refund-cap-$ids", chain.spell(ctx.player) && chain.status.mana == 32.0,
                             "mana=${chain.status.mana}")
-                        MagicManager.projectiles.forEach { it.alive = false }
+                        ProjectileRuntime.projectiles.forEach { it.alive = false }
                     }
                 }
                 if (t == 10) {
                     val stack = ModItems.wandStack(WandTier.T2)
                     wand = WandManager[WandManager.createWand(stack)].also {
-                        it.magics += MagicManager.create("fireball")!!; it.load(); it.charge = 0.0
+                        it.magics += SpellRegistry.create("fireball")!!; it.load(); it.charge = 0.0
                         it.delayTickCount = 45.0; it.rechargeTickCount = 90.0; it.status.mana = 100.0
                         shared["id"] = it.id
                     }
@@ -203,10 +204,10 @@ object HudSawScene {
                     target?.discard()
                     attacker?.discard()
                     ctx.player.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY)
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == 199) record(t, "hud-scene-cleans-world-effects", ParticleManager.of(ctx.level).getEngine().particleCount() == 0 &&
-                    MagicManager.projectiles.isEmpty(), "particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
+                    ProjectileRuntime.projectiles.isEmpty(), "particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
             }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> target?.discard(); attacker?.discard(); ctx.command("difficulty peaceful"); Minecraft.getInstance().execute {
                 Minecraft.getInstance().gui.setScreen(null); oldLayout?.let { HudSettings.save(it) }; WandHudRenderer.clear()
             } })
@@ -230,10 +231,10 @@ object HudSawScene {
             }, camera = { _, _ -> Pose(shot?.status?.pos?.x?.toDouble() ?: 0.0, floor + 3.0, -4.0, 0f, 8f) }, tick = { ctx, t ->
                 fun record(id: String, ok: Boolean, detail: String) { checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail)) }
                 if (t == 10) {
-                    shot = (MagicManager.create("sawblade") as Projectile).also {
+                    shot = (SpellRegistry.create("sawblade") as Projectile).also {
                         it.caster = caster!!; it.wand = Wand("falling-saw"); it.wand.status.particleManager = ParticleManager.of(ctx.level)
                         it.position = Vector3d((-3f).toDouble(), (floor + 4f).toDouble(), (0f).toDouble()); it.velocity = Vector3f(0.15f, 0f, 0f)
-                        it.spell(); MagicManager.add(it); initialY = it.status.pos.y; previousY = initialY
+                        it.spell(); ProjectileRuntime.add(it); initialY = it.status.pos.y; previousY = initialY
                     }
                 }
                 if (t == 16) {
@@ -252,7 +253,7 @@ object HudSawScene {
                         "bounces=${p.status.bounces} y=${p.status.pos.y}")
                 }
                 if (t == 65) { shot?.alive = false; caster?.discard() }
-                if (t == 129) record("saw-retires-all-metal-particles", MagicManager.projectiles.isEmpty() &&
+                if (t == 129) record("saw-retires-all-metal-particles", ProjectileRuntime.projectiles.isEmpty() &&
                     ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
             }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { _ -> shot?.alive = false; caster?.discard() })
     }

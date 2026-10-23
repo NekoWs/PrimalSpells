@@ -1,19 +1,20 @@
 package work.nekow.primalspells.client.capture
 
-import net.minecraft.core.BlockPos
-import net.minecraft.world.level.block.Blocks
+import kotlin.math.sin
 import net.minecraft.client.Minecraft
-import work.nekow.primalspells.client.render.WandModelProperty
+import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.block.Blocks
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.client.render.WandModelProperty
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.visual.WandCastingFx
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
+import work.nekow.primalspells.util.toPosition
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
-import work.nekow.primalspells.util.toPosition
-import kotlin.math.sin
 
 /** 真玩家持有真实法杖：切换预热、待机、移动跟随、两种冷却与放下清理。 */
 object WandCastingScenes {
@@ -54,7 +55,7 @@ object WandCastingScenes {
         fun equip(): Pair<ItemStack, Wand> {
             val stack = ItemStack(ModItems.WAND.get())
             val wand = WandManager[WandManager.createWand(stack)]
-            wand.magics += MagicManager.create("fireball")
+            wand.magics += SpellRegistry.create("fireball")
             wand.delayTickCount = 16.0; wand.rechargeTickCount = 36.0
             wand.load(); wand.status.mana = wand.mana
             return stack to wand
@@ -93,7 +94,7 @@ object WandCastingScenes {
                     firstCast = first.spell(ctx.player)
                     // add走pendingAdd；在下一Pre tick并入活动表后、第一次Move之前验证真实出生点。
                     work.nekow.primalspells.util.Deferred.after(ctx.level, 0) {
-                        val shot = MagicManager.projectiles.lastOrNull { it.wand === first }
+                        val shot = ProjectileRuntime.projectiles.lastOrNull { it.wand === first }
                         gemOriginMatches = firstCast && shot != null && shot.position.distance(gem.toPosition()) < 0.0001f
                     }
                 }
@@ -103,18 +104,18 @@ object WandCastingScenes {
                 if (t == 96) switchBlocked = !second.spell(ctx.player)
                 if (t == 115) switchCast = second.spell(ctx.player)
                 // 正面抬头取景的弹体飞行更久，提前结束弹道尾迹，独立测量持杖退场。
-                if (front && t == 128) MagicManager.projectiles.forEach { it.alive = false }
+                if (front && t == 128) ProjectileRuntime.projectiles.forEach { it.alive = false }
                 if (t == 140) {
                     ctx.player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY)
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == 160) ctx.player.setItemInHand(InteractionHand.OFF_HAND, firstStack)
                 if (t == 161) offhandBlocked = !first.spell(ctx.player)
                 if (t == 178) offhandCast = first.spell(ctx.player)
-                if (t == 180) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 180) ProjectileRuntime.projectiles.forEach { it.alive = false }
                 if (t == 190) {
                     ctx.player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY)
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
             }, finish = { ctx ->
                 ctx.player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY)
@@ -132,7 +133,7 @@ object WandCastingScenes {
                 192 -> listOf(Check(name, t, "offhand-exit-still-visible", ParticleManager.of(ctx.level).getEngine().particleCount() > 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 208 -> listOf(Check(name, t, "offhand-exit-cleaned", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 180 -> listOf(Check(name, t, "offhand-has-equip-and-casting", offhandBlocked && offhandCast, "blocked=$offhandBlocked cast=$offhandCast"))
-                219 -> listOf(Check(name, t, "projectiles-cleaned", MagicManager.projectiles.isEmpty(), "shots=${MagicManager.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")) + clientChecks.map { (label, ok) -> Check(name, t, label, ok, "result=$ok") }
+                219 -> listOf(Check(name, t, "projectiles-cleaned", ProjectileRuntime.projectiles.isEmpty(), "shots=${ProjectileRuntime.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")) + clientChecks.map { (label, ok) -> Check(name, t, label, ok, "result=$ok") }
                 else -> emptyList()
             } })
     }

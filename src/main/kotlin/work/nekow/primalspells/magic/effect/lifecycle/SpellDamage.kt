@@ -3,9 +3,8 @@ package work.nekow.primalspells.magic.effect.lifecycle
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
-import work.nekow.primalspells.magic.core.ShieldGuard
-import work.nekow.primalspells.magic.projectile.Projectile
 import net.minecraft.world.phys.Vec3
+import work.nekow.primalspells.magic.projectile.Projectile
 
 /** 服务端直接命中结算；普通弹、电弧和光束共用护盾、无敌帧及冰冻接入。 */
 object SpellDamage {

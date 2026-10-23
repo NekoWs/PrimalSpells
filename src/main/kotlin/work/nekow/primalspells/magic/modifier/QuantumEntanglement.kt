@@ -1,17 +1,17 @@
 package work.nekow.primalspells.magic.modifier
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import net.minecraft.server.level.ServerLevel
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
-import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.Lore
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * 量子纠缠修正 —— 将下一个投射物复制两份。
@@ -60,7 +60,7 @@ class QuantumEntanglement : Modifier() {
                     )
                     link.members += clone
                     clone.spell()
-                    MagicManager.add(clone)
+                    ProjectileRuntime.add(clone)
                 }
 
                 // 主投射物也需要监听复制体的死亡

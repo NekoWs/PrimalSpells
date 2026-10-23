@@ -1,5 +1,6 @@
 package work.nekow.primalspells.entity
 
+import kotlin.math.atan2
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
@@ -17,11 +18,11 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.primalspells.item.WandItem
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
-import kotlin.math.atan2
 
 /**
  * 测试木桩：用于测试伤害的假人靶子，外形与盔甲架一致（复用盔甲架模型/渲染）。
@@ -133,7 +134,7 @@ class TestDummyEntity(
     /**
      * 攻击靶子：每 tick 索敌并瞄准最近的玩家，按 [ATTACK_INTERVAL] 直接施放 [ATTACK_SPELL]。
      *
-     * 走的是 `DroneEntity` 那条路（自己构造投射物 + `MagicManager.add`），**不经过牌堆与法力** ——
+     * 走的是 `DroneEntity` 那条路（自己构造投射物 + `ProjectileRuntime.add`），**不经过牌堆与法力** ——
      * 这条指令的用途是「稳定可复现地向玩家开火」，不是模拟一个真的施法者：
      * 牌堆/冷却/法力都会让开火节奏变得不可预期。
      *
@@ -163,13 +164,13 @@ class TestDummyEntity(
         attackCooldown = interval
 
         val id = persistentData.getString(ATTACK_SPELL).orElse(DEFAULT_ATTACK_SPELL)
-        val projectile = MagicManager.create(id) as? Projectile ?: return
+        val projectile = SpellRegistry.create(id) as? Projectile ?: return
         projectile.caster = this
         projectile.wand = attackWand
         projectile.position = Vector3d(eye.x, eye.y, eye.z)
         projectile.velocity = Vector3f(unit.x.toFloat(), unit.y.toFloat(), unit.z.toFloat())
         projectile.spell()
-        MagicManager.add(projectile)
+        ProjectileRuntime.add(projectile)
     }
 
     /** 木桩不接受任何治疗效果 */

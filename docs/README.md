@@ -37,6 +37,7 @@ ParticleDrawing 是必需前置，锁定版本以 `gradle.properties` 与 `lib/`
 - `src/main/java/work/nekow/primalspells/mixin/`：Java mixin。
 - `src/main/resources/`：资源、语言、数据包与加载配置。
 - `tools/`：录制、资源生成和诊断工具。
+- `gradle/architecture.gradle`：随build执行的源码依赖边界检查。
 - `lib/`：当前PD主JAR与源码JAR；源码JAR不参与构建。
 - `build/`、`run/`：生成产物、开发存档与日志，不作为源码入库。
 

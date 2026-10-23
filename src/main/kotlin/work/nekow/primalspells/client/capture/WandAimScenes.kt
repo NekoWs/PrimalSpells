@@ -1,8 +1,6 @@
 package work.nekow.primalspells.client.capture
 
 import net.minecraft.client.Minecraft
-import org.joml.Vector3d
-import work.nekow.primalspells.mixin.ItemInHandRendererAccessor
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
@@ -10,14 +8,17 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.item.WandItem
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.WandCastingFx
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
+import work.nekow.primalspells.mixin.ItemInHandRendererAccessor
 import work.nekow.primalspells.registry.ModItems
-import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.util.Deferred
+import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandAim
 import work.nekow.primalspells.wand.WandManager
@@ -35,7 +36,7 @@ object WandAimScenes {
             results["$label-cast"] = wand.spell(ctx.player)
             results["$label-hit"] = false
             Deferred.after(ctx.level, 0) {
-                val shot = MagicManager.projectiles.lastOrNull { it.wand === wand }
+                val shot = ProjectileRuntime.projectiles.lastOrNull { it.wand === wand }
                 val expected = shot?.let { aim.subtract(it.position.toVec3()).normalize() }
                 results["$label-direction"] = shot != null && expected != null &&
                     Vec3(shot.velocity).normalize().distanceTo(expected) < 1.0e-5
@@ -74,7 +75,7 @@ object WandAimScenes {
                 WandCastingFx.clear()
                 stack = ItemStack(ModItems.WAND.get())
                 wand = WandManager[WandManager.createWand(stack)]
-                wand.magics += MagicManager.create("fireball")
+                wand.magics += SpellRegistry.create("fireball")
                 wand.delayTickCount = 2.0; wand.rechargeTickCount = 2.0; wand.load(); wand.status.mana = wand.mana
                 ctx.player.inventory.setItem(7,stack)
                 dummy = ctx.spawnDummy(.5,floor+1.0,3.5)
@@ -105,7 +106,7 @@ object WandAimScenes {
                     112 -> fire(ctx,"occluded")
                     132 -> {
                         ctx.player.setItemInHand(InteractionHand.OFF_HAND,ItemStack.EMPTY)
-                        dummy.discard(); MagicManager.projectiles.forEach { it.alive=false }
+                        dummy.discard(); ProjectileRuntime.projectiles.forEach { it.alive=false }
                     }
                 }
             }, checksAt = { _,t -> if(t==159) results.map { (key,ok) -> Check(name,t,key,ok,"result=$ok") } else emptyList() },

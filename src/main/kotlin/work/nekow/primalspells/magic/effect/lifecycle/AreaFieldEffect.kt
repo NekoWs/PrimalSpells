@@ -1,5 +1,6 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import kotlin.math.sqrt
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.effect.MobEffects
@@ -8,12 +9,11 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.EffectPhase
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.pdParticles
-import kotlin.math.sqrt
 
 /**
  * 区域场效果基类 —— 黑洞与重力场共用的「持续区域」实现。
@@ -146,7 +146,7 @@ abstract class AreaFieldEffect(
      * 排除本效果自己所在的投射物 —— 否则区域弹会被自己往下压、或被自己吸住。
      */
     private fun applyProjectileForces(center: Vec3) {
-        val projectiles = MagicManager.projectiles
+        val projectiles = ProjectileRuntime.projectiles
         if (projectiles.isEmpty()) return
         val radiusSq = radius * radius * projectile.areaScale * projectile.areaScale
         for (p in projectiles) {

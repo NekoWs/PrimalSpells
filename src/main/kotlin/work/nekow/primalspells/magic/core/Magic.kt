@@ -152,13 +152,13 @@ abstract class Magic {
     /**
      * 新建一枚「本次施法专用」的法术实例 —— **这是新建，不是字段拷贝**。
      *
-     * 为什么必须新建：[Wand.castHand] 会把修饰器的效果注入到**实例自身**的 [effects]，
+     * 为什么必须新建：[Wand.spell] 会把修饰器的效果注入到**实例自身**的 [effects]，
      * 复用同一实例会让上一发注入的效果残留、并随施法次数不断叠加。
      * 因此这里从注册表工厂重建一个默认状态实例；运行期状态（当前速度、被修饰器改过的伤害等）
      * **不会**被继承——任何依赖「克隆时继承父投射物状态」的逻辑都是错的。
      *
      * @throws IllegalStateException [id] 未注册时抛出（比 `!!` 的 NPE 更容易定位）
      */
-    open fun clone(): Magic = MagicManager.create(id)
+    open fun clone(): Magic = SpellRegistry.create(id)
         ?: throw IllegalStateException("法术 id 未注册，无法创建施法实例：$id")
 }

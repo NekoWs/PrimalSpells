@@ -1,18 +1,18 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
 import org.joml.Vector3d
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.core.TriggerSpell
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.HitResult
 
 /**
  * 命中时释放触发法术的 payload（挂在 `TriggerFireball` 这类触发投射物上）。
  *
  * payload 语义：
- * - `Wand.drawChain` 在施法时按 `triggerCast` 预算**递归预留一条独立法术链**，把抽到的法术（已克隆、尚未施放）
+ * - `WandDeck.draw` 在施法时按 `triggerCast` 预算**递归预留一条独立法术链**，把抽到的法术（已克隆、尚未施放）
  *   装进 payload；若抽到的是触发法术，会递归填充它自己的 payload，
  *   于是形成 `触发A( 触发B( 火球 ) )` 这样的链式结构。
  * - 命中（实体或方块）时，把 payload 里的投射物**就地施放**：起点 = 命中点，方向 = 命中法线
@@ -41,7 +41,7 @@ class Trigger : BaseEffect() {
             shot.position = Vector3d(result.pos)
             shot.velocity = org.joml.Vector3f(result.normal)
             shot.spell()
-            MagicManager.add(shot)
+            ProjectileRuntime.add(shot)
         }
     }
 }

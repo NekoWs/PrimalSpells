@@ -14,7 +14,7 @@ import net.minecraft.world.item.ItemStack
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.RegisterCommandsEvent
 import work.nekow.primalspells.entity.TestDummyEntity
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.modifier.EnergyShield
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.registry.ModEntities
@@ -135,7 +135,7 @@ object ShieldDummyCommand {
         // `WandManager` 里查的，自己 `Wand(...)` 造一个再塞组件，查回来会是另一个空实例（实测 shields=0）。
         val stack = ItemStack(ModItems.WAND.get())
         val wand = WandManager.createWand(stack).let { id -> WandManager[id] }
-        repeat(cards) { wand.magics += MagicManager.create("energy_shield") as EnergyShield }
+        repeat(cards) { wand.magics += SpellRegistry.create("energy_shield") as EnergyShield }
         wand.load()
         dummy.setItemInHand(InteractionHand.MAIN_HAND, stack)
         if (!level.addFreshEntity(dummy)) {
@@ -163,7 +163,7 @@ object ShieldDummyCommand {
      */
     private fun spawnAttacker(source: CommandSourceStack, spellId: String, interval: Int): Int {
         val level = source.level
-        if (MagicManager.create(spellId) !is Projectile) {
+        if (SpellRegistry.create(spellId) !is Projectile) {
             source.sendFailure(Component.literal("没有这个投射物法术：$spellId"))
             return 0
         }
@@ -218,8 +218,8 @@ object ShieldDummyCommand {
 
     /** 补全候选：所有注册过的**投射物**法术 id（攻击靶子只能打投射物）。 */
     private val SPELL_SUGGESTIONS = SuggestionProvider<CommandSourceStack> { _, builder ->
-        MagicManager.registry.keys
-            .filter { MagicManager.create(it) is Projectile }
+        SpellRegistry.factories.keys
+            .filter { SpellRegistry.create(it) is Projectile }
             .sorted()
             .forEach(builder::suggest)
         builder.buildFuture()

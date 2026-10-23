@@ -1,19 +1,20 @@
 @file:Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 package work.nekow.primalspells.client.capture
 
+import java.util.concurrent.ConcurrentHashMap
 import net.minecraft.client.Minecraft
 import org.joml.Vector3d
-import work.nekow.particledrawing.core.client.ClientParticleEngine
-import work.nekow.particledrawing.lighting.DynamicLightManager
-import java.util.concurrent.ConcurrentHashMap
-import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
+import work.nekow.particledrawing.core.client.ClientParticleEngine
+import work.nekow.particledrawing.lighting.DynamicLightManager
 import work.nekow.primalspells.magic.core.*
-import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.SpellDamage
 import work.nekow.primalspells.magic.modifier.Torch
+import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.wand.Wand
 
 /** 真实抽牌树、付费、复制、追加条件、正负治疗和逐刻切割回归。 */
@@ -41,11 +42,11 @@ object NewSpellScene {
             tick={ctx,t ->
                 fun record(id:String,ok:Boolean,detail:String) { checks.getOrPut(t){arrayListOf()}.add(Check(name,t,id,ok,detail)) }
                 fun cast(ids:List<String>,mana:Double=10000.0):Pair<Wand,List<Projectile>> {
-                    MagicManager.projectiles.forEach { it.alive=false };MagicManager.tick()
+                    ProjectileRuntime.projectiles.forEach { it.alive=false };ProjectileRuntime.tick()
                     val w=Wand("new-$t-${ids.joinToString()}")
-                    w.magics+=ids.map { MagicManager.create(it)!! };w.load();w.status.mana=mana
-                    w.spell(source!!);MagicManager.tick()
-                    return w to MagicManager.projectiles.filter { it.alive }.toList()
+                    w.magics+=ids.map { SpellRegistry.create(it)!! };w.load();w.status.mana=mana
+                    w.spell(source!!);ProjectileRuntime.tick()
+                    return w to ProjectileRuntime.projectiles.filter { it.alive }.toList()
                 }
                 if(t==8) {
                     for((id,n) in listOf("triple_cast" to 3,"quadruple_cast" to 4,"quintuple_cast" to 5)) {
@@ -56,12 +57,12 @@ object NewSpellScene {
                     val native=allShots.filterIsInstance<work.nekow.primalspells.magic.projectile.TriggerFireball>().single()
                     record("cast-all-preserves-payload-scope",allShots.size==3 && native.payload.map{it.id}==listOf("speed_boost","chainsaw") && native.modifiers.isEmpty(),"shots=${allShots.size} payload=${native.payload.map{it.id}}")
                     record("cast-all-pays-once-no-wrap",all.status.mana==9938.0,"mana=${all.status.mana}")
-                    MagicManager.projectiles.forEach{it.alive=false};MagicManager.tick()
+                    ProjectileRuntime.projectiles.forEach{it.alive=false};ProjectileRuntime.tick()
                     val noWrap=Wand("cast-all-old-discard");noWrap.cast=2
-                    noWrap.magics+=listOf("healing_bolt","cast_all","fireball").map{MagicManager.create(it)!!}
+                    noWrap.magics+=listOf("healing_bolt","cast_all","fireball").map{SpellRegistry.create(it)!!}
                     noWrap.load();noWrap.discardPile+=noWrap.drawPile.removeFirst();noWrap.status.mana=1000.0
-                    noWrap.spell(source!!);MagicManager.tick()
-                    val allOnly=MagicManager.projectiles.filter{it.alive}
+                    noWrap.spell(source!!);ProjectileRuntime.tick()
+                    val allOnly=ProjectileRuntime.projectiles.filter{it.alive}
                     record("cast-all-extra-budget-does-not-wrap-old-discard",allOnly.map{it.id}==listOf("fireball"),"shots=${allOnly.map{it.id}}")
                     for((id,n) in listOf("divide_two" to 2,"divide_three" to 3,"divide_five" to 5,"divide_ten" to 10)) {
                         val (_,shots)=cast(listOf(id,"concentrated_light"))
@@ -93,24 +94,24 @@ object NewSpellScene {
                     record("appended-copy-independent",copy.addedTriggers.single().cards[1]!==payload[1],"original/copy child identity")
                     val (_,hitShots)=cast(listOf("add_trigger","fireball","healing_bolt"))
                     val hit=hitShots.single();hit.collisionEnabled=false;hit.status.bounces=1
-                    hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
-                    record("appended-hit-releases-on-bounce",hit.alive && hit.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"alive=${hit.alive}")
+                    hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
+                    record("appended-hit-releases-on-bounce",hit.alive && hit.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"alive=${hit.alive}")
                     val (_,pierced)=cast(listOf("piercing","add_trigger","fireball","healing_bolt"))
                     val through=pierced.single();through.collisionEnabled=false
                     through.hitEntity(source!!)
                     val heldPayload=through.addedTriggers.single().cards.isNotEmpty()
-                    through.hitBlock(Vector3d(through.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
-                    record("appended-piercing-entity-waits-for-block",heldPayload && through.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"held=$heldPayload")
+                    through.hitBlock(Vector3d(through.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
+                    record("appended-piercing-entity-waits-for-block",heldPayload && through.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"held=$heldPayload")
                     val (_,early)=cast(listOf("add_timer","fireball","healing_bolt"))
                     val earlyTimer=early.single();earlyTimer.collisionEnabled=false
-                    earlyTimer.hitBlock(Vector3d(earlyTimer.status.pos),Vector3f(0f,0f,-1f));MagicManager.tick()
-                    record("timer-earlier-collision-releases",earlyTimer.status.age<20 && earlyTimer.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"age=${earlyTimer.status.age}")
+                    earlyTimer.hitBlock(Vector3d(earlyTimer.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
+                    record("timer-earlier-collision-releases",earlyTimer.status.age<20 && earlyTimer.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"age=${earlyTimer.status.age}")
                     val (_,death)=cast(listOf("add_expiration","fireball","healing_bolt"))
                     val deathTrigger=death.single();deathTrigger.collisionEnabled=false;deathTrigger.status.bounces=1
                     deathTrigger.hitBlock(Vector3d(deathTrigger.status.pos),Vector3f(0f,0f,-1f))
                     val waits=deathTrigger.alive && deathTrigger.addedTriggers.single().cards.isNotEmpty()
-                    deathTrigger.hitBlock(Vector3d(deathTrigger.status.pos),Vector3f(0f,0f,1f));MagicManager.tick()
-                    record("expiration-waits-through-bounce-until-death",waits && deathTrigger.addedTriggers.single().cards.isEmpty() && MagicManager.projectiles.count{it.id=="healing_bolt"}==1,"waits=$waits")
+                    deathTrigger.hitBlock(Vector3d(deathTrigger.status.pos),Vector3f(0f,0f,1f));ProjectileRuntime.tick()
+                    record("expiration-waits-through-bounce-until-death",waits && deathTrigger.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"waits=$waits")
                     val (_,reduced)=cast(listOf("reduce_recharge","fireball"))
                     record("reduce-recharge-registered",reduced.single().modifiers["reduce_recharge"]==1,"recipe=${reduced.single().modifiers}")
                     val (_,heals)=cast(listOf("healing_bolt"))
@@ -123,7 +124,7 @@ object NewSpellScene {
                     record("healing-plus-five-restores-five",stand.health==before+5f,"before=$before after=${stand.health}")
                     val mid=stand.health;SpellDamage.hit(ctx.level,stand,heal,-5.0)
                     record("healing-negative-removes-five",stand.health==mid-5f,"before=$mid after=${stand.health}")
-                    stand.discard();MagicManager.projectiles.forEach{it.alive=false}
+                    stand.discard();ProjectileRuntime.projectiles.forEach{it.alive=false}
                 }
                 if(t==35) {
                     val (_,shots)=cast(listOf("double_cast","add_timer","fireball","healing_bolt","add_expiration","fireball","healing_bolt"))
@@ -138,12 +139,12 @@ object NewSpellScene {
                 if(t==65) {
                     record("timer-fires-once-at-20",timerCount==1 && timerAge==20,"count=$timerCount age=$timerAge")
                     record("expiration-fires-once-at-end",expireCount==1 && expireAge==6,"count=$expireCount age=$expireAge")
-                    MagicManager.projectiles.forEach{it.alive=false}
-                    val p=MagicManager.create("sawblade") as Projectile
+                    ProjectileRuntime.projectiles.forEach{it.alive=false}
+                    val p=SpellRegistry.create("sawblade") as Projectile
                     p.caster=source!!;p.wand=Wand("saw-frame");p.wand.status.particleManager=ParticleManager.of(ctx.level)
                     // 摄影机正对盘面；下坠和侧面厚度另由sawblade_falling连续录制。
                     p.position=Vector3d((-2f).toDouble(), (ctx.floorBlockY(0,0)+3f).toDouble(), (0f).toDouble());p.velocity=Vector3f(0.05f,0f,0f)
-                    p.spell();MagicManager.add(p);saw=p
+                    p.spell();ProjectileRuntime.add(p);saw=p
                     val target=ctx.spawnDummy(6.0,ctx.floorBlockY(0,0)+1.0,0.0)
                     val before=target.totalDamage
                     repeat(5){SpellDamage.hit(ctx.level,target,p,p.status.damage)}
@@ -152,7 +153,7 @@ object NewSpellScene {
                     target.discard()
                     val b=p.status.bounces;p.hitBlock(Vector3d(p.status.pos),Vector3f(0f,0f,-1f))
                     record("saw-bounces-and-self-harms",p.alive && p.status.bounces==b-1 && p.selfDamage,"bounces=${p.status.bounces} self=${p.selfDamage}")
-                    val w=Wand("torch-idle");torch=MagicManager.create("torch") as Torch;w.magics+=torch!!;w.load();w.tick(source!!,ctx.level)
+                    val w=Wand("torch-idle");torch=SpellRegistry.create("torch") as Torch;w.magics+=torch!!;w.load();w.tick(source!!,ctx.level)
                 }
                 if(t in listOf(95,110)) Minecraft.getInstance().execute {
                     val engine=ClientParticleEngine.instance() ?: return@execute
@@ -165,12 +166,12 @@ object NewSpellScene {
                         lights["worldLightmap"]=DynamicLightManager.getLightmapWithDynamicLight(0,x,y,z).toDouble()
                     }
                 }
-                if(t==100){torch?.onUnloaded();saw?.alive=false;MagicManager.projectiles.forEach{it.alive=false}}
+                if(t==100){torch?.onUnloaded();saw?.alive=false;ProjectileRuntime.projectiles.forEach{it.alive=false}}
                 if(t==112) source?.discard()
                 if(t==179){
                     record("torch-registers-one-world-light",lights["emitters95"]==1.0 && (lights["worldLight"]?:0.0)>10.0 && (lights["worldLightmap"]?:0.0)>0.0,"samples=$lights")
                     record("torch-world-light-retires",lights["emitters110"]==0.0,"samples=$lights")
-                    record("projectiles-cleaned",MagicManager.projectiles.isEmpty(),"shots=${MagicManager.projectiles.size}")
+                    record("projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"shots=${ProjectileRuntime.projectiles.size}")
                     record("pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                     source?.discard()
                 }

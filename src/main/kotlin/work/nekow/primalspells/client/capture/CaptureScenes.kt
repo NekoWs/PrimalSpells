@@ -1,9 +1,15 @@
 package work.nekow.primalspells.client.capture
 
+import java.io.File
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.sin
+import kotlin.math.sqrt
 import net.minecraft.world.InteractionHand
-import net.minecraft.world.item.DyeColor
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.projectile.arrow.Arrow
+import net.minecraft.world.item.DyeColor
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import org.joml.Vector3d
@@ -13,20 +19,15 @@ import work.nekow.particledrawing.core.client.ClientParticleEngine
 import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.EffectPhase
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.AreaFieldEffect
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.modifier.EnergyShield
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
-import java.io.File
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /** 相机位姿：位置 + 朝向（MC 约定：yaw 0 = 朝 +Z，pitch 正 = 低头）。 */
 data class Pose(val x: Double, val y: Double, val z: Double, val yaw: Float, val pitch: Float)
@@ -133,7 +134,7 @@ object CaptureScenes {
                     pitch = 0f,
                 )
                 wand = Wand("capture-black-hole").also { w ->
-                    w.innate += MagicManager.create("black_hole")
+                    w.innate += SpellRegistry.create("black_hole")
                         ?: error("black_hole 未注册")
                     w.status.mana = 1000.0
                     w.load()
@@ -145,14 +146,14 @@ object CaptureScenes {
                 val feetY = ctx.floorBlockY(CX, CZ) + 1.0
                 ctx.placeForCast(CX + 0.5, feetY + FIELD_CENTER_LIFT - EYE_HEIGHT, CZ + 0.5)
                 val ok = wand!!.spell(ctx.player)
-                ctx.log("$name cast -> $ok, projectiles=${MagicManager.projectiles.size}")
+                ctx.log("$name cast -> $ok, projectiles=${ProjectileRuntime.projectiles.size}")
             },
             tick = { _, t ->
-                // 新弹先经 MagicManager.pendingAdd 入列，再装录制专用定位效果。
+                // 新弹先经 ProjectileRuntime.pendingAdd 入列，再装录制专用定位效果。
                 if (moving && t == 3) addFieldMotion("black_hole")
                 // t=70 触发正常死亡路径（onDie → 退场动画），而不是删粒子
                 if (t == DEATH_TICK) {
-                    MagicManager.projectiles.filter { it.id == "black_hole" }.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.filter { it.id == "black_hole" }.forEach { it.alive = false }
                 }
             },
             checksAt = { ctx, t -> projectileChecks(name, t, "black_hole", lengthTicks - 1, ctx) + fieldMotionChecks(name, t, "black_hole", moving) },
@@ -190,7 +191,7 @@ object CaptureScenes {
                     pitch = 0f,
                 )
                 wand = Wand("capture-gravity").also { w ->
-                    w.innate += MagicManager.create("gravity_field")
+                    w.innate += SpellRegistry.create("gravity_field")
                         ?: error("gravity_field 未注册")
                     w.status.mana = 1000.0
                     w.load()
@@ -201,13 +202,13 @@ object CaptureScenes {
                 val feetY = ctx.floorBlockY(CX, CZ) + 1.0
                 ctx.placeForCast(CX + 0.5, feetY + FIELD_CENTER_LIFT - EYE_HEIGHT, CZ + 0.5)
                 val ok = wand!!.spell(ctx.player)
-                ctx.log("$name cast -> $ok, projectiles=${MagicManager.projectiles.size}")
+                ctx.log("$name cast -> $ok, projectiles=${ProjectileRuntime.projectiles.size}")
             },
             tick = { _, t ->
-                // 新弹先经 MagicManager.pendingAdd 入列，再装录制专用定位效果。
+                // 新弹先经 ProjectileRuntime.pendingAdd 入列，再装录制专用定位效果。
                 if (moving && t == 3) addFieldMotion("gravity_field")
                 if (t == DEATH_TICK) {
-                    MagicManager.projectiles.filter { it.id == "gravity_field" }.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.filter { it.id == "gravity_field" }.forEach { it.alive = false }
                 }
             },
             checksAt = { ctx, t -> projectileChecks(name, t, "gravity_field", lengthTicks - 1, ctx) + fieldMotionChecks(name, t, "gravity_field", moving) },
@@ -216,7 +217,7 @@ object CaptureScenes {
 
     /** 录制专用定位效果：走真实 OVERRIDE 阶段，固定镜头便于看出结构有没有留在出生点。 */
     private fun addFieldMotion(id: String) {
-        val p = MagicManager.projectiles.single { it.id == id }
+        val p = ProjectileRuntime.projectiles.single { it.id == id }
         val origin = Vector3d(p.status.pos)
         p.effects += object : BaseEffect() {
             override val phase = EffectPhase.OVERRIDE
@@ -242,7 +243,7 @@ object CaptureScenes {
 
     private fun fieldMotionChecks(name: String, t: Int, id: String, moving: Boolean): List<Check> {
         if (!moving || t != 25) return emptyList()
-        val effects = MagicManager.projectiles.single { it.id == id }.effects.sortedBy { it.phase.tickOrder }
+        val effects = ProjectileRuntime.projectiles.single { it.id == id }.effects.sortedBy { it.phase.tickOrder }
         val field = effects.indexOfFirst { it is AreaFieldEffect }
         val override = effects.indexOfLast { it.phase == EffectPhase.OVERRIDE }
         return listOf(Check(name, t, "field-after-position-override", field > override && override >= 0,
@@ -325,7 +326,7 @@ object CaptureScenes {
                 // （爆炸抵扣那条路要从实体反查到护盾），裸 `Wand` 实例它找不到。
                 val stack = ItemStack(ModItems.WAND.get())
                 val w = WandManager.createWand(stack).let { id -> WandManager[id] }
-                val card = MagicManager.create("energy_shield") as EnergyShield
+                val card = SpellRegistry.create("energy_shield") as EnergyShield
                 w.magics += card
                 w.load()
                 // 测试台设置：满法力 + **关掉回复**（`charge = 0`）。默认 1000/s 的回复会在两次大爆之间
@@ -340,7 +341,7 @@ object CaptureScenes {
                 attacker = ctx.spawnDummy(CX + 5.5, floorY + 1.0, CZ + 0.5, yaw = 90f)
                 // **普通火球**（强度 5）：预算 6 之下"单发挡得住（5 ≤ 6）、同一窗口第二发超预算（10 > 6）"才成立 ——
                 // 第 41 轮把预算按小白锚收紧到 6 之后，+3 的强化火球（8）会一发就超预算，不适合当"点射"探针
-                val bolt = MagicManager.create("fireball")!!
+                val bolt = SpellRegistry.create("fireball")!!
                 val sw = Wand("capture-shooter").also {
                     it.magics += bolt
                     it.load()
@@ -400,7 +401,7 @@ object CaptureScenes {
                     // 把法力压到付不起基础 5 MP，并收掉残余火球
                     // —— 后者的橙色拖尾会污染破口窗口的「暖色像素」判据
                     w.status.mana = SHIELD_LOW_MANA
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == SHIELD_REFILL_AT) {
                     // 箭矢 / 小额爆炸那两段要在"付得起"的前提下验证格挡，所以先把法力补回来
@@ -600,13 +601,13 @@ object CaptureScenes {
         offsetX: Float = 3.5f,
     ) {
         val floorY = ctx.floorBlockY(CX, CZ)
-        val projectile = MagicManager.create("large_explosion") as Projectile
+        val projectile = SpellRegistry.create("large_explosion") as Projectile
         projectile.caster = caster
         projectile.wand = wand
         projectile.position = Vector3d((CX + offsetX).toDouble(), (floorY + 2.0f).toDouble(), (CZ + 0.5f).toDouble())
         projectile.velocity = Vector3f(0f, 0f, 0f)
         projectile.spell()
-        MagicManager.add(projectile)
+        ProjectileRuntime.add(projectile)
     }
 
     /**
@@ -683,7 +684,7 @@ object CaptureScenes {
                     pitch = 0f,
                 )
                 wand = Wand("capture-trail").also { w ->
-                    w.innate += MagicManager.create("fireball") ?: error("fireball 未注册")
+                    w.innate += SpellRegistry.create("fireball") ?: error("fireball 未注册")
                     w.status.mana = 1000.0
                     w.load()
                 }
@@ -702,13 +703,13 @@ object CaptureScenes {
                 ctx.player.setXRot(0f)
                 ctx.player.setOldPosAndRot()
                 val ok = wand!!.spell(ctx.player)
-                ctx.log("$name cast -> $ok, projectiles=${MagicManager.projectiles.size}")
+                ctx.log("$name cast -> $ok, projectiles=${ProjectileRuntime.projectiles.size}")
             },
             tick = { ctx, t ->
                 // 诊断：每 4 tick 记一行「火球位置 / 速度 / 寿命 / 在场投射物数」——
                 // 第 43 轮就是靠它看出「火球沿预热视角斜飞、t≈17 扎进地面」的（像素判据量不出这件事）
                 if (t % 4 == 0) {
-                    val alive = MagicManager.projectiles.firstOrNull { it.id == "fireball" && it.alive }
+                    val alive = ProjectileRuntime.projectiles.firstOrNull { it.id == "fireball" && it.alive }
                     val state = if (alive == null) "gone" else (
                         "pos=(%.2f,%.2f,%.2f) v=(%.3f,%.3f,%.3f) age=%d".format(
                             alive.status.pos.x, alive.status.pos.y, alive.status.pos.z,
@@ -716,12 +717,12 @@ object CaptureScenes {
                             alive.status.age,
                         )
                         )
-                    ctx.log("trail diag t=$t n=${MagicManager.projectiles.size} bolt=$state")
+                    ctx.log("trail diag t=$t n=${ProjectileRuntime.projectiles.size} bolt=$state")
                 }
                 // 到点主动收掉火球（而不是等它撞墙）：撞墙时刻取决于棚子尺寸与拖拽，
                 // 显式收掉才能让「尾迹逐颗消散」的窗口刚好落在场景后半段（退场判据要 ≥4 帧的渐隐）
                 if (t == TRAIL_DEATH_TICK) {
-                    MagicManager.projectiles.filter { it.id == "fireball" }.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.filter { it.id == "fireball" }.forEach { it.alive = false }
                     ctx.log("trail: bolt released at t=$t (尾迹开始逐颗消散)")
                 }
             },
@@ -741,8 +742,8 @@ object CaptureScenes {
                     TRAIL_TICKS - 3 -> listOf(
                         Check(
                             name, t, "trail-cleaned-up",
-                            MagicManager.projectiles.none { it.id == "fireball" },
-                            "残留火球 = ${MagicManager.projectiles.count { it.id == "fireball" }}",
+                            ProjectileRuntime.projectiles.none { it.id == "fireball" },
+                            "残留火球 = ${ProjectileRuntime.projectiles.count { it.id == "fireball" }}",
                         ),
                         pdParticleCheck(name, t, ctx),
                         // 尾迹粒子现在活在**客户端**（发射器）⇒ 泄漏也要在客户端这一侧看
@@ -797,7 +798,7 @@ object CaptureScenes {
     /** 跟拍机位：跟在火球**后上方偏一侧**，视线锁在火球上（火球没了就停在最后位置）。 */
     private fun trailCam(ctx: CaptureDriver.SceneCtx, t: Int): Pose {
         val floorY = ctx.floorBlockY(CX, CZ)
-        val bolt = MagicManager.projectiles.firstOrNull { it.id == "fireball" && it.alive }
+        val bolt = ProjectileRuntime.projectiles.firstOrNull { it.id == "fireball" && it.alive }
         if (bolt != null) {
             lastTrailX = bolt.status.pos.x
             lastTrailY = bolt.status.pos.y
@@ -915,13 +916,13 @@ object CaptureScenes {
         val floorY = ctx.floorBlockY(CX, CZ)
         val from = Vector3f(CX + 3.0f, floorY + 2.0f, CZ + 0.5f)
         val aim = Vector3f(CX + 0.5f, floorY + 2.0f, CZ + 0.5f)
-        val projectile = MagicManager.create("laser") as Projectile
+        val projectile = SpellRegistry.create("laser") as Projectile
         projectile.caster = caster
         projectile.wand = wand
         projectile.position = Vector3d(from)
         projectile.velocity = aim.sub(from).normalize()
         projectile.spell()
-        MagicManager.add(projectile)
+        ProjectileRuntime.add(projectile)
     }
 
     private const val DEATH_TICK = 70
@@ -976,7 +977,7 @@ object CaptureScenes {
                 if (t != EXPLOSION_CAST) return@Scene
                 val guard = holder ?: return@Scene
                 val floorY = ctx.floorBlockY(CX, CZ)
-                val bolt = MagicManager.create("large_explosion") as Projectile
+                val bolt = SpellRegistry.create("large_explosion") as Projectile
                 // 保留摄影相机作为施法者；爆炸也可伤害来源本人，伤害观察目标单独放在爆心旁。
                 bolt.caster = ctx.player
                 bolt.wand = Wand("capture-explosion")
@@ -992,7 +993,7 @@ object CaptureScenes {
                     }
                 }
                 bolt.spell()
-                MagicManager.add(bolt)
+                ProjectileRuntime.add(bolt)
                 // guard 只是场心的靶子，这里显式用一下，避免"未使用"告警
                 check(guard.isAlive)
             },
@@ -1169,8 +1170,8 @@ object CaptureScenes {
         endTick: Int,
         ctx: CaptureDriver.SceneCtx,
     ): List<Check> {
-        val alive = MagicManager.projectiles.count { it.id == id && it.alive }
-        val total = MagicManager.projectiles.size
+        val alive = ProjectileRuntime.projectiles.count { it.id == id && it.alive }
+        val total = ProjectileRuntime.projectiles.size
         return when (tick) {
             2 -> listOf(Check(scene, tick, "spawned", alive == 1, "alive=$alive total=$total"))
             DEATH_TICK - 2 -> listOf(Check(scene, tick, "alive-before-death", alive == 1, "alive=$alive"))

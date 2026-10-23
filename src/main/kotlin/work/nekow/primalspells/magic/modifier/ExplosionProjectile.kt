@@ -1,15 +1,15 @@
 package work.nekow.primalspells.magic.modifier
 
+import kotlin.random.Random
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import org.joml.Vector3f
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.Explosion
-import kotlin.random.Random
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 
 /**
  * 爆炸投射修正 —— 每隔 10 tick 向垂直方向随机发射一枚爆炸火球。
@@ -64,7 +64,7 @@ class ExplosionProjectile : Modifier() {
                 bullet.effects += Explosion(onHit = true, onDeath = false)
 
                 bullet.spell()
-                MagicManager.add(bullet)
+                ProjectileRuntime.add(bullet)
 
                 // 播放发射音效
                 level.playSound(

@@ -1,15 +1,15 @@
 package work.nekow.primalspells.magic.effect.lifecycle
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 
 /** 斥力场：半径四格，对魔法弹与原版弹施加有限外推；不反射归属，不影响生物。 */
 class RepulsionField : BaseEffect() {
@@ -42,7 +42,7 @@ class RepulsionField : BaseEffect() {
         lastCenter = center
         if (status.age % 8 == 0) work.nekow.primalspells.magic.effect.visual.PixelVfx.ring(ParticleManager.of(world),
             center, Vec3(0.0, 1.0, 0.0), 0.75 * projectile.areaScale, Color.ofInt(245, 145, 80), 10, 5f)
-        for (p in MagicManager.projectiles) {
+        for (p in ProjectileRuntime.projectiles) {
             if (p === projectile || !p.alive || !p.motionEnabled || p.caster.level() !== world) continue
             val offset = Vec3(p.status.pos.x.toDouble(), p.status.pos.y.toDouble(), p.status.pos.z.toDouble()).subtract(center)
             if (offset.lengthSqr() !in 1e-6..(16.0 * projectile.areaScale * projectile.areaScale)) continue

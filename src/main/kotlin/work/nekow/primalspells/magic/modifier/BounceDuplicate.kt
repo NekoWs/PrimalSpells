@@ -1,17 +1,17 @@
 package work.nekow.primalspells.magic.modifier
 
+import kotlin.random.Random
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import org.joml.Vector3d
 import org.joml.Vector3f
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.core.Modifier
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.geometry.Bounce
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.HitResult
 import work.nekow.primalspells.util.HitType
-import kotlin.random.Random
 
 /**
  * 弹跳复制修正 —— 在投射物每次弹跳时生成一个自身复制体
@@ -20,7 +20,7 @@ import kotlin.random.Random
  * - 继承非生成型修饰配方，每个子弹重建独立效果
  * - 发射方向 = 弹跳方向 + [randomStrength] 倍的随机偏移向量
  * - 速度大小 = 弹跳时投射物的当前速度
- * - 复制体立即施放并加入 MagicManager 管理
+ * - 复制体立即施放并加入 ProjectileRuntime 管理
  *
  * 音效：
  * - 复制体生成时播放紫水晶钟鸣声
@@ -90,7 +90,7 @@ class BounceDuplicate : Modifier() {
 
                 // 施放复制体并注册到管理器
                 clone.spell()
-                MagicManager.add(clone)
+                ProjectileRuntime.add(clone)
 
                 // 播放紫水晶钟鸣声 —— 复制体生成提示音
                 level.playSound(

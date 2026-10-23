@@ -1,5 +1,6 @@
 package work.nekow.primalspells.client.capture
 
+import kotlin.math.abs
 import net.minecraft.core.BlockPos
 import net.minecraft.tags.DamageTypeTags
 import net.minecraft.world.entity.EntitySpawnReason
@@ -11,13 +12,13 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.lifecycle.*
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModDamageTypes
 import work.nekow.primalspells.wand.Wand
-import kotlin.math.abs
 
 /** 第66轮：原版伤害源/实体受力，以及双黑洞长时互吸的真实运行回归。 */
 object DamageMassScene {
@@ -45,8 +46,8 @@ object DamageMassScene {
                     ctx.level.addFreshEntity(p);pigs+=p;return p
                 }
                 fun shot(id:String,at:Vec3,mods:List<String> = emptyList()):Projectile {
-                    val p=MagicManager.create(id) as Projectile
-                    SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
+                    val p=SpellRegistry.create(id) as Projectile
+                    SpellAssembly.apply(p,mods.map { SpellRegistry.create(it) as Modifier })
                     p.caster=ctx.player;p.wand=Wand("mass-$t-$id");p.position=Vector3d((at.x).toDouble(), (at.y).toDouble(), (at.z).toDouble())
                     p.velocity=Vector3f(0f,0f,1f);p.spell();return p
                 }
@@ -108,13 +109,13 @@ object DamageMassScene {
                 }
                 if(t==45) {
                     holes=listOf(shot("black_hole",Vec3(-1.0,floor+3.0,0.0)),shot("black_hole",Vec3(1.0,floor+3.0,0.0)))
-                    holes.forEach { it.maxAge=120;MagicManager.add(it) }
+                    holes.forEach { it.maxAge=120;ProjectileRuntime.add(it) }
                 }
                 if(t==70 || t==140) record(t,"two-heavy-holes-slow-and-finite-$t",holes.size==2 && holes.all{it.alive && it.mass==256.0 && it.status.velocity.isFinite && it.status.velocity.length()<0.15f && abs(it.status.pos.x)<2.0},"holes=${holes.map{it.status.pos to it.status.velocity}}")
-                if(t==175) MagicManager.projectiles.forEach{it.alive=false}
+                if(t==175) ProjectileRuntime.projectiles.forEach{it.alive=false}
             },checksAt={ctx,t ->
                 if(t==219) {
-                    record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}")
+                    record(t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}")
                     record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                 }
                 checks[t].orEmpty()

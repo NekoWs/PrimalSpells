@@ -7,7 +7,7 @@ import net.minecraft.util.RandomSource
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import net.minecraft.world.item.component.WrittenBookContent
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.WandManager
 import work.nekow.primalspells.wand.WandVariant
@@ -24,7 +24,7 @@ object SpellLoot {
         val recipe = recipes[random.nextInt(recipes.size)]
         // 数据包可给出长配方；成品必须能容纳真实卡牌，不丢弃尾部。
         wand.size = maxOf(wand.size, recipe.size)
-        wand.magics += recipe.map { requireNotNull(MagicManager.create(it)) { "Unknown exploration spell: $it" } }
+        wand.magics += recipe.map { requireNotNull(SpellRegistry.create(it)) { "Unknown exploration spell: $it" } }
         wand.load()
         wand.status.mana = wand.mana
         stack.set(ModItems.WAND_SPELLS, recipe + List(wand.size - recipe.size) { "" })

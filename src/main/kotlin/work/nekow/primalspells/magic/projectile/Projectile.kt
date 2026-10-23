@@ -4,17 +4,18 @@ import net.minecraft.world.entity.Entity
 import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.Color
+import work.nekow.primalspells.magic.core.Magic
+import work.nekow.primalspells.magic.core.MagicStatus
 import work.nekow.primalspells.magic.effect.geometry.Move
 import work.nekow.primalspells.magic.effect.geometry.Position
-import work.nekow.primalspells.magic.effect.visual.Trajectory
 import work.nekow.primalspells.magic.effect.geometry.Velocity
-import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.magic.effect.lifecycle.ShieldGuard
+import work.nekow.primalspells.magic.effect.visual.Trajectory
 import work.nekow.primalspells.util.HitResult
 import work.nekow.primalspells.util.HitType
 import work.nekow.primalspells.util.Lore
 import work.nekow.primalspells.util.LoreEntry
-import work.nekow.primalspells.magic.core.Magic
-import work.nekow.primalspells.magic.core.MagicStatus
+import work.nekow.primalspells.util.toVec3
 
 abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
@@ -170,7 +171,7 @@ abstract class Projectile: Magic() {
     fun hitEntity(entity: Entity): Boolean {
         val level = entity.level() as? net.minecraft.server.level.ServerLevel
         if (!(damageType == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && status.damage > 0) && entity is net.minecraft.world.entity.LivingEntity && level != null &&
-            work.nekow.primalspells.magic.core.ShieldGuard.absorbProjectile(level, entity, this)) return true
+            ShieldGuard.absorbProjectile(level, entity, this)) return true
         val offset = status.pos.toVec3().subtract(entity.boundingBox.center).toVector3f()
         val direction = currentDirection()
         val impactNormal = if (offset.lengthSquared() > 1e-8f) offset.normalize() else Vector3f(direction).negate()

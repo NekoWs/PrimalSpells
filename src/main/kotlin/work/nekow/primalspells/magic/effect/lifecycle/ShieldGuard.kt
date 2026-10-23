@@ -1,5 +1,4 @@
-package work.nekow.primalspells.magic.core
-
+package work.nekow.primalspells.magic.effect.lifecycle
 
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.InteractionHand
@@ -7,6 +6,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import work.nekow.primalspells.item.WandItem
+import work.nekow.primalspells.magic.core.SpellDamageType
 import work.nekow.primalspells.magic.modifier.EnergyShield
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.wand.Wand

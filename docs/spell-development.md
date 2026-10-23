@@ -32,7 +32,7 @@ class ExampleBolt : Projectile() {
 }
 ```
 
-在MagicManager集中注册工厂，不把未注册ID当临时克隆对象。出生位置/方向由法杖赋值，Projectile.spell统一加Position/Velocity/Move，不在示例重复积分。speed是模板系数，发射再乘LAUNCH_SPEED_SCALE=8；静止为0。伤害/MP/时间规则见 [战斗规则](design/combat-pricing.md)，全部游戏时长用完整刻。
+在registry/ModSpells集中注册工厂，由通用SpellRegistry创建独立实例，不把未注册ID当临时克隆对象。出生位置/方向由法杖赋值，Projectile.spell统一加Position/Velocity/Move，不在示例重复积分。speed是模板系数，发射再乘LAUNCH_SPEED_SCALE=8；静止为0。伤害/MP/时间规则见 [战斗规则](design/combat-pricing.md)，全部游戏时长用完整刻。
 
 DirectDamage声明单次直接强度，实际命中走SpellDamage/SpellImpact；不要绕过护盾、事件、类型、冻结或击退入口。持续攻击同目标每刻最多一次使用damageOncePerTick。
 

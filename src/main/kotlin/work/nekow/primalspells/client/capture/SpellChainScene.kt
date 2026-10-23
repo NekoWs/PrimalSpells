@@ -1,10 +1,10 @@
 @file:Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 package work.nekow.primalspells.client.capture
 
+import kotlin.math.abs
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
@@ -13,12 +13,13 @@ import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.*
 import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.lifecycle.PlasmaBeam
 import work.nekow.primalspells.magic.projectile.*
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
-import work.nekow.primalspells.wand.*
 import work.nekow.primalspells.util.toPosition
-import kotlin.math.abs
+import work.nekow.primalspells.wand.*
 
 /** 真实世界回归束壳截点、穿刺触发、强追踪、付费机枪配方与十秒统计重置。 */
 object SpellChainScene {
@@ -37,7 +38,7 @@ object SpellChainScene {
         fun equip(entity: LivingEntity): Wand {
             val stack = ItemStack(ModItems.WAND.get())
             val w = WandManager[WandManager.createWand(stack)]
-            repeat(8) { w.magics += MagicManager.create("energy_shield") }
+            repeat(8) { w.magics += SpellRegistry.create("energy_shield") }
             w.load(); w.mana=100000.0; w.status.mana=100000.0; w.charge=0.0
             entity.setItemInHand(InteractionHand.MAIN_HAND,stack)
             w.tick(entity,entity.level() as net.minecraft.server.level.ServerLevel)
@@ -54,61 +55,61 @@ object SpellChainScene {
             tick={ctx,t ->
                 val floor=ctx.floorBlockY(0,0)
                 fun shot(id:String, pos:Vec3, mods:List<String> = emptyList(), caster:LivingEntity = ctx.player):Projectile {
-                    val p=MagicManager.create(id) as Projectile
-                    SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
+                    val p=SpellRegistry.create(id) as Projectile
+                    SpellAssembly.apply(p,mods.map { SpellRegistry.create(it) as Modifier })
                     p.caster=caster;p.wand=Wand("chain-$id-$t");p.position=pos.toPosition();p.velocity=Vector3f(0f,0f,1f)
                     p.spell();return p
                 }
                 if(t==8) {
                     val target=ctx.spawnDummy(-6.0,floor+2.0,0.0)
-                    val parent=MagicManager.create("trigger_fireball") as TriggerFireball
-                    SpellAssembly.apply(parent,listOf(MagicManager.create("piercing") as Modifier))
-                    parent.payload += MagicManager.create("fireball")!!
+                    val parent=SpellRegistry.create("trigger_fireball") as TriggerFireball
+                    SpellAssembly.apply(parent,listOf(SpellRegistry.create("piercing") as Modifier))
+                    parent.payload += SpellRegistry.create("fireball")!!
                     parent.caster=ctx.player;parent.wand=Wand("piercing-trigger");parent.position=target.boundingBox.center.toPosition();parent.velocity=Vector3f(0f,0f,1f);parent.spell()
                     parent.hitEntity(target)
                     record(t,"piercing-entity-damages-and-keeps-payload",target.totalDamage==4.0 && parent.payload.size==1 && parent.alive,"damage=${target.totalDamage} payload=${parent.payload.size} alive=${parent.alive}")
-                    val before=MagicManager.projectiles.size
+                    val before=ProjectileRuntime.projectiles.size
                     parent.hitBlock(parent.status.pos,Vector3f(0f,0f,-1f))
-                    MagicManager.tick()
-                    record(t,"piercing-wall-releases-once",parent.payload.isEmpty() && MagicManager.projectiles.size==before+1,"payload=${parent.payload.size} shots=${MagicManager.projectiles.size}")
+                    ProjectileRuntime.tick()
+                    record(t,"piercing-wall-releases-once",parent.payload.isEmpty() && ProjectileRuntime.projectiles.size==before+1,"payload=${parent.payload.size} shots=${ProjectileRuntime.projectiles.size}")
                     parent.hitBlock(parent.status.pos,Vector3f(0f,0f,-1f))
-                    record(t,"wall-payload-does-not-repeat",MagicManager.projectiles.size==before+1,"shots=${MagicManager.projectiles.size}")
+                    record(t,"wall-payload-does-not-repeat",ProjectileRuntime.projectiles.size==before+1,"shots=${ProjectileRuntime.projectiles.size}")
                     parent.alive=false;parent.die();target.discard()
-                    MagicManager.projectiles.forEach { it.alive=false }
+                    ProjectileRuntime.projectiles.forEach { it.alive=false }
                     val source=ctx.spawnDummy(-8.0,floor+2.0,-5.0)
                     val w=Wand("machinegun");w.delayTickCount=10.0;w.rechargeTickCount=20.0;w.charge=100.0
-                    w.innate += listOf("double_cast","trigger_fireball","omnidirectional_scatter","chainsaw").map { MagicManager.create(it)!! }
+                    w.innate += listOf("double_cast","trigger_fireball","omnidirectional_scatter","chainsaw").map { SpellRegistry.create(it)!! }
                     w.load();w.status.mana=1000.0
                     val ok=w.spell(source)
-                    MagicManager.tick()
-                    record(t,"paid-machinegun-recipe-ready-next-tick",ok && w.status.delay==0.0 && w.status.recharge==0.0 && MagicManager.projectiles.any { it.id=="trigger_fireball" } && MagicManager.projectiles.none { it.id=="chainsaw" },"cast=$ok delay=${w.status.delay} recharge=${w.status.recharge}")
-                    val carrier=MagicManager.projectiles.filterIsInstance<TriggerFireball>().single()
+                    ProjectileRuntime.tick()
+                    record(t,"paid-machinegun-recipe-ready-next-tick",ok && w.status.delay==0.0 && w.status.recharge==0.0 && ProjectileRuntime.projectiles.any { it.id=="trigger_fireball" } && ProjectileRuntime.projectiles.none { it.id=="chainsaw" },"cast=$ok delay=${w.status.delay} recharge=${w.status.recharge}")
+                    val carrier=ProjectileRuntime.projectiles.filterIsInstance<TriggerFireball>().single()
                     record(t,"machinegun-parent-does-not-scatter",carrier.modifiers.keys==setOf("double_cast") && carrier.payload.map{it.id}==listOf("omnidirectional_scatter","chainsaw") && carrier.delay==0 && carrier.recharge==0,"mods=${carrier.modifiers} payload=${carrier.payload.map{it.id}}")
                     record(t,"machinegun-mana-charged-once",w.status.mana==992.0,"mana=${w.status.mana}")
-                    carrier.hitBlock(carrier.status.pos,Vector3f(0f,0f,-1f));MagicManager.tick()
-                    val saw=MagicManager.projectiles.single{it.id=="chainsaw"}
+                    carrier.hitBlock(carrier.status.pos,Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
+                    val saw=ProjectileRuntime.projectiles.single{it.id=="chainsaw"}
                     record(t,"machinegun-only-payload-scatters",saw.modifiers.keys==setOf("omnidirectional_scatter") && carrier.payload.isEmpty(),"mods=${saw.modifiers}")
                     // 同一链的尾部修正也要覆盖先抽到的投射物；内层修正不得穿过链边界。
                     fun castCards(ids:List<String>,budget:Int=1,mana:Double=1000.0):Pair<Wand,List<Projectile>> {
-                        MagicManager.projectiles.forEach{it.alive=false};MagicManager.tick()
+                        ProjectileRuntime.projectiles.forEach{it.alive=false};ProjectileRuntime.tick()
                         val wand=Wand("scope-${ids.joinToString("-")}")
                         wand.cast=budget;wand.delayTickCount=10.0;wand.rechargeTickCount=20.0
-                        wand.magics += ids.map{MagicManager.create(it)!!};wand.load();wand.status.mana=mana
-                        wand.spell(source);MagicManager.tick()
-                        return wand to MagicManager.projectiles.toList()
+                        wand.magics += ids.map{SpellRegistry.create(it)!!};wand.load();wand.status.mana=mana
+                        wand.spell(source);ProjectileRuntime.tick()
+                        return wand to ProjectileRuntime.projectiles.toList()
                     }
                     val (nestedW,nestedShots)=castCards(listOf("damage_boost","trigger_fireball","speed_boost","delayed_cast","freeze_charge","fireball"))
                     val outer=nestedShots.single() as TriggerFireball
                     val middle=outer.payload.filterIsInstance<DelayedCastProjectile>().single()
                     val inner=middle.payload.filterIsInstance<Projectile>().single()
                     record(t,"nested-chain-boundaries",outer.modifiers.keys==setOf("damage_boost") && outer.payload.filterIsInstance<Modifier>().map{it.id}==listOf("speed_boost") && middle.payload.filterIsInstance<Modifier>().map{it.id}==listOf("freeze_charge"),"root=${outer.modifiers} middle=${outer.payload.map{it.id}} inner=${middle.payload.map{it.id}}")
-                    record(t,"nested-fees-once",nestedW.status.mana==1000.0-listOf("damage_boost","trigger_fireball","speed_boost","delayed_cast","freeze_charge","fireball").sumOf{MagicManager.create(it)!!.mana} && outer.delay==0 && middle.delay==0,"mana=${nestedW.status.mana} delay=${nestedW.status.delay}")
+                    record(t,"nested-fees-once",nestedW.status.mana==1000.0-listOf("damage_boost","trigger_fireball","speed_boost","delayed_cast","freeze_charge","fireball").sumOf{SpellRegistry.create(it)!!.mana} && outer.delay==0 && middle.delay==0,"mana=${nestedW.status.mana} delay=${nestedW.status.delay}")
                     val copied=SpellAssembly.copy(outer) as TriggerFireball
                     val copiedMiddle=copied.payload.filterIsInstance<DelayedCastProjectile>().single()
                     record(t,"copies-own-independent-payload-tree",copied.payload!==outer.payload && copiedMiddle!==middle && copiedMiddle.payload!==middle.payload && copiedMiddle.payload.zip(middle.payload).all{(a,b)->a!==b},"copy=${copied.payload.map{it.id}}")
-                    outer.hitBlock(outer.status.pos,Vector3f(0f,0f,1f));MagicManager.tick()
+                    outer.hitBlock(outer.status.pos,Vector3f(0f,0f,1f));ProjectileRuntime.tick()
                     record(t,"trigger-child-does-not-inherit-parent",middle.modifiers.keys==setOf("speed_boost") && middle.status.damage==0.0,"mods=${middle.modifiers}")
-                    middle.expire();MagicManager.tick()
+                    middle.expire();ProjectileRuntime.tick()
                     record(t,"delayed-child-does-not-inherit-parent",inner.modifiers.keys==setOf("freeze_charge") && inner.status.damage==3.75 && middle.payload.isEmpty(),"mods=${inner.modifiers} damage=${inner.status.damage}")
                     record(t,"releasing-original-keeps-copy-payload",copiedMiddle.payload.size==2 && copied.payload.size==2,"copy=${copiedMiddle.payload.size}")
                     val (_,siblings)=castCards(listOf("double_cast","fireball","damage_boost","fireball"))
@@ -121,7 +122,7 @@ object SpellChainScene {
                     val (_,multicastPayload)=castCards(listOf("damage_boost","trigger_fireball","double_cast","fireball","speed_boost","fireball"))
                     val multicastCarrier=multicastPayload.single() as TriggerFireball
                     val childShots=multicastCarrier.payload.filterIsInstance<Projectile>()
-                    multicastCarrier.hitBlock(multicastCarrier.status.pos,Vector3f(0f,0f,1f));MagicManager.tick()
+                    multicastCarrier.hitBlock(multicastCarrier.status.pos,Vector3f(0f,0f,1f));ProjectileRuntime.tick()
                     record(t,"payload-multicast-shares-only-local-modifiers",childShots.size==2 && childShots.all{it.modifiers.keys==setOf("double_cast","speed_boost") && it.status.damage==5.0 && abs(it.status.velocity.length()-8f)<1e-5},"children=${childShots.map{Triple(it.modifiers,it.status.damage,it.status.velocity.length())}}")
                     val (_,twoTriggers)=castCards(listOf("double_cast","trigger_fireball","freeze_charge","fireball","trigger_fireball","damage_boost","fireball"))
                     val carriers=twoTriggers.filterIsInstance<TriggerFireball>()
@@ -143,12 +144,12 @@ object SpellChainScene {
                     }
                     record(t,"modifier-order-independent-composition",values.distinct().size==1 && values.first()==(11.0 to 24.0),"values=$values")
                     val reduced=Wand("scatter-delay");reduced.delayTickCount=10.0;reduced.rechargeTickCount=20.0
-                    reduced.innate += listOf("omnidirectional_scatter","fireball").map { MagicManager.create(it)!! }
+                    reduced.innate += listOf("omnidirectional_scatter","fireball").map { SpellRegistry.create(it)!! }
                     reduced.load();reduced.status.mana=1000.0
                     reduced.spell(source)
                     record(t,"scatter-reduces-wand-base-cooldowns",reduced.status.delay==0.0 && reduced.status.recharge==0.0,"delay=${reduced.status.delay} recharge=${reduced.status.recharge}")
-                    MagicManager.tick()
-                    MagicManager.projectiles.forEach { it.alive=false };source.discard()
+                    ProjectileRuntime.tick()
+                    ProjectileRuntime.projectiles.forEach { it.alive=false };source.discard()
                     val signs=mutableSetOf<Int>()
                     repeat(32) {
                         val p=shot("fireball",Vec3(-8.0,floor+5.0,0.0),listOf("omnidirectional_scatter"))
@@ -171,7 +172,7 @@ object SpellChainScene {
                         val end=p.effects.filterIsInstance<PlasmaBeam>().single().beamEnd
                         record(t,"beam-clips-real-shell-$i",abs(end.distanceTo(center)-1.7)<1e-4 && end.z<0 && p.status.pos.distance(start.toPosition())<1e-5 && p.status.velocity.lengthSquared()==0f,"end=$end source=${p.status.pos}")
                         record(t,"beam-protects-holder-and-behind-$i",holder!!.totalDamage==0.0 && behind!!.totalDamage==0.0 && shield.status.mana<before,"holder=${holder!!.totalDamage} behind=${behind!!.totalDamage} mana=${shield.status.mana}")
-                        if(i==0){visibleBeam=p;MagicManager.add(p)} else {p.alive=false;p.die()}
+                        if(i==0){visibleBeam=p;ProjectileRuntime.add(p)} else {p.alive=false;p.die()}
                     }
                 }
                 if(t==65) {visibleBeam?.alive=false;holder?.discard();behind?.discard()}
@@ -204,7 +205,7 @@ object SpellChainScene {
                 }
                 if(t==365) stats?.discard()
                 if(t==399) {
-                    record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}")
+                    record(t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}")
                     record(t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                     record(t,"dummy-stat-displays-cleaned",ctx.level.getEntitiesOfClass(DummyStatsDisplay::class.java,AABB.ofSize(Vec3(0.0,floor.toDouble(),0.0),60.0,60.0,60.0)).isEmpty(),"no orphan boards")
                 }

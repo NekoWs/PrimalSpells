@@ -6,8 +6,9 @@
 
 | 目录 | 职责 |
 |---|---|
-| `registry/` | DeferredRegister与物品、实体、组件、伤害、战利品注册 |
+| `registry/` | 内置法术工厂清单、DeferredRegister与物品、实体、组件、伤害、战利品注册 |
 | `magic/core/` | 法术抽象、阶段、注册工厂、配方、伤害分类与质量 |
+| `magic/runtime/` | 弹体生命周期与待加入队列，不承载内容注册 |
 | `magic/projectile/`、`immobile/` | 飞行/静态法术内容 |
 | `magic/modifier/` | 修正和现有被动卡 |
 | `magic/action/` | 复制单卡、全量施放、追加触发等抽牌控制卡 |
@@ -30,7 +31,7 @@ Java mixin放 `src/main/java/work/nekow/primalspells/mixin/`。资源放 `src/ma
 
 注册放registry；抽牌控制放action；能在世界运行的法术放projectile；注入行为放effect对应子包；物品持久身份和牌堆放wand；领域状态放所属领域，不堆入util。客户端专属类只由客户端入口加载。
 
-依赖由入口/事件指向领域，客户端可读公共数据，公共侧不得反向依赖client。`magic/core`不引用具体内容类，集中注册工厂的 `MagicManager` 是例外。新增结构或迁移路径同步本页第1节和第8节。
+依赖由入口/事件指向领域，客户端可读公共数据，公共侧不得反向依赖client。`magic/core`可引用Projectile基类和效果契约，不导入具体法术卡或registry；内置卡清单放ModSpells，护盾具体接入放lifecycle。抽牌/付费不导入PD、表现与网络，实际发射由WandCasting接线。新增结构或迁移路径同步本页第1节和第8节。
 
 ## 3. 命名
 
@@ -50,7 +51,7 @@ Java mixin放 `src/main/java/work/nekow/primalspells/mixin/`。资源放 `src/ma
 
 ## 6. 网络
 
-Payload放network，提供ID、StreamCodec；公共注册集中在 `PrimalSpells`，客户端处理注册集中在客户端入口。当前协议为1.5.0，改编码需同步两端。
+Payload放network，提供ID、StreamCodec；公共协议注册集中在 `network/ModNetworking`，服务端编杖/预览校验在 `WandRequestHandler`，由PrimalSpells挂载，客户端处理注册集中在客户端入口。当前协议为1.5.0，改编码需同步两端。
 
 生存编杖/编包优先原版物品PICKUP交互；创造编杖使用受服务端校验的专用包。选择槽和预览请求校验实际拥有的菜单/背包物品、范围与请求频率。只同步展示所需数据，不把客户端组件当权威状态。
 
@@ -59,7 +60,7 @@ Payload放network，提供ID、StreamCodec；公共注册集中在 `PrimalSpells
 - 内容已注册，资源/语言/获取来源完整；修改创建配方不能污染模板或共享可变effect。
 - 核心机制符合 [架构第8节](architecture.md#8-关键不变量与陷阱)，新效果遵循阶段和独立荷载规则。
 - 粒子使用PD；缺陷遵守第9节；动画按 [连贯性](design/animation-continuity.md) 验证。
-- 跑 `./gradlew build`；依赖已缓存时可加 `--offline`。运行与取证见 [构建指南](build-and-run.md)。
+- 跑 `./gradlew build`（包含checkArchitecture源码依赖护栏）；依赖已缓存时可加 `--offline`。运行与取证见 [构建指南](build-and-run.md)。
 - 更新相关文档和问题状态，检查差异，按第10节提交Git。
 
 ## 8. 路径迁移对照
@@ -68,6 +69,11 @@ Payload放network，提供ID、StreamCodec；公共注册集中在 `PrimalSpells
 
 | 旧入口 | 当前入口/规则 |
 |---|---|
+| `magic/core/MagicManager` | 工厂目录为`magic/core/SpellRegistry`，内容清单为`registry/ModSpells`，世界循环为`magic/runtime/ProjectileRuntime`，事件为`event/SpellRuntimeEvents` |
+| `Wand.drawChain/payChain/castHand` | `wand/WandDeck`、`CastTransaction`、`WandCasting`；原Wand公共入口保留 |
+| `Wand`内NBT与预览构建 | `wand/WandPersistence`、`WandPreviewBuilder`，NBT键和网络编码保持 |
+| `PrimalSpells`内网络处理 | `network/ModNetworking`注册、`WandRequestHandler`校验 |
+| `magic/core/ShieldGuard` | `magic/effect/lifecycle/ShieldGuard` |
 | `Revise` | `magic/core/Modifier.kt` |
 | `magic/modifier/SineWave.kt` | `Serpentine.kt`，法术ID仍为sine_wave |
 | `WandTooltipTracker`、`WandScrollHandler` | `SpellSlotTracker`、`SpellSlotScrollHandler`，法杖与小包共用 |

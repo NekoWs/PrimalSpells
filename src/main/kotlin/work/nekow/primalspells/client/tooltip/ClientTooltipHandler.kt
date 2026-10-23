@@ -9,7 +9,7 @@ import net.neoforged.neoforge.client.event.RenderTooltipEvent
 import work.nekow.primalspells.client.hud.WandHudRenderer
 import work.nekow.primalspells.item.SpellPouchItem
 import work.nekow.primalspells.item.WandItem
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.util.Lore
 
@@ -92,7 +92,7 @@ object ClientTooltipHandler {
 
     private fun addSpellLore(event: RenderTooltipEvent.GatherComponents) {
         val id = ModItems.spellIdOf(event.itemStack.item) ?: return
-        val magic = MagicManager.create(id) ?: return
+        val magic = SpellRegistry.create(id) ?: return
         for ((type, args) in magic.lore) {
             addLoreLine(event, type, args, id)
         }
@@ -119,7 +119,7 @@ object ClientTooltipHandler {
         val selected = SpellSlotTracker.getSelectedSlot(targetId)
         val spellId = spells.getOrNull(selected) ?: return
         if (spellId.isEmpty()) return
-        val magic = MagicManager.create(spellId) ?: return
+        val magic = SpellRegistry.create(spellId) ?: return
         val item = ModItems.spellItem(spellId)
         if (item != null) {
             event.tooltipElements.add(Either.left(

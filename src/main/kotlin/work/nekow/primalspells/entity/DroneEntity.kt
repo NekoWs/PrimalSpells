@@ -1,5 +1,8 @@
 package work.nekow.primalspells.entity
 
+import java.util.*
+import kotlin.math.atan2
+import kotlin.math.min
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.Mth
 import net.minecraft.world.damagesource.DamageSource
@@ -21,12 +24,10 @@ import net.minecraft.world.level.pathfinder.PathType
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
-import work.nekow.primalspells.magic.core.MagicManager
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.projectile.Projectile
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.wand.Wand
-import java.util.*
-import kotlin.math.atan2
-import kotlin.math.min
 
 class DroneEntity(
     entityType: EntityType<out DroneEntity>,
@@ -50,7 +51,7 @@ class DroneEntity(
 
     /** 召唤者的非生成型修饰配方，实体重载后继续用于无人机弹。 */
     var spellModifiers: Map<String, Int>
-        get() = MagicManager.registry.keys.associateWith { persistentData.getInt("spell_modifier_$it").orElse(0) }.filterValues { it > 0 }
+        get() = SpellRegistry.factories.keys.associateWith { persistentData.getInt("spell_modifier_$it").orElse(0) }.filterValues { it > 0 }
         set(value) { value.forEach { (id, count) -> persistentData.putInt("spell_modifier_$id", count) } }
 
     /** NBT保存顺序配方，避免伤害加法和乘法在后代中交换顺序。 */
@@ -138,7 +139,7 @@ class DroneEntity(
 
         // 无人机专用弱弹：**不经过牌堆/法力**，所以数值必须由这个法术自己承担
         // （火球被抬到 5 伤害后，5 架无人机白拿会变成全场最强输出，见 DroneBolt 的 KDoc）
-        val bolt = MagicManager.create("drone_bolt") as? Projectile ?: return
+        val bolt = SpellRegistry.create("drone_bolt") as? Projectile ?: return
         bolt.caster = this
         bolt.wand = droneWand
         val eye = eyePosition
@@ -147,10 +148,10 @@ class DroneEntity(
         val dir = center.subtract(eye).normalize()
         bolt.velocity = Vector3f(dir.x.toFloat(), dir.y.toFloat(), dir.z.toFloat())
         work.nekow.primalspells.magic.core.SpellAssembly.apply(bolt, spellRecipe.map {
-            MagicManager.create(it) as work.nekow.primalspells.magic.core.Modifier
+            SpellRegistry.create(it) as work.nekow.primalspells.magic.core.Modifier
         })
         bolt.spell()
-        MagicManager.add(bolt)
+        ProjectileRuntime.add(bolt)
     }
 
     override fun hurtServer(level: ServerLevel, source: DamageSource, amount: Float): Boolean {

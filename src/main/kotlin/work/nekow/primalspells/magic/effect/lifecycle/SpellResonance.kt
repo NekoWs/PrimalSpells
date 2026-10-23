@@ -5,9 +5,9 @@ import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.Color
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.MagicManager
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.PixelVfx
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.HitResult
 
 /** 通用弹体质感与修饰共鸣；服务端维护玩法，PD负责冲击和标记动画。 */
@@ -28,7 +28,7 @@ class SpellResonance : BaseEffect() {
         }
         // 护盾卡也能包裹发射出去的法术：真实反射敌方魔法弹，归属改为当前施法者。
         if ("energy_shield" in projectile.modifiers) {
-            for (other in MagicManager.projectiles.toList()) {
+            for (other in ProjectileRuntime.projectiles.toList()) {
                 if (other === projectile || !other.alive || other.caster === caster || other.caster.level() !== level) continue
                 val p = Vec3(other.status.pos.x.toDouble(), other.status.pos.y.toDouble(), other.status.pos.z.toDouble())
                 if (p.distanceToSqr(center) > 1.0) continue

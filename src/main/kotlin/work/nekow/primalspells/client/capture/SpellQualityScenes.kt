@@ -12,10 +12,12 @@ import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.lifecycle.*
 import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toVec3
+import work.nekow.primalspells.wand.Wand
 
 /** 第54轮：真实法杖发射、生命周期和跨投射物反应的实机回归。 */
 object SpellQualityScenes {
@@ -25,7 +27,7 @@ object SpellQualityScenes {
         yaw: Float = 0f, pitch: Float = 0f, source: Entity = ctx.player) {
         source.setPos(x, y, z); source.setYRot(yaw); source.setXRot(pitch); source.setOldPosAndRot()
         val wand = Wand("quality-${ctx.level.gameTime}-${ids.joinToString()}")
-        wand.innate += ids.map { MagicManager.create(it)!! }; wand.load(); wand.status.mana = 1000.0
+        wand.innate += ids.map { SpellRegistry.create(it)!! }; wand.load(); wand.status.mana = 1000.0
         check(wand.spell(source))
     }
     /** 长时双场受力穿墙与超过512成员的PD批量载荷、即时追踪与高速穿刺的真实运行回归。 */
@@ -54,10 +56,10 @@ object SpellQualityScenes {
                     cast(ctx, listOf("black_hole"), 1.5, floor+2.0, 0.0)
                 }
                 if (t == 10) {
-                    holes = MagicManager.projectiles.filter { it.id == "black_hole" }
+                    holes = ProjectileRuntime.projectiles.filter { it.id == "black_hole" }
                     holes.forEach { it.status.velocity.z = 0.25f }
                 }
-                if (t == 129) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 129) ProjectileRuntime.projectiles.forEach { it.alive = false }
                 if (t == 92) {
                     val manager = ParticleManager.of(ctx.level)
                     val batch = work.nekow.particledrawing.api.ParticleBatch(manager)
@@ -71,8 +73,8 @@ object SpellQualityScenes {
                 }
                 if (t == 125) {
                     target = ctx.spawnDummy(0.6, floor+2.0, -2.0)
-                    val p = MagicManager.create("fireball") as Projectile
-                    SpellAssembly.apply(p, listOf(MagicManager.create("homing") as Modifier))
+                    val p = SpellRegistry.create("fireball") as Projectile
+                    SpellAssembly.apply(p, listOf(SpellRegistry.create("homing") as Modifier))
                     p.caster = ctx.player; p.wand = Wand("first-tick-tracking")
                     p.position = Vector3d((0f).toDouble(), (target!!.boundingBox.center.y).toDouble(), (-2f).toDouble()); p.velocity = Vector3f(0f, 0f, 1f)
                     p.spell(); probe = p
@@ -81,7 +83,7 @@ object SpellQualityScenes {
                     firstTurn = p.status.velocity.x > 0 && launchSpeed > 0.79f && launchSpeed < 0.81f && p.status.age == 0
                     p.alive = false; p.die()
                     target!!.discard()
-                    val piercing = MagicManager.create("fireball") as Projectile
+                    val piercing = SpellRegistry.create("fireball") as Projectile
                     piercing.caster = ctx.player; piercing.wand = Wand("wall-pass")
                     piercing.position = Vector3d((0f).toDouble(), (floor+3f).toDouble(), (2.8f).toDouble()); piercing.velocity = Vector3f(0f, 0f, 1f)
                     piercing.throughBlocks = true; piercing.spell(); piercing.tick(); probe = piercing
@@ -100,7 +102,7 @@ object SpellQualityScenes {
                 128 -> listOf(Check(name, t, "two-holes-long-running-finite", holes.size == 2 && holes.all { it.alive && it.status.pos.x.isFinite() && it.status.velocity.length().isFinite() }, "holes=${holes.map { it.status.pos }}"))
                 126 -> listOf(Check(name, t, "homing-first-tick-and-faster-launch", firstTurn, "firstTurn=$firstTurn"), Check(name, t, "piercing-integrates-through-solid-wall", probe != null && probe!!.status.pos.z > 3.4f, "position=${probe?.status?.pos}"))
                 140 -> listOf(Check(name, t, "bounded-solid-crystal-budget", crystalBudget in 300..1000, "particles=$crystalBudget"))
-                179 -> listOf(Check(name, t, "clean-projectiles", MagicManager.projectiles.isEmpty(), "shots=${MagicManager.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                179 -> listOf(Check(name, t, "clean-projectiles", ProjectileRuntime.projectiles.isEmpty(), "shots=${ProjectileRuntime.projectiles.size}"), Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 else -> emptyList()
             } })
     }
@@ -129,8 +131,8 @@ object SpellQualityScenes {
             tick = { ctx,t ->
                 val floor = ctx.floorBlockY(0,0)
                 fun probe(id: String, mods: List<String> = emptyList(), pos: Vector3f = Vector3f(0f,floor+3f,0f)): Projectile {
-                    val p = MagicManager.create(id) as Projectile
-                    SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
+                    val p = SpellRegistry.create(id) as Projectile
+                    SpellAssembly.apply(p,mods.map { SpellRegistry.create(it) as Modifier })
                     p.caster=ctx.player;p.wand=Wand("probe-$t-$id");p.position=Vector3d(pos);p.velocity=Vector3f(0f,0f,1f);p.dragCoeff=0f
                     p.spell();return p
                 }
@@ -143,9 +145,9 @@ object SpellQualityScenes {
                         val w=Wand.fromTag(tag);val saved=w.saveTag();val again=Wand.fromTag(saved)
                         record("time-migration-$unit",w.delayTicks()==expected && again.delayTicks()==expected && w.status.delay==0.0 && w.charge==5.0 && again.charge==5.0 && saved.contains("delay_ticks") && !saved.contains("delay_sec"),"delay=${w.delayTicks()} charge=${w.charge}")
                     }
-                    record("cluster-unregistered",MagicManager.create("cluster_bomb")==null,"removed from registry")
-                    record("teleport-60-ticks",(MagicManager.create("teleport") as Projectile).maxAge==60,"age=60")
-                    record("plasma-default-static",(MagicManager.create("plasma_beam") as Projectile).speed==0f,"speed=0")
+                    record("cluster-unregistered",SpellRegistry.create("cluster_bomb")==null,"removed from registry")
+                    record("teleport-60-ticks",(SpellRegistry.create("teleport") as Projectile).maxAge==60,"age=60")
+                    record("plasma-default-static",(SpellRegistry.create("plasma_beam") as Projectile).speed==0f,"speed=0")
                     val decelerate=probe("fireball",listOf("gradual_decelerate"))
                     decelerate.collisionEnabled=false
                     val start=decelerate.status.velocity.length()
@@ -190,22 +192,22 @@ object SpellQualityScenes {
                         }
                         record("speed-expands-$mod",radii[0]>2.3 && radii[1]>radii[0]+.2 && radii[1]-radii[0]<1.0,"radii=$radii")
                     }
-                    MagicManager.projectiles.forEach { it.alive=false }
+                    ProjectileRuntime.projectiles.forEach { it.alive=false }
                 }
                 if(t==12) {
                     val p=probe("delayed_cast",pos=Vector3f(-4f,floor+3f,0f))
-                    val payload=MagicManager.create("fireball") as Projectile
+                    val payload=SpellRegistry.create("fireball") as Projectile
                     payload.effects += object:work.nekow.primalspells.magic.effect.BaseEffect() {
                         override fun onActive() { payloadCount++;exactExpiry=p.status.age==p.maxAge }
                     }
-                    (p as TriggerSpell).payload += payload;delayed=p;MagicManager.add(p)
+                    (p as TriggerSpell).payload += payload;delayed=p;ProjectileRuntime.add(p)
                 }
                 if(t==45) {
                     cast(ctx,listOf("quantum_entanglement","fireball"),0.0,floor+2.0,-4.0)
                 }
                 if(t==49) {
-                    val leader=MagicManager.projectiles.firstOrNull { "quantum_entanglement" in it.modifiers }
-                    copies=MagicManager.projectiles.filter { it.id=="fireball" && "quantum_entanglement" !in it.modifiers && it.alive && it.wand===leader?.wand }
+                    val leader=ProjectileRuntime.projectiles.firstOrNull { "quantum_entanglement" in it.modifiers }
+                    copies=ProjectileRuntime.projectiles.filter { it.id=="fireball" && "quantum_entanglement" !in it.modifiers && it.alive && it.wand===leader?.wand }
                     separated=copies.size==2 && leader!=null && copies.all { it.status.pos.distance(leader.status.pos)>1.5f && it.status.velocity.length()>0f }
                 }
                 if(t==54 && copies.isNotEmpty()) {
@@ -216,27 +218,27 @@ object SpellQualityScenes {
                     copyHit=copies.any { it.status.hitTargets>0 }
                     val target=quantumTarget
                     copyDamage=target!=null && target.totalDamage>0.0
-                    quantumTarget?.discard();MagicManager.projectiles.forEach { it.alive=false }
+                    quantumTarget?.discard();ProjectileRuntime.projectiles.forEach { it.alive=false }
                 }
-                if(t==75 || t==83) { val p=probe("laser",pos=Vector3f(-3f,floor+3f,-1f));MagicManager.add(p) }
-                if(t==95) { movingBeam=probe("plasma_beam");MagicManager.add(movingBeam!!) }
+                if(t==75 || t==83) { val p=probe("laser",pos=Vector3f(-3f,floor+3f,-1f));ProjectileRuntime.add(p) }
+                if(t==95) { movingBeam=probe("plasma_beam");ProjectileRuntime.add(movingBeam!!) }
                 if(t in 100..113) movingBeam?.status?.velocity?.set(.25f,0f,0f)
-                if(t==116) MagicManager.projectiles.forEach { it.alive=false }
+                if(t==116) ProjectileRuntime.projectiles.forEach { it.alive=false }
                 if(t==140) {
                     val w=Wand("tick-cadence");w.delayTickCount=7.0;w.rechargeTickCount=0.0
-                    w.innate+=MagicManager.create("fireball")!!;w.load();w.status.mana=w.mana
+                    w.innate+=SpellRegistry.create("fireball")!!;w.load();w.status.mana=w.mana
                     val intervals=ArrayList<Int>();var last=0
                     for(step in 0..35) { if(w.spell(ctx.player)) { if(step>0)intervals+=step-last;last=step };w.tick() }
                     record("integer-repeat-cadence",intervals.isNotEmpty() && intervals.all { it==7 },"intervals=$intervals")
                 }
-                if(t==160) MagicManager.projectiles.forEach { it.alive=false }
+                if(t==160) ProjectileRuntime.projectiles.forEach { it.alive=false }
             },checksAt={ctx,t -> when(t) {
                 10 -> checks.toList()
                 25 -> listOf(Check(name,t,"delay-no-early-hit-trigger",payloadCount==0,"count=$payloadCount age=${delayed?.status?.age}"))
                 36 -> listOf(Check(name,t,"delay-expires-exactly-once",payloadCount==1 && exactExpiry && (delayed as TriggerSpell).payload.isEmpty(),"count=$payloadCount exact=$exactExpiry age=${delayed?.status?.age}"))
                 60 -> listOf(Check(name,t,"quantum-separated-moving-bodies",separated,"copies=${copies.size}"),Check(name,t,"quantum-copies-collide-and-damage",copyHit && copyDamage,"hit=$copyHit damage=$copyDamage"))
                 142 -> listOf(checks.last())
-                219 -> listOf(Check(name,t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"shots=${MagicManager.projectiles.size}"),Check(name,t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
+                219 -> listOf(Check(name,t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"shots=${ProjectileRuntime.projectiles.size}"),Check(name,t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 else -> emptyList()
             }})
     }
@@ -266,10 +268,10 @@ object SpellQualityScenes {
                 frozenTarget = ctx.spawnDummy(1.0, floor+1.0, 0.0)
                 enemy = ctx.spawnDummy(10.0, floor+1.0, 8.0)
                 matrix = 0; matrixOk = true; clusterHit = false; droneBoltSeen = false
-                val modifiers = MagicManager.registry.keys.filter { MagicManager.create(it) is Modifier }
-                val shots = MagicManager.registry.keys.filter { MagicManager.create(it) is Projectile }
-                val ordered = MagicManager.create("fireball") as Projectile
-                SpellAssembly.apply(ordered, listOf("damage_boost", "volatile", "damage_boost").map { MagicManager.create(it) as Modifier })
+                val modifiers = SpellRegistry.factories.keys.filter { SpellRegistry.create(it) is Modifier }
+                val shots = SpellRegistry.factories.keys.filter { SpellRegistry.create(it) is Projectile }
+                val ordered = SpellRegistry.create("fireball") as Projectile
+                SpellAssembly.apply(ordered, listOf("damage_boost", "volatile", "damage_boost").map { SpellRegistry.create(it) as Modifier })
                 val copy = ordered.clone(); SpellAssembly.inherit(ordered, copy)
                 for (p in listOf(ordered, copy)) {
                     p.caster = ctx.player; p.wand = Wand("ordered-probe")
@@ -277,8 +279,8 @@ object SpellQualityScenes {
                 }
                 matrixOk = copy.modifierOrder == ordered.modifierOrder && copy.status.damage == 11.0 && ordered.status.damage == 11.0 && copy.status.explosionDamage == 24.0 && ordered.status.explosionDamage == 24.0
                 for (id in shots) for (mod in modifiers) {
-                    val p = MagicManager.create(id) as Projectile
-                    SpellAssembly.apply(p, listOf(MagicManager.create(mod) as Modifier))
+                    val p = SpellRegistry.create(id) as Projectile
+                    SpellAssembly.apply(p, listOf(SpellRegistry.create(mod) as Modifier))
                     SpellAssembly.prepare(p)
                     if ((id in listOf("small_explosion", "large_explosion", "drone_swarm", "crystal_detonation")) && mod in listOf("explosion_projectile", "bounce_duplicate")) matrixOk = matrixOk && p.maxAge >= 40
                     val child = p.clone(); SpellAssembly.inherit(p, child)
@@ -289,14 +291,14 @@ object SpellQualityScenes {
             tick = { ctx, t ->
                 val floor = ctx.floorBlockY(0, 0)
                 if (t == 8) cast(ctx, listOf("dormant_crystal"), -3.0, floor+2.0, 0.0, pitch=90f)
-                if (t == 18) crystal = MagicManager.projectiles.first { it.id == "dormant_crystal" }
+                if (t == 18) crystal = ProjectileRuntime.projectiles.first { it.id == "dormant_crystal" }
                 if (t == 20) cast(ctx, listOf("freeze_charge", "plasma_beam"), -3.0, floor-0.5, -4.0)
-                if (t == 45 || t == 90 || t == 115 || t == 145 || t == 170 || t == 190) MagicManager.projectiles.forEach { it.alive = false }
+                if (t == 45 || t == 90 || t == 115 || t == 145 || t == 170 || t == 190) ProjectileRuntime.projectiles.forEach { it.alive = false }
                 if (t == 65) {
                     cast(ctx, listOf("speed_boost", "diffusion", "volatile", "freeze_charge", "small_explosion"), 0.0, floor+1.0, -3.0)
                     // 真实施法先进入pendingAdd；flush后、首次移动前保存对象，不遗漏断言。
                     work.nekow.primalspells.util.Deferred.after(ctx.level, 0) {
-                        bomb = MagicManager.projectiles.firstOrNull { it.id == "small_explosion" }
+                        bomb = ProjectileRuntime.projectiles.firstOrNull { it.id == "small_explosion" }
                         bomb?.let {
                             it.status.pos.set(0.0, floor+2.0, 0.0)
                             it.alive = false
@@ -312,19 +314,19 @@ object SpellQualityScenes {
                     cast(ctx, listOf("fireball"), 0.0, floor+1.0, -1.0)
                     // 固定真正重叠的接触，避免提速后的弹体在两次服务端刻之间跨过点触发范围。
                     work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
-                        val source = MagicManager.projectiles.first { it.id=="black_hole" }
-                        val food = MagicManager.projectiles.first { it.id=="fireball" && it.alive }
+                        val source = ProjectileRuntime.projectiles.first { it.id=="black_hole" }
+                        val food = ProjectileRuntime.projectiles.first { it.id=="fireball" && it.alive }
                         food.status.pos.set(source.status.pos); food.status.velocity.zero()
                     }
                 }
-                if (t == 128) hole = MagicManager.projectiles.firstOrNull { it.id == "black_hole" }
+                if (t == 128) hole = ProjectileRuntime.projectiles.firstOrNull { it.id == "black_hole" }
                 if (t == 150) {
                     cast(ctx, listOf("energy_shield", "plasma_beam"), 3.0, floor+1.0, 0.0)
                     cast(ctx, listOf("fireball"), 3.0, floor+1.0, -1.0, source=enemy!!)
                     enemy!!.setPos(10.0, floor+1.0, 8.0)
                     work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
-                        val source = MagicManager.projectiles.first { it.id=="plasma_beam" }
-                        val food = MagicManager.projectiles.first { it.id=="fireball" && it.alive }
+                        val source = ProjectileRuntime.projectiles.first { it.id=="plasma_beam" }
+                        val food = ProjectileRuntime.projectiles.first { it.id=="fireball" && it.alive }
                         food.status.pos.set(source.status.pos).add(0.0,0.0,-0.5)
                         food.status.velocity.set(0f,0f,0.2f)
                     }
@@ -341,22 +343,22 @@ object SpellQualityScenes {
                     drone.performRangedAttack(frozenTarget!!, 1f)
                 }
                 if (t in 225..249) {
-                    val bolts = MagicManager.projectiles.filter { it.id == "drone_bolt" }
+                    val bolts = ProjectileRuntime.projectiles.filter { it.id == "drone_bolt" }
                     if (bolts.isNotEmpty()) droneBoltEvidence = bolts.map { Triple(it.status.damage, it.status.freezeTicks, it.modifiers) }.toString()
                     droneBoltSeen = droneBoltSeen || bolts.any { it.status.damage == 3.75 && it.status.freezeTicks == 30 && "homing" in it.modifiers }
                 }
                 if (t == 250) {
                     ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DroneEntity::class.java, AABB.ofSize(Vec3.ZERO, 100.0, 200.0, 100.0)).forEach { it.discard() }
-                    MagicManager.projectiles.forEach { it.alive = false }
+                    ProjectileRuntime.projectiles.forEach { it.alive = false }
                 }
                 if (t == 175) {
                     cast(ctx, listOf("bounce_duplicate", "damage_boost", "freeze_charge", "speed_boost", "fireball"), -4.0, floor+3.0, -3.0)
                     work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
-                        val parent = MagicManager.projectiles.first { "bounce_duplicate" in it.modifiers }
+                        val parent = ProjectileRuntime.projectiles.first { "bounce_duplicate" in it.modifiers }
                         parent.hitBlock(Vector3d(parent.status.pos),Vector3f(0f,0f,-1f)); clusterHit=true
                         val expectedSpeed = parent.status.velocity.length()
                         work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
-                            val children = MagicManager.projectiles.filter { it.id=="fireball" && "bounce_duplicate" !in it.modifiers && it.wand===parent.wand }
+                            val children = ProjectileRuntime.projectiles.filter { it.id=="fireball" && "bounce_duplicate" !in it.modifiers && it.wand===parent.wand }
                             copyInherited = children.size==1 && children.all { it.modifiers["damage_boost"]==1 && it.status.freezeTicks>0 &&
                                 it.status.damage==6.0 && it.status.velocity.isFinite && kotlin.math.abs(it.status.velocity.length()-expectedSpeed)<1e-4 }
                             copyEvidence="expectedSpeed=$expectedSpeed children=${children.map { it.modifiers to it.status.velocity }}"
@@ -370,16 +372,16 @@ object SpellQualityScenes {
                 68 -> listOf(Check(name, t, "moving-bomb-keeps-modified-explosion", bomb != null && bomb!!.speed > 0 && bomb!!.maxAge >= 40 && bomb!!.status.explosionRadius == 6f && bomb!!.status.explosionDamage == 12.0,
                     "speed=${bomb?.speed} age=${bomb?.maxAge} radius=${bomb?.status?.explosionRadius} damage=${bomb?.status?.explosionDamage}"),
                     Check(name, t, "explosion-applies-freeze", FrozenStatus.isFrozen(frozenTarget!!), "frozen=${FrozenStatus.isFrozen(frozenTarget)}"))
-                110 -> listOf(Check(name, t, "ice-fire-react-and-consume-both", MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "shots=${MagicManager.projectiles.map { it.id }}"))
-                140 -> listOf(Check(name, t, "black-hole-stores-consumed-shot", hole != null && hole!!.storedEnergy > 0 && MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "energy=${hole?.storedEnergy}"))
-                155 -> listOf(Check(name, t, "shield-projectile-reflects-and-changes-owner", MagicManager.projectiles.any { it.id == "fireball" && it.caster === ctx.player && it.status.velocity.z < 0 }, "shots=${MagicManager.projectiles.map { it.id to it.status.velocity }}"))
+                110 -> listOf(Check(name, t, "ice-fire-react-and-consume-both", ProjectileRuntime.projectiles.none { it.id == "fireball" && it.alive }, "shots=${ProjectileRuntime.projectiles.map { it.id }}"))
+                140 -> listOf(Check(name, t, "black-hole-stores-consumed-shot", hole != null && hole!!.storedEnergy > 0 && ProjectileRuntime.projectiles.none { it.id == "fireball" && it.alive }, "energy=${hole?.storedEnergy}"))
+                155 -> listOf(Check(name, t, "shield-projectile-reflects-and-changes-owner", ProjectileRuntime.projectiles.any { it.id == "fireball" && it.caster === ctx.player && it.status.velocity.z < 0 }, "shots=${ProjectileRuntime.projectiles.map { it.id to it.status.velocity }}"))
                 185 -> listOf(Check(name, t, "block-rebound-creates-inheriting-copy", clusterHit && copyInherited, "hit=$clusterHit $copyEvidence"))
                 212 -> listOf(Check(name, t, "teleport-hit-carries-damage-and-freeze", FrozenStatus.isFrozen(teleportTarget!!) && enemy!!.position().distanceToSqr(teleportTarget!!.position()) < 4.0, "frozen=${FrozenStatus.isFrozen(teleportTarget!!)} caster=${enemy!!.position()}"))
                 248 -> {
                     val drones = ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DroneEntity::class.java, AABB.ofSize(Vec3.ZERO, 100.0, 200.0, 100.0))
                     listOf(Check(name, t, "drone-recipe-persists-and-modifies-bolts", drones.size == 5 && drones.all { it.spellRecipe == listOf("damage_boost", "freeze_charge", "homing") } && droneBoltSeen, "drones=${drones.size} bolt=$droneBoltSeen evidence=$droneBoltEvidence recipe=${drones.map { it.spellRecipe }}"))
                 }
-                319 -> listOf(Check(name, t, "projectiles-cleaned", MagicManager.projectiles.isEmpty(), "remaining=${MagicManager.projectiles.size}"),
+                319 -> listOf(Check(name, t, "projectiles-cleaned", ProjectileRuntime.projectiles.isEmpty(), "remaining=${ProjectileRuntime.projectiles.size}"),
                     Check(name, t, "pd-particles-zero", ParticleManager.of(ctx.level).getEngine().particleCount() == 0, "remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 else -> emptyList()
             } })

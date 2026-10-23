@@ -5,7 +5,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.EntityHitResult
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent
-import work.nekow.primalspells.magic.core.ShieldGuard
+import work.nekow.primalspells.magic.effect.lifecycle.ShieldGuard
 
 /**
  * 「原版投射物 → 能量护盾」的**命中兜底**接线（第 40 轮；用户口径：护盾能够防御/反弹原版的投射物）。

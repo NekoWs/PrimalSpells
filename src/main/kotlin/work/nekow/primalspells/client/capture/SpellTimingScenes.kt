@@ -11,11 +11,13 @@ import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.visual.DelayedCastFx
 import work.nekow.primalspells.magic.projectile.Projectile
-import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
+import work.nekow.primalspells.wand.Wand
 
 /** 链锯整次清零、链内修正无牌序差异，真实移动载体的视觉爆开与荷载出生严格同刻。 */
 object SpellTimingScenes {
@@ -46,16 +48,16 @@ object SpellTimingScenes {
                 fun wand(ids: List<String>, delay: Double=9.0, recharge: Double=3.0, mana: Double=1000.0): Wand {
                     val w=Wand("timing-$t-${ids.joinToString()}")
                     w.delayTickCount=delay;w.rechargeTickCount=recharge
-                    w.innate+=ids.map { MagicManager.create(it)!! };w.load();w.status.mana=mana
+                    w.innate+=ids.map { SpellRegistry.create(it)!! };w.load();w.status.mana=mana
                     return w
                 }
                 if (t == 8) {
                     for ((index, mods) in listOf(emptyList<String>(),listOf("speed_boost")).withIndex()) {
-                        val p=MagicManager.create("delayed_cast") as Projectile
-                        SpellAssembly.apply(p,mods.map { MagicManager.create(it) as Modifier })
+                        val p=SpellRegistry.create("delayed_cast") as Projectile
+                        SpellAssembly.apply(p,mods.map { SpellRegistry.create(it) as Modifier })
                         p.caster=ctx.player;p.wand=Wand("delay-visual-$index")
                         p.position=Vector3d((if(index==0)-3f else 3f).toDouble(), (floor+3f).toDouble(), (-2f).toDouble());p.velocity=Vector3f(0f,0f,1f)
-                        val payload=MagicManager.create("laser") as Projectile
+                        val payload=SpellRegistry.create("laser") as Projectile
                         payload.effects+=object:BaseEffect() {
                             override fun onActive() {
                                 releases++
@@ -63,7 +65,7 @@ object SpellTimingScenes {
                                 synchronized=synchronized && p.status.age==p.maxAge && fx.releasedAtAge==p.maxAge && status.pos.distance(p.status.pos)<1e-5
                             }
                         }
-                        (p as TriggerSpell).payload+=payload;p.spell();MagicManager.add(p);carriers+=p
+                        (p as TriggerSpell).payload+=payload;p.spell();ProjectileRuntime.add(p);carriers+=p
                     }
                 }
                 if (t == 45) {
@@ -84,24 +86,24 @@ object SpellTimingScenes {
                 if (t in 55..74) { consecutive=consecutive && gun!!.spell(ctx.player);shots++;gun!!.tick() }
                 if (t == 100) {
                     sawTarget=ctx.spawnDummy(0.0,floor+1.0,0.0)
-                    val saw=MagicManager.create("chainsaw") as Projectile
-                    SpellAssembly.apply(saw,listOf(MagicManager.create("damage_boost") as Modifier))
+                    val saw=SpellRegistry.create("chainsaw") as Projectile
+                    SpellAssembly.apply(saw,listOf(SpellRegistry.create("damage_boost") as Modifier))
                     saw.effects+=object:BaseEffect() {
                         override fun onHitEntity(target:net.minecraft.world.entity.Entity) { sawHit=target===sawTarget && status.damage==5.0 }
                     }
                     saw.caster=ctx.player;saw.wand=Wand("saw-hit")
                     saw.position=Vector3d((0f).toDouble(), ((sawTarget!!.boundingBox.center.y)).toDouble(), (-1.2f).toDouble());saw.velocity=Vector3f(0f,0f,1f)
-                    saw.spell();MagicManager.add(saw)
+                    saw.spell();ProjectileRuntime.add(saw)
                 }
-                if(t==76) MagicManager.projectiles.forEach { it.alive=false }
-                if(t==110) MagicManager.projectiles.forEach { it.alive=false }
+                if(t==76) ProjectileRuntime.projectiles.forEach { it.alive=false }
+                if(t==110) ProjectileRuntime.projectiles.forEach { it.alive=false }
                 if(t==115) {
-                    val saw=MagicManager.create("chainsaw") as Projectile
-                    SpellAssembly.apply(saw,listOf("extended_lifetime","speed_boost").map { MagicManager.create(it) as Modifier })
+                    val saw=SpellRegistry.create("chainsaw") as Projectile
+                    SpellAssembly.apply(saw,listOf("extended_lifetime","speed_boost").map { SpellRegistry.create(it) as Modifier })
                     saw.caster=ctx.player;saw.wand=Wand("saw-long-visual")
                     saw.position=Vector3d((-2f).toDouble(), (floor+3f).toDouble(), (-2f).toDouble());saw.velocity=Vector3f(0f,0f,.1f)
                     saw.spell();saw.maxAge=8;saw.collisionEnabled=false
-                    longSaw=saw;MagicManager.add(saw)
+                    longSaw=saw;ProjectileRuntime.add(saw)
                 }
             }, checksAt={ctx,t -> when(t) {
                 22 -> listOf(Check(name,t,"no-premature-burst-or-payload",releases==0 && carriers.all { it.effects.filterIsInstance<DelayedCastFx>().single().releasedAtAge==-1 },"released=$releases"))
@@ -111,7 +113,7 @@ object SpellTimingScenes {
                 76 -> listOf(Check(name,t,"chainsaw-machinegun-every-tick",consecutive && shots==20 && gun!!.status.delay==0.0 && gun!!.status.recharge==0.0,"shots=$shots delay=${gun!!.status.delay} recharge=${gun!!.status.recharge}"))
                 105 -> listOf(Check(name,t,"chainsaw-real-hit-with-damage-modifier",sawHit && sawTarget!!.totalDamage==5.0,"hit=$sawHit actualDamage=${sawTarget!!.totalDamage}"))
                 127 -> listOf(Check(name,t,"extended-fast-chainsaw-keeps-cutting",longSaw!!.effects.filterIsInstance<work.nekow.primalspells.magic.effect.visual.ChainsawFx>().single().cutsEmitted==4 && longSaw!!.status.pos.z>1f,"cuts=${longSaw!!.effects.filterIsInstance<work.nekow.primalspells.magic.effect.visual.ChainsawFx>().single().cutsEmitted} z=${longSaw!!.status.pos.z}"))
-                149 -> listOf(Check(name,t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}"),
+                149 -> listOf(Check(name,t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}"),
                     Check(name,t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"))
                 else -> emptyList()
             }})
@@ -139,12 +141,12 @@ object SpellTimingScenes {
                 source.yRot=0f;source.xRot=0f
                 target=ctx.spawnDummy(0.0,floor+1.0,0.0)
                 gun=Wand("continuous-trigger-gun");gun.delayTickCount=10.0;gun.rechargeTickCount=20.0
-                gun.magics+=listOf("double_cast","trigger_fireball","mana_injection","omnidirectional_scatter","chainsaw").map{MagicManager.create(it)!!}
+                gun.magics+=listOf("double_cast","trigger_fireball","mana_injection","omnidirectional_scatter","chainsaw").map{SpellRegistry.create(it)!!}
                 gun.load();gun.status.mana=10000.0
             },camera={ctx,_ -> Pose(3.0,ctx.floorBlockY(0,0)+3.0,-6.0,28f,10f)},
             tick={ctx,t ->
                 if(t in 8..87) { if(gun.spell(source))rounds++;gun.tick() }
-                for(p in MagicManager.projectiles) {
+                for(p in ProjectileRuntime.projectiles) {
                     val fx=p.effects.filterIsInstance<work.nekow.primalspells.magic.effect.visual.ChainsawFx>().firstOrNull() ?: continue
                     val axis=fx.lastCutAxis
                     if(axis.lengthSqr()>0.1) rolls+=(kotlin.math.atan2(axis.y,axis.x)*12).toInt()
@@ -154,13 +156,13 @@ object SpellTimingScenes {
                     record(t,"machinegun-every-tick-and-real-damage",rounds==80 && target.totalDamage>=320.0,"rounds=$rounds damage=${target.totalDamage}")
                     record(t,"cut-orientations-vary",rolls.size>=8,"directions=${rolls.size}")
                     record(t,"sustained-particles-stay-readable",peak<900,"peak=$peak")
-                    MagicManager.projectiles.forEach{it.alive=false}
+                    ProjectileRuntime.projectiles.forEach{it.alive=false}
                     source.discard();target.discard()
                     // 隔离范围检查，不借用命中箱范围判定锁定距离。
                     fun probe(distance:Double):Boolean {
                         val dummy=ctx.spawnDummy(-6.0,ctx.floorBlockY(0,0)+2.0,4.0)
-                        val p=MagicManager.create("fireball") as Projectile
-                        SpellAssembly.apply(p,listOf(MagicManager.create("homing") as Modifier))
+                        val p=SpellRegistry.create("fireball") as Projectile
+                        SpellAssembly.apply(p,listOf(SpellRegistry.create("homing") as Modifier))
                         p.caster=ctx.player;p.wand=Wand("radius-probe");p.position=dummy.boundingBox.center.add(-distance,0.0,0.0).toPosition()
                         p.velocity=Vector3f(0f,0f,1f);p.spell();p.collisionEnabled=false;p.tick()
                         val turned=p.status.velocity.x>0.1f
@@ -169,7 +171,7 @@ object SpellTimingScenes {
                     record(t,"homing-six-block-radius",probe(5.9) && !probe(6.1),"5.9 inside / 6.1 outside")
                 }
                 if(t==169) {
-                    record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}")
+                    record(t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}")
                     record(t,"pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                 }
             },checksAt={_,t -> checks[t] ?: emptyList()})

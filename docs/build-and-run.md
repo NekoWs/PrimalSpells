@@ -26,7 +26,7 @@ PD本地项目在 `D:/Backup/IDEA Projects/ParticleDrawing`。获授权升级时
 .\gradlew.bat runData
 ```
 
-离线仅适用于依赖已缓存的机器；本机在线解析可能长时间等待，可用--offline。runClient使用run/client；runServer使用run/server并带nogui。常规build当前无单元测试源，成功不等于实机玩法和视觉已通过。
+离线仅适用于依赖已缓存的机器；本机在线解析可能长时间等待，可用--offline。runClient使用run/client；runServer使用run/server并带nogui。build包含checkArchitecture源码依赖护栏；可单独运行gradlew.bat checkArchitecture。当前无单元测试源，成功不等于实机玩法和视觉已通过。
 
 ## 4. 产物
 
@@ -99,7 +99,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | expansion_* / spell_resonance / spell_mechanics | 光束/冰冻/远距、跨弹反应、刻迁移与后代 |
 | recoil_light / concentrated_light_first_person / combat_impact / damage_mass | 固定聚光、后坐力、伤害/自伤与质量 |
 | wand_casting* / wand_aim / magic_hud | 主副手/FOV、阵列/模型、HUD与布局 |
-| foundations / new_spells | 原编杖分色/真实V入口、抽牌控制和治疗/火把 |
+| foundations / new_spells | 原编杖分色/真实V入口、抽牌控制和治疗/火把；foundations还覆盖NBT兼容/游标、注册目录与弹体生命周期顺序 |
 | exploration / progression | 实际结构掉落、术士、数据重载、生活卡与罗盘 |
 
 完整名称/帧数取CaptureScenes.all和assemble.SCENES，新场景两处一起更新。取景摄影棚用于对比，不代替自然地形/多人体验。

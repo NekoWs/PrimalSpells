@@ -2,6 +2,7 @@
 
 package work.nekow.primalspells.client.capture
 
+import kotlin.math.abs
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.EntityTypes
@@ -13,10 +14,11 @@ import org.joml.Vector3d
 import org.joml.Vector3f
 import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.magic.core.*
+import work.nekow.primalspells.magic.core.SpellRegistry
 import work.nekow.primalspells.magic.projectile.*
-import work.nekow.primalspells.wand.Wand
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
-import kotlin.math.abs
+import work.nekow.primalspells.wand.Wand
 
 object RecoilLightScene {
     fun scene():Scene {
@@ -33,7 +35,7 @@ object RecoilLightScene {
             },camera={ctx,_ -> Pose(-12.0,ctx.floorBlockY(0,0)+6.0,-14.0,-40f,15f)},tick={ctx,t ->
                 val floor=ctx.floorBlockY(0,0)
                 fun shot(id:String,mods:List<String> = emptyList(),z:Float=-5f):Projectile {
-                    val p=MagicManager.create(id) as Projectile;SpellAssembly.apply(p,mods.map{MagicManager.create(it) as Modifier})
+                    val p=SpellRegistry.create(id) as Projectile;SpellAssembly.apply(p,mods.map{SpellRegistry.create(it) as Modifier})
                     p.caster=ctx.player;p.wand=Wand("recoil-$t-$id");p.position=Vector3d((0f).toDouble(), (floor+4f).toDouble(), (z).toDouble());p.velocity=Vector3f(0f,0f,1f);p.spell();return p
                 }
                 if(t==8) {
@@ -42,7 +44,7 @@ object RecoilLightScene {
                     pig.persistentData.putDouble(MagicMass.ENTITY_TAG,1.0);ctx.level.addFreshEntity(pig)
                     fun fire(ids:List<String>):Double {
                         pig.deltaMovement=Vec3.ZERO
-                        val w=Wand("recoil-${ids.joinToString()}");w.innate+=ids.map{MagicManager.create(it)!!};w.load();w.status.mana=1000.0
+                        val w=Wand("recoil-${ids.joinToString()}");w.innate+=ids.map{SpellRegistry.create(it)!!};w.load();w.status.mana=1000.0
                         check(w.spell(pig));return pig.deltaMovement.length()
                     }
                     val base=fire(listOf("fireball"));val damp=fire(listOf("recoil_damper","fireball"));val boost=fire(listOf("recoil_boost","fireball"))
@@ -54,12 +56,12 @@ object RecoilLightScene {
                     val focused=fire(listOf("concentrated_light"))
                     record(t,"focused-light-paid-cast-small-recoil",abs(focused-0.06)<1e-6,"kick=$focused")
                     // 付费检查只验证出手推力，立即结束其蓄能，避免污染后续独立发射镜头。
-                    MagicManager.projectiles.filterIsInstance<ConcentratedLight>().filter{it.caster===pig}.forEach{it.alive=false}
+                    ProjectileRuntime.projectiles.filterIsInstance<ConcentratedLight>().filter{it.caster===pig}.forEach{it.alive=false}
                     pig.deltaMovement=Vec3.ZERO
-                    val child=MagicManager.create("fireball") as Projectile;child.caster=pig;child.wand=Wand("child");child.position=Vector3d((8f).toDouble(), (floor+4f).toDouble(), (0f).toDouble());child.velocity=Vector3f(0f,0f,1f);child.spell()
+                    val child=SpellRegistry.create("fireball") as Projectile;child.caster=pig;child.wand=Wand("child");child.position=Vector3d((8f).toDouble(), (floor+4f).toDouble(), (0f).toDouble());child.velocity=Vector3f(0f,0f,1f);child.spell()
                     record(t,"unarmed-child-does-not-kick",pig.deltaMovement.lengthSqr()==0.0,"velocity=${pig.deltaMovement}")
                     child.alive=false;child.die()
-                    val charged=MagicManager.create("concentrated_light") as ConcentratedLight
+                    val charged=SpellRegistry.create("concentrated_light") as ConcentratedLight
                     charged.caster=pig;charged.wand=Wand("charged-recoil");charged.position=Vector3d((8f).toDouble(), (floor+4f).toDouble(), (0f).toDouble());charged.velocity=Vector3f(0f,0f,1f);charged.spell();charged.queueCastRecoil()
                     record(t,"focused-light-small-recoil-on-cast",abs(pig.deltaMovement.length()-0.06)<1e-6,"velocity=${pig.deltaMovement}")
                     charged.status.age=ConcentratedLight.CHARGE_TICKS;charged.tick();val kick=pig.deltaMovement.length()
@@ -108,16 +110,16 @@ object RecoilLightScene {
                             runtimeReflection = beam!!.status.bounces in 0..4 && abs(beam!!.status.velocity.length()-ConcentratedLight.FLIGHT_SPEED)<1e-5
                         }
                     }
-                    MagicManager.add(beam!!)
+                    ProjectileRuntime.add(beam!!)
                     work.nekow.primalspells.util.Deferred.after(ctx.level,6) {
                         runtimeCharge = beam!!.awaitingRelease && abs(beam!!.status.pos.z+5)<0.001
                     }
                 }
                 if(t==100)record(t,"runtime-charge-stays-visible-at-muzzle",runtimeCharge,"age=${beam!!.status.age} pos=${beam!!.status.pos}")
                 if(t==100)record(t,"runtime-beam-reflects",runtimeReflection,"age=${beam!!.status.age} remainingBounces=${beam!!.status.bounces} pos=${beam!!.status.pos} velocity=${beam!!.status.velocity}")
-                if(t==180)MagicManager.projectiles.forEach{it.alive=false}
+                if(t==180)ProjectileRuntime.projectiles.forEach{it.alive=false}
             },checksAt={ctx,t ->
-                if(t==219){record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}
+                if(t==219){record(t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}
                 checks[t].orEmpty()
             })
     }
@@ -140,25 +142,25 @@ object RecoilLightScene {
                 work.nekow.primalspells.magic.effect.visual.WandCastingFx.clear()
                 stack=net.minecraft.world.item.ItemStack(work.nekow.primalspells.registry.ModItems.WAND.get())
                 wand=work.nekow.primalspells.wand.WandManager[work.nekow.primalspells.wand.WandManager.createWand(stack)]
-                wand.magics+=MagicManager.create("concentrated_light");wand.load();wand.status.mana=1000.0
+                wand.magics+=SpellRegistry.create("concentrated_light");wand.load();wand.status.mana=1000.0
                 ctx.player.inventory.setItem(7,stack)
             },camera={ctx,t -> Pose(if(t in 30..40)0.5-(t-30)*0.04 else if(t>40)0.1 else 0.5,ctx.floorBlockY(0,0)+1.0,0.5,if(t in 30..40)(t-30)*5f else if(t>40)50f else 0f,0f)},
             tick={ctx,t ->
                 if(t==8)ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,stack)
                 if(t==28)cast=wand.spell(ctx.player)
-                if(t==30){val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand};anchor=p?.status?.pos?.let{Vector3d(it)};direction=p?.launchDirection;p?.collisionEnabled=false}
+                if(t==30){val p=ProjectileRuntime.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand};anchor=p?.status?.pos?.let{Vector3d(it)};direction=p?.launchDirection;p?.collisionEnabled=false}
                 // 本场隔离朝向锁定与首人称退场，墙面/护盾反弹由独立场景检查。
-                if(t==41)MagicManager.projectiles.filter{it.wand===wand}.forEach{it.alive=false}
-                if(t==100){ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);ctx.player.inventory.setItem(7,net.minecraft.world.item.ItemStack.EMPTY);MagicManager.projectiles.forEach{it.alive=false}}
+                if(t==41)ProjectileRuntime.projectiles.filter{it.wand===wand}.forEach{it.alive=false}
+                if(t==100){ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);ctx.player.inventory.setItem(7,net.minecraft.world.item.ItemStack.EMPTY);ProjectileRuntime.projectiles.forEach{it.alive=false}}
             },finish={ctx ->
                 ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);ctx.player.inventory.setItem(7,net.minecraft.world.item.ItemStack.EMPTY)
                 work.nekow.primalspells.magic.effect.visual.WandCastingFx.forget(ctx.player.uuid)
             },checksAt={ctx,t ->
-                val p=MagicManager.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand}
+                val p=ProjectileRuntime.projectiles.filterIsInstance<ConcentratedLight>().lastOrNull{it.wand===wand}
                 when(t){
                     35 -> listOf(Check(name,t,"real-wand-charges-at-fixed-world-point",cast && p?.awaitingRelease==true && anchor!=null && p.status.pos.distance(anchor!!)<0.001f && p.status.pos.distance(work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(ctx.player,wand).toPosition())>0.15f,"cast=$cast age=${p?.status?.age} pos=${p?.status?.pos} anchor=$anchor origin=${work.nekow.primalspells.magic.effect.visual.WandCastingFx.origin(ctx.player,wand)}"))
                     40 -> listOf(Check(name,t,"real-wand-releases-after-charge-with-locked-direction",p!=null && !p.awaitingRelease && p.releasedAtAge==ConcentratedLight.CHARGE_TICKS && direction!=null && Vec3(p.status.velocity).normalize().dot(direction!!)>0.999 && ctx.player.lookAngle.dot(direction!!)<0.8,"released=${p?.releasedAtAge} velocity=${p?.status?.velocity} locked=$direction look=${ctx.player.lookAngle}"))
-                    179 -> listOf(Check(name,t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"),Check(name,t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}"))
+                    179 -> listOf(Check(name,t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}"),Check(name,t,"projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"remaining=${ProjectileRuntime.projectiles.size}"))
                     else -> emptyList()
                 }
             })

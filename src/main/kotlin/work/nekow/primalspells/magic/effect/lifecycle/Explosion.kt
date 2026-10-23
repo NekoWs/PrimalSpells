@@ -9,8 +9,8 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import work.nekow.particledrawing.api.ParticleManager
-import work.nekow.primalspells.magic.core.ShieldGuard
 import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 
 /**
  * 爆炸效果 —— 用 [MagicStatus] 的 `explosionRadius` / `explosionDamage` 触发自定义爆炸：
@@ -67,7 +67,7 @@ class Explosion(
 
             CrystalReaction.notifyExplosion(serverLevel, Vec3(cx, cy, cz), radius.toDouble())
 
-            SpellInteractions.shock(serverLevel, Vec3(cx, cy, cz), radius.toDouble(), damage, work.nekow.primalspells.magic.core.MagicManager.projectiles.toList())
+            SpellInteractions.shock(serverLevel, Vec3(cx, cy, cz), radius.toDouble(), damage, ProjectileRuntime.projectiles.toList())
 
             // 1. 播放自定爆炸音效
             serverLevel.playSound(

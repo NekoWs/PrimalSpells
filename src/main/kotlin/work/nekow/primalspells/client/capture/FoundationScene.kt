@@ -1,12 +1,12 @@
 package work.nekow.primalspells.client.capture
 
+import java.util.concurrent.ConcurrentHashMap
 import net.minecraft.world.item.ItemStack
+import work.nekow.primalspells.client.screen.WandPreviewScreen
+import work.nekow.primalspells.magic.core.SpellRegistry
+import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.*
-import work.nekow.primalspells.magic.core.MagicManager
-import work.nekow.primalspells.item.WandItem
-import work.nekow.primalspells.client.screen.WandPreviewScreen
-import java.util.concurrent.ConcurrentHashMap
 
 /** 预览与真实抽牌/费用/冷却一致性、真实网络与界面回归。 */
 object FoundationScene {
@@ -22,18 +22,19 @@ object FoundationScene {
             camera = { _, _ -> Pose(0.0, floor + 2.0, -7.0, 0f, 5f) },
             tick = { ctx, t ->
                 if (t == 8) {
+                    ArchitectureChecks.run(ctx) { name, ok, detail -> record(t, name, ok, detail) }
                     val stack = ItemStack(ModItems.WAND.get())
                     wand = WandManager[WandManager.createWand(stack)]
                     id = requireNotNull(wand).id
                     val cards = listOf("double_cast", "trigger_fireball", "omnidirectional_scatter", "chainsaw")
-                    requireNotNull(wand).magics += cards.map { MagicManager.create(it)!! }; while (requireNotNull(wand).magics.size < 18) requireNotNull(wand).magics += null; requireNotNull(wand).load(); requireNotNull(wand).status.mana = 3000.0
+                    requireNotNull(wand).magics += cards.map { SpellRegistry.create(it)!! }; while (requireNotNull(wand).magics.size < 18) requireNotNull(wand).magics += null; requireNotNull(wand).load(); requireNotNull(wand).status.mana = 3000.0
                     stack.set(ModItems.WAND_SPELLS, cards + List(14) { "" })
                     ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack)
                     val before = requireNotNull(wand).saveTag().toString()
                     val p = requireNotNull(wand).preview()
                     record(t, "preview-is-read-only", before == requireNotNull(wand).saveTag().toString(), before)
                     record(t, "layout-isolates-payload-and-empty-slots", p.slots[0].scope == p.slots[1].scope && p.slots[1].scope != p.slots[2].scope && p.slots[2].scope == p.slots[3].scope && p.slots.drop(4).all { it.scope.isEmpty() }, p.slots.toString())
-                    val all = Wand("layout-all"); all.magics += listOf("fireball", "fireball", "trigger_fireball", "fireball", "fireball").map { MagicManager.create(it)!! }; all.load(); all.status.mana = 0.0
+                    val all = Wand("layout-all"); all.magics += listOf("fireball", "fireball", "trigger_fireball", "fireball", "fireball").map { SpellRegistry.create(it)!! }; all.load(); all.status.mana = 0.0
                     val scopes = all.preview().slots.take(5).map { it.scope }
                     record(t, "layout-covers-all-casts-with-duplicate-cards-and-zero-mana", scopes.toSet().size == 5 && scopes[3].startsWith(scopes[2] + "/"), scopes.toString())
                     val carrier = p.rows.first { it.id == "trigger_fireball" }
@@ -41,12 +42,12 @@ object FoundationScene {
                     record(t, "payload-scope-is-isolated", "omnidirectional_scatter" !in carrier.modifiers && "omnidirectional_scatter" in saw.modifiers && saw.scope != carrier.scope, p.toString())
                     val recipes = listOf(cards, listOf("divide_ten", "speed_boost", "fireball"), listOf("divide_three", "trigger_fireball", "fireball"), listOf("cast_all", "fireball", "healing_bolt"), listOf("add_timer", "fireball", "sawblade"))
                     for ((i, recipe) in recipes.withIndex()) {
-                        val w = Wand("preview-$i"); w.magics += recipe.map { MagicManager.create(it)!! }; w.load(); w.status.mana = 3000.0
+                        val w = Wand("preview-$i"); w.magics += recipe.map { SpellRegistry.create(it)!! }; w.load(); w.status.mana = 3000.0
                         val beforeMana = w.status.mana; val plan = w.preview()
                         record(t, "preview-tree-$i", plan.rows.isNotEmpty() && plan.rows.all { it.accepted } && plan.manaAfter <= beforeMana && plan.delay >= 0 && plan.recharge >= 0, plan.toString())
                         if (i == 1) record(t, "divide-copies-card-not-chain", plan.rows.count { it.id == "speed_boost" } == 10 && plan.rows.count { it.id == "fireball" } == 1, plan.toString())
                     }
-                    val poor = Wand("poor"); poor.mana = 1.0; poor.status.mana = 1.0; poor.magics += MagicManager.create("concentrated_light")!!; poor.load()
+                    val poor = Wand("poor"); poor.mana = 1.0; poor.status.mana = 1.0; poor.magics += SpellRegistry.create("concentrated_light")!!; poor.load()
                     record(t, "preview-reports-insufficient-mana", poor.preview().shots == 0 && poor.preview().reasons.any { it.startsWith("Mana") }, poor.preview().toString())
                 }
                 if (t == 53) record(t, "creative-right-click-removes-card", requireNotNull(wand).magics[0] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("double_cast"), ctx.player.containerMenu.carried.toString())
@@ -79,7 +80,7 @@ object FoundationScene {
                 if (t == 220) record(t, "chest-wheel-selection-reaches-server", chest!!.getItem(0).get(ModItems.WAND_SELECTED_SLOT) == 5, chest.getItem(0).toString())
                 if (t == 230) record(t, "chest-vanilla-right-click-removes-card", requireNotNull(wand).magics[4] == null && ctx.player.containerMenu.carried.item == ModItems.spellItem("speed_boost"), ctx.player.containerMenu.carried.toString())
                 if (t == 240) record(t, "chest-vanilla-right-click-inserts-card", requireNotNull(wand).magics[4]?.id == "speed_boost" && ctx.player.containerMenu.carried.isEmpty, ctx.player.containerMenu.carried.toString())
-                if (t == 250) { chest?.setItem(0, ItemStack.EMPTY); ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY); ctx.player.inventory.setItem(9, ItemStack.EMPTY); MagicManager.projectiles.forEach { it.alive = false } }
+                if (t == 250) { chest?.setItem(0, ItemStack.EMPTY); ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY); ctx.player.inventory.setItem(9, ItemStack.EMPTY); ProjectileRuntime.projectiles.forEach { it.alive = false } }
             },
             clientTick = { mc, t ->
                 fun inventory() = mc.gui.screen() as net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>

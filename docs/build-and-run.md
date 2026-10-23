@@ -88,6 +88,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | 场景 | 主要覆盖 |
 |---|---|
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
+| spell_performance | 固定32发高速物理/制导、512普通/冻结弹联动，逐样本服务端计时与线程分配；[口径与结果](design/performance.md) |
 | collision_precision | 双精度接点、24种斜反弹、单刻余程、薄形状/拼缝/跨格形状、墙角分量、命中排序、自伤豁免与真实路径联动 |
 | homing_light | 前方优先/后方排除、同刻穿透换靶与接缝、64格光脊、穿刺付费冷却与十刻蓄能 |
 | projectile_flight / fireball_trail | 原版弩速对比、六格扫掠追踪、复制速度、实际alpha递减 |
@@ -111,8 +112,6 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 当前PD 1.0.21原生复验：particle_lighting 4/4、pd_api 10/10、fireball_trail 5/5，三场共302帧、0丢帧，机制与视觉门禁均通过。光照随alpha下降，组缩片退场最大单刻光强差1.875，原15→0硬切未复现。已知5条OSHI诊断按用户要求计入忽略项，不再使整体报告失败；其他日志门禁保持。所有法术入退场与短寿命高刷范围见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
 
-当前运动/碰撞复验：`pwsh tools/capture/capture.ps1 -Offline -Scene collision_precision,homing_light,recoil_light,shield_balance,spell_chain,projectile_flight,wand_aim,crystal_lifecycle -TimeoutSec 600`。八场共246项机制检查、1630帧、0丢帧，机制和视觉门禁均通过，证据在 `build/capture/out`。
+当前性能与运动回归命令、测量负载和结果统一见[性能基准](design/performance.md)。正常捕获还检查碰撞、前方追踪/穿透切线、实际法杖命中、付费/独立荷载、护盾和晶体生命周期；机制与视觉门禁分别统计，未用FPS代替服务端计时。
 
-collision_precision覆盖24种斜角下各六次真实墙接触、单刻九次反射且总路程约64格、薄末地烛边角、跨格栅栏、整数拼缝、双轴墙角、墙/实体近远排序、出生豁免与返弹自伤、水晶真实反弹路径联动。另有512组平移薄箱求交，包含负坐标和接近±3000万格，以及世界边缘真实1/16格移动。其余场景保留前方追踪/穿透切线、近远施法命中、付费与独立荷载、连续伤害、护盾和晶体生命周期检查。
-
-护盾首反射夹具隔离摄影棚墙面，并在实际反射终点前放靶验证回击；穿越后的剩余时间不再停在壳面等一刻。recoil_light的专属视觉窗口为58～85t，覆盖实际连续反弹结束后的余辉，未降低可见性/退场阈值。自然地形、移动目标跨刻与高延迟体验仍见 [verify](issues/verify.md)。
+recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹，不再用客户端固定帧号猜服务端年龄。spell_resonance的接触夹具使用真实发射后重叠位置，复制夹具实际装备bounce_duplicate并在子弹首次移动前检查继承。其混合视觉退场门禁见[open](issues/open.md)。

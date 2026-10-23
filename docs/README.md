@@ -12,6 +12,7 @@ PrimalSpells 是 Minecraft NeoForge 魔法模组：玩家把法术卡装入法�
 | 找实现或法术ID | [代码导航](code-map.md) |
 | 写代码、放文件、提交 | [开发约定](conventions.md) |
 | 新增或修改法术 | [法术开发](spell-development.md) |
+| 每刻耗时与分配优化 | [性能与原生基准](design/performance.md) |
 | 构建、排障、实机取证 | [构建与运行](build-and-run.md)；录制见第9节 |
 | 当前问题与验证边界 | [问题台账](issues/README.md) |
 | 后续开发范围 | [TODO](todo.md) |

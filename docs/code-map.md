@@ -28,6 +28,7 @@
 | 数据重载/API/事件 | `integration/{PackRules,SpellApi,SpellEvents}.kt` |
 | PD管理器/共享spawn | `util/PdParticles.kt`；PD能力问题只记台账 |
 | 录制/诊断 | `client/capture/CaptureDriver.kt`、CaptureScenes及各Scene；`tools/capture/{capture.ps1,diagnostics.ps1,assemble.py}` |
+| 性能回归 | `client/capture/SpellPerformanceScene.kt`，场景spell_performance；真实Move/联动耗时与线程分配，输出performance.tsv |
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
 | 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 光照连续性复现 | `client/capture/ParticleLightingScene.kt`，场景particle_lighting |

@@ -23,6 +23,8 @@ object RecoilLightScene {
         val name="recoil_light";val checks=linkedMapOf<Int,MutableList<Check>>()
         fun record(t:Int,id:String,ok:Boolean,info:String){checks.getOrPut(t){arrayListOf()}.add(Check(name,t,id,ok,info))}
         var beam:ConcentratedLight?=null
+        var runtimeCharge = false
+        var runtimeReflection = false
         return Scene(name,"后坐力 / 创造飞行豁免 / 汇聚蓄能与反弹",24,220,
             prepare={ctx ->
                 val floor=ctx.floorBlockY(0,0)
@@ -100,10 +102,19 @@ object RecoilLightScene {
                 }
                 if(t==50) {
                     for(z in listOf(-8,6))for(x in -1..1)for(y in floor+3..floor+5)ctx.level.setBlock(BlockPos(x,y,z),Blocks.STONE.defaultBlockState(),2)
-                    beam=shot("concentrated_light") as ConcentratedLight;beam!!.maxAge=70;MagicManager.add(beam!!)
+                    beam=shot("concentrated_light") as ConcentratedLight;beam!!.maxAge=70
+                    beam!!.effects += object : work.nekow.primalspells.magic.effect.BaseEffect() {
+                        override fun onHitBlock(pos: Vector3d) {
+                            runtimeReflection = beam!!.status.bounces in 0..4 && abs(beam!!.status.velocity.length()-ConcentratedLight.FLIGHT_SPEED)<1e-5
+                        }
+                    }
+                    MagicManager.add(beam!!)
+                    work.nekow.primalspells.util.Deferred.after(ctx.level,6) {
+                        runtimeCharge = beam!!.awaitingRelease && abs(beam!!.status.pos.z+5)<0.001
+                    }
                 }
-                if(t==56)record(t,"runtime-charge-stays-visible-at-muzzle",beam!!.awaitingRelease && abs(beam!!.status.pos.z+5)<0.001,"age=${beam!!.status.age} pos=${beam!!.status.pos}")
-                if(t==62)record(t,"runtime-beam-reflects",!beam!!.awaitingRelease && beam!!.status.bounces in 0..4 && abs(beam!!.status.velocity.length()-ConcentratedLight.FLIGHT_SPEED)<1e-5,"age=${beam!!.status.age} remainingBounces=${beam!!.status.bounces} pos=${beam!!.status.pos} velocity=${beam!!.status.velocity}")
+                if(t==100)record(t,"runtime-charge-stays-visible-at-muzzle",runtimeCharge,"age=${beam!!.status.age} pos=${beam!!.status.pos}")
+                if(t==100)record(t,"runtime-beam-reflects",runtimeReflection,"age=${beam!!.status.age} remainingBounces=${beam!!.status.bounces} pos=${beam!!.status.pos} velocity=${beam!!.status.velocity}")
                 if(t==180)MagicManager.projectiles.forEach{it.alive=false}
             },checksAt={ctx,t ->
                 if(t==219){record(t,"projectiles-cleaned",MagicManager.projectiles.isEmpty(),"remaining=${MagicManager.projectiles.size}");record(t,"pd-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")}

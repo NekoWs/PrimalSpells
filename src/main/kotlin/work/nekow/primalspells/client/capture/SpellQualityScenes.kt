@@ -248,6 +248,8 @@ object SpellQualityScenes {
         var frozenTarget: TestDummyEntity? = null
         var enemy: TestDummyEntity? = null
         var clusterHit = false
+        var copyInherited = false
+        var copyEvidence = ""
         var teleportTarget: TestDummyEntity? = null
         var droneBoltSeen = false
         var droneBoltEvidence = ""
@@ -308,12 +310,24 @@ object SpellQualityScenes {
                 if (t == 125) {
                     cast(ctx, listOf("black_hole"), 0.0, floor+1.0, 0.0)
                     cast(ctx, listOf("fireball"), 0.0, floor+1.0, -1.0)
+                    // 固定真正重叠的接触，避免提速后的弹体在两次服务端刻之间跨过点触发范围。
+                    work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
+                        val source = MagicManager.projectiles.first { it.id=="black_hole" }
+                        val food = MagicManager.projectiles.first { it.id=="fireball" && it.alive }
+                        food.status.pos.set(source.status.pos); food.status.velocity.zero()
+                    }
                 }
                 if (t == 128) hole = MagicManager.projectiles.firstOrNull { it.id == "black_hole" }
                 if (t == 150) {
                     cast(ctx, listOf("energy_shield", "plasma_beam"), 3.0, floor+1.0, 0.0)
                     cast(ctx, listOf("fireball"), 3.0, floor+1.0, -1.0, source=enemy!!)
                     enemy!!.setPos(10.0, floor+1.0, 8.0)
+                    work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
+                        val source = MagicManager.projectiles.first { it.id=="plasma_beam" }
+                        val food = MagicManager.projectiles.first { it.id=="fireball" && it.alive }
+                        food.status.pos.set(source.status.pos).add(0.0,0.0,-0.5)
+                        food.status.velocity.set(0f,0f,0.2f)
+                    }
                 }
                 if (t == 200) {
                     teleportTarget = ctx.spawnDummy(-5.0, floor+1.0, 0.0)
@@ -335,9 +349,19 @@ object SpellQualityScenes {
                     ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DroneEntity::class.java, AABB.ofSize(Vec3.ZERO, 100.0, 200.0, 100.0)).forEach { it.discard() }
                     MagicManager.projectiles.forEach { it.alive = false }
                 }
-                if (t == 175) cast(ctx, listOf("damage_boost", "freeze_charge", "speed_boost", "fireball"), -4.0, floor+3.0, -3.0)
-                if (t in 176..182 && !clusterHit) MagicManager.projectiles.firstOrNull { it.id == "fireball" && "bounce_duplicate" in it.modifiers }?.let { p ->
-                    p.hitBlock(Vector3d(p.status.pos), Vector3f(0f, 0f, -1f)); clusterHit = true
+                if (t == 175) {
+                    cast(ctx, listOf("bounce_duplicate", "damage_boost", "freeze_charge", "speed_boost", "fireball"), -4.0, floor+3.0, -3.0)
+                    work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
+                        val parent = MagicManager.projectiles.first { "bounce_duplicate" in it.modifiers }
+                        parent.hitBlock(Vector3d(parent.status.pos),Vector3f(0f,0f,-1f)); clusterHit=true
+                        val expectedSpeed = parent.status.velocity.length()
+                        work.nekow.primalspells.util.Deferred.after(ctx.level,0) {
+                            val children = MagicManager.projectiles.filter { it.id=="fireball" && "bounce_duplicate" !in it.modifiers && it.wand===parent.wand }
+                            copyInherited = children.size==1 && children.all { it.modifiers["damage_boost"]==1 && it.status.freezeTicks>0 &&
+                                it.status.damage==6.0 && it.status.velocity.isFinite && kotlin.math.abs(it.status.velocity.length()-expectedSpeed)<1e-4 }
+                            copyEvidence="expectedSpeed=$expectedSpeed children=${children.map { it.modifiers to it.status.velocity }}"
+                        }
+                    }
                 }
             }, checksAt = { ctx, t -> when (t) {
                 2 -> listOf(Check(name, t, "all-modifier-projectile-assemblies", matrixOk && matrix >= 400, "pairs=$matrix independent=$matrixOk"))
@@ -349,10 +373,7 @@ object SpellQualityScenes {
                 110 -> listOf(Check(name, t, "ice-fire-react-and-consume-both", MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "shots=${MagicManager.projectiles.map { it.id }}"))
                 140 -> listOf(Check(name, t, "black-hole-stores-consumed-shot", hole != null && hole!!.storedEnergy > 0 && MagicManager.projectiles.none { it.id == "fireball" && it.alive }, "energy=${hole?.storedEnergy}"))
                 155 -> listOf(Check(name, t, "shield-projectile-reflects-and-changes-owner", MagicManager.projectiles.any { it.id == "fireball" && it.caster === ctx.player && it.status.velocity.z < 0 }, "shots=${MagicManager.projectiles.map { it.id to it.status.velocity }}"))
-                185 -> {
-                    val children = MagicManager.projectiles.filter { it.id == "fireball" && it.alive && "bounce_duplicate" !in it.modifiers }
-                    listOf(Check(name, t, "block-rebound-creates-inheriting-copy", children.size == 1 && children.all { it.modifiers["damage_boost"] == 1 && it.status.freezeTicks > 0 && it.status.damage == 6.0 && it.status.velocity.isFinite && it.status.velocity.length() in (0.1f)..(4.0f) }, "hit=$clusterHit all=${MagicManager.projectiles.map { it.id to it.modifiers }} children=${children.map { it.modifiers to it.status.damage }}"))
-                }
+                185 -> listOf(Check(name, t, "block-rebound-creates-inheriting-copy", clusterHit && copyInherited, "hit=$clusterHit $copyEvidence"))
                 212 -> listOf(Check(name, t, "teleport-hit-carries-damage-and-freeze", FrozenStatus.isFrozen(teleportTarget!!) && enemy!!.position().distanceToSqr(teleportTarget!!.position()) < 4.0, "frozen=${FrozenStatus.isFrozen(teleportTarget!!)} caster=${enemy!!.position()}"))
                 248 -> {
                     val drones = ctx.level.getEntitiesOfClass(work.nekow.primalspells.entity.DroneEntity::class.java, AABB.ofSize(Vec3.ZERO, 100.0, 200.0, 100.0))

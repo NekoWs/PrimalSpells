@@ -4,6 +4,8 @@
 
 | 主题 | 当前保证 | 回归入口 |
 |---|---|---|
+| 每刻性能 | 按需积分、同格邻域复用、无数组slab、反应分类配对；已加载区块查询避免同步生成，保留接点/曲线/伤害语义 | spell_performance、collision_precision；[基准](../design/performance.md) |
+| 弹跳音效 | 弹跳修正不再播放史莱姆占位声；法术音效后续统一设计 | MoreBounce、[TODO](../todo.md) |
 | 抽牌作用域 | 同链修正无牌序；触发荷载独立，子链散射不污染载体；付费一次、链锯清整次延迟 | spell_chain、foundations |
 | 复制与后代 | 按配方重建独立effect/荷载，抵消重复速度倍率，量子复制有本体与真实命中 | spell_mechanics、spell_resonance |
 | 寿命触发 | 定时到期当刻释放；休眠水晶到期爆炸，提前死亡与expire区分 | spell_timing、crystal_lifecycle |

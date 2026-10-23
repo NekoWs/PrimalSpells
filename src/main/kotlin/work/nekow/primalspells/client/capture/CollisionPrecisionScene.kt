@@ -63,6 +63,49 @@ object CollisionPrecisionScene {
                     record(t, "returning-projectile-can-still-hit-caster", !self.alive && self.status.hitTargets == 1,
                         "alive=${self.alive} hits=${self.status.hitTargets}")
                     self.alive = false; self.die()
+                    val unknownStart = Vec3(2_000_000.25, floor + 8.0, 2_000_000.25)
+                    val chunkX = 2_000_000 shr 4
+                    val beforeLoaded = ctx.level.chunkSource.getChunkNow(chunkX, chunkX) != null
+                    val unknown = light(ctx, unknownStart, Vec3(1.0, 0.0, 0.0))
+                    unknown.tick()
+                    record(t, "unloaded-terrain-does-not-force-chunk-generation", !beforeLoaded &&
+                        ctx.level.chunkSource.getChunkNow(chunkX, chunkX) == null && unknown.status.pos.toVec3() == unknownStart &&
+                        unknown.alive && unknown.status.bounces == 5 && unknown.status.hitTargets == 0,
+                        "beforeLoaded=$beforeLoaded pos=${unknown.status.pos} alive=${unknown.alive}")
+                    unknown.alive = false; unknown.die()
+                    val sky = light(ctx, Vec3(2_000_000.25, 4000.0, 2_000_000.25), Vec3(0.0, 1.0, 0.0))
+                    sky.tick()
+                    record(t,"known-void-height-needs-no-loaded-chunk", sky.alive && abs(sky.status.pos.y-4064.0)<1e-7 &&
+                        ctx.level.chunkSource.getChunkNow(chunkX,chunkX)==null,"pos=${sky.status.pos}")
+                    sky.alive=false; sky.die()
+                    var borderChunk = 0
+                    while (borderChunk < 64 && ctx.level.chunkSource.getChunkNow(borderChunk, 0) != null) borderChunk++
+                    val borderX = borderChunk * 16.0
+                    val borderStart = Vec3(borderX - 2.25, floor + 10.0, 0.5)
+                    val boundary = light(ctx, borderStart, Vec3(1.0, 0.0, 0.0))
+                    boundary.tick()
+                    record(t, "flight-stops-at-known-edge-without-a-false-impact", borderChunk in 1..63 &&
+                        boundary.alive && boundary.status.hitTargets==0 && boundary.status.bounces==5 &&
+                        boundary.status.pos.x > borderStart.x && boundary.status.pos.x < borderX &&
+                        boundary.flightPath.last()==boundary.status.pos.toVec3() && ctx.level.chunkSource.getChunkNow(borderChunk,0)==null,
+                        "border=$borderChunk pos=${boundary.status.pos} start=$borderStart")
+                    boundary.alive=false; boundary.die()
+                    fun reactionShot(freeze: Int): Projectile {
+                        val p = MagicManager.create("fireball") as Projectile
+                        p.effects.removeIf { it.phase==EffectPhase.VISUAL }
+                        p.caster=ctx.player; p.wand=Wand("ordered-reaction")
+                        p.position=Vec3(0.0,floor+10.0,0.0).toPosition(); p.velocity=Vector3f(0f,0f,1f)
+                        p.spell(); p.status.freezeTicks=freeze
+                        return p
+                    }
+                    val hotFirst=reactionShot(0); val coldMiddle=reactionShot(30); val hotLast=reactionShot(0)
+                    work.nekow.primalspells.magic.effect.lifecycle.SpellInteractions.tick(listOf(hotFirst,coldMiddle,hotLast))
+                    record(t,"filtered-reactions-preserve-first-pair-order", !hotFirst.alive && !coldMiddle.alive && hotLast.alive,
+                        "alive=${listOf(hotFirst,coldMiddle,hotLast).map { it.alive }}")
+                    val coldFirst=reactionShot(30); val coldSecond=reactionShot(30)
+                    work.nekow.primalspells.magic.effect.lifecycle.SpellInteractions.tick(listOf(coldFirst,coldSecond))
+                    record(t,"frozen-projectiles-do-not-react-with-each-other", coldFirst.alive && coldSecond.alive,"cold pair")
+                    listOf(hotFirst,coldMiddle,hotLast,coldFirst,coldSecond).forEach { it.alive=false; it.die() }
                     val random = Random(8174)
                     for (offset in listOf(0.0, -10000.0, 29_999_900.0, -29_999_900.0)) {
                         var maxError = 0.0

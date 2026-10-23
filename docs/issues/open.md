@@ -14,8 +14,9 @@
 ## 混合场景退场门禁
 
 - 级别：验证缺口。`machinegun_visual`机制6/6、可见性和零残留通过，但95%→5%跨度4帧、最大单帧覆盖下降42.2%，超35%阈值；归零前9.2%满足10%门槛。独立fireball_trail实际alpha检查通过。
+- `spell_resonance`机制12/12通过、可见性与零残留通过，但全局50%→5%覆盖量仅跨3帧，未达4帧；证据在 `build/capture/performance-interactions-audit/spell_resonance`。需拆分真实退出事件/ROI，未改阈值或粒子寿命掩盖此问题。
 - `spell_mechanics`与`new_spells`混合多组独立生命周期，全局颜色峰值到末端的瞬退判据也曾失败，不能以玩法断言通过替代视觉通过。
-- 复现：`pwsh tools/capture/capture.ps1 -Offline -Scene machinegun_visual,spell_mechanics,new_spells`。机枪当前证据保存在 `build/capture/projectile-baseline/machinegun_visual`；原帧与meta可复核，后续录制需保留当前输出再覆盖。
+- 复现：`pwsh tools/capture/capture.ps1 -Offline -Scene machinegun_visual,spell_mechanics,new_spells,spell_resonance`。机枪当前证据保存在 `build/capture/projectile-baseline/machinegun_visual`；原帧与meta可复核，后续录制需保留当前输出再覆盖。
 - 下一步：按真实退场事件分ROI或拆独立场景，定位头部/短尾/切痕各自的覆盖变化。保留严格门禁，不统一延长粒子寿命或放宽阈值凑通过。
 - 位置：SpellTimingScenes、SpellQualityScenes、NewSpellScene及 `tools/capture/assemble.py`。
 

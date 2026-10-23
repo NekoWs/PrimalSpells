@@ -1,9 +1,12 @@
 package work.nekow.primalspells.magic.effect.geometry
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.level.ChunkPos
+import net.minecraft.world.level.chunk.LevelChunk
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3f
@@ -27,7 +30,16 @@ class Move(
 ) : BaseEffect() {
     override val phase = EffectPhase.MOTION
     private var leftCaster = false
-    private val blockShapes = hashMapOf<BlockPos, List<AABB>>()
+    private val blockShapes = Long2ObjectOpenHashMap<List<AABB>>()
+    private val loadedChunks = Long2ObjectOpenHashMap<LevelChunk>()
+    private var collisionAreaLoaded = true
+    private val nearbyBoxes = arrayListOf<AABB>()
+    private var neighborhoodValid = false
+    private var neighborhoodLow = 0L
+    private var neighborhoodHigh = 0L
+    private val impacts = arrayListOf<Impact>()
+    private val resumeEntities = hashSetOf<Entity>()
+    private class Collider(val entity: Entity, var original: AABB, var box: AABB)
 
     private fun record(point: Vec3) {
         if (projectile.flightPath.lastOrNull()?.distanceToSqr(point)?.let { it < 1e-20 } != true) projectile.flightPath += point
@@ -39,6 +51,10 @@ class Move(
         val speed = status.velocity.length()
         status.velocity.mul(1 / (1 + dragCoeff * speed))
         blockShapes.clear()
+        loadedChunks.clear()
+        collisionAreaLoaded = true
+        neighborhoodValid = false
+        resumeEntities.clear()
         val start = status.pos.toVec3()
         record(start)
         val level = caster.level() as? ServerLevel
@@ -49,46 +65,56 @@ class Move(
         // 反弹/换靶后的可达范围也必须在宽相位中，不能只查最初的直线包围盒。
         val swept = AABB.ofSize(start, radius * 2, radius * 2, radius * 2)
         val candidates = if (collision && hitRadius > 0) level!!.getEntities(null,
-            swept.inflate(hitRadius + 1.0)) { projectile.canHarm(it) } else emptyList()
+            swept.inflate(hitRadius + 1.0)) { projectile.canHarm(it) }
+            .map { Collider(it, it.boundingBox, it.boundingBox.inflate(hitRadius)) } else emptyList()
         val shields = if (collision && hitRadius > 0 && projectile.maxHitTargets >= 0)
             level!!.getEntitiesOfClass(LivingEntity::class.java, swept.inflate(2.7)) {
                 it.isAlive && it !== caster && ShieldGuard.hasShield(it)
             } else emptyList()
         // 同一个接点换靶后不再立刻重复它；下一完整子步恢复原有持续命中语义。
-        val resumeEntities = hashSetOf<Entity>()
+        val startVelocity = Vector3f()
         while (remainingTime > 1e-10 && projectile.alive && projectile.motionEnabled) {
             val movement = Vector3f(status.velocity)
             val segmentSpeed = movement.length().toDouble()
             if (segmentSpeed <= 1e-10) break
             val guidance = projectile.guidance
-            val path = planFlight(status.pos.toVec3(), movement, segmentSpeed * remainingTime)
+            val path = FlightPlan(status.pos.toVec3(), movement, segmentSpeed * remainingTime)
             var replan = false
-            for (step in path) {
+            while (path.advance()) {
+                val step = path
                 val from = status.pos.toVec3()
-                val startVelocity = Vector3f(status.velocity)
+                startVelocity.set(status.velocity)
                 val to = step.position
                 val stepTime = step.distance / segmentSpeed
-                val impacts = arrayListOf<Impact>()
+                impacts.clear()
                 if (collision) {
-                    if (!throughBlocks) blockContact(level!!, from, to)?.let { impacts += Impact(it) }
+                    if (!throughBlocks) {
+                        blockContact(level!!, from, to)?.let { impacts += Impact(it) }
+                        // 未知地形不当成空气，也不当作碰撞；留在最后的已知位置，寿命照常推进。
+                        if (!collisionAreaLoaded) return
+                    }
                     for (holder in shields) {
                         ShieldGuard.segmentEntry(holder, from.toPosition(), to.toPosition())?.let { point ->
                             impacts += Impact(SweptCollision.Contact(fraction(from, to, point), point, Vec3.ZERO, 0), holder, true)
                         }
                     }
                     // 必须先真正离开，再允许返弹自伤；不能在出壳子步按from重算一次出生自撞。
-                    if (!caster.boundingBox.inflate(hitRadius).contains(from)) leftCaster = true
-                    for (entity in candidates) {
+                    if (!leftCaster && !caster.boundingBox.inflate(hitRadius).contains(from)) leftCaster = true
+                    for (candidate in candidates) {
+                        val entity = candidate.entity
                         if (entity in resumeEntities || entity === caster && !leftCaster || !entity.isAlive) continue
-                        val box = entity.boundingBox.inflate(hitRadius)
+                        val currentBox = entity.boundingBox
+                        if (currentBox !== candidate.original) {
+                            candidate.original = currentBox; candidate.box = currentBox.inflate(hitRadius)
+                        }
+                        val box = candidate.box
                         val hit = if (box.contains(from)) SweptCollision.Contact(0.0, from, Vec3.ZERO, 0)
                             else SweptCollision.entry(from, to, box)
                         hit?.let { impacts += Impact(it, entity) }
                     }
                 }
                 // 同距先墙后盾后实体；隔着墙的实体不能抢先受到伤害。
-                impacts.sortWith(compareBy<Impact> { it.contact.fraction }.thenBy { if (it.entity == null) 0 else if (it.shield) 1 else 2 }
-                    .thenBy { it.entity?.id ?: 0 })
+                if (impacts.size > 1) impacts.sortWith(IMPACT_ORDER)
                 for (impact in impacts) {
                     val hit = impact.contact
                     status.pos.set(hit.point.x, hit.point.y, hit.point.z)
@@ -107,7 +133,7 @@ class Move(
                         record(hit.point)
                         projectile.hitEntity(impact.entity).also { resumeEntities += impact.entity }
                     }
-                    blockShapes.clear() // 命中荷载/扩展回调可能改变地形，接下来的扫掠重新取真实形状。
+                    blockShapes.clear(); neighborhoodValid = false // 命中回调可能改变地形，下个子步重新取形状。
                     if (!projectile.alive || !projectile.motionEnabled) return
                     if (interrupted || projectile.guidance !== guidance) {
                         remainingTime -= stepTime * hit.fraction
@@ -132,69 +158,112 @@ class Move(
 
     /** 碰撞形状可能越过自身方块（栅栏等），所以包含相邻格，不能只看端点所在方块。 */
     private fun blockContact(level: ServerLevel, from: Vec3, to: Vec3): SweptCollision.Contact? {
-        var best: SweptCollision.Contact? = null
-        for (x in floor(min(from.x, to.x)).toInt() - 1..floor(max(from.x, to.x)).toInt() + 1)
-            for (y in floor(min(from.y, to.y)).toInt() - 1..floor(max(from.y, to.y)).toInt() + 1)
-                for (z in floor(min(from.z, to.z)).toInt() - 1..floor(max(from.z, to.z)).toInt() + 1) {
+        val minX = floor(min(from.x, to.x)).toInt() - 1
+        val minY = floor(min(from.y, to.y)).toInt() - 1
+        val minZ = floor(min(from.z, to.z)).toInt() - 1
+        val maxX = floor(max(from.x, to.x)).toInt() + 1
+        val maxY = floor(max(from.y, to.y)).toInt() + 1
+        val maxZ = floor(max(from.z, to.z)).toInt() + 1
+        val low = BlockPos.asLong(minX, minY, minZ)
+        val high = BlockPos.asLong(maxX, maxY, maxZ)
+        // 相邻子步通常还在同一格，只有跨格/命中回调才重收集邻格；不降低扫掠精度。
+        if (!neighborhoodValid || low != neighborhoodLow || high != neighborhoodHigh) {
+            neighborhoodLow = low; neighborhoodHigh = high; neighborhoodValid = true
+            nearbyBoxes.clear()
+            for (x in minX..maxX) for (y in minY..maxY) for (z in minZ..maxZ) {
+                // 世界高度外是已知虚空，不查询区块；也不把超出打包范围的Y写入坐标缓存。
+                if (level.isOutsideBuildHeight(y)) continue
+                val key = BlockPos.asLong(x, y, z)
+                var boxes = blockShapes.get(key)
+                if (boxes == null) {
                     val pos = BlockPos(x, y, z)
-                    val boxes = blockShapes.getOrPut(pos) {
-                        level.getBlockState(pos).getCollisionShape(level, pos).toAabbs().map { it.move(x.toDouble(), y.toDouble(), z.toDouble()) }
+                    val chunkKey = ChunkPos.pack(x shr 4, z shr 4)
+                    var chunk = loadedChunks.get(chunkKey)
+                    if (chunk == null) {
+                        chunk = level.chunkSource.getChunkNow(x shr 4, z shr 4)
+                        if (chunk == null) {
+                            collisionAreaLoaded = false; neighborhoodValid = false; nearbyBoxes.clear()
+                            return null
+                        }
+                        loadedChunks.put(chunkKey, chunk)
                     }
-                    for (box in boxes) {
-                        val hit = SweptCollision.entry(from, to, box) ?: continue
-                        val old = best
-                        if (old == null || hit.fraction < old.fraction - 1e-9) best = hit
-                        else if (abs(hit.fraction - old.fraction) <= 1e-9) best = old.copy(
-                            normal = old.normal.add(hit.normal).normalize(), axes = old.axes or hit.axes)
-                    }
+                    val shape = chunk.getBlockState(pos).getCollisionShape(level, pos)
+                    boxes = if (shape.isEmpty) emptyList() else shape.toAabbs()
+                        .map { it.move(x.toDouble(), y.toDouble(), z.toDouble()) }
+                    blockShapes.put(key, boxes)
                 }
+                // 空列表的addAll也可能分配临时数组；空气格是最常见情况，直接跳过。
+                if (boxes.isNotEmpty()) nearbyBoxes.addAll(boxes)
+            }
+        }
+        var best: SweptCollision.Contact? = null
+        for (box in nearbyBoxes) {
+            val hit = SweptCollision.entry(from, to, box) ?: continue
+            val old = best
+            if (old == null || hit.fraction < old.fraction - 1e-9) best = hit
+            else if (abs(hit.fraction - old.fraction) <= 1e-9) best = old.copy(
+                normal = old.normal.add(hit.normal).normalize(), axes = old.axes or hit.axes)
+        }
         return best
     }
 
-    private data class FlightStep(val position: Vec3, val velocity: Vector3f,
-        val distance: Double, val guidanceTravel: Float)
+    private companion object {
+        val IMPACT_ORDER = compareBy<Impact> { it.contact.fraction }
+            .thenBy { if (it.entity == null) 0 else if (it.shield) 1 else 2 }.thenBy { it.entity?.id ?: 0 }
+    }
 
-    /** 保持本刻路程和速度，按曲率限幅逐子步转向；中点方向积分使前后切线连续。 */
-    private fun planFlight(start: Vec3, movement: Vector3f, distance: Double = movement.length().toDouble()): List<FlightStep> {
-        val speed = movement.length()
-        if (!distance.isFinite() || distance <= 0.0 || speed <= 0f) return emptyList()
-        val steps = maxOf(1, ceil(distance * 16).toInt())
-        val heading = Vector3f(movement).div(speed)
-        var position = start
-        val guidance = projectile.guidance
-        val arrival = guidance?.targetBounds?.inflate(hitRadius)
+    /** 按需积分下一子步；反弹/换靶只舍弃规划器，未行驶的未来路径不分配也不计算。 */
+    private inner class FlightPlan(start: Vec3, movement: Vector3f, totalDistance: Double) {
+        private val speed = movement.length()
+        private val heading = Vector3f(movement).div(speed)
+        private val next = Vector3f()
+        private val chord = Vector3f()
+        private val aim = Vector3f()
+        private val turn = Quaternionf()
+        private val targetTurn = Quaternionf()
+        private val guidance = projectile.guidance
+        private val arrival = guidance?.targetBounds?.inflate(hitRadius)
+        private val blendDistance = guidance?.target?.distanceTo(start)?.times(0.25)?.coerceIn(0.2, 1.5) ?: 1.5
+        private var arrived = false
+        private var remainingDistance = totalDistance
+        var position: Vec3 = start
+            private set
+        val velocity = Vector3f(movement)
+        var distance = 0.0
+            private set
         var guidanceTravel = guidance?.travelled ?: 0f
-        val blendDistance = guidance?.target?.distanceTo(start)?.times(0.25)?.coerceIn(0.2, 1.5) ?: 1.5
-        var arrived = false
-        return (1..steps).map { index ->
-            val step = min(index / 16.0, distance) - min((index - 1) / 16.0, distance)
-            val next = Vector3f(heading)
-            // 在真正进入目标碰撞范围后保持切线；不能把本刻剩余路径预排成绕中心的回头小圈。
+            private set
+
+        fun advance(): Boolean {
+            if (remainingDistance <= 1e-12 || !remainingDistance.isFinite()) return false
+            distance = min(1.0 / 16, remainingDistance)
+            remainingDistance -= distance
+            next.set(heading)
             if (arrival?.contains(position) == true) arrived = true
             if (guidance != null && guidance.strength > 0f && !arrived) {
-                val aim = guidance.target.subtract(position).toVector3f()
+                aim.set((guidance.target.x - position.x).toFloat(), (guidance.target.y - position.y).toFloat(),
+                    (guidance.target.z - position.z).toFloat())
                 val remaining = aim.length()
                 if (remaining > 1e-6f) {
                     aim.div(remaining)
                     val angle = acos(heading.dot(aim).coerceIn(-1f, 1f))
                     if (angle > 1e-6f) {
-                        // 远处使用较弱制导舒展弧线，三格内渐增末段修正，避免减弱后只绕靶不命中。
                         val precision = (1f - remaining / 3f).coerceIn(0f, 1f)
                         val turnStrength = guidance.strength * (1f + precision * (2f / 3f))
                         val radius = (remaining * 0.6f).coerceIn(0.3f, 4f) / turnStrength
-                        // 极多复制修正也不能在单个子步翻转180度，避免中点方向退化为零。
                         val blend = (guidanceTravel / blendDistance).coerceIn(0.0, 1.0).toFloat()
                         val ease = blend * blend * (3f - 2f * blend)
-                        val fraction = (min(step / radius * ease, 0.2).toFloat() / angle).coerceIn(0f, 1f)
-                        Quaternionf().slerp(Quaternionf().rotationTo(heading, aim), fraction).transform(next).normalize()
+                        val fraction = (min(distance / radius * ease, 0.2).toFloat() / angle).coerceIn(0f, 1f)
+                        turn.identity().slerp(targetTurn.rotationTo(heading, aim), fraction).transform(next).normalize()
                     }
                 }
             }
-            position = position.add(Vec3(Vector3f(heading).add(next).normalize()).scale(step))
+            chord.set(heading).add(next).normalize()
+            position = position.add(chord.x * distance, chord.y * distance, chord.z * distance)
             heading.set(next)
-            guidanceTravel += step.toFloat()
-            FlightStep(position, Vector3f(heading).mul(speed), step, guidanceTravel)
+            guidanceTravel += distance.toFloat()
+            velocity.set(heading).mul(speed)
+            return true
         }
     }
-
 }

@@ -58,6 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "spell_performance": {"length": 140, "title": "原生 CPU / 分配基准", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "机制计时与真实光束展示分别取证，性能数据不设机器相关通过阈值"},
     "collision_precision": {"length": 140, "title": "高速反弹 / 双精度接点 / 连续余程", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "多次真实发射分别退场，机制读取实际扫掠与接触回调"},
     "homing_light": {"length": 150, "title": "六格追踪 / 弧线扫掠 / 聚光照明", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "范围/真实曲线碰撞与照明各有独立原生断言，多个发射阶段不共用全局退场峰值"},
     "particle_lighting": {"length": 110, "title": "粒子照明 / 出生与退场连续性", "metric": "blue", "quiet": (0, 6), "decay": "none", "decay_reason": "独立观察原生光场与透明度，连续性由光照数值断言验证"},

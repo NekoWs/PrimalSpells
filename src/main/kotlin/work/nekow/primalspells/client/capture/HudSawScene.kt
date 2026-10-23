@@ -93,7 +93,12 @@ object HudSawScene {
                 if (t == 95 || t == 98) {
                     val events = WandHudRenderer.snapshot()?.impacts.orEmpty()
                     record(t, "real-same-tick-damage-preserves-each-feedback-$t",
-                        events.count { !it.killed } == 3 && events.count { it.killed } == if (t == 95) 0 else 2,
+                        events.count { !it.killed } == (if (t == 95) 3 else 1) && events.count { it.killed } == (if (t == 95) 0 else 2),
+                        "events=$events")
+                }
+                if (t == 58) {
+                    val events = WandHudRenderer.snapshot()?.impacts.orEmpty()
+                    record(t, "real-repeated-single-target-shows-one-feedback", events.size == 1 && !events.single().killed,
                         "events=$events")
                 }
                 if (t == 70 || t == 77) {
@@ -195,6 +200,9 @@ object HudSawScene {
                 if (t == 59) record(t, "real-kill-accepted", target?.let {
                     SpellImpact.hurt(ctx.level, it, ctx.player, 100.0, Vec3.ZERO) && !it.isAlive
                 } == true, "health=${target?.health}")
+                if (t in 56..58) record(t, "real-repeated-damage-accepted-$t", (0..15).all {
+                    SpellImpact.hurt(ctx.level, requireNotNull(target), ctx.player, 0.01, Vec3.ZERO)
+                }, "16 accepted hits on one target")
                 if (t == 67) {
                     ctx.command("gamemode survival @a")
                     attacker = ctx.spawnDummy(-12.0, floor + 1.0, -7.0)

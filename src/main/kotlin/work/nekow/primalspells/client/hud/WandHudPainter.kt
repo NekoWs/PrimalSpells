@@ -97,34 +97,9 @@ object WandHudPainter {
     }
     private fun feedback(g: GuiGraphicsExtractor, f: WandHudFrame, scale: Double) {
         val cx = 45; val cy = 29
-        // 原版准星占中心15×15GUI像素；缩小反馈时也保留至少两像素空隙。
-        val inner = ceil(10 / scale).toInt()
-        // 三条短径向轨道，更多并发沿切向交错；位置出生即固定，不挤走旧动画。
         for (impact in f.impacts) {
-            val alpha = impact.alpha * f.presence
-            val group = impact.slot / 3
-            val tangent = (group + 1) / 2 * 3 * if (group % 2 == 0) -1 else 1
-            val start = inner + impact.slot % 3 * 5 + (4 * impact.spread).roundToInt()
-            val length = ceil(4 * impact.draw).toInt()
-            for (arm in 0..3) for (step in 0 until length) {
-                val d = start + step
-                val thickness = if (step < 2) 2 else 1
-                val sx = if (arm < 2) 1 else -1
-                val sy = if (arm % 2 == 0) 1 else -1
-                val (x, y) = if (impact.killed) sx * d + sy * tangent to sy * d - sx * tangent
-                    else when (arm) {
-                        0 -> d to tangent; 1 -> -tangent to d
-                        2 -> -d to -tangent; else -> tangent to -d
-                    }
-                val color = if (impact.killed) {
-                    if (step == 0) 0xFFFFB1BA.toInt() else 0xFFFF4B64.toInt()
-                } else if (step == 0) WHITE else PURPLE
-                // 每臂只有连续的短尖芒，无独立碎点、外框或光晕。
-                val width = if (impact.killed || arm % 2 == 1) thickness else 1
-                val height = if (impact.killed || arm % 2 == 0) thickness else 1
-                rect(g, cx + x - if (x < 0) width - 1 else 0,
-                    cy + y - if (y < 0) height - 1 else 0, width, height, color, alpha)
-            }
+            impact.previous?.let { impactStar(g, it, cx, cy, scale, f.presence) }
+            impactStar(g, impact, cx, cy, scale, f.presence)
         }
         // 受击弧位于外圈；折线缺口与晶齿保留像素魔法感。
         val hurt = f.hurtAlpha * f.presence
@@ -144,4 +119,29 @@ object WandHudPainter {
             }
         }
     }
+
+    /** 每个目标是一枚完整小星芒，最长七像素；不复用准星中心，避免并发笔画连成虚线。 */
+    private fun impactStar(g: GuiGraphicsExtractor, impact: HudImpactFrame, cx: Int, cy: Int, scale: Double, presence: Double) {
+        val alpha = impact.alpha * presence
+        if (alpha <= 0.003) return
+        val (dx, dy) = impact.center(scale)
+        val x = cx + dx; val y = cy + dy
+        val core = if (impact.killed) 0xFFFFB1BA.toInt() else WHITE
+        val color = if (impact.killed) 0xFFFF4B64.toInt() else PURPLE
+        rect(g, x, y, 1, 1, core, alpha)
+        val length = ceil(3 * impact.draw).toInt()
+        for (arm in 0..3) for (d in 1..length) {
+            val sx = if (arm < 2) 1 else -1
+            val sy = if (arm % 2 == 0) 1 else -1
+            val (px, py) = if (impact.killed) sx * d to sy * d else when (arm) {
+                0 -> d to 0; 1 -> 0 to d; 2 -> -d to 0; else -> 0 to -d
+            }
+            val thickness = if (d == 1) 2 else 1
+            val width = if (impact.killed || arm % 2 == 1) thickness else 1
+            val height = if (impact.killed || arm % 2 == 0) thickness else 1
+            rect(g, x + px - if (px < 0) width - 1 else 0,
+                y + py - if (py < 0) height - 1 else 0, width, height, color, alpha)
+        }
+    }
+
 }

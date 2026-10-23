@@ -46,7 +46,7 @@ object SpellImpact {
         if (accepted && caster is net.minecraft.server.level.ServerPlayer && caster !== target &&
             type != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) {
             net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(caster,
-                work.nekow.primalspells.network.HudImpactPayload(!target.isAlive))
+                work.nekow.primalspells.network.HudImpactPayload(target.id, !target.isAlive))
         }
         if (accepted && knockback && type != work.nekow.primalspells.magic.core.SpellDamageType.HEALING) {
             val resistance = if (target is LivingEntity) target.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) else 0.0

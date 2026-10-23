@@ -96,7 +96,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
         NeoForge.EVENT_BUS.addListener<net.neoforged.neoforge.client.event.ScreenEvent.KeyPressed.Pre> {
             if (previewKey.matches(it.keyEvent) && it.screen is net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>) { openPreview(); it.isCanceled = true }
         }
-        ClientPayloadSink.hudImpact = { WandHudRenderer.impact(it.killed) }
+        ClientPayloadSink.hudImpact = { WandHudRenderer.impact(it.targetId, it.killed) }
         ClientPayloadSink.wandStats = { WandHudRenderer.putStats(it) }
         ClientPayloadSink.wandCast = { WandModelProperty.flash(it.wandId) }
         ClientPayloadSink.screenShake = { ScreenShakeClient.onShake(it) }

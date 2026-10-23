@@ -23,7 +23,7 @@
 | 普通尾迹/特殊弹本体 | `magic/effect/visual/`；通用造型 `PixelVfx.kt` |
 | 持杖三角形/宝石出生点 | `magic/effect/visual/WandCastingFx.kt`、`wand/{WandAim,WandGrip}.kt` |
 | 模型/姿势/施法余光 | `client/render/{WandModelProperty,WandHandPose,WandArmPose}.kt`、`tools/wands/generate_models.py`、`wand/WandGrip.kt` |
-| HUD/布局/反馈 | `client/hud/`（独立反馈队列`HudImpactAnimations`）、`client/screen/HudEditorScreen.kt`、`network/HudImpactPayload.kt` |
+| HUD/布局/反馈 | `client/hud/`（按目标反馈队列`HudImpactAnimations`）、`client/screen/HudEditorScreen.kt`、`network/HudImpactPayload.kt` |
 | 假人DPS/跳字 | `entity/{TestDummyEntity,DummyStatsDisplay,DamageNumber}.kt` |
 | 获取池/掉落 | `loot/`、`registry/ModLoot.kt` |
 | 术士流派/AI/生成 | `entity/{RogueMageEntity,RogueMageAttackGoal,MageSchool}.kt`、`event/SpellcasterSpawns.kt` |

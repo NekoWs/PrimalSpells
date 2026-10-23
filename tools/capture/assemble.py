@@ -520,54 +520,62 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
             return np.asarray(Image.open(tick_frames[t]).convert("RGB"), dtype=np.int16) - baseline
         def components(mask):
             pending = set(zip(*np.where(mask)))
-            sizes = []
+            groups = []
             while pending:
                 stack = [pending.pop()]
-                size = 0
+                points = []
                 while stack:
                     y, x = stack.pop()
-                    size += 1
+                    points.append((y, x))
                     for dy in (-1, 0, 1):
                         for dx in (-1, 0, 1):
                             point = y + dy, x + dx
                             if point in pending:
                                 pending.remove(point)
                                 stack.append(point)
-                sizes.append(size)
-            return sizes
+                ys, xs = zip(*points)
+                groups.append((len(points), (min(xs), min(ys), max(xs), max(ys))))
+            return groups
         idle = [int(feedback_mask(t)[300:420, 580:700].sum()) for t in (24, 27, 39)]
         hit = max(int(feedback_mask(t)[310:410, 590:690].sum()) for t in (56, 57, 58))
-        kill = feedback_mask(62, red=True)
-        corners = [int(kill[y:y+28, x:x+28].sum()) for y in (321, 371) for x in (601, 651)]
-        cardinal = int(kill[318:402, 638:643].sum()) + int(kill[358:363, 598:682].sum())
+        def marker_mask(t, red=False):
+            delta = feedback_delta(t)
+            r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
+            return ((r > 15) & (r - g > 10) & (r - b > 10)) if red else delta.max(axis=2) > 30
+        kill = marker_mask(62, red=True)[260:460, 540:740]
         right = int(feedback_mask(70, red=True)[330:390, 696:734].sum())
         left = int(feedback_mask(70, red=True)[330:390, 546:584].sum())
         front = int(feedback_mask(77, red=True)[270:310, 610:670].sum())
         result["asserts"].append(("准心不再重复显示充能菱框", max(idle) == 0, f"静止/充能窗口紫色像素={idle}"))
         result["asserts"].append(("真实命中魔法十字可见", hit >= 50, f"中心紫色覆盖={hit}"))
-        result["asserts"].append(("真实击杀只有红色斜十字", min(corners) >= 10 and cardinal == 0,
-            f"四角红色覆盖={corners}，水平/竖直中心线红色={cardinal}"))
+        result["asserts"].append(("真实击杀显示独立红色小斜十字", len(components(kill)) == 1 and int(kill.sum()) >= 50,
+            f"完整红色标记={len(components(kill))}，红色覆盖={int(kill.sum())}"))
         result["asserts"].append(("真实受击方向弧可见", right >= 10 and left == 0 and front >= 10,
             f"右/左/前向红色覆盖={right}/{left}/{front}"))
-        # 前半程描出笔画，后半程径向移走，验证实际像素而不是只读取动画参数。
+        # 反馈已改成局部完整小星芒；按实际中心外移验收，不要求四臂绕原版准星展开。
         radii = []
         for t in (61, 64, 66):
-            delta = feedback_delta(t)[300:420, 580:700]
-            r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
-            ys, xs = np.where((r > 15) & (r - g > 10) & (r - b > 10))
-            radii.append(int(np.max(np.maximum(np.abs(xs - 60), np.abs(ys - 60)))) if len(xs) else 0)
-        result["asserts"].append(("击杀从中心画出并向外散开", 0 < radii[0] < radii[1] < radii[2], f"斜十字半径={radii}"))
-        protected = [int((feedback_mask(t) | feedback_mask(t, red=True))[336:384, 616:664].sum())
+            ys, xs = np.where(marker_mask(t, red=True)[260:460, 540:740])
+            radii.append(float(np.hypot(np.mean(xs) - 100, np.mean(ys) - 100)) if len(xs) else 0.0)
+        result["asserts"].append(("小星芒平滑向外移动", 0 < radii[0] <= radii[1] <= radii[2] and radii[2] > radii[0],
+            f"标记中心距离={radii}"))
+        protected = [int(marker_mask(t)[336:384, 616:664].sum())
                      for t in (*range(56, 70), *range(94, 100))]
         result["asserts"].append(("命中和击杀与原版准星留空", max(protected) == 0,
-            f"准星外围保护区最大彩色像素={max(protected)}"))
-        single = components(feedback_mask(57)[260:460, 540:740])
-        triple = components(feedback_mask(95)[260:460, 540:740])
-        double_kill = components(feedback_mask(98, red=True)[260:460, 540:740])
-        result["asserts"].append(("命中无消散碎点", len(single) == 4 and min(single, default=0) >= 18,
-            f"单次命中四臂连通面积={single}"))
-        result["asserts"].append(("同刻多目标各有独立可见星芒", len(triple) == 12 and len(double_kill) == 8,
-            f"三次命中/两次击杀笔画数量={len(triple)}/{len(double_kill)}"))
+            f"准星外围保护区最大变化像素={max(protected)}"))
+        single = components(marker_mask(57)[260:460, 540:740])
+        triple = components(marker_mask(95)[260:460, 540:740])
+        double_kill = components(marker_mask(98, red=True)[260:460, 540:740])
+        result["asserts"].append(("同一目标连击只有完整小星芒且无碎点", len(single) == 1 and single[0][0] >= 50,
+            f"同一目标16次连击后标记面积={single}"))
+        result["asserts"].append(("不同目标才显示多个独立标记", len(triple) == 3 and len(double_kill) == 2,
+            f"三目标命中/两目标击杀完整标记数={len(triple)}/{len(double_kill)}"))
+        boxes = [box for _, box in triple]
+        centers = [((x0 + x1) / 2, (y0 + y1) / 2) for x0, y0, x1, y1 in boxes]
+        area = abs(float(np.linalg.det(np.array([[x, y, 1] for x, y in centers])))) if len(centers) == 3 else 0
+        result["asserts"].append(("星芒短小且不排成虚线", len(boxes) == 3 and area > 100 and
+            all(x1 - x0 + 1 <= 24 and y1 - y0 + 1 <= 24 for x0, y0, x1, y1 in boxes),
+            f"三个独立包围框={boxes}，中心三角形双面积={area:.1f}"))
         delta = feedback_delta(97)[260:460, 540:740]
         r, g, b = delta[..., 0], delta[..., 1], delta[..., 2]
         simultaneous = [int(((b > 15) & (b - g > 10) & (b - r > 5)).sum()),

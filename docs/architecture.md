@@ -75,7 +75,7 @@ WandManager通过背包tick及主动施法markHeld确认任意实体持有者；
 
 ## 6. 网络与整合
 
-公共协议版本统一定义在`ModNetworking.PROTOCOL_VERSION`，当前1.5.0。S→C数值、命中反馈、成功施法模型通知、镜头冲击和预览结果经ClientPayloadSink分发。C→S选槽/预览校验实际菜单与背包中的身份和范围；创造专用编辑包只接受创造玩家和合法散卡，生存走原版PICKUP。
+公共协议版本统一定义在`ModNetworking.PROTOCOL_VERSION`，当前1.6.0。S→C数值、命中反馈、成功施法模型通知、镜头冲击和预览结果经ClientPayloadSink分发。C→S选槽/预览校验实际菜单与背包中的身份和范围；创造专用编辑包只接受创造玩家和合法散卡，生存走原版PICKUP。
 
 `WandPreviewBuilder`在隔离牌堆/卡牌/法力副本上调用同一WandDeck与CastTransaction，不运行施法钩子、不影响原杖。整副配置分色只观察WandDeck.draw，不付费、不回洗；按卡牌对象身份标记槽，重复ID不合并。
 

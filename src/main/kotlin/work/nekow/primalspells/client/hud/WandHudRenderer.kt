@@ -34,8 +34,8 @@ object WandHudRenderer {
     fun snapshot(): WandHudFrame? = lastFrame
     /** 网络入口记录本地接收时间，冷却子帧外推不会依赖包发送频率。 */
     fun putStats(payload: SyncWandStatsPayload) { statsMap[payload.wandId] = payload; received[payload.wandId] = clock() }
-    /** 真正接受的法术伤害回报；每次通知独立播放，不覆盖或延长其它反馈。 */
-    fun impact(killed: Boolean) { impacts.add(killed, clock()) }
+    /** 真正接受的法术伤害回报；同一目标只占一个反馈位置，不影响实际伤害次数。 */
+    fun impact(targetId: Int, killed: Boolean) { impacts.add(targetId, killed, clock()) }
     /** 退出世界时清缓存与动画，不清本机布局。 */
     fun clear() {
         statsMap.clear(); received.clear(); identity = null; lastTime = Double.NaN; lastFrame = null

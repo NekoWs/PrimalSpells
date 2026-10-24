@@ -99,6 +99,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | machinegun_visual / spell_timing | 高频视觉、随机链锯、延迟当刻释放 |
 | explosion / crystal_lifecycle / sawblade_falling | 爆炸外扩、临爆晶体与锯片下坠反弹 |
 | expansion_* / spell_resonance / spell_mechanics | 光束/冰冻/远距、跨弹反应、刻迁移与后代 |
+| death_attribution | 九种渠道的施法者/自伤/未知来源文本、原生战斗记录、真实玩家死亡界面及正常重生 |
 | recoil_light / concentrated_light_first_person / combat_impact / damage_mass | 固定聚光、后坐力、伤害/自伤与质量 |
 | wand_design | 暮紫封印户外材质、下半屏外侧位置、主副手/左惯用手与真实施法 |
 | wand_casting* / wand_aim / magic_hud | 主副手/FOV、阵列/模型、HUD与布局 |

@@ -17,7 +17,7 @@
 | 汇聚之光 | 原地锁定方向蓄能10t，释放后64格/t连续光脊；装“光”时本体照明有限退场，保留真实5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
 | 穿刺代价 | 每张增加10t施放延迟，预览与实际付费一致；多卡叠加，链锯仍清整次delay | homing_light |
 | MP与存档 | 当前MP封顶；空槽/牌堆保序；完整刻迁移旧秒/毫秒；复制不共享wandId | spell_mechanics、exploration、magic_hud |
-| 伤害 | 独立分类/死亡文本；正治疗恢复、负治疗伤害；按实际接受强度击退，假人无击退 | damage_mass、combat_impact、new_spells |
+| 伤害 | 独立分类；原版死亡界面/聊天显示真实施法者、自伤明确、未知来源不冒用旧攻击者；中英文文案贴近原版；正治疗恢复、负治疗伤害；强度击退与假人免击退 | death_attribution、damage_mass、combat_impact、new_spells |
 | 多卡护盾 | 卡数提高抗性与立方窗口预算，破盾当次仍吸收；无常驻壳和多余圆环 | shield_balance |
 | 黑洞 | 高质量互吸缓慢、静态源不碰撞、原维度持续结算，创造飞行免吸 | damage_mass、spell_stability |
 | 晶体 | 外向晶面、多角可读、临爆加速白闪和爆碎 | crystal_lifecycle、sawblade_falling |

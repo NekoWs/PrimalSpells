@@ -160,6 +160,7 @@ SCENES["shield_balance"] = {"length": 250, "title": "单卡与八卡护盾 / 破
 SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 原地聚光阵与锁定方向", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
 SCENES["pd_api"] = {"length": 120, "title": "PD跟踪曲线 / 静止受光 / 帧间尺寸 / 完成销毁", "metric": "blue", "quiet": (0, 6), "decay": "collapse"}
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
+SCENES["death_attribution"] = {"length": 110, "title": "法术死亡来源 / 真实死亡界面与重生", "metric": "white", "quiet": (0, 8), "decay": "none", "decay_reason": "原版死亡界面持续显示至玩家重生，不套用世界粒子退场时长；真实死亡/重生断言和尾帧验收"}
 SCENES["combat_impact"] = {"length": 260, "title": "跃迁魔弹 / 强度击退 / 自伤 / 黑洞暗核", "metric": "warm", "quiet": (0, 8), "decay": "collapse"}
 SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白闪 / 到期爆炸", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 # 此场景验证完整战斗与夺杖流程，多个独立生命周期不适用单一峰值退场跨度。

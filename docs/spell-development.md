@@ -60,7 +60,7 @@ Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已�
 
 ## 5. 伤害、质量与特殊释放
 
-Projectile.damageType与selfDamage分别声明，类型不自动开启自伤。正HEALING恢复HP，负值取相反数造成healing伤害；不额外击退。新增类型同步ModDamageTypes、damage_type数据、原版标签、中英文类型/死亡文本和假人颜色。
+Projectile.damageType与selfDamage分别声明，类型不自动开启自伤。正HEALING恢复HP，负值取相反数造成healing伤害；不额外击退。新增类型同步ModDamageTypes、damage_type数据、原版标签、中英文类型/死亡文本（基础/.player/.self）和假人颜色。统一通过ModDamageTypes创建SpellDamageSource，死亡文本选择与来源规则见[战斗规则](design/combat-pricing.md#5-伤害类型自伤与击退)。
 
 质量必须正且有限；实体可用NeoForgeData的primalspells:mass覆盖，投射物字段受MagicMass校验。引力按F/m，不能乘来源质量。后坐力只为付费直接施法排队，复制/触发不重复推施法者。
 

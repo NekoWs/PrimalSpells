@@ -10,6 +10,7 @@ import net.neoforged.neoforge.registries.DeferredRegister
 import java.util.function.Supplier
 import work.nekow.primalspells.PrimalSpells
 import work.nekow.primalspells.magic.core.SpellDamageType
+import work.nekow.primalspells.magic.core.SpellDamageSource
 
 object ModDamageTypes {
     val DAMAGE_TYPES = DeferredRegister.create(Registries.DAMAGE_TYPE, PrimalSpells.MODID)
@@ -29,7 +30,7 @@ object ModDamageTypes {
             if (warnedMissing.add(channel)) PrimalSpells.LOGGER.error("缺少法术伤害类型 {}，跳过本渠道伤害", channel.key)
             return null
         }
-        return DamageSource(type, cause)
+        return SpellDamageSource(type, cause)
     }
 
     fun projectileSourceOrNull(level: ServerLevel, cause: Entity?): DamageSource? =

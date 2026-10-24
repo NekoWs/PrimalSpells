@@ -56,7 +56,9 @@ object DamageMassScene {
                     for(type in SpellDamageType.entries) {
                         target.health=100f;target.invulnerableTime=17
                         val src=ModDamageTypes.sourceOrNull(ctx.level,ctx.player,type)!!
-                        val accepted=SpellImpact.hurt(ctx.level,target,ctx.player,2.0,Vec3.ZERO,knockback=false,type=type)
+                        // 负治疗才是伤害；正治疗保持恢复生命的生产语义。
+                        val amount=if(type==SpellDamageType.HEALING) -2.0 else 2.0
+                        val accepted=SpellImpact.hurt(ctx.level,target,ctx.player,amount,Vec3.ZERO,knockback=false,type=type)
                         val key=src.getLocalizedDeathMessage(target).toString()
                         record(t,"native-type-${type.id}",accepted && target.health==98f && target.lastDamageSource?.msgId=="primalspells_${type.id}" &&
                             src.`is`(DamageTypeTags.NO_KNOCKBACK) && target.invulnerableTime==17 && key.contains("death.attack.primalspells_${type.id}"),

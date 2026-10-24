@@ -15,6 +15,7 @@
 | 网络注册/服务端请求 | `network/{ModNetworking,WandRequestHandler}.kt` |
 | 运动、反弹、追踪 | `magic/effect/geometry/{Move,SweptCollision,Tracking,Bounce,ConstantAcceleration}.kt` |
 | 可命中实体筛选 | `magic/projectile/Projectile.canHitEntity`、`wand/WandAim`；`client/capture/EntityHitChecks`经collision_precision跑真实实体回归 |
+| 死亡文本/施法者来源 | `magic/core/SpellDamageSource.kt`、`registry/ModDamageTypes.kt`、中英文`death.attack.primalspells_*`语言键 |
 | 命中/伤害/击退/冻结 | `magic/effect/lifecycle/{SpellDamage,SpellImpact,DirectDamage,FrozenStatus}.kt` |
 | 护盾判定/反射点 | `magic/effect/lifecycle/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
 | 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |

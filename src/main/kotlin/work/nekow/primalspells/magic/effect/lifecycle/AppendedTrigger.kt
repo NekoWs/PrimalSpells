@@ -7,13 +7,12 @@ import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.HitResult
-import work.nekow.primalspells.util.HitType
 
-/** 命中/20刻定时/失效三种一次性条件；发射前清空，独立装配荷载。 */
+/** 终结命中/20刻定时/失效三种一次性条件；存活反弹保留荷载，发射前清空。 */
 class AppendedTrigger : BaseEffect() {
     override val phase = EffectPhase.OVERRIDE
     override fun onHit(result: HitResult) {
-        if (projectile.maxHitTargets < 0 && result.type == HitType.ENTITY) return
+        if (projectile.alive) return
         projectile.addedTriggers.filter { it.kind != DrawAction.Kind.EXPIRE }.forEach { release(it, result.pos, result.normal) }
     }
     override fun onTick() {
@@ -21,7 +20,8 @@ class AppendedTrigger : BaseEffect() {
             .forEach { release(it, status.pos, direction()) }
     }
     override fun onDie() {
-        projectile.addedTriggers.filter { it.kind == DrawAction.Kind.EXPIRE }.forEach { release(it, status.pos, direction()) }
+        projectile.addedTriggers.filter { it.kind == DrawAction.Kind.EXPIRE || it.kind == DrawAction.Kind.HIT }
+            .forEach { release(it, status.pos, direction()) }
     }
     override fun onExpire() = onDie()
     private fun direction() = if (status.velocity.lengthSquared() > 1e-8f) Vector3f(status.velocity).normalize()

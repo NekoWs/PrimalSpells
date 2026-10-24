@@ -51,7 +51,7 @@
   "lore.primalspells.max_age": "Duration: %st",
   "lore.primalspells.speed": "Speed: x%s",
   "lore.primalspells.fireball.desc": "A slow-moving fireball.",
-  "lore.primalspells.trigger_fireball.desc": "A slow-moving fireball that casts another spell on impact.",
+  "lore.primalspells.trigger_fireball.desc": "Casts its payload when the fireball ends. Bounces and piercing hits preserve the payload.",
   "lore.primalspells.laser.desc": "An extremely fast laser beam.",
   "lore.primalspells.damage_boost.desc": "Increases the spell's damage.",
   "lore.primalspells.bounce.desc": "Allows the spell to bounce.",

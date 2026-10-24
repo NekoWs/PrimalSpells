@@ -96,7 +96,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | homing_light | 前方优先/后方排除、同刻穿透换靶与接缝、64格光脊、穿刺付费冷却与十刻蓄能 |
 | projectile_flight / fireball_trail | 原版弩速对比、六格扫掠追踪、复制速度、实际alpha递减 |
 | black_hole / black_hole_moving / gravity_field / gravity_field_moving | 区域场原维度、移动跟随和收尾 |
-| energy_shield / shield_balance / spell_chain | 护盾预算/接点/束截断/穿刺荷载/同链作用域 |
+| energy_shield / shield_balance / spell_chain | 护盾预算/接点/束截断/穿刺荷载/同链作用域；spell_chain的TriggerLifecycleChecks覆盖连续反弹到终结才释放、到期当刻释放及清理不重复 |
 | machinegun_visual / spell_timing | 高频视觉、随机链锯、延迟当刻释放 |
 | explosion / crystal_lifecycle / sawblade_falling | 爆炸外扩、临爆晶体与锯片下坠反弹 |
 | expansion_* / spell_resonance / spell_mechanics | 光束/冰冻/远距、跨弹反应、刻迁移与后代 |
@@ -120,6 +120,8 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 实体筛选回归：collision_precision、homing_light、spell_chain、shield_balance四场209项机制检查、940帧零丢帧，画面/日志门禁通过。EntityHitChecks实际生成掉落物、经验球、药水云、交互/文本展示实体及物品展示框，检查真实扫掠、命中次数和触发荷载；不靠实体类型黑名单或仅验证筛选函数。
 
 伤害频率回归：`pwsh tools/capture/capture.ps1 -Offline -Scene piercing_contact,collision_precision,homing_light,spell_chain,shield_balance,damage_mass -TimeoutSec 600`。piercing_contact直接读取木桩totalDamage、弹体hitTargets和正式AfterImpact事件，不用跳字合并数量替代实际伤害；51项覆盖火花弹速度、不同入射相位、跨刻/刻末/薄箱接触，以及聚光4～128格/t、同刻真实反弹重入、锯片附加爆炸、等离子静止/移动/穿刺/扩散、同刻入口重入保护、多个目标与独立复制体、暗核/连锁/终结爆炸。六场286项检查、1300帧零丢帧，机制、画面与日志门禁通过。证据位于`build/capture/out`，重新录制前需按本节规则归档；纯运动性能基准另按[性能指南](design/performance.md)运行。
+
+触发终结回归：`pwsh tools/capture/capture.ps1 -Offline -Scene spell_chain,spell_timing,collision_precision,shield_balance,piercing_contact,foundations -TimeoutSec 600`。325项机制检查通过，1339帧、1丢帧在原预算内，日志无阻塞错误；spell_chain含28项TriggerLifecycleChecks，通过真实Move连续反弹及ProjectileRuntime到期/清理验证。五场画面门禁通过；spell_timing混合机枪退场覆盖门禁未通过，见[未解决问题](issues/open.md#混合场景退场门禁)，不能把本次结果写成画面全部通过。独立抽牌夹具清场会取消旧荷载，区别于玩法死亡，避免旧配方的终结子弹混入下一配方计数。
 
 当前性能与运动回归命令、测量负载和结果统一见[性能基准](design/performance.md)。正常捕获还检查碰撞、前方追踪/穿透切线、实际法杖命中、付费/独立荷载、护盾和晶体生命周期；机制与视觉门禁分别统计，未用FPS代替服务端计时。
 

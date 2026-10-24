@@ -42,7 +42,12 @@ object NewSpellScene {
             tick={ctx,t ->
                 fun record(id:String,ok:Boolean,detail:String) { checks.getOrPut(t){arrayListOf()}.add(Check(name,t,id,ok,detail)) }
                 fun cast(ids:List<String>,mana:Double=10000.0):Pair<Wand,List<Projectile>> {
-                    ProjectileRuntime.projectiles.forEach { it.alive=false };ProjectileRuntime.tick()
+                    // 独立配方夹具取消旧荷载，避免上一配方的死亡释放进入本次计数。
+                    ProjectileRuntime.projectiles.forEach {
+                        (it as? TriggerSpell)?.payload?.clear()
+                        it.addedTriggers.forEach { trigger -> trigger.cards.clear() }
+                        it.alive=false
+                    };ProjectileRuntime.tick()
                     val w=Wand("new-$t-${ids.joinToString()}")
                     w.magics+=ids.map { SpellRegistry.create(it)!! };w.load();w.status.mana=mana
                     w.spell(source!!);ProjectileRuntime.tick()
@@ -95,7 +100,9 @@ object NewSpellScene {
                     val (_,hitShots)=cast(listOf("add_trigger","fireball","healing_bolt"))
                     val hit=hitShots.single();hit.collisionEnabled=false;hit.status.bounces=1
                     hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
-                    record("appended-hit-releases-on-bounce",hit.alive && hit.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"alive=${hit.alive}")
+                    val bounceHeld=hit.alive && hit.addedTriggers.single().cards.isNotEmpty() && ProjectileRuntime.projectiles.none{it.id=="healing_bolt"}
+                    hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,1f));ProjectileRuntime.tick()
+                    record("appended-hit-waits-through-bounce-until-terminal",bounceHeld && !hit.alive && hit.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"bounceHeld=$bounceHeld alive=${hit.alive}")
                     val (_,pierced)=cast(listOf("piercing","add_trigger","fireball","healing_bolt"))
                     val through=pierced.single();through.collisionEnabled=false
                     through.hitEntity(source!!)

@@ -61,6 +61,7 @@ object SpellChainScene {
                     p.spell();return p
                 }
                 if(t==8) {
+                    checks.getOrPut(t) { arrayListOf() }.addAll(TriggerLifecycleChecks.run(ctx, t, floor))
                     val target=ctx.spawnDummy(-6.0,floor+2.0,0.0)
                     val parent=SpellRegistry.create("trigger_fireball") as TriggerFireball
                     SpellAssembly.apply(parent,listOf(SpellRegistry.create("piercing") as Modifier))
@@ -91,7 +92,12 @@ object SpellChainScene {
                     record(t,"machinegun-only-payload-scatters",saw.modifiers.keys==setOf("omnidirectional_scatter") && carrier.payload.isEmpty(),"mods=${saw.modifiers}")
                     // 同一链的尾部修正也要覆盖先抽到的投射物；内层修正不得穿过链边界。
                     fun castCards(ids:List<String>,budget:Int=1,mana:Double=1000.0):Pair<Wand,List<Projectile>> {
-                        ProjectileRuntime.projectiles.forEach{it.alive=false};ProjectileRuntime.tick()
+                        // 每份抽牌夹具取消未使用荷载，不能把清场误当成玩法死亡来生成下一份测试的子弹。
+                        ProjectileRuntime.projectiles.forEach {
+                            (it as? TriggerSpell)?.payload?.clear()
+                            it.addedTriggers.forEach { trigger -> trigger.cards.clear() }
+                            it.alive=false
+                        };ProjectileRuntime.tick()
                         val wand=Wand("scope-${ids.joinToString("-")}")
                         wand.cast=budget;wand.delayTickCount=10.0;wand.rechargeTickCount=20.0
                         wand.magics += ids.map{SpellRegistry.create(it)!!};wand.load();wand.status.mana=mana

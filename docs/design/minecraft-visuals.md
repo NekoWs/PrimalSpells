@@ -16,7 +16,7 @@ glowing用于魔法核心/边界免环境光，烟尘等保留世界受光。造
 
 ### 待选美术提案
 
-以下仅为画风与显示名提案，未替换运行时贴图、语言键或法术ID。已认可的D+风格采用骨白/黑曜封印结构，扩大元素色的面积，结合C中紫蓝晶体向内卷入的黑洞。[融合预览](references/spell-style-dplus-spectral-seals.png)中2、4、6表达不明确；[语义优化预览](references/spell-style-dplus-semantics.png)分别改为三束光汇聚后射出单束光、带锯齿的实体旋转锯盘、两张错位法术卡同时射出两道法术。其余三张保持原设计，新图仍待确认。底部物品栏是概念缩略对照，并非游戏截图或真实32×32成品。
+以下仅为画风与显示名提案，未替换运行时贴图、语言键或法术ID。保留已认可D+的粗像素质感、明暗关系与丰富元素色，但每张图只表达本法术的行为，不能为了统一材质添加无关封印片、宝石或碎屑。双重施放仅展示抽出的两张卡，不附带闪电或投射物；汇聚之光仅展示一道光束，不添加聚光器或分支。火球、黑洞、锯片分别以火焰、紫蓝漩涡、连续锯盘为主体；穿刺只保留投射物穿过单个障碍所需的元素。[当前精简预览](references/spell-style-dplus-minimal.png)仍待确认。底部物品栏是概念缩略对照，并非游戏截图或真实32×32成品。
 
 原始对照：[A 遗迹石刻](references/spell-style-a-relic-carvings.png)、[B 秘典墨绘](references/spell-style-b-grimoire-ink.png)、[C 晶质珐琅](references/spell-style-c-crystal-enamel.png)、[D 黑曜封印](references/spell-style-d-obsidian-seals.png)。各图顺序为火球、汇聚之光、黑洞、锯片、穿刺、双重施放。使用内置imagegen生成与参考图编辑，完整提示词、参考图及命名备选见 [提案清单](references/spell-style-proposals.json)。
 

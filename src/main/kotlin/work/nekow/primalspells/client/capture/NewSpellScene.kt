@@ -49,6 +49,7 @@ object NewSpellScene {
                         it.alive=false
                     };ProjectileRuntime.tick()
                     val w=Wand("new-$t-${ids.joinToString()}")
+                    w.mana=maxOf(w.mana,mana)
                     w.magics+=ids.map { SpellRegistry.create(it)!! };w.load();w.status.mana=mana
                     w.spell(source!!);ProjectileRuntime.tick()
                     return w to ProjectileRuntime.projectiles.filter { it.alive }.toList()
@@ -86,6 +87,8 @@ object NewSpellScene {
                     val carrier=carriers.single();val payload=carrier.addedTriggers.single().cards
                     record("appended-payload-scope",carrier.modifiers.keys==setOf("speed_boost") && payload.map{it.id}==listOf("omnidirectional_scatter","chainsaw"),"parent=${carrier.modifiers} payload=${payload.map{it.id}}")
                     record("append-intermediate-modifier-free",added.status.mana==9984.0,"mana=${added.status.mana}")
+                    val copy=SpellAssembly.copy(carrier)
+                    record("appended-copy-independent",copy.addedTriggers.single().cards[1]!==payload[1],"original/copy child identity before fixture cleanup")
                     // 回蓝放在复制卡前后，同一链均能支付复制卡。
                     for(ids in listOf(listOf("mana_injection","divide_two","fireball"),listOf("double_cast","divide_two","fireball","mana_injection"))) {
                         val (funded,shots)=cast(ids,mana=6.0)
@@ -95,20 +98,22 @@ object NewSpellScene {
                     record("append-recursively-waives-modifiers",waivedShots.size==1 && waivedShots.single().modifiers["speed_boost"]==2 && waived.status.mana==9956.0,"mana=${waived.status.mana}")
                     val (divided,dividedShots)=cast(listOf("divide_two","add_trigger","speed_boost","fireball","chainsaw"))
                     record("copied-append-preserves-waiver",dividedShots.size==2 && divided.status.mana==9942.0,"mana=${divided.status.mana}")
-                    val copy=SpellAssembly.copy(carrier)
-                    record("appended-copy-independent",copy.addedTriggers.single().cards[1]!==payload[1],"original/copy child identity")
                     val (_,hitShots)=cast(listOf("add_trigger","fireball","healing_bolt"))
                     val hit=hitShots.single();hit.collisionEnabled=false;hit.status.bounces=1
+                    val enemy=ctx.spawnDummy(-3.0,ctx.floorBlockY(0,0)+1.0,-4.0)
                     hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
                     val bounceHeld=hit.alive && hit.addedTriggers.single().cards.isNotEmpty() && ProjectileRuntime.projectiles.none{it.id=="healing_bolt"}
-                    hit.hitBlock(Vector3d(hit.status.pos),Vector3f(0f,0f,1f));ProjectileRuntime.tick()
-                    record("appended-hit-waits-through-bounce-until-terminal",bounceHeld && !hit.alive && hit.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"bounceHeld=$bounceHeld alive=${hit.alive}")
+                    hit.hitEntity(enemy);ProjectileRuntime.tick()
+                    record("appended-hit-waits-through-bounce-until-enemy",bounceHeld && !hit.alive && hit.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"bounceHeld=$bounceHeld alive=${hit.alive}")
                     val (_,pierced)=cast(listOf("piercing","add_trigger","fireball","healing_bolt"))
                     val through=pierced.single();through.collisionEnabled=false
-                    through.hitEntity(source!!)
+                    through.hitEntity(enemy);through.hitEntity(enemy);ProjectileRuntime.tick()
                     val heldPayload=through.addedTriggers.single().cards.isNotEmpty()
+                    record("appended-piercing-releases-every-enemy-hit",heldPayload && through.alive && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==2,"hits=${through.status.hitTargets}")
+                    ProjectileRuntime.projectiles.filter{it!==through}.forEach{it.alive=false}
                     through.hitBlock(Vector3d(through.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
-                    record("appended-piercing-entity-waits-for-block",heldPayload && through.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.count{it.id=="healing_bolt"}==1,"held=$heldPayload")
+                    record("appended-piercing-wall-does-not-release",through.addedTriggers.single().cards.isEmpty() && ProjectileRuntime.projectiles.none{it.id=="healing_bolt"},"held=$heldPayload")
+                    enemy.discard()
                     val (_,early)=cast(listOf("add_timer","fireball","healing_bolt"))
                     val earlyTimer=early.single();earlyTimer.collisionEnabled=false
                     earlyTimer.hitBlock(Vector3d(earlyTimer.status.pos),Vector3f(0f,0f,-1f));ProjectileRuntime.tick()

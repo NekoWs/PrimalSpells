@@ -14,10 +14,13 @@ import work.nekow.particledrawing.api.ParticleManager
 import work.nekow.primalspells.entity.DamageNumber
 import work.nekow.primalspells.entity.TestDummyEntity
 import work.nekow.primalspells.magic.core.SpellRegistry
+import work.nekow.primalspells.magic.effect.BaseEffect
 import work.nekow.primalspells.magic.effect.lifecycle.Explosion
 import work.nekow.primalspells.magic.effect.lifecycle.FrozenStatus
 import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.registry.ModItems
+import work.nekow.primalspells.util.HitResult
+import work.nekow.primalspells.util.HitType
 import work.nekow.primalspells.wand.Wand
 import work.nekow.primalspells.wand.WandManager
 
@@ -180,6 +183,7 @@ object SpellExpansionScenes {
         val name = "expansion_combinations"
         var initialOrbit: Vec3? = null
         var orbiter: TestDummyEntity? = null
+        var triggerTarget: TestDummyEntity? = null
         val overlappingTargets = arrayListOf<TestDummyEntity>()
         return Scene(name, "组合：双发水晶 / 触发荷载 / 移动环绕光束", 24, 180,
             prepare = { ctx -> prepare(ctx); orbiter = ctx.spawnDummy(0.0, ctx.floorBlockY(0, 0) + 1.0, 0.0) }, camera = { ctx, _ -> camera(ctx) },
@@ -190,9 +194,11 @@ object SpellExpansionScenes {
                 if (t == 55) {
                     for (x in -1..1) for (y in floor + 1..floor + 4)
                         ctx.level.setBlock(BlockPos(x, y, 0), Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState(), 2)
+                    triggerTarget = ctx.spawnDummy(0.0, floor + 1.0, -2.0)
                     cast(ctx, listOf("trigger_fireball", "dormant_crystal"), 0.0, floor + 1.0, -5.0)
                 }
                 if (t == 86) {
+                    triggerTarget?.discard()
                     for (x in -1..1) for (y in floor + 1..floor + 4) ctx.level.setBlock(BlockPos(x, y, 0), Blocks.AIR.defaultBlockState(), 2)
                     cast(ctx, listOf("self_orbit", "plasma_beam"), 0.0, floor + 1.0, 0.0, source = orbiter!!)
                 }
@@ -210,8 +216,9 @@ object SpellExpansionScenes {
                 32 -> listOf(Check(name, t, "double-cast-two-sticky-crystals",
                     ProjectileRuntime.projectiles.count { it.id == "dormant_crystal" && !it.motionEnabled } == 2,
                     "shots=${ProjectileRuntime.projectiles.map { it.id }}"))
-                78 -> listOf(Check(name, t, "trigger-spawns-sticky-crystal",
-                    ProjectileRuntime.projectiles.any { it.id == "dormant_crystal" && !it.motionEnabled },
+                78 -> listOf(Check(name, t, "enemy-hit-trigger-spawns-independent-crystal",
+                    ProjectileRuntime.projectiles.any { it.id == "dormant_crystal" && it.caster === ctx.player &&
+                        it.wand.innate.any { card -> card.id == "trigger_fireball" } && it.modifiers.isEmpty() && it.status.velocity.isFinite },
                     "shots=${ProjectileRuntime.projectiles.map { it.id to it.motionEnabled }}"))
                 115 -> {
                     val p = ProjectileRuntime.projectiles.single { it.id == "plasma_beam" }
@@ -234,6 +241,9 @@ object SpellExpansionScenes {
         val name = "expansion_utilities"
         var target: TestDummyEntity? = null
         var arrow: Arrow? = null
+        var triggerTarget: TestDummyEntity? = null
+        var triggerDirection: Vec3? = null
+        var repelledMagic = false
         return Scene(name, "冰冻碎冰 / 远距与触发荷载 / 斥力弹道", 24, 220,
             prepare = { ctx -> prepare(ctx); target = ctx.spawnDummy(0.0, ctx.floorBlockY(0, 0) + 1.0, 0.0) },
             camera = { ctx, _ -> camera(ctx) },
@@ -247,16 +257,32 @@ object SpellExpansionScenes {
                     for (x in -6..-4) for (y in floor + 1..floor + 4) ctx.level.setBlock(BlockPos(x, y, -2), Blocks.CONCRETE.pick(net.minecraft.world.item.DyeColor.BLACK).defaultBlockState(), 2)
                     cast(ctx, listOf("long_distance_cast", "black_hole"), -5.0, floor + 1.0, -6.0)
                 }
-                if (t == 120) cast(ctx, listOf("trigger_fireball", "long_distance_cast", "black_hole"), -5.0, floor + 1.0, -6.0)
+                if (t == 120) {
+                    triggerTarget = ctx.spawnDummy(-5.0, floor + 1.0, -3.5)
+                    val wand = cast(ctx, listOf("trigger_fireball", "long_distance_cast", "black_hole"), -5.0, floor + 1.0, -6.0)
+                    ProjectileRuntime.tick()
+                    ProjectileRuntime.projectiles.single { it.id == "trigger_fireball" && it.wand === wand }.effects += object : BaseEffect() {
+                        override fun onHit(result: HitResult) {
+                            if (result.type == HitType.ENTITY) triggerDirection = Vec3(result.normal)
+                        }
+                    }
+                }
                 if (t == 140) {
+                    triggerTarget?.discard()
                     ProjectileRuntime.projectiles.forEach { it.alive = false }
                     cast(ctx, listOf("repulsion_field"), 5.0, floor + 1.0, 0.0)
-                    cast(ctx, listOf("fireball"), 9.0, floor + 1.0, 0.0, yaw = 90f)
+                    val incoming = cast(ctx, listOf("fireball"), 9.0, floor + 1.0, 0.0, yaw = 90f)
+                    ProjectileRuntime.tick()
+                    // 斥力是有限加速度，不是强制反射；与下方原版箭使用同一慢速标尺。
+                    ProjectileRuntime.projectiles.single { it.id == "fireball" && it.wand === incoming }.status.velocity.set(-0.05f, 0f, 0f)
                     val a = Arrow(ctx.level, ctx.player, ItemStack(Items.ARROW), null)
                     a.setPos(7.0, floor + 2.6, 2.0); a.setNoGravity(true); a.deltaMovement = Vec3(-0.05, 0.0, 0.0)
                     ctx.level.addFreshEntity(a); arrow = a
                 }
                 if (t == 175) { ProjectileRuntime.projectiles.forEach { it.alive = false }; arrow?.discard() }
+                if (t in 141..154) repelledMagic = repelledMagic || ProjectileRuntime.projectiles.any {
+                    it.id == "fireball" && it.status.velocity.x > 0
+                }
             }, checksAt = { ctx, t -> when (t) {
                 28 -> listOf(Check(name, t, "accepted-hit-freezes", FrozenStatus.isFrozen(target!!), "frozen=${FrozenStatus.isFrozen(target)}"))
                 39 -> listOf(Check(name, t, "heavy-hit-shatters", !FrozenStatus.isFrozen(target!!) && "-7" in numbers(ctx), "damage=${numbers(ctx)}"))
@@ -266,8 +292,10 @@ object SpellExpansionScenes {
                     listOf(Check(name, t, "immobile-cast-moves-forward", kotlin.math.abs(p.status.pos.z) < 0.2, "pos=${p.status.pos}"))
                 }
                 104 -> listOf(Check(name, t, "far-cast-stops-at-wall", ProjectileRuntime.projectiles.any { it.id == "black_hole" && it.status.pos.z in -2.3f..-2.0f }, "positions=${ProjectileRuntime.projectiles.filter { it.id == "black_hole" }.map { it.status.pos }}"))
-                134 -> listOf(Check(name, t, "trigger-payload-keeps-launch-direction", ProjectileRuntime.projectiles.any { it.id == "black_hole" && it.status.pos.z < -7f }, "positions=${ProjectileRuntime.projectiles.filter { it.id == "black_hole" }.map { it.status.pos }}"))
-                155 -> listOf(Check(name, t, "repels-magic-and-vanilla", arrow!!.deltaMovement.x > 0 && ProjectileRuntime.projectiles.any { it.id == "fireball" && it.status.velocity.x > 0 }, "arrow=${arrow.deltaMovement} shots=${ProjectileRuntime.projectiles.map { it.id to it.status.velocity }}"))
+                134 -> listOf(Check(name, t, "trigger-payload-keeps-hit-direction", triggerDirection != null && ProjectileRuntime.projectiles.any {
+                    it.id == "black_hole" && it.launchDirection.dot(triggerDirection.normalize()) > 0.999
+                }, "contactDirection=$triggerDirection"))
+                155 -> listOf(Check(name, t, "repels-magic-and-vanilla", arrow!!.deltaMovement.x > 0 && repelledMagic, "arrow=${arrow.deltaMovement} repelledMagic=$repelledMagic"))
                 219 -> clean(name, t, ctx)
                 else -> emptyList()
             } })

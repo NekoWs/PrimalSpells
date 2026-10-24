@@ -19,7 +19,7 @@
 | 死亡文本/施法者来源 | `magic/core/SpellDamageSource.kt`、`registry/ModDamageTypes.kt`、中英文`death.attack.primalspells_*`语言键 |
 | 命中/伤害/击退/冻结 | `magic/effect/lifecycle/{SpellDamage,SpellImpact,DirectDamage,FrozenStatus}.kt` |
 | 护盾判定/反射点 | `magic/effect/lifecycle/ShieldGuard.kt`、`magic/modifier/EnergyShield.kt`、Projectile命中入口 |
-| 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger}.kt` |
+| 触发/到期 | `magic/effect/lifecycle/{Trigger,DelayedTrigger,AppendedTrigger,PayloadRelease}.kt`；命中荷载复制模板，定时/失效消费一次 |
 | 爆炸与跨投射物联动 | `magic/effect/lifecycle/{Explosion,ExplosionFx,SpellInteractions,SpellResonance,CrystalReaction}.kt` |
 | 真实弧线光束采样 | `magic/effect/visual/FlightTrace.kt`；读取Projectile.flightPath，高速光脊按实际里程采样，不改写命中轨迹 |
 | 普通尾迹/特殊弹本体 | `magic/effect/visual/`；通用造型 `PixelVfx.kt` |
@@ -37,7 +37,7 @@
 | 性能回归 | `client/capture/SpellPerformanceScene.kt`，场景spell_performance；真实Move/联动耗时与线程分配，输出performance.tsv |
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
 | 命中与伤害频率回归 | `client/capture/PiercingContactScene.kt`与`DamageFrequencyChecks.kt`，场景piercing_contact；接触时间、逐刻伤害、附加效果、复制预算及AfterImpact真实结算 |
-| 触发终结时机回归 | `client/capture/TriggerLifecycleChecks.kt`由spell_chain运行；真实连续反弹、穿刺、实体终结、运行时到期/清理与追加触发/定时 |
+| 触发命中回归 | `client/capture/TriggerLifecycleChecks.kt`由spell_chain运行；重复穿刺、无直接伤害仍触发、独立副本/嵌套配方、一次付费及墙/寿命排除，定时/失效保留 |
 | 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 法杖外观/占屏回归 | `client/capture/WandDesignScene.kt`，场景wand_design；户外主副手/左惯用手和紫晶实际像素边界 |
 | 地形照明截断复现 | `client/capture/LightBoundaryScene.kt`，场景light_boundary；纯PD源慢移及同光场地形像素对照 |

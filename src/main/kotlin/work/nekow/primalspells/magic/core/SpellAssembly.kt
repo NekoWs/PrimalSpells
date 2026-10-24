@@ -42,7 +42,10 @@ object SpellAssembly {
         copied.mana = card.mana
         copyPayload(card, copied)
         if (card is DrawAction && copied is DrawAction) copied.expanded += card.expanded.map(::copyCard)
-        if (card is Projectile && copied is Projectile) copyAppended(card, copied)
+        if (card is Projectile && copied is Projectile) {
+            apply(copied, card.modifierOrder.map { SpellRegistry.create(it) as Modifier })
+            copyAppended(card, copied)
+        }
     }
 
     private fun copyAppended(parent: Projectile, child: Projectile) {
@@ -51,13 +54,7 @@ object SpellAssembly {
 
     private fun copyPayload(parent: Magic, child: Magic) {
         if (parent !is TriggerSpell || child !is TriggerSpell) return
-        parent.payload.forEach { card ->
-            val copied = copyCard(card)
-            if (card is Projectile && copied is Projectile) {
-                apply(copied, card.modifierOrder.map { SpellRegistry.create(it) as Modifier })
-            }
-            child.payload += copied
-        }
+        child.payload += parent.payload.map(::copyCard)
     }
 
     /** 子弹按当前速度发射，抵消基础speed及速度卡的重复乘法，再交由SETUP正常装配。 */

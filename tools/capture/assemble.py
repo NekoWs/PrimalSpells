@@ -603,7 +603,8 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
 
     if scene == "new_spells":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
-        blades = [white_spell_mask(tick_frames[t])[340:450, 700:850] for t in (80, 90)]
+        # 当前真实锯盘位于画面左侧；旧右侧ROI只读到了飞散碎屑。
+        blades = [white_spell_mask(tick_frames[t])[340:445, 420:630] for t in (80, 90)]
         counts = [int(a.sum()) for a in blades]
         result["asserts"].append(("锯片本体持续可见且旋转移动", min(counts) >= 50 and int((blades[0] != blades[1]).sum()) >= 20,
             f"独立锯片覆盖={counts}，图形变化={int((blades[0] != blades[1]).sum())}像素"))

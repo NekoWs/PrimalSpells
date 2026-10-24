@@ -68,16 +68,20 @@ object SpellChainScene {
                     parent.payload += SpellRegistry.create("fireball")!!
                     parent.caster=ctx.player;parent.wand=Wand("piercing-trigger");parent.position=target.boundingBox.center.toPosition();parent.velocity=Vector3f(0f,0f,1f);parent.spell()
                     parent.hitEntity(target)
-                    record(t,"piercing-entity-damages-and-keeps-payload",target.totalDamage==4.0 && parent.payload.size==1 && parent.alive,"damage=${target.totalDamage} payload=${parent.payload.size} alive=${parent.alive}")
-                    val before=ProjectileRuntime.projectiles.size
-                    parent.hitBlock(parent.status.pos,Vector3f(0f,0f,-1f))
+                    parent.hitEntity(target)
                     ProjectileRuntime.tick()
-                    record(t,"piercing-wall-releases-once",parent.payload.isEmpty() && ProjectileRuntime.projectiles.size==before+1,"payload=${parent.payload.size} shots=${ProjectileRuntime.projectiles.size}")
+                    record(t,"piercing-entity-releases-each-hit-with-zero-direct-damage",target.totalDamage==0.0 && parent.payload.size==1 && parent.alive && ProjectileRuntime.projectiles.count{it.id=="fireball"}==2,"damage=${target.totalDamage} payload=${parent.payload.size} alive=${parent.alive}")
+                    ProjectileRuntime.projectiles.forEach{it.alive=false}
                     parent.hitBlock(parent.status.pos,Vector3f(0f,0f,-1f))
-                    record(t,"wall-payload-does-not-repeat",ProjectileRuntime.projectiles.size==before+1,"shots=${ProjectileRuntime.projectiles.size}")
+                    parent.die()
+                    ProjectileRuntime.tick()
+                    record(t,"piercing-wall-does-not-release",parent.payload.isEmpty() && ProjectileRuntime.projectiles.isEmpty(),"payload=${parent.payload.size} shots=${ProjectileRuntime.projectiles.size}")
+                    parent.hitBlock(parent.status.pos,Vector3f(0f,0f,-1f))
+                    record(t,"wall-payload-does-not-repeat",ProjectileRuntime.projectiles.isEmpty(),"shots=${ProjectileRuntime.projectiles.size}")
                     parent.alive=false;parent.die();target.discard()
                     ProjectileRuntime.projectiles.forEach { it.alive=false }
                     val source=ctx.spawnDummy(-8.0,floor+2.0,-5.0)
+                    val triggerVictim=ctx.spawnDummy(-6.0,floor+2.0,0.0)
                     val w=Wand("machinegun");w.delayTickCount=10.0;w.rechargeTickCount=20.0;w.charge=100.0
                     w.innate += listOf("double_cast","trigger_fireball","omnidirectional_scatter","chainsaw").map { SpellRegistry.create(it)!! }
                     w.load();w.status.mana=1000.0
@@ -87,7 +91,7 @@ object SpellChainScene {
                     val carrier=ProjectileRuntime.projectiles.filterIsInstance<TriggerFireball>().single()
                     record(t,"machinegun-parent-does-not-scatter",carrier.modifiers.keys==setOf("double_cast") && carrier.payload.map{it.id}==listOf("omnidirectional_scatter","chainsaw") && carrier.delay==0 && carrier.recharge==0,"mods=${carrier.modifiers} payload=${carrier.payload.map{it.id}}")
                     record(t,"machinegun-mana-charged-once",w.status.mana==992.0,"mana=${w.status.mana}")
-                    carrier.hitBlock(carrier.status.pos,Vector3f(0f,0f,-1f));ProjectileRuntime.tick()
+                    carrier.hitEntity(triggerVictim);ProjectileRuntime.tick()
                     val saw=ProjectileRuntime.projectiles.single{it.id=="chainsaw"}
                     record(t,"machinegun-only-payload-scatters",saw.modifiers.keys==setOf("omnidirectional_scatter") && carrier.payload.isEmpty(),"mods=${saw.modifiers}")
                     // 同一链的尾部修正也要覆盖先抽到的投射物；内层修正不得穿过链边界。
@@ -113,10 +117,12 @@ object SpellChainScene {
                     val copied=SpellAssembly.copy(outer) as TriggerFireball
                     val copiedMiddle=copied.payload.filterIsInstance<DelayedCastProjectile>().single()
                     record(t,"copies-own-independent-payload-tree",copied.payload!==outer.payload && copiedMiddle!==middle && copiedMiddle.payload!==middle.payload && copiedMiddle.payload.zip(middle.payload).all{(a,b)->a!==b},"copy=${copied.payload.map{it.id}}")
-                    outer.hitBlock(outer.status.pos,Vector3f(0f,0f,1f));ProjectileRuntime.tick()
-                    record(t,"trigger-child-does-not-inherit-parent",middle.modifiers.keys==setOf("speed_boost") && middle.status.damage==0.0,"mods=${middle.modifiers}")
-                    middle.expire();ProjectileRuntime.tick()
-                    record(t,"delayed-child-does-not-inherit-parent",inner.modifiers.keys==setOf("freeze_charge") && inner.status.damage==3.75 && middle.payload.isEmpty(),"mods=${inner.modifiers} damage=${inner.status.damage}")
+                    outer.hitEntity(triggerVictim);ProjectileRuntime.tick()
+                    val releasedMiddle=ProjectileRuntime.projectiles.filterIsInstance<DelayedCastProjectile>().single()
+                    val releasedInner=releasedMiddle.payload.filterIsInstance<Projectile>().single()
+                    record(t,"trigger-child-does-not-inherit-parent",releasedMiddle.modifiers.keys==setOf("speed_boost") && releasedMiddle.status.damage==0.0,"mods=${releasedMiddle.modifiers}")
+                    releasedMiddle.expire();ProjectileRuntime.tick()
+                    record(t,"delayed-child-does-not-inherit-parent",releasedInner.modifiers.keys==setOf("freeze_charge") && releasedInner.status.damage==3.75 && releasedMiddle.payload.isEmpty(),"mods=${releasedInner.modifiers} damage=${releasedInner.status.damage}")
                     record(t,"releasing-original-keeps-copy-payload",copiedMiddle.payload.size==2 && copied.payload.size==2,"copy=${copiedMiddle.payload.size}")
                     val (_,siblings)=castCards(listOf("double_cast","fireball","damage_boost","fireball"))
                     record(t,"late-modifier-applies-to-entire-chain",siblings.size==2 && siblings.all{it.status.damage==8.0},"damage=${siblings.map{it.status.damage}}")
@@ -127,8 +133,8 @@ object SpellChainScene {
                     record(t,"quantum-copies-retain-isolated-payload",quantumCarriers.size==3 && quantumCarriers.all{it.payload.map{card->card.id}==listOf("omnidirectional_scatter","chainsaw") && "omnidirectional_scatter" !in it.modifiers} && quantumCarriers.map{System.identityHashCode(it.payload[1])}.distinct().size==3,"copies=${quantumCarriers.map{it.modifiers to it.payload.map{card->card.id}}}")
                     val (_,multicastPayload)=castCards(listOf("damage_boost","trigger_fireball","double_cast","fireball","speed_boost","fireball"))
                     val multicastCarrier=multicastPayload.single() as TriggerFireball
-                    val childShots=multicastCarrier.payload.filterIsInstance<Projectile>()
-                    multicastCarrier.hitBlock(multicastCarrier.status.pos,Vector3f(0f,0f,1f));ProjectileRuntime.tick()
+                    multicastCarrier.hitEntity(triggerVictim);ProjectileRuntime.tick()
+                    val childShots=ProjectileRuntime.projectiles.filter{it.id=="fireball"}
                     record(t,"payload-multicast-shares-only-local-modifiers",childShots.size==2 && childShots.all{it.modifiers.keys==setOf("double_cast","speed_boost") && it.status.damage==5.0 && abs(it.status.velocity.length()-8f)<1e-5},"children=${childShots.map{Triple(it.modifiers,it.status.damage,it.status.velocity.length())}}")
                     val (_,twoTriggers)=castCards(listOf("double_cast","trigger_fireball","freeze_charge","fireball","trigger_fireball","damage_boost","fireball"))
                     val carriers=twoTriggers.filterIsInstance<TriggerFireball>()
@@ -155,7 +161,7 @@ object SpellChainScene {
                     reduced.spell(source)
                     record(t,"scatter-reduces-wand-base-cooldowns",reduced.status.delay==0.0 && reduced.status.recharge==0.0,"delay=${reduced.status.delay} recharge=${reduced.status.recharge}")
                     ProjectileRuntime.tick()
-                    ProjectileRuntime.projectiles.forEach { it.alive=false };source.discard()
+                    ProjectileRuntime.projectiles.forEach { it.alive=false };source.discard();triggerVictim.discard()
                     val signs=mutableSetOf<Int>()
                     repeat(32) {
                         val p=shot("fireball",Vec3(-8.0,floor+5.0,0.0),listOf("omnidirectional_scatter"))

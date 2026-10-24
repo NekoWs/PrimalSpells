@@ -86,7 +86,8 @@ object ShieldBalanceScene {
                     incoming(combo,20.0,listOf("volatile"))
                     record(t,"same-impact-explosion-does-not-bypass-broken-shield",combo.health==1000f && shield(wc).breached && neighbor.health<1000f,"holder=${combo.health} neighbor=${neighbor.health}")
                     combo.discard();neighbor.discard()
-                    val pierce=pig(0.0);val wp=equip(pierce,8);incoming(pierce,5.0,listOf("piercing"))
+                    // 保留5HP有效直伤，避免将新穿刺减伤误判为护盾挡住了穿刺。
+                    val pierce=pig(0.0);val wp=equip(pierce,8);incoming(pierce,20.0,listOf("piercing"))
                     record(t,"piercing-still-ignores-shield",pierce.health<1000f && wp.status.mana==10000.0 && !shield(wp).breached,"health=${pierce.health} mana=${wp.status.mana}");pierce.discard()
                     val inner=pig(0.0);val wi=equip(inner,8)
                     Explosion.customExplode(ctx.player,inner.boundingBox.center.toVector3f(),2f,10.0)

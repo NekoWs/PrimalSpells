@@ -122,7 +122,8 @@ object FoundationScene {
                     record(t, "inventory-preview-uses-edited-recipe", screen?.preview?.slots?.getOrNull(4)?.id == "speed_boost", screen?.preview.toString())
                 }
                 if (t == 180) (mc.gui.screen() as? WandPreviewScreen)?.onClose()
-                if (t == 201) {
+                // 按真实持续悬停轮询，等待组件同步与节流请求完成，不把网络往返固定为一帧。
+                if (t in 201..214) {
                     val stack = wandSlot().item
                     work.nekow.primalspells.client.tooltip.WandPreviewCache.slots(id, stack.get(ModItems.WAND_SPELLS).orEmpty())
                 }

@@ -194,8 +194,8 @@ object HomingLightScene {
                         pierce.alive = false; pierce.die(); victim.discard()
                     }
 
-                    val recipes = listOf(listOf("fireball") to 1.0, listOf("piercing", "fireball") to 11.0,
-                        listOf("fireball", "piercing") to 11.0, listOf("piercing", "piercing", "fireball") to 21.0,
+                    val recipes = listOf(listOf("fireball") to 1.0, listOf("piercing", "fireball") to 1.0,
+                        listOf("fireball", "piercing") to 1.0, listOf("piercing", "piercing", "fireball") to 1.0,
                         listOf("piercing", "chainsaw") to 0.0)
                     recipes.forEachIndexed { index, (cards, expected) ->
                         // 两张投射物预算将尾部修正也纳入当前链，避免把下一链误当牌序差异。

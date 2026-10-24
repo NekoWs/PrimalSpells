@@ -26,10 +26,12 @@ object PiercingContactScene {
         fun record(t: Int, id: String, ok: Boolean, detail: String) {
             checks.getOrPut(t) { arrayListOf() }.add(Check(name, t, id, ok, detail))
         }
+        // 用真实增伤抵消穿刺减伤，保持5HP的接触时钟标尺；实际减伤另由触发回归验证。
+        fun frequencyModifiers() = (listOf("piercing") + List(5) { "damage_boost" }).map { SpellRegistry.create(it) as Modifier }
         fun shot(ctx: CaptureDriver.SceneCtx, start: Vec3, multiplier: Float = 1f,
                  visual: Boolean = false): Projectile {
             val p = SpellRegistry.create("fireball") as Projectile
-            SpellAssembly.apply(p, listOf(SpellRegistry.create("piercing") as Modifier))
+            SpellAssembly.apply(p, frequencyModifiers())
             if (!visual) p.effects.removeIf { it.phase == EffectPhase.VISUAL }
             p.caster = ctx.player; p.wand = Wand("piercing-contact")
             p.position = start.toPosition(); p.velocity = Vector3f(0f, 0f, 1f)
@@ -87,7 +89,7 @@ object PiercingContactScene {
                     // 扩张箱入射面为精确的-0.25，避免夹具自身的浮点误差把刻末移到下一刻。
                     val boundaryTarget = ctx.spawnDummy(0.0, floor + 5.0, 0.2)
                     val boundary = SpellRegistry.create("fireball") as Projectile
-                    SpellAssembly.apply(boundary, listOf(SpellRegistry.create("piercing") as Modifier))
+                    SpellAssembly.apply(boundary, frequencyModifiers())
                     boundary.effects.removeIf { it.phase == EffectPhase.VISUAL }
                     boundary.dragCoeff = 0f
                     boundary.caster = ctx.player; boundary.wand = Wand("contact-boundary")
@@ -148,7 +150,7 @@ object PiercingContactScene {
                     thinTarget.boundingBox = net.minecraft.world.phys.AABB(-0.25, thinY - 0.5, 0.012, 0.25, thinY + 0.5, 0.0125)
                     // 整个交集都在一个空间子步内部，两个端点均在箱外。
                     val narrow = SpellRegistry.create("fireball") as Projectile
-                    SpellAssembly.apply(narrow, listOf(SpellRegistry.create("piercing") as Modifier))
+                    SpellAssembly.apply(narrow, frequencyModifiers())
                     narrow.effects.removeIf { it.phase == EffectPhase.VISUAL }
                     narrow.hitRadius = 0.0001; narrow.speed *= 4f
                     narrow.caster = ctx.player; narrow.wand = Wand("contact-thin")

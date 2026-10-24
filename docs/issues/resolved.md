@@ -10,13 +10,13 @@
 | 抽牌作用域 | 同链修正无牌序；触发荷载独立，子链散射不污染载体；付费一次、链锯清整次延迟 | spell_chain、foundations |
 | 复制与后代 | 按配方重建独立effect/荷载，抵消重复速度倍率，量子复制有本体与真实命中 | spell_mechanics、spell_resonance |
 | 寿命触发 | 定时到期当刻释放；休眠水晶到期爆炸，提前死亡与expire区分 | spell_timing、crystal_lifecycle |
-| 反弹与触发荷载 | 触发火球及追加触发只在载体终结时释放，存活反弹/穿刺接触保留；终结接点向外发射，自然到期当刻释放，其它终结由死亡清理兜底，各入口只消费一次；追加定时仍保持20t | spell_chain的TriggerLifecycleChecks（28项），覆盖真实8次反弹与第9次终结、实体终结、到期/清理及荷载隔离 |
+| 命中触发与独立荷载 | 普通/追加命中触发随每次有效生物接触复制独立模板，穿刺重复命中不重新扣蓝、不叠加模板修正；墙/寿命/死亡不补发，定时/失效仍消费一次 | spell_chain的TriggerLifecycleChecks、new_spells、expansion_combinations、expansion_utilities |
 | 命中对象 | 使用原版可被投射物命中的能力判定；掉落物/经验球/效果云/Display展示实体/交互实体不阻挡弹体或消费荷载，正常生物与可射击的物品展示框仍命中；索敌/束/准星一致 | collision_precision的EntityHitChecks、homing_light、spell_chain、shield_balance |
 | 碰撞与反射 | 出生豁免不误伤、返弹自伤保留；双精度世界位置，解析扫掠薄形状/拼缝并按接点排序；斜墙/墙角不嵌入，同刻多次反弹走完余时；光束保留折点，水晶联动读取实际路径 | collision_precision、spell_chain、shield_balance |
 | 等离子束 | 默认静态，本体随位置；有效射线在墙/护盾截断，视觉与伤害共用截点，允许自伤 | expansion_plasma、spell_chain |
 | 追踪与弹速 | 扫掠预计飞行段找六格侧向范围内的目标中心，前方对准度优先，排除后方回锁；穿透后当刻沿当前切线渐入新目标的曲率，不抑制重复伤害；真实子步与光束共用路径 | homing_light、projectile_flight |
 | 汇聚之光 | 原地锁定方向蓄能10t，释放后64格/t连续光脊；装“光”时本体照明有限退场，保留真实5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
-| 穿刺代价 | 每张增加10t施放延迟，预览与实际付费一致；多卡叠加，链锯仍清整次delay | homing_light |
+| 穿刺代价 | 费用及投射物渠道减伤遵循[战斗规则](../design/combat-pricing.md#3-资源与节奏)，不增加双冷却；与增伤相加且牌序无关，直接伤害≤0仍能触发，治疗/能量/切割不受该减值影响 | homing_light、spell_chain、piercing_contact |
 | 穿刺接触次数 | 消除按空间子步重复伤害；首次立即命中，之后按1/16刻实际接触时间结算，默认水平穿木桩4次，提速更少；保留跨刻、重新进入、同刻反弹、穿刺荷载与锯片逐刻伤害，刻末首次进入不遗漏/双算 | piercing_contact接触计时检查、collision_precision、homing_light、spell_chain、shield_balance |
 | 帧伤与命中修正 | 锯片同目标同刻的全部实体命中回调共用一次预算，直接伤害去重不能放任易爆重复；等离子束和黑洞显式限制同目标同刻直接伤害；不同目标/复制体独立，普通穿刺与真实墙反弹保留各自频率 | piercing_contact的DamageFrequencyChecks（32项）、spell_chain、shield_balance、damage_mass |
 | MP与存档 | 当前MP封顶；空槽/牌堆保序；完整刻迁移旧秒/毫秒；复制不共享wandId | spell_mechanics、exploration、magic_hud |
@@ -33,6 +33,7 @@
 | 原编杖 | 原容器滚轮/右键，V只读分色；创造专用包校验，生存原版协议 | foundations |
 | 获取与整合 | 原结构箱子追加、真实持杖敌人原物掉落、池/等级原子重载、不重掷旧杖 | exploration、progression |
 | 录制诊断 | 捕获启动崩溃/FATAL/超时/驱动错误，保留当前日志与部分帧，构建失败不误引旧MC日志 | capture.ps1、diagnostics.ps1 |
+| 抽牌与组合夹具 | MP上限与当前MP一致；在配方清场前验证复制；按真实悬停持续轮询异步分色；生物触发检查真实子弹与HitResult方向；锯盘ROI对准主体且保留原阈值，有限斥力使用同速慢弹/箭并在存活窗口观察 | foundations、new_spells、expansion_combinations、expansion_utilities |
 | OSHI处理 | 按用户要求忽略系统信息采集记录及其已知关联堆栈，保留原日志，不作为待修或待重启项；其他错误/FATAL照常阻塞 | assemble.classify_log_errors、test_log_filter.py |
 
 ## 已接入的PD能力

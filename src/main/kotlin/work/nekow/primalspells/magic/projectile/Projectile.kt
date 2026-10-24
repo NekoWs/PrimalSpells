@@ -21,7 +21,7 @@ abstract class Projectile: Magic() {
     var status: MagicStatus = MagicStatus()
     /** 独立的施法配方；只保存id计数，不保存共享effect实例。 */
     val modifiers = linkedMapOf<String, Int>()
-    /** 追加触发拥有独立、一次性的荷载树。 */
+    /** 追加条件拥有独立荷载树；命中保留模板，定时/失效消费一次。 */
     val addedTriggers = arrayListOf<work.nekow.primalspells.magic.core.AppendedPayload>()
     /** 规范化修正配方，用于同源复制体重建独立效果；不表示牌序。 */
     val modifierOrder = arrayListOf<String>()

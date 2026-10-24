@@ -5,140 +5,173 @@ import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
 import org.joml.Vector3d
 import org.joml.Vector3f
-import work.nekow.primalspells.magic.core.AppendedPayload
-import work.nekow.primalspells.magic.core.DrawAction
-import work.nekow.primalspells.magic.core.EffectPhase
-import work.nekow.primalspells.magic.core.Modifier
-import work.nekow.primalspells.magic.core.SpellAssembly
-import work.nekow.primalspells.magic.core.SpellRegistry
-import work.nekow.primalspells.magic.core.TriggerSpell
-import work.nekow.primalspells.magic.effect.BaseEffect
+import work.nekow.primalspells.magic.core.*
 import work.nekow.primalspells.magic.projectile.Projectile
 import work.nekow.primalspells.magic.runtime.ProjectileRuntime
 import work.nekow.primalspells.util.toPosition
-import work.nekow.primalspells.util.toVec3
 import work.nekow.primalspells.wand.Wand
 
-/** spell_chain调用；真实Move反弹与运行时终结的荷载时机，不用人工碰撞替代连续反弹。 */
+/** spell_chain调用；观察真正发射的独立子弹，覆盖重复穿刺、条件排除与一次性荷载。 */
 object TriggerLifecycleChecks {
     fun run(ctx: CaptureDriver.SceneCtx, tick: Int, floor: Int): List<Check> {
         val checks = arrayListOf<Check>()
         fun record(id: String, ok: Boolean, detail: String) { checks += Check("spell_chain", tick, id, ok, detail) }
-        class Carrier(val shot: Projectile, val child: Projectile) {
-            var releases = 0
-            var bornAlive = false
-            var bornAt = Vec3.ZERO
-            var heading = Vec3.ZERO
-            fun hasPayload(): Boolean = (shot as? TriggerSpell)?.payload?.isNotEmpty()
-                ?: shot.addedTriggers.single().cards.isNotEmpty()
-        }
+        fun cards(p: Projectile): ArrayList<Magic> = (p as? TriggerSpell)?.payload ?: p.addedTriggers.single().cards
         fun carrier(appended: Boolean = false, piercing: Boolean = false,
-                    kind: DrawAction.Kind = DrawAction.Kind.HIT, z: Double = 0.0): Carrier {
-            val p = SpellRegistry.create(if (appended) "fireball" else "trigger_fireball") as Projectile
-            SpellAssembly.apply(p, (listOf("bounce") + if (piercing) listOf("piercing") else emptyList()).map {
-                SpellRegistry.create(it) as Modifier
-            })
+                    kind: DrawAction.Kind = DrawAction.Kind.HIT, id: String = "fireball"): Projectile {
+            val p = SpellRegistry.create(if (appended) id else "trigger_fireball") as Projectile
+            SpellAssembly.apply(p, (if (piercing) listOf("piercing") else emptyList()).map { SpellRegistry.create(it) as Modifier })
             p.effects.removeIf { it.phase == EffectPhase.VISUAL }
-            p.caster = ctx.player; p.wand = Wand("trigger-lifecycle")
-            p.position = Vec3(0.1, floor + 7.0, z).toPosition(); p.velocity = Vector3f(0f, 0f, 1f)
-            val child = SpellRegistry.create("fireball") as Projectile
-            child.effects.removeIf { it.phase == EffectPhase.VISUAL }
-            child.collisionEnabled = false
-            val fixture = Carrier(p, child)
-            child.effects += object : BaseEffect() {
-                override fun onActive() {
-                    fixture.releases++; fixture.bornAlive = p.alive
-                    fixture.bornAt = status.pos.toVec3(); fixture.heading = child.launchDirection
-                }
-            }
-            val cards = arrayListOf(SpellRegistry.create("speed_boost")!!, child)
-            if (appended) p.addedTriggers += AppendedPayload(kind, cards)
-            else (p as TriggerSpell).payload += cards
+            p.speed = 0.5f // 两类载体统一4格/t标尺，分别完整穿过两个相隔5格的目标。
+            p.caster = ctx.player; p.wand = Wand("trigger-hit-check")
+            p.position = Vec3(0.0, floor + 7.0, -1.0).toPosition(); p.velocity = Vector3f(0f, 0f, 1f)
+            val payload = arrayListOf(SpellRegistry.create("speed_boost")!!, SpellRegistry.create("fireball")!!)
+            if (appended) p.addedTriggers += AppendedPayload(kind, payload) else (p as TriggerSpell).payload += payload
             p.spell()
-            return fixture
+            return p
         }
-        fun cancel(fixture: Carrier) {
-            // 验收结束的取消不模拟玩法死亡；先丢弃未用荷载，再回收本夹具的粒子/运行时队列。
-            (fixture.shot as? TriggerSpell)?.payload?.clear()
-            fixture.shot.addedTriggers.forEach { it.cards.clear() }
-            fixture.shot.alive = false; fixture.shot.die()
-            fixture.child.alive = false; ProjectileRuntime.clear()
+        fun discard(p: Projectile) {
+            (p as? TriggerSpell)?.payload?.clear(); p.addedTriggers.forEach { it.cards.clear() }
+            p.alive = false; p.die()
+        }
+        fun collect(retire: Boolean = true): List<Projectile> {
+            // 新子弹在pendingAdd末尾入列，此时尚未移动，不会干扰载体的下一次命中。
+            ProjectileRuntime.tick()
+            return ProjectileRuntime.projectiles.toList().also { shots -> if (retire) shots.forEach { discard(it) } }
         }
         fun walls(solid: Boolean) {
             for (z in listOf(-4, 3)) for (y in floor + 5..floor + 9)
                 ctx.level.setBlock(BlockPos(0, y, z), (if (solid) Blocks.STONE else Blocks.AIR).defaultBlockState(), 2)
         }
 
-        record("trigger-fixture-starts-empty", ProjectileRuntime.projectiles.isEmpty(), "isolated lifecycle checks")
-        walls(true)
-        for ((label, appended, piercing) in listOf(Triple("native", false, false), Triple("piercing", false, true), Triple("appended", true, false))) {
-            val f = carrier(appended, piercing)
-            var walls = 0
-            f.shot.effects += object : BaseEffect() { override fun onHitBlock(pos: Vector3d) { walls++ } }
-            val victim = if (piercing) ctx.spawnDummy(0.1, floor + 6.0, 1.0) else null
-            var waiting = true
-            var elapsed = 0
-            while (f.shot.alive && elapsed++ < 80) {
-                f.shot.tick(); f.shot.status.age++
-                if (f.shot.alive) waiting = waiting && f.hasPayload() && f.releases == 0
-            }
-            record("trigger-$label-keeps-payload-through-eight-bounces", waiting && walls == 9 && !f.shot.alive && f.releases == 1 && !f.bornAlive,
-                "waiting=$waiting walls=$walls releases=${f.releases} bornAlive=${f.bornAlive}")
-            record("trigger-$label-uses-final-contact-and-outgoing-direction", f.bornAt.distanceTo(f.shot.status.pos.toVec3()) <= 1.1e-7 &&
-                f.heading.dot(Vec3(f.shot.status.velocity).normalize()) < -0.999,
-                "birth=${f.bornAt} final=${f.shot.status.pos} heading=${f.heading}")
-            record("trigger-$label-payload-remains-independent", f.child.modifiers.keys == setOf("speed_boost") && f.child.status.bounces == 0,
-                "mods=${f.child.modifiers} childBounces=${f.child.status.bounces}")
-            if (victim != null) {
-                record("trigger-piercing-entity-contact-only-deals-carrier-damage", victim.totalDamage > 0.0 && f.shot.status.hitTargets > 0,
-                    "damage=${victim.totalDamage} hits=${f.shot.status.hitTargets}")
-                victim.discard()
-            }
-            f.shot.expire(); f.shot.die(); f.shot.die()
-            record("trigger-$label-terminal-cleanup-never-repeats-payload", f.releases == 1 && !f.hasPayload(), "releases=${f.releases}")
-            cancel(f)
-        }
-
-        val onEntity = carrier()
-        val entity = ctx.spawnDummy(0.1, floor + 6.0, -2.0)
-        var entityWalls = 0
-        onEntity.shot.effects += object : BaseEffect() { override fun onHitBlock(pos: Vector3d) { entityWalls++ } }
-        repeat(5) { if (onEntity.shot.alive) { onEntity.shot.tick(); onEntity.shot.status.age++ } }
-        record("trigger-bounce-then-terminal-entity-hit-releases", entityWalls == 1 && entity.totalDamage == 4.0 &&
-            !onEntity.shot.alive && onEntity.releases == 1 && onEntity.shot.status.bounces == 7,
-            "walls=$entityWalls damage=${entity.totalDamage} releases=${onEntity.releases}")
-        entity.discard(); cancel(onEntity)
-        walls(false)
-
+        record("trigger-fixture-starts-empty", ProjectileRuntime.projectiles.isEmpty(), "isolated hit checks")
         for (appended in listOf(false, true)) {
-            val f = carrier(appended)
-            f.shot.maxAge = 2; f.shot.collisionEnabled = false
-            ProjectileRuntime.add(f.shot); ProjectileRuntime.tick(); ProjectileRuntime.tick()
-            record("trigger-expiry-waits-for-life-end-$appended", f.shot.alive && f.shot.status.age == 1 && f.releases == 0 && f.hasPayload(),
-                "age=${f.shot.status.age} releases=${f.releases}")
-            ProjectileRuntime.tick()
-            record("trigger-expiry-releases-in-expiry-tick-$appended", !f.shot.alive && f.releases == 1 && !f.hasPayload() &&
-                f.bornAt.distanceTo(f.shot.status.pos.toVec3()) < 1e-8 && f.child.status.age == 0,
-                "age=${f.shot.status.age} releases=${f.releases} childAge=${f.child.status.age}")
-            ProjectileRuntime.tick()
-            record("trigger-expiry-following-cleanup-does-not-repeat-$appended", f.releases == 1 && f.child.status.age == 1, "releases=${f.releases}")
-            cancel(f)
+            walls(true)
+            val bouncing = carrier(appended)
+            bouncing.status.bounces = 8; bouncing.bounceScaler.set(1f)
+            var bounces = 0
+            while (bouncing.alive && bounces++ < 80) { bouncing.tick(); bouncing.status.age++ }
+            record("hit-trigger-wall-bounces-never-release-$appended", !bouncing.alive && collect().isEmpty(), "age=${bouncing.status.age}")
+            bouncing.expire(); bouncing.die()
+            record("hit-trigger-terminal-hooks-never-release-$appended", cards(bouncing).isEmpty() && collect().isEmpty(), "walls/end are not enemy hits")
+            walls(false)
 
-            val ended = carrier(appended)
-            ProjectileRuntime.add(ended.shot); ProjectileRuntime.tick()
-            ended.shot.alive = false; ProjectileRuntime.tick()
-            record("trigger-external-end-releases-once-$appended", ended.releases == 1 && !ended.bornAlive && !ended.hasPayload(),
-                "releases=${ended.releases} bornAlive=${ended.bornAlive}")
-            ended.shot.die(); ended.shot.expire()
-            record("trigger-external-end-hooks-are-idempotent-$appended", ended.releases == 1, "releases=${ended.releases}")
-            cancel(ended)
+            val target = ctx.spawnDummy(0.0, floor + 6.0, 0.0)
+            val ordinary = carrier(appended)
+            ordinary.tick()
+            val single = collect()
+            record("hit-trigger-on-first-enemy-contact-$appended", !ordinary.alive && single.size == 1 &&
+                target.totalDamage == if (appended) 5.0 else 4.0, "children=${single.size} damage=${target.totalDamage}")
+            discard(ordinary); target.discard()
+
+            val first = ctx.spawnDummy(0.0, floor + 6.0, 0.0)
+            val second = ctx.spawnDummy(0.0, floor + 6.0, 5.0)
+            val p = carrier(appended, piercing = true)
+            val template = cards(p).filterIsInstance<Projectile>().single()
+            p.tick(); p.status.age++
+            val wave1 = collect()
+            record("piercing-each-contact-releases-$appended", p.alive && p.status.hitTargets == 4 && wave1.size == 4 &&
+                first.totalDamage == 0.0, "hits=${p.status.hitTargets} children=${wave1.size} damage=${first.totalDamage}")
+            record("hit-payload-local-modifiers-only-$appended", wave1.all { it !== template && it.status.damage == 5.0 &&
+                it.modifiers == mapOf("speed_boost" to 1) && kotlin.math.abs(it.status.velocity.length() - 8f) < 1e-5 }, "mods=${wave1.map { it.modifiers }}")
+            wave1.firstOrNull()?.status?.damage = 999.0
+            p.tick(); p.status.age++
+            val wave2 = collect()
+            record("piercing-next-target-releases-fresh-wave-$appended", p.status.hitTargets == 8 && wave2.size == 4 &&
+                wave2.all { it.status.damage == 5.0 } && wave1.none { a -> wave2.any { it === a } }, "hits=${p.status.hitTargets} children=${wave2.size}")
+            record("hit-payload-template-stays-unmodified-$appended", cards(p).size == 2 && template.modifiers.isEmpty() &&
+                template.status.age == 0 && template.status.damage == 5.0, "templateMods=${template.modifiers} age=${template.status.age}")
+            discard(p); first.discard(); second.discard()
+            record("piercing-cleanup-adds-no-extra-wave-$appended", collect().isEmpty(), "death does not fire hit payload")
+
+            val expiry = carrier(appended); expiry.collisionEnabled = false; expiry.maxAge = 1
+            ProjectileRuntime.add(expiry); ProjectileRuntime.tick(); ProjectileRuntime.tick()
+            record("hit-trigger-expiry-is-not-a-hit-$appended", !expiry.alive && cards(expiry).isEmpty() &&
+                ProjectileRuntime.projectiles.none { it !== expiry }, "age=${expiry.status.age}")
+            ProjectileRuntime.tick()
+            record("hit-trigger-expiry-cleanup-is-empty-$appended", ProjectileRuntime.projectiles.isEmpty(), "no fallback casts")
         }
+
         val timer = carrier(appended = true, kind = DrawAction.Kind.TIMER)
-        timer.shot.hitBlock(Vector3d(timer.shot.status.pos), Vector3f(0f, 0f, -1f))
-        record("appended-timer-surviving-bounce-does-not-fire-early", timer.shot.alive && timer.hasPayload() && timer.releases == 0, "releases=${timer.releases}")
-        timer.shot.collisionEnabled = false; timer.shot.status.age = 19; timer.shot.tick()
-        record("appended-timer-still-fires-at-twenty-ticks", timer.shot.alive && timer.releases == 1 && !timer.hasPayload(), "releases=${timer.releases}")
-        cancel(timer)
+        timer.status.bounces = 1; timer.hitBlock(Vector3d(timer.status.pos), Vector3f(0f, 0f, -1f))
+        record("appended-timer-keeps-bounce-condition", timer.alive && collect().isEmpty(), "not fired on surviving bounce")
+        timer.collisionEnabled = false; timer.status.age = 19; timer.tick()
+        record("appended-timer-still-fires-once-at-20", cards(timer).isEmpty() && collect().size == 1, "timer consumes one prepared payload")
+        timer.tick(); discard(timer)
+        record("appended-timer-does-not-repeat", collect().isEmpty(), "timer consumed")
+
+        val expired = carrier(appended = true, kind = DrawAction.Kind.EXPIRE)
+        expired.expire(); expired.die(); expired.die()
+        record("appended-expiration-still-fires-once", cards(expired).isEmpty() && collect().size == 1, "expiry and cleanup share one consumption")
+        val terminalTimer = carrier(appended = true, kind = DrawAction.Kind.TIMER)
+        terminalTimer.hitBlock(Vector3d(terminalTimer.status.pos), Vector3f(0f, 0f, -1f))
+        record("appended-timer-still-fires-on-terminal-wall", collect().size == 1, "only hit-trigger condition changed")
+        discard(terminalTimer)
+
+        val sawTarget = ctx.spawnDummy(0.0, floor + 6.0, 0.0)
+        val saw = carrier(appended = true, piercing = true, id = "sawblade")
+        saw.motionEnabled = false
+        saw.hitEntity(sawTarget); saw.hitEntity(sawTarget)
+        record("repeat-trigger-obeys-per-tick-contact-budget", collect().size == 1 && sawTarget.totalDamage == 12.0,
+            "hits=${saw.status.hitTargets} damage=${sawTarget.totalDamage}")
+        saw.tick(); saw.hitEntity(sawTarget)
+        record("repeat-trigger-budget-resets-next-tick", collect().size == 1 && sawTarget.totalDamage == 24.0, "cut damage is unchanged")
+        discard(saw); sawTarget.discard()
+
+        val nested = carrier(piercing = true)
+        val nestedTemplate = SpellRegistry.create("trigger_fireball") as Projectile
+        (nestedTemplate as TriggerSpell).payload += SpellRegistry.create("fireball")!!
+        SpellAssembly.apply(nestedTemplate, listOf(SpellRegistry.create("damage_boost") as Modifier))
+        cards(nested).clear(); cards(nested) += nestedTemplate
+        val nestedTarget = ctx.spawnDummy(0.0, floor + 6.0, 0.0)
+        nested.hitEntity(nestedTarget); nested.hitEntity(nestedTarget)
+        val nestedShots = collect(retire = false)
+        val trees = nestedShots.filterIsInstance<TriggerSpell>()
+        record("repeated-payloads-deep-copy-nested-trees", trees.size == 2 && trees[0].payload !== trees[1].payload &&
+            trees[0].payload.single() !== trees[1].payload.single(), "independent recursive trees")
+        record("prepared-payload-modifiers-copy-once", nestedShots.all { it.modifiers == mapOf("damage_boost" to 1) && it.status.damage == 7.0 } &&
+            (nestedTemplate.modifiers["damage_boost"] == 1) &&
+            nestedTemplate.status.damage == 4.0, "unfired template is unchanged")
+        nestedShots.forEach(::discard)
+        discard(nested); nestedTarget.discard()
+
+        val composed = listOf(listOf("piercing") + List(5) { "damage_boost" }, List(5) { "damage_boost" } + "piercing").map { ids ->
+            val shot = SpellRegistry.create("fireball") as Projectile
+            SpellAssembly.apply(shot, ids.map { SpellRegistry.create(it) as Modifier })
+            shot.effects.removeIf { it.phase == EffectPhase.VISUAL }
+            shot.caster = ctx.player; shot.wand = Wand("piercing-addition")
+            shot.position = Vec3(0.0, floor + 7.0, -1.0).toPosition(); shot.velocity = Vector3f(0f, 0f, 1f)
+            shot.spell()
+            shot.status.damage.also { discard(shot) }
+        }
+        record("piercing-penalty-adds-with-damage-boost-regardless-of-order", composed == listOf(5.0, 5.0), "damage=$composed")
+        val healing = SpellRegistry.create("healing_bolt") as Projectile
+        SpellAssembly.apply(healing, listOf(SpellRegistry.create("piercing") as Modifier))
+        healing.effects.removeIf { it.phase == EffectPhase.VISUAL }
+        healing.caster = ctx.player; healing.wand = Wand("piercing-healing")
+        healing.position = Vec3(0.0, floor + 7.0, -1.0).toPosition(); healing.velocity = Vector3f(0f, 0f, 1f); healing.spell()
+        record("piercing-does-not-turn-healing-into-damage", healing.status.damage == 5.0 && healing.damageType == SpellDamageType.HEALING,
+            "healing=${healing.status.damage}")
+        discard(healing)
+
+        val source = ctx.spawnDummy(-8.0, floor + 2.0, -5.0)
+        val wand = Wand("repeat-trigger-payment"); wand.mana = 2000.0; wand.delayTickCount = 0.0; wand.rechargeTickCount = 0.0
+        wand.magics += listOf("piercing", "trigger_fireball", "damage_boost", "fireball").map { SpellRegistry.create(it)!! }
+        wand.load(); wand.status.mana = 2000.0
+        val price = wand.magics.filterNotNull().sumOf { it.mana }
+        val preview = wand.preview(); val accepted = wand.spell(source); ProjectileRuntime.tick()
+        val paid = ProjectileRuntime.projectiles.singleOrNull { it is TriggerSpell }
+        val victim = ctx.spawnDummy(-7.0, floor + 2.0, -5.0)
+        paid?.hitEntity(victim); paid?.hitEntity(victim)
+        paid?.let(::discard)
+        val children = collect()
+        record("repeated-payload-charged-only-at-cast", accepted && children.size == 2 &&
+            wand.status.mana == 2000.0 - price && price == 313.0 && children.all { it.status.damage == 8.0 },
+            "mana=${wand.status.mana} price=$price children=${children.size}")
+        record("piercing-has-no-extra-cooldowns", preview.delay == 1.0 && preview.recharge == 0.0,
+            "delay=${preview.delay} recharge=${preview.recharge}")
+        source.discard(); victim.discard()
+        collect(); ProjectileRuntime.clear()
         record("trigger-fixture-cleans-active-and-pending", ProjectileRuntime.projectiles.isEmpty(), "next checks start empty")
         return checks
     }

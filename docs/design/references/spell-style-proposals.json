@@ -2,7 +2,7 @@
   "status": "six_sample_icons_applied_naming_pending",
   "date": "2026-10-24",
   "tool": "built-in image_gen",
-  "scope": "法术物品图标画风与中文显示名提案；六张16px游戏贴图已落地，其他图标及语言键、玩法数值未修改。",
+  "scope": "六张16px游戏图标主体已落地，并统一完整法术目录的类型边框；其他主体、语言键及玩法数值未修改。",
   "subjects": [
     "火球",
     "汇聚之光",
@@ -111,8 +111,8 @@
       "prompt": "Use case: stylized-concept.\nAsset type: original Minecraft magic mod inventory-icon art-direction proposal, NOT a screenshot and NOT a finished sprite export.\nCreate one beautiful, disciplined comparison board for one art direction, landscape composition around 1536 by 1024. Dark charcoal neutral flat background, six isolated LARGE pixel-art item icons in a spacious 3-column by 2-row grid. Main focus the six sprites, not presentation decorations. Make icons visually convincing as coarse logical 32x32 sprites enlarged with nearest-neighbor pixels: crisp square pixels, strong chunky silhouettes, limited deliberate flat palette, 2-3 discrete shade bands per material, no gradients, no bloom, no blur, no soft particles, no anti-aliasing, no realistic texture noise, no micro-detail. Readable at inventory scale. These should feel like original collectable magic items, NOT modern app icons.\nIdentical subject order for all proposal boards: 1 top left a compact fire projectile/fire seed with clear ember core; 2 top middle concentrated light, three gathered rays becoming one bright spear; 3 top right an inward gravity core, asymmetrical inward bending pieces around a dark void, NOT a ringed planet; 4 bottom left a sharp circular rotating cutting blade with chunky teeth; 5 bottom middle a piercing modifier, one sharp projectile visibly passing through two slabs; 6 bottom right a double-cast instruction, one starting mark branching into two identical outgoing spell marks, NOT two playing cards. Each subject must have a distinct silhouette and clear functional metaphor. No shared circular badge, no enclosing coin, no ornate card frames, no generic plus-sign overlays, no Noita imagery, no game logos.\nTop margin only the single requested large Latin option letter and its English title, small icon numerals 1 2 3 4 5 6 adjacent to the grid cells, no other lettering. Bottom margin one understated horizontal inventory strip repeating all six designs at a much smaller scale, crisp pixels, in simple grey Minecraft-like square inventory slots. Show the actual proposed sprite style again in miniature, not different sprites. The large sprites must remain the dominant visual area, with plenty of empty space between them.\n\nDirection D: OBSIDIAN SEALS. Coarse, elegant bone-ivory and black obsidian floating seal fragments with restrained amethyst inlays, matching a Minecraft wand made of segmented black obsidian, bone-white open brackets, and a floating purple crystal. Each icon is an ORIGINAL OPEN physical magical glyph made from 3-6 chunky pieces with generous negative space, not an enclosed medallion. Strong asymmetry and silhouette differentiation. Secondary function-color accents: ember amber for fire, pale gold for light, violet-black for gravity, pale steel for cutting, icy cyan for piercing, restrained teal for dual casting. Material highlights only blocky discrete pixel faces, nearly matte. Fire formed by a small ember held between two separate bone seal fragments, light a long ivory spear converging from three black prongs, gravity inward curved ivory shards pulled toward a black center, blade broken angular silver/bone teeth around an obsidian hub, piercing long sharp bone needle through two separate black strips, double cast one ivory stem splitting into two square violet-tipped branches. Sophisticated arcane artifact aesthetic in coarse pixels, not science-fiction UI, no bloom, no translucent glow, no ornamental clutter. Header EXACTLY \"D  OBSIDIAN SEALS\"."
     }
   ],
-  "recommendation": "维持MC原版16×16低像素密度；已落地六张游戏样例，待实际观感评估后扩展其余图标。命名备选尚未应用。",
-  "latestFeedback": "用史莱姆、僵尸或骷髅演示穿刺，并重画游戏图标查看；样例采用轮廓更简洁的史莱姆。",
+  "recommendation": "保留类型框与MC原版低像素密度；六张主体样例已落地，其他法术先统一边框颜色，命名备选尚未应用。",
+  "latestFeedback": "恢复类型边框，投射物橙红、修正蓝；黑洞、汇聚之光、双重施放重新绘制。",
   "production": {
   "status": "six_sample_icons_applied",
   "ids": [
@@ -131,8 +131,10 @@
   "generator": "tools/spells/generate_icons.py",
   "preview": "spell-icons-native.png",
   "gameScreenshot": "spell-icons-inventory.png",
-  "notes": "真实16px逐像素原稿；穿刺贯穿史莱姆，白金聚光；其余60张保持旧图标。显示名与玩法未修改。",
-  "validation": "build通过；尺寸/硬透明/有限色数/JAR字节/生成幂等性通过；spell_icons原生76帧零丢帧、3项界面同步检查及画面日志门禁通过。"
+  "bodySize": [12, 12],
+  "frames": {"projectile": "橙红", "modifier": "蓝", "other": "原紫色"},
+  "notes": "12px逐像素主体配16px圆形类型框；穿刺贯穿史莱姆、黑洞暗核与旋入亮边、细长白金光迹、扇形双卡；其余主体保持不变。完整目录按已注册类的继承链配色，显示名与玩法未修改。",
+  "validation": "build通过；完整目录类型边框/硬透明/JAR字节及其余主体一致性、六张样例16px尺寸/有限色数/生成幂等性通过；spell_icons原生76帧零丢帧、3项界面同步检查及画面日志门禁通过。"
 },
   "accuracyRevision": {
   "image": "spell-style-coarse-accuracy.png",

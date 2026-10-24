@@ -1,8 +1,9 @@
 """重建全部注册法术的硬边像素卡图标；有限实色色板，无抗锯齿或半透明像素。"""
 from pathlib import Path
 import json, re
+from functools import cache
 from PIL import Image, ImageDraw, ImageFont
-from pixel_icons import SPRITES, pixel_icon
+from pixel_icons import FRAME_COLORS, SPRITES, pixel_icon
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'src/main/resources/assets/primalspells/textures/item'
@@ -23,13 +24,13 @@ ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
 
 
 def icon(name):
-    pixel = pixel_icon(name)
+    category = registered_categories()[name]
+    pixel = pixel_icon(name, category)
     if pixel is not None:
         return pixel
     im = Image.new('RGBA', (32,32))
     d = ImageDraw.Draw(im)
-    rim = '#d6a650' if name in PROJECTILES else '#9972c8'
-    dark = '#78552f' if name in PROJECTILES else '#533f74'
+    rim, dark = FRAME_COLORS[category]
     outline = ((9,1),(22,1),(27,4),(30,9),(30,22),(27,27),(22,30),(9,30),(4,27),(1,22),(1,9),(4,4))
     d.polygon(outline, fill='#101721')
     d.polygon(((10,2),(21,2),(26,5),(29,10),(29,21),(26,26),(21,29),(10,29),(5,26),(2,21),(2,10),(5,5)), fill=dark)
@@ -202,17 +203,31 @@ def icon(name):
     return im.resize((64,64),Image.Resampling.NEAREST)
 
 
-def registered_ids():
+@cache
+def registered_categories():
+    """按已注册类的继承链识别类型，避免新卡遗漏在手写分类表之外。"""
     classes = re.findall(r'register \{ (\w+)\(\) }', (ROOT/'src/main/kotlin/work/nekow/primalspells/registry/ModSpells.kt').read_text(encoding='utf-8'))
-    result=[]
+    sources = {p.stem: p.read_text(encoding='utf-8') for p in MAGIC.rglob('*.kt')}
+    roots = {'Projectile': 'projectile', 'Modifier': 'modifier', 'DrawAction': 'other'}
+    result={}
     for cls in classes:
-        path=next(p for p in MAGIC.rglob(cls+'.kt'))
-        result.append(re.search(r'override val id = "([^"]+)"',path.read_text(encoding='utf-8'))[1])
+        name = re.search(r'override val id = "([^"]+)"', sources[cls])[1]
+        ancestor = cls
+        visited = set()
+        while ancestor not in roots:
+            if ancestor in visited:
+                raise ValueError(f'循环继承：{cls}')
+            visited.add(ancestor)
+            parent = re.search(r'\bclass\s+' + re.escape(ancestor) + r'\b[^{]*:\s*(\w+)', sources[ancestor])
+            if parent is None:
+                raise ValueError(f'无法识别类型：{cls} → {ancestor}')
+            ancestor = parent[1]
+        result[name] = roots[ancestor]
     return result
 
 
 def main():
-    assert set(registered_ids())==set(IDS), 'Glyph table must cover the registry exactly'
+    assert set(registered_categories())==set(IDS), 'Glyph table must cover the registry exactly'
     for name in IDS:
         image=icon(name);path=OUT/(name+'.png')
         # Pillow版本或编码选项变化不应让未改画面的资源出现二进制噪声。

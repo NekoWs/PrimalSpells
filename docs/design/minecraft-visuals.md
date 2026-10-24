@@ -10,15 +10,17 @@ glowing用于魔法核心/边界免环境光，烟尘等保留世界受光。造
 
 ## 法术卡图标
 
-火球、汇聚之光、黑洞、锯片、穿刺、双重施放已替换为原生16×16样例：无抗锯齿，alpha仅0/255，每张4～7种实色，无通用圆形徽章。其余法术暂保留32×32逻辑像素、最近邻放大至64×64的旧图标，待样例评估后扩展；法术ID、物品模型和语言键不变。
+类型框必须保留：投射物（含静态投射物）为橙红边框，修正为蓝边框，其他抽牌控制卡保留原紫框。生成器读取已注册类的继承链决定类型，不用旧的手写分组判定，避免锯片、治疗弹或多重施放被分错类。
 
-`tools/spells/pixel_icons.py` 保存六张显式16×16像素原稿，每字符一个像素。`python tools/spells/generate_icons.py` 优先读取这些原稿，其他卡走原生成器；仅在尺寸或像素实际变化时写资源，避免PNG编码差异污染提交。输出全目录预览 `build/verify/spell-icons-mc.png` 和六张样例 `build/verify/spell-icons-selected.png`；同时检查放大图与原生16px物品栏。注册数量以ModSpells/SpellRegistry为准。
+火球、汇聚之光、黑洞、锯片、穿刺、双重施放采用16×16圆形类型框与12×12主体原稿：无抗锯齿，alpha仅0/255，主体3～7种实色，边框额外使用4种实色。其余法术暂保留32×32逻辑像素、最近邻放大至64×64的旧主体，仅同步边框配色；法术ID、物品模型和语言键不变。
+
+`tools/spells/pixel_icons.py` 保存六张显式12×12主体原稿，每字符一个像素，并绘制16×16类型框。`python tools/spells/generate_icons.py` 的registered_categories读取注册与继承关系，统一新旧图标边框颜色；优先读取像素原稿，其他卡走原主体生成器。仅在尺寸或像素实际变化时写资源，避免PNG编码差异污染提交。输出全目录预览 `build/verify/spell-icons-mc.png` 和六张样例 `build/verify/spell-icons-selected.png`；同时检查放大图与原生16px物品栏。注册数量以ModSpells/SpellRegistry为准。
 
 ### 图标表达与样例
 
-每张图只表达本法术的行为，不加无关封印片、宝石或碎屑。火球为火焰，黑洞为紫蓝漩涡，锯片为连续锯盘，双重施放仅展示抽出的两张空白卡，不附带闪电或投射物。汇聚之光为由宽收窄的暖白金色光束，避免对称斜线形成大于号；颜色对照ConcentratedLightFx白光脊RGB(255,253,233)与金色侧线RGB(255,204,88)。穿刺用投射物贯穿绿色史莱姆表达：保留方形身体与眼睛、两侧可见的贯通弹道，不表达穿墙。
+类型框之外，主体只表达本法术的行为，不加无关封印片、宝石或碎屑。火球为火焰，锯片为连续锯盘，穿刺用投射物贯穿绿色史莱姆表达：保留方形身体与眼睛、两侧可见的贯通弹道，不表达穿墙。黑洞突出深黑暗核与不对称旋入的紫蓝亮边；双重施放为扇形展开的两张空白卡，不附带闪电或投射物。汇聚之光为斜向延伸的细长白金光迹，避免实心三角或大于号；颜色对照ConcentratedLightFx白光脊RGB(255,253,233)与金色侧线RGB(255,204,88)。
 
-[实际贴图对照](references/spell-icons-native.png)由生成器直接放大真实16px资源，下方保留原尺寸；[原版物品栏截图](references/spell-icons-inventory.png)来自spell_icons原生录制，不使用自绘界面或概念图拼接。六张尺寸、硬透明、色数及JAR内字节均检查通过；录制76帧、零丢帧、3项物品同步/界面检查和画面/日志门禁通过。复验命令见 [构建指南](../build-and-run.md#9-实机录制流水线)。
+[实际贴图对照](references/spell-icons-native.png)由生成器直接放大真实16px资源，下方保留原尺寸；[原版物品栏截图](references/spell-icons-inventory.png)来自spell_icons原生录制，不使用自绘界面或概念图拼接。完整注册目录的类型边框、硬透明及JAR内字节均检查通过，其余旧主体逐像素保持一致；六张样例另检查16px尺寸与有限色数。录制76帧、零丢帧、3项物品同步/界面检查和画面/日志门禁通过。复验命令见 [构建指南](../build-and-run.md#9-实机录制流水线)。
 
 原始概念对照：[A 遗迹石刻](references/spell-style-a-relic-carvings.png)、[B 秘典墨绘](references/spell-style-b-grimoire-ink.png)、[C 晶质珐琅](references/spell-style-c-crystal-enamel.png)、[D 黑曜封印](references/spell-style-d-obsidian-seals.png)。概念图由内置imagegen生成，提示词、参考图及命名备选见 [提案清单](references/spell-style-proposals.json)；它们不是真实游戏贴图。参考用户提供的Noita图标语义与像素密度，不直接复制素材或像素布局。
 

@@ -92,6 +92,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
 | spell_performance | 固定32发高速物理/制导、512普通/冻结弹联动，逐样本服务端计时与线程分配；[口径与结果](design/performance.md) |
 | collision_precision | 原版可命中契约（掉落物/经验球/交互过滤、荷载不消费、物品展示框正例）、双精度接点、24种斜反弹、单刻余程、薄形状/拼缝/跨格形状、墙角分量、命中排序、自伤豁免与真实路径联动 |
+| piercing_contact | 木桩真实伤害/次数随速度变化、接触时钟跨刻/目标隔离、同刻反弹重入、锯片帧伤、普通单次命中和子步内薄箱接触 |
 | homing_light | 前方优先/后方排除、同刻穿透换靶与接缝、64格光脊、穿刺付费冷却与十刻蓄能 |
 | projectile_flight / fireball_trail | 原版弩速对比、六格扫掠追踪、复制速度、实际alpha递减 |
 | black_hole / black_hole_moving / gravity_field / gravity_field_moving | 区域场原维度、移动跟随和收尾 |
@@ -117,6 +118,8 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 当前PD原生复验：light_boundary、spell_lighting、homing_light、particle_lighting、projectile_flight、pd_api、fireball_trail七场78项机制检查、982帧、0丢帧，机制与视觉门禁均通过。等价光场地形RGB差>5的像素占比为0.00%（要求≤1%）；默认零光源拖尾通过普通粒子只读visitor恢复逐颗alpha检查。已知5条OSHI诊断按用户要求计入忽略项，其他日志门禁保持。预算压力、多人与1～2t高刷范围仍见 [verify](issues/verify.md)，其他未过门禁见 [open](issues/open.md)。
 
 实体筛选回归：collision_precision、homing_light、spell_chain、shield_balance四场209项机制检查、940帧零丢帧，画面/日志门禁通过。EntityHitChecks实际生成掉落物、经验球、药水云、交互/文本展示实体及物品展示框，检查真实扫掠、命中次数和触发荷载；不靠实体类型黑名单或仅验证筛选函数。
+
+穿刺计时回归：`pwsh tools/capture/capture.ps1 -Offline -Scene piercing_contact,collision_precision,homing_light,spell_chain,shield_balance,spell_performance -TimeoutSec 600`。piercing_contact直接读取木桩totalDamage与弹体hitTargets，不用跳字合并数量替代实际伤害；覆盖0.25/0.5/1/2/4倍速度、不同入射相位、跨刻重叠、刻末首次进入、多个目标、同刻反弹重入、锯片逐刻伤害、薄箱和墙体遮挡。六场232项检查、1220帧零丢帧，机制、画面与日志门禁通过。证据位于`build/capture/out`，重新录制前需按本节规则归档。
 
 当前性能与运动回归命令、测量负载和结果统一见[性能基准](design/performance.md)。正常捕获还检查碰撞、前方追踪/穿透切线、实际法杖命中、付费/独立荷载、护盾和晶体生命周期；机制与视觉门禁分别统计，未用FPS代替服务端计时。
 

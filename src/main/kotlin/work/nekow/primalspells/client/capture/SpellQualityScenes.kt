@@ -22,7 +22,7 @@ import work.nekow.primalspells.wand.Wand
 /** 第54轮：真实法杖发射、生命周期和跨投射物反应的实机回归。 */
 object SpellQualityScenes {
     /** 注册联动验收场景。 */
-    fun all(): List<Scene> = listOf(resonance(), stability(), mechanics(), SpellTimingScenes.scene(), CrystalLifecycleScene.scene(), CombatImpactScene.scene(), DamageMassScene.scene(), DeathAttributionScene.scene(), RecoilLightScene.scene(), RecoilLightScene.firstPerson(), ShieldBalanceScene.scene())
+    fun all(): List<Scene> = listOf(resonance(), stability(), mechanics(), SpellTimingScenes.scene(), CrystalLifecycleScene.scene(), CombatImpactScene.scene(), DamageMassScene.scene(), DeathAttributionScene.scene(), PiercingContactScene.scene(), RecoilLightScene.scene(), RecoilLightScene.firstPerson(), ShieldBalanceScene.scene())
     private fun cast(ctx: CaptureDriver.SceneCtx, ids: List<String>, x: Double, y: Double, z: Double,
         yaw: Float = 0f, pitch: Float = 0f, source: Entity = ctx.player) {
         source.setPos(x, y, z); source.setYRot(yaw); source.setXRot(pitch); source.setOldPosAndRot()

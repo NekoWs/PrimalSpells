@@ -16,6 +16,7 @@
 | 追踪与弹速 | 扫掠预计飞行段找六格侧向范围内的目标中心，前方对准度优先，排除后方回锁；穿透后当刻沿当前切线渐入新目标的曲率，不抑制重复伤害；真实子步与光束共用路径 | homing_light、projectile_flight |
 | 汇聚之光 | 原地锁定方向蓄能10t，释放后64格/t连续光脊；装“光”时本体照明有限退场，保留真实5次墙反弹 | homing_light、recoil_light、concentrated_light_first_person |
 | 穿刺代价 | 每张增加10t施放延迟，预览与实际付费一致；多卡叠加，链锯仍清整次delay | homing_light |
+| 穿刺接触次数 | 消除按空间子步重复伤害；首次立即命中，之后按1/16刻实际接触时间结算，默认水平穿木桩4次，提速更少；保留跨刻、重新进入、同刻反弹、穿刺荷载与锯片逐刻伤害，刻末首次进入不遗漏/双算 | piercing_contact（19项）、collision_precision、homing_light、spell_chain、shield_balance |
 | MP与存档 | 当前MP封顶；空槽/牌堆保序；完整刻迁移旧秒/毫秒；复制不共享wandId | spell_mechanics、exploration、magic_hud |
 | 伤害 | 独立分类；原版死亡界面/聊天显示真实施法者、自伤明确、未知来源不冒用旧攻击者；中英文文案贴近原版；正治疗恢复、负治疗伤害；强度击退与假人免击退 | death_attribution、damage_mass、combat_impact、new_spells |
 | 多卡护盾 | 卡数提高抗性与立方窗口预算，破盾当次仍吸收；无常驻壳和多余圆环 | shield_balance |

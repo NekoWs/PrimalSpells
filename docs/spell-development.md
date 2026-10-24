@@ -36,6 +36,8 @@ class ExampleBolt : Projectile() {
 
 DirectDamage声明单次直接强度，实际命中走SpellDamage/SpellImpact；不要绕过护盾、事件、类型、冻结或击退入口。持续攻击同目标每刻最多一次使用damageOncePerTick。
 
+Move对同一目标首次接触立即命中，后续每1/16刻接触结算；不要在空间子步内额外调用hitEntity或按子步数量计算伤害。更快穿过目标会减少次数，慢速停留会增加；完整刻内持续接触最多16次回调。damageOncePerTick仍可将这些回调产生的同目标伤害限制为每刻一次。直接手动调用hitEntity的特殊法术需自行声明频率，不能据此绕过普通飞行的接触时钟。
+
 ## 3. 修正与阶段
 
 世界位置（Projectile.position、MagicStatus.pos、HitResult.pos及onHitBlock参数）使用Vector3d；从原版Vec3用toPosition转换，传回原版/PD用toVec3。速度与方向仍使用Vector3f，必须先用double世界坐标做差，再转换局部向量；复制/触发荷载不得中途降低接点精度。Move统一完成分段扫掠与本刻余时，效果不要另写端点碰撞或反弹后手动截断移动。

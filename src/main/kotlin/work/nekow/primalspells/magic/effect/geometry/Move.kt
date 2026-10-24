@@ -21,7 +21,8 @@ import work.nekow.primalspells.util.toVec3
 /**
  * 唯一的普通位置积分器：双精度世界坐标，1/16格曲线分段，每段解析求真实接点。
  * 墙、球壳、实体按进入时间排序；反弹重排本刻剩余时间，不丢失剩余移动。
- * 实体内的重复接触仍按子步/刻回调，持续切割自行通过damageOncePerTick限频。
+ * 实体首次接触立即命中，之后按接触时间每1/16刻重复，独立于空间子步和弹速。
+ * 持续切割另由damageOncePerTick限制同目标每刻伤害。
  */
 class Move(
     val dragCoeff: Float = 0.01F,
@@ -38,7 +39,9 @@ class Move(
     private var neighborhoodLow = 0L
     private var neighborhoodHigh = 0L
     private val impacts = arrayListOf<Impact>()
-    private val resumeEntities = hashSetOf<Entity>()
+    /** 只保留尚未到期的目标接触时钟；重排路径/跨刻不能重复派发同一时刻的接触。 */
+    private val nextEntityContact = hashMapOf<Entity, Double>()
+    private var motionTicks = 0L
     private class Collider(val entity: Entity, var original: AABB, var box: AABB)
 
     private fun record(point: Vec3) {
@@ -47,6 +50,7 @@ class Move(
     private data class Impact(val contact: SweptCollision.Contact, val entity: Entity? = null, val shield: Boolean = false)
 
     override fun onTick() {
+        val tickStart = motionTicks++.toDouble()
         if (!projectile.alive || !projectile.motionEnabled) return
         val speed = status.velocity.length()
         status.velocity.mul(1 / (1 + dragCoeff * speed))
@@ -54,7 +58,7 @@ class Move(
         loadedChunks.clear()
         collisionAreaLoaded = true
         neighborhoodValid = false
-        resumeEntities.clear()
+        nextEntityContact.entries.removeIf { it.value <= tickStart }
         val start = status.pos.toVec3()
         record(start)
         val level = caster.level() as? ServerLevel
@@ -71,7 +75,6 @@ class Move(
             level!!.getEntitiesOfClass(LivingEntity::class.java, swept.inflate(2.7)) {
                 projectile.canHitEntity(it) && it !== caster && ShieldGuard.hasShield(it)
             } else emptyList()
-        // 同一个接点换靶后不再立刻重复它；下一完整子步恢复原有持续命中语义。
         val startVelocity = Vector3f()
         while (remainingTime > 1e-10 && projectile.alive && projectile.motionEnabled) {
             val movement = Vector3f(status.velocity)
@@ -86,6 +89,7 @@ class Move(
                 startVelocity.set(status.velocity)
                 val to = step.position
                 val stepTime = step.distance / segmentSpeed
+                val stepStart = tickStart + 1.0 - remainingTime
                 impacts.clear()
                 if (collision) {
                     if (!throughBlocks) {
@@ -102,7 +106,7 @@ class Move(
                     if (!leftCaster && !caster.boundingBox.inflate(hitRadius).contains(from)) leftCaster = true
                     for (candidate in candidates) {
                         val entity = candidate.entity
-                        if (entity in resumeEntities || entity === caster && !leftCaster || !projectile.canHitEntity(entity)) continue
+                        if (entity === caster && !leftCaster || !projectile.canHitEntity(entity)) continue
                         val currentBox = entity.boundingBox
                         if (currentBox !== candidate.original) {
                             candidate.original = currentBox; candidate.box = currentBox.inflate(hitRadius)
@@ -110,7 +114,22 @@ class Move(
                         val box = candidate.box
                         val hit = if (box.contains(from)) SweptCollision.Contact(0.0, from, Vec3.ZERO, 0)
                             else SweptCollision.entry(from, to, box)
-                        hit?.let { impacts += Impact(it, entity) }
+                        if (hit != null) {
+                            // 解析出本段真正位于命中箱内的时间区间，不能把整个子步当作接触时间。
+                            val exitFraction = if (box.contains(to)) 1.0 else
+                                SweptCollision.entry(to, from, box)?.let { 1.0 - it.fraction } ?: hit.fraction
+                            val exitTime = stepStart + stepTime * exitFraction
+                            val entryTime = stepStart + stepTime * hit.fraction
+                            var contactTime = max(entryTime,
+                                nextEntityContact[entity] ?: Double.NEGATIVE_INFINITY)
+                            // 持续接触的刻末重复交给下一刻；真实首次进入即使刚好落在刻末也不能漏掉。
+                            while (contactTime <= exitTime + TIME_EPSILON &&
+                                (contactTime < tickStart + 1.0 - TIME_EPSILON || hit.fraction > 0.0 && abs(contactTime - entryTime) <= TIME_EPSILON)) {
+                                val contactFraction = ((contactTime - stepStart) / stepTime).coerceIn(0.0, 1.0)
+                                impacts += Impact(SweptCollision.Contact(contactFraction, from.lerp(to, contactFraction), Vec3.ZERO, 0), entity)
+                                contactTime += ENTITY_CONTACT_INTERVAL
+                            }
+                        }
                     }
                 }
                 // 同距先墙后盾后实体；隔着墙的实体不能抢先受到伤害。
@@ -131,7 +150,9 @@ class Move(
                         }
                     } else {
                         record(hit.point)
-                        projectile.hitEntity(impact.entity).also { resumeEntities += impact.entity }
+                        // 只有实际执行的命中才推进时钟，前方墙/护盾截断不能提前消费后续接触。
+                        nextEntityContact[impact.entity] = stepStart + stepTime * hit.fraction + ENTITY_CONTACT_INTERVAL
+                        projectile.hitEntity(impact.entity)
                     }
                     blockShapes.clear(); neighborhoodValid = false // 命中回调可能改变地形，下个子步重新取形状。
                     if (!projectile.alive || !projectile.motionEnabled) return
@@ -142,7 +163,6 @@ class Move(
                     }
                 }
                 if (replan) break
-                resumeEntities.clear()
                 status.pos.set(to.x, to.y, to.z)
                 status.velocity.set(step.velocity)
                 guidance?.travelled = step.guidanceTravel
@@ -208,6 +228,8 @@ class Move(
     }
 
     private companion object {
+        const val ENTITY_CONTACT_INTERVAL = 1.0 / 16
+        const val TIME_EPSILON = 1e-10
         val IMPACT_ORDER = compareBy<Impact> { it.contact.fraction }
             .thenBy { if (it.entity == null) 0 else if (it.shield) 1 else 2 }.thenBy { it.entity?.id ?: 0 }
     }

@@ -1,0 +1,127 @@
+{
+  "status": "proposal_only_not_applied",
+  "date": "2026-10-24",
+  "tool": "built-in image_gen",
+  "scope": "法术物品图标画风与中文显示名提案；未修改运行时资源、语言键或数值。",
+  "subjects": [
+    "火球",
+    "汇聚之光",
+    "黑洞",
+    "锯片",
+    "穿刺",
+    "双重施放"
+  ],
+  "namingSchemes": {
+    "arcane": "① 原初术式：短名、术式感、由说明补足精确机制。",
+    "clear": "② 清晰奇幻：名字可以推测用途，兼顾独立世界观与易读性。",
+    "relic": "③ 遗物铭文：法术以刻片/刻印/铭文为实物，适合探索获取。"
+  },
+  "namingExamples": [
+    {
+      "current": "火球",
+      "arcane": "烬弹",
+      "clear": "余烬弹",
+      "relic": "余烬刻片"
+    },
+    {
+      "current": "触发火球",
+      "arcane": "寄焰",
+      "clear": "载咒火球",
+      "relic": "寄焰刻片"
+    },
+    {
+      "current": "汇聚之光",
+      "arcane": "聚辉",
+      "clear": "凝光矛",
+      "relic": "贯光铭文"
+    },
+    {
+      "current": "链锯",
+      "arcane": "瞬切",
+      "clear": "疾切术",
+      "relic": "疾刃刻印"
+    },
+    {
+      "current": "锯片",
+      "arcane": "旋刃",
+      "clear": "回旋刃",
+      "relic": "回刃刻片"
+    },
+    {
+      "current": "黑洞",
+      "arcane": "坠核",
+      "clear": "引力核",
+      "relic": "沉星残印"
+    },
+    {
+      "current": "等离子束",
+      "arcane": "辉流",
+      "clear": "熔光束",
+      "relic": "熔光铭文"
+    },
+    {
+      "current": "量子纠缠",
+      "arcane": "共命",
+      "clear": "共生双影",
+      "relic": "同契刻印"
+    },
+    {
+      "current": "双重施放",
+      "arcane": "双咒",
+      "clear": "二联施法",
+      "relic": "双生铭文"
+    },
+    {
+      "current": "一分为十",
+      "arcane": "十重拓印",
+      "clear": "十份摹写",
+      "relic": "十重摹本"
+    }
+  ],
+  "namingRules": [
+    "保留穿刺、反弹、治疗等清楚的通用机制词，不以生僻词替代所有术语。",
+    "并咒表示同时施放多个法术链，拓印表示复制后方单卡，寄咒表示将独立术式储存在载体内。",
+    "尚未选择具体方案；各方案可与任意画风组合，不修改既有法术ID。"
+  ],
+  "imageConstraints": "图片为画风概念板，非精确32×32像素资产，也非游戏截图。不能直接整体缩小替换资源。选定后先做六张真实32×32逻辑像素图标并检查16px物品栏可读性，再扩展全目录。",
+  "commonPrompt": "Use case: stylized-concept.\nAsset type: original Minecraft magic mod inventory-icon art-direction proposal, NOT a screenshot and NOT a finished sprite export.\nCreate one beautiful, disciplined comparison board for one art direction, landscape composition around 1536 by 1024. Dark charcoal neutral flat background, six isolated LARGE pixel-art item icons in a spacious 3-column by 2-row grid. Main focus the six sprites, not presentation decorations. Make icons visually convincing as coarse logical 32x32 sprites enlarged with nearest-neighbor pixels: crisp square pixels, strong chunky silhouettes, limited deliberate flat palette, 2-3 discrete shade bands per material, no gradients, no bloom, no blur, no soft particles, no anti-aliasing, no realistic texture noise, no micro-detail. Readable at inventory scale. These should feel like original collectable magic items, NOT modern app icons.\nIdentical subject order for all proposal boards: 1 top left a compact fire projectile/fire seed with clear ember core; 2 top middle concentrated light, three gathered rays becoming one bright spear; 3 top right an inward gravity core, asymmetrical inward bending pieces around a dark void, NOT a ringed planet; 4 bottom left a sharp circular rotating cutting blade with chunky teeth; 5 bottom middle a piercing modifier, one sharp projectile visibly passing through two slabs; 6 bottom right a double-cast instruction, one starting mark branching into two identical outgoing spell marks, NOT two playing cards. Each subject must have a distinct silhouette and clear functional metaphor. No shared circular badge, no enclosing coin, no ornate card frames, no generic plus-sign overlays, no Noita imagery, no game logos.\nTop margin only the single requested large Latin option letter and its English title, small icon numerals 1 2 3 4 5 6 adjacent to the grid cells, no other lettering. Bottom margin one understated horizontal inventory strip repeating all six designs at a much smaller scale, crisp pixels, in simple grey Minecraft-like square inventory slots. Show the actual proposed sprite style again in miniature, not different sprites. The large sprites must remain the dominant visual area, with plenty of empty space between them.",
+  "styles": [
+    {
+      "key": "A",
+      "title": "RELIC CARVINGS",
+      "image": "spell-style-a-relic-carvings.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: original Minecraft magic mod inventory-icon art-direction proposal, NOT a screenshot and NOT a finished sprite export.\nCreate one beautiful, disciplined comparison board for one art direction, landscape composition around 1536 by 1024. Dark charcoal neutral flat background, six isolated LARGE pixel-art item icons in a spacious 3-column by 2-row grid. Main focus the six sprites, not presentation decorations. Make icons visually convincing as coarse logical 32x32 sprites enlarged with nearest-neighbor pixels: crisp square pixels, strong chunky silhouettes, limited deliberate flat palette, 2-3 discrete shade bands per material, no gradients, no bloom, no blur, no soft particles, no anti-aliasing, no realistic texture noise, no micro-detail. Readable at inventory scale. These should feel like original collectable magic items, NOT modern app icons.\nIdentical subject order for all proposal boards: 1 top left a compact fire projectile/fire seed with clear ember core; 2 top middle concentrated light, three gathered rays becoming one bright spear; 3 top right an inward gravity core, asymmetrical inward bending pieces around a dark void, NOT a ringed planet; 4 bottom left a sharp circular rotating cutting blade with chunky teeth; 5 bottom middle a piercing modifier, one sharp projectile visibly passing through two slabs; 6 bottom right a double-cast instruction, one starting mark branching into two identical outgoing spell marks, NOT two playing cards. Each subject must have a distinct silhouette and clear functional metaphor. No shared circular badge, no enclosing coin, no ornate card frames, no generic plus-sign overlays, no Noita imagery, no game logos.\nTop margin only the single requested large Latin option letter and its English title, small icon numerals 1 2 3 4 5 6 adjacent to the grid cells, no other lettering. Bottom margin one understated horizontal inventory strip repeating all six designs at a much smaller scale, crisp pixels, in simple grey Minecraft-like square inventory slots. Show the actual proposed sprite style again in miniature, not different sprites. The large sprites must remain the dominant visual area, with plenty of empty space between them.\n\nDirection A: RELIC CARVINGS. Icons are irregular fragments of ancient dark slate / basalt engraved with bold magical pictograms. Heavy chipped square-pixel stone silhouettes, dry stony texture expressed with only a FEW large pixels, warm limestone cuts and muted oxidized turquoise and ember ochre pigment inside the engraved shapes. Different broken stone fragment contour for each icon; not all rectangular tablets or all round stones. The fire icon is a chipped ember-bearing stone, the light icon a narrow cut stone ray-glyph, gravity is broken inward pointing stone wedges around a void, blade visibly made of dark chipped stone with a sharp pale edge, piercing two broken stone layers traversed by a thin glyph, double-cast forked carved inscription. Quiet archaeological Minecraft relic atmosphere, functional large graphic shapes. Restrained matte materials, broad contrast, no glow. Header EXACTLY \"A  RELIC CARVINGS\"."
+    },
+    {
+      "key": "B",
+      "title": "GRIMOIRE INK",
+      "image": "spell-style-b-grimoire-ink.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: original Minecraft magic mod inventory-icon art-direction proposal, NOT a screenshot and NOT a finished sprite export.\nCreate one beautiful, disciplined comparison board for one art direction, landscape composition around 1536 by 1024. Dark charcoal neutral flat background, six isolated LARGE pixel-art item icons in a spacious 3-column by 2-row grid. Main focus the six sprites, not presentation decorations. Make icons visually convincing as coarse logical 32x32 sprites enlarged with nearest-neighbor pixels: crisp square pixels, strong chunky silhouettes, limited deliberate flat palette, 2-3 discrete shade bands per material, no gradients, no bloom, no blur, no soft particles, no anti-aliasing, no realistic texture noise, no micro-detail. Readable at inventory scale. These should feel like original collectable magic items, NOT modern app icons.\nIdentical subject order for all proposal boards: 1 top left a compact fire projectile/fire seed with clear ember core; 2 top middle concentrated light, three gathered rays becoming one bright spear; 3 top right an inward gravity core, asymmetrical inward bending pieces around a dark void, NOT a ringed planet; 4 bottom left a sharp circular rotating cutting blade with chunky teeth; 5 bottom middle a piercing modifier, one sharp projectile visibly passing through two slabs; 6 bottom right a double-cast instruction, one starting mark branching into two identical outgoing spell marks, NOT two playing cards. Each subject must have a distinct silhouette and clear functional metaphor. No shared circular badge, no enclosing coin, no ornate card frames, no generic plus-sign overlays, no Noita imagery, no game logos.\nTop margin only the single requested large Latin option letter and its English title, small icon numerals 1 2 3 4 5 6 adjacent to the grid cells, no other lettering. Bottom margin one understated horizontal inventory strip repeating all six designs at a much smaller scale, crisp pixels, in simple grey Minecraft-like square inventory slots. Show the actual proposed sprite style again in miniature, not different sprites. The large sprites must remain the dominant visual area, with plenty of empty space between them.\n\nDirection B: GRIMOIRE INK. Flat hand-inked fantasy bestiary / old grimoire miniature drawings translated into very chunky pixel sprites, on small irregular aged parchment scraps. Dry soot-black and sepia brush silhouettes, ivory parchment, tiny restrained accents of burnt vermilion and faded indigo. Stylized ink strokes are chunky square pixel staircases, not fluid smooth anti-aliased brushwork. Each parchment piece follows the shape of its drawing, so silhouettes differ; NOT large paper rectangles around every icon. Fire an ink flame on a small ochre fragment, light a long stark ray diagram, gravity a black pool surrounded by bent ink lines, saw a simple charcoal toothed wheel, piercing two ink cross-sections pierced by an arrow, double cast a branching magic notation. Elegant, legible medieval field notes / spell journal atmosphere, not occult horror and no readable spell words. Mostly flat highly readable silhouettes, very low detail. Header EXACTLY \"B  GRIMOIRE INK\"."
+    },
+    {
+      "key": "C",
+      "title": "CRYSTAL ENAMEL",
+      "image": "spell-style-c-crystal-enamel.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: original Minecraft magic mod inventory-icon art-direction proposal, NOT a screenshot and NOT a finished sprite export.\nCreate one beautiful, disciplined comparison board for one art direction, landscape composition around 1536 by 1024. Dark charcoal neutral flat background, six isolated LARGE pixel-art item icons in a spacious 3-column by 2-row grid. Main focus the six sprites, not presentation decorations. Make icons visually convincing as coarse logical 32x32 sprites enlarged with nearest-neighbor pixels: crisp square pixels, strong chunky silhouettes, limited deliberate flat palette, 2-3 discrete shade bands per material, no gradients, no bloom, no blur, no soft particles, no anti-aliasing, no realistic texture noise, no micro-detail. Readable at inventory scale. These should feel like original collectable magic items, NOT modern app icons.\nIdentical subject order for all proposal boards: 1 top left a compact fire projectile/fire seed with clear ember core; 2 top middle concentrated light, three gathered rays becoming one bright spear; 3 top right an inward gravity core, asymmetrical inward bending pieces around a dark void, NOT a ringed planet; 4 bottom left a sharp circular rotating cutting blade with chunky teeth; 5 bottom middle a piercing modifier, one sharp projectile visibly passing through two slabs; 6 bottom right a double-cast instruction, one starting mark branching into two identical outgoing spell marks, NOT two playing cards. Each subject must have a distinct silhouette and clear functional metaphor. No shared circular badge, no enclosing coin, no ornate card frames, no generic plus-sign overlays, no Noita imagery, no game logos.\nTop margin only the single requested large Latin option letter and its English title, small icon numerals 1 2 3 4 5 6 adjacent to the grid cells, no other lettering. Bottom margin one understated horizontal inventory strip repeating all six designs at a much smaller scale, crisp pixels, in simple grey Minecraft-like square inventory slots. Show the actual proposed sprite style again in miniature, not different sprites. The large sprites must remain the dominant visual area, with plenty of empty space between them.\n\nDirection C: CRYSTAL ENAMEL. Compact tangible magic charms made of solid faceted crystal and small bright enamel inlays, chunky original Minecraft item sprites. High-contrast polished but NOT glossy-realistic, highlights made of hard 1-2 logical pixel facets, no reflections rendered as gradients, saturated jewel colors with deliberate clean shadow bands. No external frames: each magic subject itself is the object. Fire is an amber/red crystal ember, light is a pale gold crystal spear, gravity a dark indigo fractured crystal with inward curling pale violet prongs, blade a broad silver/cyan toothed disk, piercing a mint crystal spike cleanly through two slate chips, double cast a turquoise branching crystal sprout with two matching tips. Jewel orange, luminous ivory, sapphire, pale steel, mint, and cool teal create immediately distinct functions. Cheerful precious magic collectible feeling, professional high-readability pixel inventory sprites, never round app badges. Header EXACTLY \"C  CRYSTAL ENAMEL\"."
+    },
+    {
+      "key": "D",
+      "title": "OBSIDIAN SEALS",
+      "image": "spell-style-d-obsidian-seals.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: original Minecraft magic mod inventory-icon art-direction proposal, NOT a screenshot and NOT a finished sprite export.\nCreate one beautiful, disciplined comparison board for one art direction, landscape composition around 1536 by 1024. Dark charcoal neutral flat background, six isolated LARGE pixel-art item icons in a spacious 3-column by 2-row grid. Main focus the six sprites, not presentation decorations. Make icons visually convincing as coarse logical 32x32 sprites enlarged with nearest-neighbor pixels: crisp square pixels, strong chunky silhouettes, limited deliberate flat palette, 2-3 discrete shade bands per material, no gradients, no bloom, no blur, no soft particles, no anti-aliasing, no realistic texture noise, no micro-detail. Readable at inventory scale. These should feel like original collectable magic items, NOT modern app icons.\nIdentical subject order for all proposal boards: 1 top left a compact fire projectile/fire seed with clear ember core; 2 top middle concentrated light, three gathered rays becoming one bright spear; 3 top right an inward gravity core, asymmetrical inward bending pieces around a dark void, NOT a ringed planet; 4 bottom left a sharp circular rotating cutting blade with chunky teeth; 5 bottom middle a piercing modifier, one sharp projectile visibly passing through two slabs; 6 bottom right a double-cast instruction, one starting mark branching into two identical outgoing spell marks, NOT two playing cards. Each subject must have a distinct silhouette and clear functional metaphor. No shared circular badge, no enclosing coin, no ornate card frames, no generic plus-sign overlays, no Noita imagery, no game logos.\nTop margin only the single requested large Latin option letter and its English title, small icon numerals 1 2 3 4 5 6 adjacent to the grid cells, no other lettering. Bottom margin one understated horizontal inventory strip repeating all six designs at a much smaller scale, crisp pixels, in simple grey Minecraft-like square inventory slots. Show the actual proposed sprite style again in miniature, not different sprites. The large sprites must remain the dominant visual area, with plenty of empty space between them.\n\nDirection D: OBSIDIAN SEALS. Coarse, elegant bone-ivory and black obsidian floating seal fragments with restrained amethyst inlays, matching a Minecraft wand made of segmented black obsidian, bone-white open brackets, and a floating purple crystal. Each icon is an ORIGINAL OPEN physical magical glyph made from 3-6 chunky pieces with generous negative space, not an enclosed medallion. Strong asymmetry and silhouette differentiation. Secondary function-color accents: ember amber for fire, pale gold for light, violet-black for gravity, pale steel for cutting, icy cyan for piercing, restrained teal for dual casting. Material highlights only blocky discrete pixel faces, nearly matte. Fire formed by a small ember held between two separate bone seal fragments, light a long ivory spear converging from three black prongs, gravity inward curved ivory shards pulled toward a black center, blade broken angular silver/bone teeth around an obsidian hub, piercing long sharp bone needle through two separate black strips, double cast one ivory stem splitting into two square violet-tipped branches. Sophisticated arcane artifact aesthetic in coarse pixels, not science-fiction UI, no bloom, no translucent glow, no ornamental clutter. Header EXACTLY \"D  OBSIDIAN SEALS\"."
+    }
+  ],
+  "recommendation": "命名②为基础，少量采用①的短名；画风以D为主。D+为融合后的待选预览，尚未批准替换游戏资源。",
+  "latestFeedback": "用户偏好D的统一材质与开放轮廓，希望扩大元素用色；融合C右上角紫蓝晶体向内卷入的黑洞画法，避免整体变成晶石饰品。",
+  "hybrid": {
+  "key": "D+",
+  "title": "SPECTRAL SEALS",
+  "image": "spell-style-dplus-spectral-seals.png",
+  "mode": "edit",
+  "references": [
+    "spell-style-d-obsidian-seals.png",
+    "spell-style-c-crystal-enamel.png"
+  ],
+  "prompt": "Use case: style-transfer and precise-object-edit.\nAsset type: revised magic mod inventory icon art-direction board, preview ONLY.\nInput Image 1 (D OBSIDIAN SEALS): PRIMARY EDIT TARGET and dominant visual language. Preserve its 3-column by 2-row board arrangement, six subject order, crisp chunky pixels, OPEN glyph/item silhouettes, floating bone-ivory/obsidian fragments, broad negative space and miniature inventory strip. This is the style the user strongly prefers.\nInput Image 2 (C CRYSTAL ENAMEL): SUPPORTING REFERENCE ONLY. Primarily use its TOP RIGHT gravity-vortex icon's actual shape: faceted purple-blue crystalline crescent blades curl into a genuinely dark central void. Do not adopt C's general bright crystal collectible style for the other icons.\nPrimary request: make D visibly more colorful while maintaining its coherent obsidian/bone material grammar, and replace its top-right gravity icon with a D-language interpretation of C's curling crystalline gravity vortex.\nStyle priority: approximately 80% D's design language and 20% C's color richness and gravity motif. Material consistency instead of identical color across every spell. Use larger clear color planes and inlays, about 25-40% of each subject, not just one tiny gem dot. Bone ivory and deep cool obsidian remain a shared anchor. Confident saturated material colors with 2-3 flat shade bands; not washed-out beige, not all purple/grey, not rainbow details on a single icon.\nSix icons same positions and subjects:\n1 top left FIRE: retain D's open broken brackets holding an ember, increase rich orange and crimson core, honey-amber inlays and visible ember-colored planes on a few fragments. Plenty of negative space.\n2 top middle CONCENTRATED LIGHT: keep D's three black/bone prongs focusing into ONE narrow light spear (NOT three parallel missiles). Pale gold and warm ivory light, larger gold inlays on prong tips, blue-grey/obsidian shadows.\n3 top right GRAVITY: the user's favorite form is C's TOP RIGHT icon. Use a strong inward spiraling silhouette of large purple/indigo faceted crescent pieces, with blue-violet facets and deepest black center. Translate into D by adding a FEW clean bone-ivory capped edges and angular obsidian backing to the crescent fragments. Retain a clear black hole and dynamic inward curl, NOT a four-way star, NOT straight crossed brackets, NOT a ringed planet. A few larger floating fragments, no dust cloud.\n4 bottom left CUTTING BLADE: retain D's open rotating blade silhouette, dark obsidian hub, pale steel and bone teeth, stronger cyan/ice-blue cutting-edge faces and a deep blue gem center. Mechanical-magical rather than candy crystal.\n5 bottom middle PIERCING: retain D's long needle visibly going through two separated obsidian slabs, bright cyan-teal needle tip and pronounced blue-violet slab incisions, chunky bone-white shaft.\n6 bottom right DOUBLE CAST: retain D's bone stem branching to two matching seal nodes, larger emerald-teal facets in the two black/bone nodes and a turquoise branching channel; distinct from piercing's blue palette.\nComposition: equal large icon sizes, good padding, actual exposed dark background between all fragments, no shared outer badges or coin borders. Repeat these exact SIX newly revised icons in the bottom inventory strip, not the originals.\nHeader text EXACTLY \"D+  SPECTRAL SEALS\", small numerals 1 2 3 4 5 6. No other text.\nConstraints: hard pixel edges, coarse readable pixel clusters, no anti-aliasing, no gradients, no bloom or halos, no photorealism, no tiny glitter detail. Do not simply recolor all ivory surfaces; preserve the shared ivory/obsidian structure and give each spell intentional functional color. These are concept sprites, not a real game screenshot."
+}
+}

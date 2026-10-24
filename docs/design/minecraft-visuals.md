@@ -14,6 +14,14 @@ glowing用于魔法核心/边界免环境光，烟尘等保留世界受光。造
 
 `python tools/spells/generate_icons.py` 重建资源及预览 `build/verify/spell-icons-mc.png`；同时检查64px与16px物品栏可读性。注册数量以ModSpells/SpellRegistry为准，不保留旧卡总数标题。
 
+### 待选美术提案
+
+以下仅为画风与显示名提案，未替换运行时贴图、语言键或法术ID。当前偏好是D的骨白/黑曜封印结构，扩大元素色的面积，结合C中紫蓝晶体向内卷入的黑洞。融合预览为 [D+](references/spell-style-dplus-spectral-seals.png)，仍待选择；底部物品栏是概念缩略对照，并非游戏截图或真实32×32成品。
+
+原始对照：[A 遗迹石刻](references/spell-style-a-relic-carvings.png)、[B 秘典墨绘](references/spell-style-b-grimoire-ink.png)、[C 晶质珐琅](references/spell-style-c-crystal-enamel.png)、[D 黑曜封印](references/spell-style-d-obsidian-seals.png)。各图顺序为火球、汇聚之光、黑洞、锯片、穿刺、双重施放。使用内置imagegen生成与参考图编辑，完整提示词、参考图及命名备选见 [提案清单](references/spell-style-proposals.json)。
+
+选定后先制作六张真实像素规格的样例，验证16px物品栏可读性，再扩展全套。命名可选择短名术式、清晰奇幻或遗物铭文；保留穿刺、反弹、治疗等通用机制词，区分多链同时施放、单卡复制和独立荷载，避免只换名字后让玩法更难理解。
+
 ## 模型与界面
 
 法杖采用暮紫封印造型：分面黑曜杖身、骨白封印片、紧凑开放式折臂和紫晶，保留细节且遵守游戏面光照；自带粗像素图集、原生模型帧idle和宝石离散亮态，不用写实贴图/独立渲染层。资源见 [wand-materials](wand-materials.md)。

@@ -509,7 +509,16 @@ object CaptureDriver {
             half: Int = 16,
             wallHeight: Int = 28,
             color: DyeColor = DyeColor.BLACK,
+            clearInterior: Boolean = false,
         ) {
+            if (clearInterior) {
+                // 扩大摄影棚时清除上一场较小的内墙，不能让相机隔着墙验收粒子。
+                for (x in cx - half + 1 until cx + half) for (z in cz - half + 1 until cz + half)
+                    for (y in floorY + 1..floorY + wallHeight) {
+                        val pos = BlockPos(x, y, z)
+                        if (!level.getBlockState(pos).isAir) level.setBlock(pos, Blocks.AIR.defaultBlockState(), BLOCK_FLAG)
+                    }
+            }
             // 默认黑底：让粒子（尤其细线）有对比度。**内爆场景改用中灰** —— 那一段的核心是黑色球体，
             // 黑底里看不见（见 CaptureScenes.implosion）。
             val state = Blocks.CONCRETE.pick(color).defaultBlockState()

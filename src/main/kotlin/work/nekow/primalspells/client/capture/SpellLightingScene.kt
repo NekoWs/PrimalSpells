@@ -114,7 +114,10 @@ object SpellLightingScene {
                     val (_, shots) = cast(ctx, listOf("trigger_fireball", "light", "fireball"))
                     val carrier = shots.single() as TriggerFireball
                     record(t, "payload-light-does-not-leak-to-carrier", "light" !in carrier.modifiers && carrier.payload.any { it.id == "light" }, "mods=${carrier.modifiers}")
-                    carrier.hitBlock(center.toPosition(), Vector3f(0f, 0f, 1f))
+                    // 命中触发只认生物；在真实敌方靶子上释放，不能再用撞墙夹具消费荷载。
+                    val target = ctx.spawnDummy(center.x, center.y, center.z)
+                    carrier.hitEntity(target)
+                    target.discard()
                     ProjectileRuntime.tick()
                     val child = ProjectileRuntime.projectiles.last()
                     record(t, "released-payload-receives-light", child !== carrier && child.modifiers["light"] == 1, "mods=${child.modifiers}")

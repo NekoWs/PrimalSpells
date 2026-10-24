@@ -103,7 +103,7 @@ object CaptureScenes {
     /** 球心离地高度：黑洞/重力场的作用半径是 5，正好让球底贴着地面。 */
     private const val FIELD_CENTER_LIFT = 5.0
 
-    fun all(): List<Scene> = listOf(SpellIconScene.scene(), LightBoundaryScene.scene(), SpellLightingScene.scene(), WandDesignScene.scene(), SpellPerformanceScene.scene(), CollisionPrecisionScene.scene(), HomingLightScene.scene(), ParticleLightingScene.scene(), ProjectileFlightScene.scene(), ProgressionScene.scene(), FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
+    fun all(): List<Scene> = listOf(SpellIconScene.scene(), LightBoundaryScene.scene(), SpellLightingScene.scene(), WandDesignScene.scene(), SpellPerformanceScene.scene(), ExplosionPerformanceScene.scene(), CollisionPrecisionScene.scene(), HomingLightScene.scene(), ParticleLightingScene.scene(), ProjectileFlightScene.scene(), ProgressionScene.scene(), FoundationScene.scene(), HudSawScene.hud(), HudSawScene.saw(), ExplorationScene.scene(), NewSpellScene.scene(), SpellTimingScenes.machinegun(), SpellChainScene.scene(), PdApiScene.scene(), blackHole(), blackHole(true), gravityField(), gravityField(true), energyShield(), explosion(), fireballTrail()) + SpellExpansionScenes.all() + SpellQualityScenes.all() + WandCastingScenes.all()
 
     // ---------------------------------------------------------------- 黑洞
 
@@ -231,7 +231,7 @@ object CaptureScenes {
                     t < 60 -> 2.7f - (t - 45) * 0.36f
                     else -> -2.7f
                 }
-                status.pos.set((origin.x + offset).toDouble(), origin.y.toDouble(), origin.z.toDouble())
+                status.pos.set(origin.x + offset, origin.y, origin.z)
             }
         }.also {
             it.caster = p.caster
@@ -938,16 +938,16 @@ object CaptureScenes {
     /**
      * **爆炸**：触发即爆 —— 实色碎片向外飞散 + 灰色尘屑 + 收干净。
      *
-     * 用**中灰摄影棚**：爆炸的青白色粒子在灰底上对比清楚，且灰底（r≈g≈b）不参与蓝判据。
+     * 用中灰摄影棚：橙黄火舌在灰底上对比清楚，且灰底不参与暖色判据。
      *
      * 时间线（tick）：`20` 放一颗 `large_explosion`（半径6）→ age=1死亡触发时同tick结算 → `78` 结束。
-     * 场心放一个木桩：死亡触发回调内就该出现伤害数字（第32轮起没有蓄力）。
+     * 场心木桩在死亡回调内已有实际伤害；跳字有收集窗口，不能用它推断结算时间。
      */
     private fun explosion(): Scene = run {
         val name = "explosion"
         var holder: TestDummyEntity? = null
         var burstParticles = -1
-        var immediateDamage = 0
+        var immediateDamage = 0.0
         var observedAge = -1
         Scene(
             name = name,
@@ -963,7 +963,7 @@ object CaptureScenes {
             },
             prepare = { ctx ->
                 val floorY = ctx.floorBlockY(CX, CZ)
-                ctx.buildStudio(CX, CZ, floorY, color = DyeColor.LIGHT_GRAY)
+                ctx.buildStudio(CX, CZ, floorY, half = 32, color = DyeColor.LIGHT_GRAY, clearInterior = true)
                 ctx.setup(
                     spectator = true,
                     x = CX + 0.5,
@@ -990,7 +990,7 @@ object CaptureScenes {
                 bolt.effects += object : BaseEffect() {
                     override fun onDie() {
                         burstParticles = ParticleManager.of(ctx.level).getEngine().particleCount()
-                        immediateDamage = damageNumbers(ctx, holder)
+                        immediateDamage = guard.totalDamage
                         observedAge = status.age
                     }
                 }
@@ -1007,13 +1007,13 @@ object CaptureScenes {
                     EXPLOSION_CAST + 12 -> listOf(
                         Check(
                             name, t, "burst-particles",
-                            burstParticles in 1200..2200,
-                            "死亡结算当tick PD 粒子 = $burstParticles（密集喷射、随机火舌、白热碎裂前锋和飞散余烬）",
+                            burstParticles in 60..160,
+                            "死亡结算当tick PD粒子=$burstParticles（随机体积火舌、白热前锋与有限碎片，预算≤160）",
                         ),
                         Check(
                             name, t, "damage-immediate",
                             immediateDamage > 0 && observedAge == 1,
-                            "死亡结算当tick伤害数字 = $immediateDamage，法术age=$observedAge（要求age=1即有伤害）",
+                            "死亡结算当tick靶子总伤 = $immediateDamage，法术age=$observedAge（要求age=1即有伤害）",
                         ),
                     )
                     EXPLOSION_TICKS - 3 -> listOf(pdParticleCheck(name, t, ctx))

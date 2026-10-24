@@ -34,7 +34,7 @@
 | PD管理器/共享spawn | `util/PdParticles.kt`；PD能力问题只记台账 |
 | 架构边界/持久化回归 | `gradle/architecture.gradle`随build执行；`client/capture/ArchitectureChecks.kt`由foundations运行 |
 | 录制/诊断 | `client/capture/CaptureDriver.kt`、CaptureScenes及各Scene；`tools/capture/{capture.ps1,diagnostics.ps1,assemble.py}` |
-| 性能回归 | `client/capture/SpellPerformanceScene.kt`，场景spell_performance；真实Move/联动耗时与线程分配，输出performance.tsv |
+| 性能回归 | `client/capture/SpellPerformanceScene.kt`测Move/联动；`ExplosionPerformanceScene.kt`测真实爆炸创建、八发压力与JFR，输出performance.tsv/particles.tsv |
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
 | 命中与伤害频率回归 | `client/capture/PiercingContactScene.kt`与`DamageFrequencyChecks.kt`，场景piercing_contact；接触时间、逐刻伤害、附加效果、复制预算及AfterImpact真实结算 |
 | 触发命中回归 | `client/capture/TriggerLifecycleChecks.kt`由spell_chain运行；重复穿刺、无直接伤害仍触发、独立副本/嵌套配方、一次付费及墙/寿命排除，定时/失效保留 |

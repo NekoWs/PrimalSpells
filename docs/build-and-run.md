@@ -92,6 +92,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | spell_lighting | 默认投射物目录零光源、昼夜像素不变、光修正真实付费/去重/复制/荷载隔离与退场 |
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
 | spell_performance | 固定32发高速物理/制导、512普通/冻结弹联动，逐样本服务端计时与线程分配；[口径与结果](design/performance.md) |
+| explosion_performance | 三次单发与同刻八发真实爆炸，创建耗时/分配、原生数量与随机位置签名、零光源/双端清理，保留JFR；[口径与结果](design/performance.md#爆炸表现) |
 | collision_precision | 原版可命中契约（掉落物/经验球/交互过滤、荷载不消费、物品展示框正例）、双精度接点、24种斜反弹、单刻余程、薄形状/拼缝/跨格形状、墙角分量、命中排序、自伤豁免与真实路径联动 |
 | piercing_contact | 木桩接触计时、刻末/薄箱/墙排序；DamageFrequencyChecks观察AfterImpact，覆盖聚光高速/反弹、锯片附加爆炸、束/场逐刻上限、多目标和复制体预算 |
 | homing_light | 前方优先/后方排除、同刻穿透换靶与接缝、64格光脊、穿刺付费冷却与十刻蓄能 |

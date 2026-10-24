@@ -58,6 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
+    "explosion_performance": {"length": 212, "title": "爆炸单发 / 八发压力 / CPU与分配采样", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "重复爆炸的性能采样独立于单发退场；专属断言检查原生粒子出现及双端完整回收"},
     # 三页真实背包覆盖完整目录；ROI排除原版手臂、饥饿条与上半部角色预览。
     "spell_icons": {"length": 144, "title": "完整像素法术目录 / 原版物品栏与快捷栏", "metric": "warm", "warm_roi": (390, 355, 890, 519), "quiet": (0, 6), "decay": "none", "decay_reason": "原版物品栏开关与物品栏位更换不属于世界粒子退场；检查完整目录分页面同步、快捷栏及清空后恢复"},
     "piercing_contact": {"length": 140, "title": "穿刺接触计时 / 法术伤害频率", "metric": "orange", "quiet": (0, 6), "decay": "none", "decay_reason": "独立弹体、束/场和附加爆炸分别收尾，频率由原生伤害事件与木桩统计验证"},

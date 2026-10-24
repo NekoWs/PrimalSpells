@@ -6,6 +6,7 @@
 |---|---|---|
 | 世界运行时清理 | 停服同时清空在场与待加入弹体、冻结和延迟动作，旧队列不进入下一个世界 | foundations的ArchitectureChecks |
 | 每刻性能 | 按需积分、同格邻域复用、无数组slab、反应分类配对；已加载区块查询避免同步生成，保留接点/曲线/伤害语义 | spell_performance、collision_precision；[基准](../design/performance.md) |
+| 爆炸表现开销 | 大爆炸从约两千片改为最多177片相关火舌/余烬/烟团，共享不可变曲线；三种独立随机轮廓，原生批次与有限外扩退场，零默认光源，保留当刻伤害与晶体引爆 | explosion_performance的JFR/分配/数量/位置签名，explosion、crystal_lifecycle、spell_lighting；[实测](../design/performance.md#爆炸表现) |
 | 模组静音 | 清除追踪/复制/爆炸/弹跳/传送/施法者/假人放置主动音效，自有实体始终静音；源码与声音资源护栏禁止重新引入 | checkSilentContent（含违规调用反例）、homing_light、spell_chain、exploration |
 | 抽牌作用域 | 同链修正无牌序；触发荷载独立，子链散射不污染载体；付费一次、链锯清整次延迟 | spell_chain、foundations |
 | 复制与后代 | 按配方重建独立effect/荷载，抵消重复速度倍率，量子复制有本体与真实命中 | spell_mechanics、spell_resonance |

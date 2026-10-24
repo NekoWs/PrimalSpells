@@ -38,6 +38,8 @@ ParticleVisual定义贴图、UV、广告牌/方向、各向异性尺寸、混合
 
 `ParticleLifeCurve`的通道是ALPHA、SCALE、RED、GREEN、BLUE、LIGHT；同通道多条曲线相乘，总计最多8条。`.sizeCurve/alphaCurve`是追加；重复热更必须用 `.lifeCurve(ParticleLifeCurve.of(...))`覆盖完整通道集合，避免不断叠乘或丢掉另一通道。
 
+爆炸使用共享的不可变寿命曲线，出生时一次提交；不逐片重建关键帧或逐刻热更。大像素火舌、碎片和烟团均低于spawnAll的256条单次上限；容量拒绝产生null时按原规格索引筛选速度，再交给ParticleBatch，避免存活成员与运动参数错位。数量与实测见[性能](performance.md#爆炸表现)。
+
 拖尾在spawn和life热更时都声明SCALE与ALPHA，当前视觉仍保留4t最低寿命。PD按出生partialTick计算分数年龄并逐帧采样曲线；1～2t拖尾的完整实机验收见 [待验证范围](../issues/verify.md)，不因升级直接改变既有尾长。
 
 ## 4. 出生与回收
@@ -58,7 +60,7 @@ ParticleVisual定义贴图、UV、广告牌/方向、各向异性尺寸、混合
 
 DynamicLightManager读取PD原生lightIntensity(partialTick)：基础lightLevel × 静态乘数 × LIGHT曲线 × alpha × 尺寸包络，再叠加热更接续偏移。LIGHT只影响环境照明，不改变片元alpha/全亮；ParticleVisual.lightIntensity为静态乘数，ParticleHandle.lightIntensity从当前光强接续。全局/空间格预算与相机距离裁剪继续由PD负责，不在本模组另写预算管理器。
 
-`spell_lighting`实际运行注册投射物目录，默认特效峰值超过一万颗时光源数为零；昼夜对照检查实际像素颜色。真实付费重复卡、同源复制、独立荷载以及光源有限退场均有原生断言。`particle_lighting`保留PD曲线/缩片原生光场检查。
+`spell_lighting`实际运行注册投射物目录，检查可见粒子存在而默认光源数为零；粒子数量随内容预算变化，不以堆到固定数量作为照明验收。昼夜对照检查实际像素颜色，真实付费重复卡、同源复制、独立荷载以及光源有限退场均有原生断言。`particle_lighting`保留PD曲线/缩片原生光场检查。
 
 PD地形烘焙现在对已请求刷新基准累计位移，停住时补精确刷新，未提交的脏section跨帧排队。`light_boundary`使用0.1格/t单源跨section与同位置/同光强重建对照，地形RGB差>5的像素占比0.00%（要求≤1%），退出无残光。当前七场78项机制检查与画面门禁通过，982帧零丢帧；预算压力、多人和更广泛地形范围仍在[verify](../issues/verify.md)。
 

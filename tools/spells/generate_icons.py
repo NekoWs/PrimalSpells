@@ -1,206 +1,15 @@
-"""重建全部注册法术的硬边像素卡图标；有限实色色板，无抗锯齿或半透明像素。"""
+"""从原生像素稿生成完整注册图标；缺稿、多稿或类型不明时停止。"""
 from pathlib import Path
-import json, re
+import json
+import re
 from functools import cache
 from PIL import Image, ImageDraw, ImageFont
-from pixel_icons import FRAME_COLORS, SPRITES, pixel_icon
+from pixel_icons import SPRITES, pixel_icon
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'src/main/resources/assets/primalspells/textures/item'
 MAGIC = ROOT / 'src/main/kotlin/work/nekow/primalspells/magic'
-PROJECTILES = ('fireball','drone_bolt','trigger_fireball','delayed_cast','drone_swarm','laser','chainsaw','concentrated_light',
-               'small_explosion','large_explosion','gravity_field','black_hole','teleport',
-               'dormant_crystal','crystal_detonation','chain_bolt','plasma_beam','repulsion_field')
-MODIFIERS = ('damage_boost','gravity','bounce','double_cast','speed_boost','extended_lifetime',
-             'piercing','bounce_explosion','homing','bounce_duplicate','gradual_accelerate',
-             'gradual_decelerate','random_path','reciprocate','sine_wave','mana_injection',
-             'diffusion','implosion','volatile','explosion_remove','explosion_projectile',
-             'self_orbit','quantum_entanglement','energy_shield','long_distance_cast','freeze_charge','recoil_damper','recoil_boost','omnidirectional_scatter','light')
-NEW_IDS = ('divide_two', 'divide_three', 'divide_five', 'divide_ten', 'cast_all', 'add_trigger', 'add_timer', 'add_expiration', 'triple_cast', 'quadruple_cast', 'quintuple_cast', 'reduce_recharge', 'sawblade', 'healing_bolt', 'torch')
-UTILITY_IDS = ('survey_pulse','item_pull','feather_ward')
-IDS = PROJECTILES + MODIFIERS + NEW_IDS + UTILITY_IDS
-WHITE, BLUE, DARK_BLUE = '#eef5e9', '#76d9e8', '#267eaa'
-ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
-
-
-def icon(name):
-    category = registered_categories()[name]
-    pixel = pixel_icon(name, category)
-    if pixel is not None:
-        return pixel
-    im = Image.new('RGBA', (32,32))
-    d = ImageDraw.Draw(im)
-    rim, dark = FRAME_COLORS[category]
-    outline = ((9,1),(22,1),(27,4),(30,9),(30,22),(27,27),(22,30),(9,30),(4,27),(1,22),(1,9),(4,4))
-    d.polygon(outline, fill='#101721')
-    d.polygon(((10,2),(21,2),(26,5),(29,10),(29,21),(26,26),(21,29),(10,29),(5,26),(2,21),(2,10),(5,5)), fill=dark)
-    d.line(((3,18),(3,10),(6,6),(10,3),(21,3),(26,6)), fill=rim, width=2)
-    d.polygon(((10,5),(21,5),(26,10),(26,21),(21,26),(10,26),(5,21),(5,10)), fill='#202b38')
-    d.line(((10,26),(21,26),(26,21)),fill='#151e2b',width=2)
-    def line(points,c=WHITE,w=2): d.line(points,fill=c,width=w)
-    def box(x,y,c=WHITE,r=2): d.rectangle((x-r,y-r,x+r,y+r),fill=c)
-    def arrow(a,b,c=WHITE,w=2):
-        line((a,b),c,w)
-        dx,dy=b[0]-a[0],b[1]-a[1]
-        if abs(dx)>=abs(dy): line(((b[0]-(3 if dx>0 else -3),b[1]-3),b,(b[0]-(3 if dx>0 else -3),b[1]+3)),c,w)
-        else: line(((b[0]-3,b[1]-(3 if dy>0 else -3)),b,(b[0]+3,b[1]-(3 if dy>0 else -3))),c,w)
-    def plus(x,y,c=YELLOW): line(((x-3,y),(x+3,y)),c);line(((x,y-3),(x,y+3)),c)
-    def flame(x=16,y=16):
-        d.polygon(((x-7,y+6),(x-7,y),(x-3,y-4),(x-3,y-8),(x+1,y-5),(x+4,y-8),(x+7,y),(x+5,y+7),(x-3,y+8)),fill=ORANGE)
-        d.polygon(((x-3,y+5),(x-3,y),(x,y-4),(x+4,y+1),(x+3,y+6)),fill=YELLOW)
-        box(x,y+4,WHITE,1)
-    def burst(x=16,y=16,r=8,c=YELLOW):
-        d.polygon(((x-r,y),(x-4,y-3),(x-4,y-6),(x-1,y-4),(x+2,y-r),(x+3,y-3),(x+r,y-4),(x+5,y+1),(x+r,y+4),(x+3,y+4),(x+1,y+r),(x-2,y+5),(x-6,y+7),(x-5,y+2)),fill=c)
-        box(x,y,WHITE,2)
-    def crystal(x=16,y=16,r=8):
-        d.polygon(((x,y-r),(x+6,y),(x,y+r),(x-6,y)),fill=PURPLE)
-        d.polygon(((x,y-r),(x,y+r),(x-6,y)),fill='#6b4d9c')
-        line(((x,y-r),(x-2,y),(x,y+r)),WHITE,1)
-    def hourglass():
-        line(((9,8),(23,8)),YELLOW);line(((9,24),(23,24)),YELLOW)
-        line(((11,9),(11,12),(20,21),(20,23)),WHITE)
-        line(((21,9),(21,12),(12,21),(12,23)),WHITE)
-        line(((13,11),(19,11)),ORANGE);line(((14,21),(18,21)),ORANGE)
-    def orbit(two=False):
-        d.ellipse((6,10,26,22),outline=PURPLE,width=2)
-        if two: d.ellipse((11,5,21,27),outline=DARK_BLUE,width=2)
-        box(16,16,WHITE,2);box(25,14,BLUE,2)
-    def bounce():
-        line(((6,21),(12,10),(18,21)),BLUE)
-        arrow((18,21),(24,10),BLUE)
-        line(((7,24),(25,24)),WHITE)
-    if name=='trigger_fireball':
-        flame();plus(24,8,WHITE)
-    elif name in ('recoil_damper','recoil_boost'):
-        d.rectangle((17,9,23,22),fill=DARK_BLUE,outline=BLUE,width=2)
-        arrow((16,16),(6,16),YELLOW)
-        if name=='recoil_damper':
-            line(((8,10),(8,22)),PURPLE,3)
-            line(((12,10),(12,22)),WHITE,1)
-        else:
-            arrow((15,10),(6,10),ORANGE)
-            arrow((15,22),(6,22),ORANGE)
-    elif name=='omnidirectional_scatter':
-        for end in ((16,6),(26,16),(16,26),(6,16)):
-            arrow((16,16),end,BLUE,2)
-        for end in ((8,8),(24,8),(24,24),(8,24)):
-            line(((16,16),end),PURPLE,2);box(*end,YELLOW,1)
-        box(16,16,WHITE,2)
-    elif name=='chainsaw':
-        d.polygon(((8,22),(6,19),(9,15),(12,17),(14,14),(18,18),(14,23)),fill=ORANGE)
-        d.polygon(((13,15),(20,7),(24,7),(25,11),(18,19)),fill='#768997')
-        line(((14,15),(21,8),(23,10),(17,17)),WHITE,2)
-        for x,y in ((16,10),(19,7),(23,6),(25,10),(23,13),(20,16)): box(x,y,YELLOW,1)
-        box(11,19,DARK_BLUE,1)
-    elif name=='drone_bolt':
-        d.rectangle((8,10,18,22),fill='#707f8c',outline=WHITE,width=2);box(13,16,BLUE,2);arrow((20,16),(25,16),BLUE)
-    elif name=='drone_swarm':
-        for x,y in ((9,12),(23,12),(16,22)):
-            d.rectangle((x-4,y-4,x+3,y+3),fill='#6c7b86',outline=WHITE);box(x,y,BLUE,1)
-    elif name in ('delayed_cast','extended_lifetime'):
-        hourglass()
-        if name=='extended_lifetime': plus(24,8,BLUE)
-    elif name in ('laser','plasma_beam'):
-        line(((7,16),(25,16)),DARK_BLUE,5 if name=='plasma_beam' else 3)
-        line(((7,16),(25,16)),BLUE,3 if name=='plasma_beam' else 1)
-        line(((9,16),(25,16)),WHITE,1);box(6,16,BLUE,2)
-        if name=='plasma_beam':line(((12,10),(12,22)),BLUE)
-    elif name in ('small_explosion','large_explosion','explosion_projectile'):
-        burst(r=6 if name=='small_explosion' else 10)
-        if name=='explosion_projectile':arrow((6,24),(13,20),ORANGE)
-    elif name=='gravity_field':
-        d.ellipse((6,7,26,25),outline=DARK_BLUE,width=1)
-        for x in (10,16,22):arrow((x,9),(x,20),BLUE)
-        line(((7,25),(25,25)),WHITE)
-    elif name=='teleport':
-        d.rectangle((6,8,11,24),outline=PURPLE,width=2);d.rectangle((21,8,26,24),outline=BLUE,width=2)
-        arrow((12,16),(20,16),WHITE)
-    elif name=='dormant_crystal':crystal()
-    elif name=='crystal_detonation':burst(c=ORANGE);crystal(r=4)
-    elif name=='chain_bolt':
-        line(((7,9),(13,18),(18,10),(25,22)),BLUE)
-        for x,y in ((7,9),(18,10),(25,22)):box(x,y,WHITE,2)
-    elif name in ('repulsion_field','implosion'):
-        box(16,16,ORANGE,2)
-        for outer,inner in (((16,5),(16,11)),((16,27),(16,21)),((5,16),(11,16)),((27,16),(21,16))):
-            arrow(inner,outer,ORANGE) if name=='repulsion_field' else arrow(outer,inner,PURPLE)
-    elif name=='damage_boost':
-        line(((9,24),(23,10)),RED,4);line(((10,18),(16,24)),YELLOW);plus(9,8,WHITE)
-    elif name=='gravity':
-        arrow((16,6),(16,17),BLUE);d.rectangle((9,21,23,25),fill='#9aa8b1');d.rectangle((12,18,20,21),fill=WHITE)
-    elif name in ('bounce','bounce_explosion','bounce_duplicate'):
-        bounce()
-        if name=='bounce_explosion':burst(9,8,4,ORANGE)
-        if name=='bounce_duplicate':box(7,9,YELLOW,2);box(25,22,YELLOW,2)
-    elif name in ('speed_boost','gradual_accelerate','gradual_decelerate'):
-        sizes=(5,5,5) if name=='speed_boost' else ((2,4,6) if name=='gradual_accelerate' else (6,4,2))
-        for x,r in zip((8,15,22),sizes):line(((x-3,16-r),(x+2,16),(x-3,16+r)),BLUE)
-    elif name=='homing':
-        d.ellipse((18,7,26,15),outline=RED);plus(22,11,RED)
-        line(((6,24),(11,24),(16,20),(18,15)),BLUE);arrow((18,15),(22,11),WHITE,1)
-    elif name=='random_path':
-        line(((6,23),(10,12),(15,21),(20,8)),PURPLE);arrow((20,8),(26,11),BLUE)
-    elif name=='reciprocate':
-        arrow((7,11),(25,11),BLUE);arrow((25,21),(7,21),YELLOW)
-    elif name=='sine_wave':
-        line(((5,16),(8,10),(12,10),(16,22),(20,22),(24,10),(27,16)),BLUE)
-    elif name=='mana_injection':
-        d.polygon(((15,6),(8,16),(8,21),(12,25),(18,25),(22,21),(22,16)),fill=DARK_BLUE)
-        line(((12,15),(10,19),(12,22)),BLUE);plus(23,9,WHITE)
-    elif name=='diffusion':
-        for b in ((25,7),(26,16),(25,25)):arrow((7,16),b,BLUE)
-    elif name=='volatile':
-        d.ellipse((8,12,24,27),fill='#52626e',outline=WHITE,width=1)
-        line(((16,12),(16,8),(21,8)),ORANGE);plus(23,7,YELLOW)
-    elif name=='explosion_remove':
-        burst(c=ORANGE);line(((7,25),(25,7)),RED,3);line(((6,24),(24,6)),WHITE,1)
-    elif name=='self_orbit':orbit()
-    elif name=='quantum_entanglement':
-        line(((10,12),(22,20)),BLUE)
-        for x,y in ((10,12),(22,20)):
-            d.polygon(((x,y-5),(x+5,y),(x,y+5),(x-5,y)),outline=PURPLE);box(x,y,WHITE,1)
-    elif name=='energy_shield':
-        d.polygon(((7,8),(16,5),(25,8),(25,17),(21,23),(16,27),(11,23),(7,17)),fill=DARK_BLUE,outline=BLUE)
-        line(((16,8),(16,23)),WHITE);line(((11,13),(21,13)),WHITE)
-    elif name=='long_distance_cast':
-        line(((7,9),(7,24)),PURPLE);line(((26,9),(26,24)),DARK_BLUE);arrow((11,16),(24,16),WHITE)
-    elif name=='freeze_charge':
-        for a,b in (((16,6),(16,26)),((7,11),(25,21)),((7,21),(25,11))):line((a,b),BLUE)
-        line(((12,8),(16,12),(20,8)),WHITE,1);line(((12,24),(16,20),(20,24)),WHITE,1);box(16,16,WHITE,1)
-    elif name in ('triple_cast','quadruple_cast','quintuple_cast','cast_all'):
-        count={'triple_cast':3,'quadruple_cast':4,'quintuple_cast':5,'cast_all':6}[name]
-        for j in range(count):
-            x=5+j*3;d.rectangle((x,7+j%2,x+6,23+j%2),fill=DARK_BLUE,outline=WHITE)
-        if name=='cast_all': arrow((8,26),(25,26),YELLOW,1)
-    elif name.startswith('divide_'):
-        count={'divide_two':2,'divide_three':3,'divide_five':5,'divide_ten':10}[name]
-        box(9,16,PURPLE,3);line(((12,16),(16,16)),WHITE,1)
-        for j in range(min(count,5)):
-            y=7+j*4;line(((16,16),(21,y)),BLUE,1);box(24,y,WHITE,1)
-        if count==10:line(((27,6),(27,25)),YELLOW,1)
-    elif name.startswith('add_'):
-        box(11,16,ORANGE,4);plus(22,10,BLUE)
-        if name=='add_timer':
-            d.ellipse((17,17,27,27),outline=WHITE);line(((22,19),(22,22),(25,22)),WHITE,1)
-        elif name=='add_expiration':line(((19,20),(25,26)),RED);line(((25,20),(19,26)),RED)
-        else: arrow((18,23),(26,23),WHITE,1)
-    elif name=='reduce_recharge':
-        orbit();arrow((9,15),(23,15),BLUE);line(((9,21),(23,21)),WHITE,2)
-    elif name=='healing_bolt':plus(16,16,'#7cffa0');arrow((5,24),(11,20),WHITE,1)
-    elif name=='light':
-        d.polygon(((16,10),(21,16),(16,22),(11,16)),fill=YELLOW)
-        box(16,16,WHITE,2)
-        for a,b in [((16,5),(16,8)),((16,24),(16,27)),((5,16),(8,16)),((24,16),(27,16)),((7,7),(10,10)),((22,22),(25,25)),((7,25),(10,22)),((22,10),(25,7))]: line((a,b),YELLOW,1)
-    elif name=='torch':
-        line(((14,20),(11,27)),WHITE,3);flame(18,13)
-    elif name=='survey_pulse':
-        d.ellipse((6,10,26,22),outline=BLUE,width=2);crystal(16,16,4);line(((16,5),(16,8)),WHITE,1)
-    elif name=='item_pull':
-        d.rectangle((12,13,22,24),fill=DARK_BLUE,outline=BLUE,width=2);arrow((6,8),(13,16),WHITE,1);arrow((26,7),(20,16),WHITE,1)
-    elif name=='feather_ward':
-        d.polygon(((8,25),(13,10),(24,6),(23,17),(8,25)),fill=BLUE);line(((8,25),(22,8)),WHITE,2)
-    else:raise ValueError('No glyph: '+name)
-    return im.resize((64,64),Image.Resampling.NEAREST)
+SAMPLES = ('fireball', 'concentrated_light', 'black_hole', 'sawblade', 'piercing', 'double_cast')
 
 
 @cache
@@ -227,36 +36,58 @@ def registered_categories():
 
 
 def main():
-    assert set(registered_categories())==set(IDS), 'Glyph table must cover the registry exactly'
-    for name in IDS:
-        image=icon(name);path=OUT/(name+'.png')
-        # Pillow版本或编码选项变化不应让未改画面的资源出现二进制噪声。
+    categories = registered_categories()
+    missing, extra = categories.keys() - SPRITES.keys(), SPRITES.keys() - categories.keys()
+    if missing or extra:
+        raise ValueError(f'原稿必须覆盖注册目录：缺少{sorted(missing)}，多余{sorted(extra)}')
+    ids = sorted(categories, key=lambda name: ('projectile', 'modifier', 'other').index(categories[name]))
+    images = {name: pixel_icon(name, categories[name]) for name in ids}
+    for name, image in images.items():
+        path = OUT / (name + '.png')
+        # 编码器变化不应导致像素未改的资源出现二进制噪声。
         if path.exists():
             with Image.open(path) as previous:
-                if previous.size==image.size and previous.convert('RGBA').tobytes()==image.tobytes():
+                if previous.size == image.size and previous.convert('RGBA').tobytes() == image.tobytes():
                     continue
         image.save(path)
-    # 验收图不进入游戏资源；中文名称与原生16px栏位同时展示。
-    labels=json.loads((OUT.parents[1]/'lang/zh_cn.json').read_text(encoding='utf-8'))
-    font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',13)
-    sheet=Image.new('RGB',(8*136,((len(IDS)+7)//8)*120),'#192330'); d=ImageDraw.Draw(sheet)
-    for i,name in enumerate(IDS):
-        x,y=(i%8)*136,(i//8)*120
-        im=icon(name).resize((64,64),Image.Resampling.NEAREST);sheet.paste(im,(x+36,y+8),im)
-        tiny=im.resize((16,16),Image.Resampling.NEAREST);sheet.paste(tiny,(x+110,y+52),tiny)
-        d.text((x+8,y+76),labels['item.primalspells.'+name],fill='#f0e7d1',font=font)
-        d.text((x+8,y+98),name,fill='#8499b3',font=ImageFont.load_default(size=10))
-    target=ROOT/'build/verify/spell-icons-mc.png';target.parent.mkdir(parents=True,exist_ok=True);sheet.save(target)
-    # 样例只放大显式16px原稿，并列保留原生尺寸，避免概念图冒充游戏资源。
-    sample=Image.new('RGB',(6*144,210),'#25212d');preview=ImageDraw.Draw(sample)
-    for i,name in enumerate(SPRITES):
-        x=i*144;native=icon(name)
-        enlarged=native.resize((112,112),Image.Resampling.NEAREST)
-        sample.paste(enlarged,(x+16,16),enlarged)
-        preview.rectangle((x+62,140,x+81,159),fill='#6f6f76',outline='#a9a9b0')
-        sample.paste(native,(x+64,142),native)
-        preview.text((x+8,174),labels['item.primalspells.'+name],fill='#f0e7d1',font=font)
+    labels = json.loads((OUT.parents[1] / 'lang/zh_cn.json').read_text(encoding='utf-8'))
+    font = ImageFont.truetype('C:/Windows/Fonts/msyh.ttc', 13)
+    small = ImageFont.load_default(size=10)
+    sheet = Image.new('RGB', (8 * 144, ((len(ids) + 7) // 8) * 126), '#192330')
+    draw = ImageDraw.Draw(sheet)
+    for i, name in enumerate(ids):
+        x, y = (i % 8) * 144, (i // 8) * 126
+        native = images[name]
+        enlarged = native.resize((64, 64), Image.Resampling.NEAREST)
+        sheet.paste(enlarged, (x + 32, y + 8), enlarged)
+        draw.rectangle((x + 111, y + 49, x + 130, y + 68), fill='#6f6f76', outline='#a9a9b0')
+        sheet.paste(native, (x + 113, y + 51), native)
+        draw.text((x + 8, y + 76), labels['item.primalspells.' + name], fill='#f0e7d1', font=font)
+        # 最长的ID在词边界换行，避免跨栏盖住相邻图标。
+        words = name.split('_')
+        lines = ['']
+        for word in words:
+            if len(lines[-1]) + len(word) + 1 > 22:
+                lines.append(word)
+            else:
+                lines[-1] += ('_' if lines[-1] else '') + word
+        draw.multiline_text((x + 8, y + 97), '\n'.join(lines), fill='#8499b3', font=small, spacing=1)
+    target = ROOT / 'build/verify/spell-icons-mc.png'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(target)
+    sample = Image.new('RGB', (len(SAMPLES) * 144, 210), '#25212d')
+    preview = ImageDraw.Draw(sample)
+    for i, name in enumerate(SAMPLES):
+        x = i * 144
+        native = images[name]
+        enlarged = native.resize((112, 112), Image.Resampling.NEAREST)
+        sample.paste(enlarged, (x + 16, 16), enlarged)
+        preview.rectangle((x + 62, 140, x + 81, 159), fill='#6f6f76', outline='#a9a9b0')
+        sample.paste(native, (x + 64, 142), native)
+        preview.text((x + 8, 174), labels['item.primalspells.' + name], fill='#f0e7d1', font=font)
     sample.save(target.with_name('spell-icons-selected.png'))
-    print(f'Rebuilt {len(IDS)} icons; preview: {target}')
+    print(f'Rebuilt {len(ids)} native 16px icons; preview: {target}')
 
-if __name__=='__main__':main()
+
+if __name__ == '__main__':
+    main()

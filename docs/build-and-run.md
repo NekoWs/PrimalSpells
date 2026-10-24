@@ -87,7 +87,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 | 场景 | 主要覆盖 |
 |---|---|
-| spell_icons | 六张原生16px贴图的真实物品栏/快捷栏与清空后恢复；背包第一排暖色ROI排除手臂、饥饿条及世界背景 |
+| spell_icons | 完整66张原生16px贴图按三页展示，真实物品栏/快捷栏与清空后恢复；背包三排暖色ROI排除手臂、饥饿条与角色预览 |
 | light_boundary | 单颗原生PD光源慢移跨section、同位置/光强重建对照；检查当前地形照明与光场一致、结束无残留 |
 | spell_lighting | 默认投射物目录零光源、昼夜像素不变、光修正真实付费/去重/复制/荷载隔离与退场 |
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
@@ -122,7 +122,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 命中与荷载回归：`pwsh tools/capture/capture.ps1 -Offline -Scene piercing_contact,collision_precision,homing_light,spell_chain,shield_balance,foundations,new_spells,expansion_combinations,expansion_utilities -TimeoutSec 600`。九场分场复验汇总406项机制检查、1920帧零丢帧，机制、画面及日志门禁通过。piercing_contact的51项检查直接读取木桩totalDamage、弹体hitTargets和正式AfterImpact，覆盖接触计时、速度/入射相位、薄箱/墙排序、聚光4～128格/t、锯片附加效果、等离子束逐刻预算及独立复制体。穿刺减伤后的5HP计时夹具用真实增伤卡构造；不改变生产数值来维持旧断言。
 
-spell_chain的TriggerLifecycleChecks读取实际新生子弹，覆盖两类命中触发连续穿过两个目标、每次接触的新副本、无直接伤害仍触发、单次收费、模板/嵌套配方不污染、墙/寿命排除和定时/失效单次消费。foundations按真实悬停逐刻轮询异步分色；new_spells同时设定夹具MP上限与当前MP，在清场前检查复制，锯片画面ROI覆盖真实主体而非碎屑。水晶/远距组合检查真实生物触发及HitResult方向；有限斥力夹具比较同速慢弹与箭，不要求高速弹被瞬间反射。证据按场保存在`build/capture/repeat-trigger-fixture-audit`（四场频率/碰撞/追踪/护盾通过部分）、`repeat-trigger-verified`（spell_chain与foundations）、`repeat-trigger-combinations-verified`（new_spells与expansion_combinations通过部分）及`out/expansion_utilities`。旧夹具失败原始证据保留，不混作通过场；其它尚未通过门禁见[未解决问题](issues/open.md)。
+spell_chain的TriggerLifecycleChecks读取实际新生子弹，覆盖两类命中触发连续穿过两个目标、每次接触的新副本、无直接伤害仍触发、单次收费、模板/嵌套配方不污染、墙/寿命排除和定时/失效单次消费。foundations按真实悬停逐刻轮询异步分色；new_spells同时设定夹具MP上限与当前MP，在清场前检查复制，锯片画面ROI覆盖真实主体而非碎屑。水晶/远距组合检查真实生物触发及HitResult方向；有限斥力夹具比较同速慢弹与箭，不要求高速弹被瞬间反射。证据按场保存在`build/capture/repeat-trigger-fixture-audit`（四场频率/碰撞/追踪/护盾通过部分）、`repeat-trigger-verified`（spell_chain与foundations）、`repeat-trigger-combinations-verified`（new_spells与expansion_combinations通过部分）及`repeat-trigger-utilities-verified/expansion_utilities`。旧夹具失败原始证据保留，不混作通过场；其它尚未通过门禁见[未解决问题](issues/open.md)。
 
 当前性能与运动回归命令、测量负载和结果统一见[性能基准](design/performance.md)。正常捕获还检查碰撞、前方追踪/穿透切线、实际法杖命中、付费/独立荷载、护盾和晶体生命周期；机制与视觉门禁分别统计，未用FPS代替服务端计时。
 

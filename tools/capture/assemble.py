@@ -58,8 +58,8 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
-    # 仅观察背包第一排六格的暖色图标；排除原版手臂、饥饿条与世界背景。
-    "spell_icons": {"length": 76, "title": "16像素法术图标 / 原版物品栏与快捷栏", "metric": "warm", "warm_roi": (390, 355, 720, 410), "quiet": (0, 6), "decay": "none", "decay_reason": "原版物品栏开关与物品栏位更换不属于世界粒子退场；检查真实物品同步、可见像素及清空后恢复"},
+    # 三页真实背包覆盖完整目录；ROI排除原版手臂、饥饿条与上半部角色预览。
+    "spell_icons": {"length": 144, "title": "完整像素法术目录 / 原版物品栏与快捷栏", "metric": "warm", "warm_roi": (390, 355, 890, 519), "quiet": (0, 6), "decay": "none", "decay_reason": "原版物品栏开关与物品栏位更换不属于世界粒子退场；检查完整目录分页面同步、快捷栏及清空后恢复"},
     "piercing_contact": {"length": 140, "title": "穿刺接触计时 / 法术伤害频率", "metric": "orange", "quiet": (0, 6), "decay": "none", "decay_reason": "独立弹体、束/场和附加爆炸分别收尾，频率由原生伤害事件与木桩统计验证"},
     "light_boundary": {"length": 180, "title": "单光源慢移 / 区块边界 / 等价光场对照", "metric": "terrain_light", "quiet": (0, 6), "decay": "none", "decay_reason": "仅观察原生地形照明，等价光场的网格颜色应一致"},
     "spell_lighting": {"length": 220, "title": "法术全亮 / 光照修正 / 单源预算与独立荷载", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "昼夜像素与原生光场、光源数量、独立荷载分别检查"},

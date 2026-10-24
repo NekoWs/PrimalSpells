@@ -37,7 +37,7 @@ object PiercingContactScene {
             p.spell()
             return p
         }
-        return Scene(name, "穿刺接触计时 / 弹速与命中数", 24, 140,
+        return Scene(name, "穿刺接触计时 / 法术伤害频率", 24, 140,
             prepare = { ctx ->
                 floor = ctx.floorBlockY(0, 0)
                 for (x in -12..12) for (z in -12..12) for (y in floor + 1..floor + 12)
@@ -47,6 +47,7 @@ object PiercingContactScene {
             }, camera = { _, _ -> Pose(2.0, floor + 3.0, -4.0, 22f, 25f) },
             tick = { ctx, t ->
                 if (t == 8) {
+                    checks.getOrPut(t) { arrayListOf() }.addAll(DamageFrequencyChecks.run(ctx, t, floor))
                     for ((multiplier, expected) in listOf(0.25f to 15, 0.5f to 8, 1f to 4, 2f to 2, 4f to 1)) {
                         val dummy = ctx.spawnDummy(0.0, floor + 5.0, 0.0)
                         val start = Vec3(0.0, dummy.boundingBox.center.y, dummy.boundingBox.minZ - 0.2 - 0.0625)

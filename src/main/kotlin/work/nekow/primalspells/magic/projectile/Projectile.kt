@@ -71,6 +71,7 @@ abstract class Projectile: Magic() {
         shieldReflectionPoint = null
         shieldedImpactTargets.clear()
         damagedThisTick.clear()
+        contactedThisTick.clear()
         guidance = null
         flightPath.clear()
         super.tick()
@@ -93,9 +94,10 @@ abstract class Projectile: Magic() {
         caster.hurtMarked = true
     }
 
-    /** 持续切割同一实体每刻最多结算一次，避免扫掠子步放大帧伤。 */
+    /** 帧伤法术同目标每刻只派发一次实体命中及直接伤害；附加命中效果共用该接触预算。 */
     var damageOncePerTick = false
     val damagedThisTick = hashSetOf<java.util.UUID>()
+    private val contactedThisTick = hashSetOf<java.util.UUID>()
 
     var maxAge: Int = 0
     var alive: Boolean = true
@@ -177,6 +179,9 @@ abstract class Projectile: Magic() {
         val level = entity.level() as? net.minecraft.server.level.ServerLevel
         if (!(damageType == work.nekow.primalspells.magic.core.SpellDamageType.HEALING && status.damage > 0) && entity is net.minecraft.world.entity.LivingEntity && level != null &&
             ShieldGuard.absorbProjectile(level, entity, this)) return true
+        // 帧伤限制在所有命中回调之前，不能只让Hurt去重而让爆炸等附加效果重复执行。
+        // 护盾仍先执行反射，不能因已命中过该实体就跳过本次真实拦截。
+        if (damageOncePerTick && !contactedThisTick.add(entity.uuid)) return false
         val offset = status.pos.toVec3().subtract(entity.boundingBox.center).toVector3f()
         val direction = currentDirection()
         val impactNormal = if (offset.lengthSquared() > 1e-8f) offset.normalize() else Vector3f(direction).negate()

@@ -25,6 +25,7 @@ class BlackHoleProjectile : Projectile() {
         collisionEnabled = false
         selfDamage = true
         status.damage = 4.0
+        damageOncePerTick = true
         hitRadius = 0.0
         effects += Trajectory(Color.of(0.3f, 0f, 0.5f))
         effects += BlackHole()

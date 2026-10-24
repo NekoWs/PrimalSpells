@@ -14,6 +14,7 @@ class PlasmaBeamProjectile : Projectile() {
         damageType = work.nekow.primalspells.magic.core.SpellDamageType.ENERGY
         mana = 30.0; delay = 40; maxAge = 40; speed = 0f; dragCoeff = 0f
         status.damage = 1.5
+        damageOncePerTick = true
         effects += PlasmaBeam()
     }
 }

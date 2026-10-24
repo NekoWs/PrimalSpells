@@ -58,7 +58,7 @@ except ImportError as exc:  # pragma: no cover - 环境缺库时给一句人话
 
 #: 每个场景的期望帧数与判定阈值（帧数必须与 CaptureScenes.kt 里的 lengthTicks 一致）
 SCENES = {
-    "piercing_contact": {"length": 140, "title": "穿刺接触计时 / 弹速与命中数", "metric": "orange", "quiet": (0, 6), "decay": "none", "decay_reason": "不同速度的独立短弹分别收尾，伤害与命中数由真实木桩统计验证"},
+    "piercing_contact": {"length": 140, "title": "穿刺接触计时 / 法术伤害频率", "metric": "orange", "quiet": (0, 6), "decay": "none", "decay_reason": "独立弹体、束/场和附加爆炸分别收尾，频率由原生伤害事件与木桩统计验证"},
     "light_boundary": {"length": 180, "title": "单光源慢移 / 区块边界 / 等价光场对照", "metric": "terrain_light", "quiet": (0, 6), "decay": "none", "decay_reason": "仅观察原生地形照明，等价光场的网格颜色应一致"},
     "spell_lighting": {"length": 220, "title": "法术全亮 / 光照修正 / 单源预算与独立荷载", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "昼夜像素与原生光场、光源数量、独立荷载分别检查"},
     "wand_design": {"length": 160, "title": "暮紫封印 / 户外低位持握 / 左右手", "metric": "violet_model", "quiet": (0, 6), "decay": "none", "decay_reason": "材质/占屏来自实际紫晶像素，装备和收杖保留原版动画；施法及粒子清理由原生断言覆盖"},

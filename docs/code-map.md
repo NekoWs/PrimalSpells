@@ -35,6 +35,7 @@
 | 录制/诊断 | `client/capture/CaptureDriver.kt`、CaptureScenes及各Scene；`tools/capture/{capture.ps1,diagnostics.ps1,assemble.py}` |
 | 性能回归 | `client/capture/SpellPerformanceScene.kt`，场景spell_performance；真实Move/联动耗时与线程分配，输出performance.tsv |
 | 碰撞精度回归 | `client/capture/CollisionPrecisionScene.kt`，场景collision_precision；薄形状、拼缝、墙角、24种斜反弹、命中排序和远坐标 |
+| 命中与伤害频率回归 | `client/capture/PiercingContactScene.kt`与`DamageFrequencyChecks.kt`，场景piercing_contact；接触时间、逐刻伤害、附加效果、复制预算及AfterImpact真实结算 |
 | 弧线/照明回归 | `client/capture/HomingLightScene.kt`，场景homing_light |
 | 法杖外观/占屏回归 | `client/capture/WandDesignScene.kt`，场景wand_design；户外主副手/左惯用手和紫晶实际像素边界 |
 | 地形照明截断复现 | `client/capture/LightBoundaryScene.kt`，场景light_boundary；纯PD源慢移及同光场地形像素对照 |

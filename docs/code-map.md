@@ -11,6 +11,7 @@
 | 原容器编杖/小包 | `item/{WandItem,SpellPouchItem}.kt`、`client/input/{SpellSlotScrollHandler,ClientContainerDragHandler,CreativeWandEditHandler}.kt` |
 | 法杖创建/保存/持有者 | `wand/{WandTier,WandPersistence,WandManager,WandSavedData}.kt`，WandStats定义在WandTier.kt |
 | 法术注册 | `registry/ModSpells.kt`、`magic/core/SpellRegistry.kt`；物品由 `registry/ModItems.kt` 自动创建 |
+| 法术图标 | `tools/spells/pixel_icons.py`的16px原稿、`tools/spells/generate_icons.py`生成器；`client/capture/SpellIconScene.kt`录制原版物品栏 |
 | 弹体循环/停服清理 | `magic/runtime/ProjectileRuntime.kt`、`event/SpellRuntimeEvents.kt` |
 | 网络注册/服务端请求 | `network/{ModNetworking,WandRequestHandler}.kt` |
 | 运动、反弹、追踪 | `magic/effect/geometry/{Move,SweptCollision,Tracking,Bounce,ConstantAcceleration}.kt` |

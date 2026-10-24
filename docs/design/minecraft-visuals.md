@@ -10,19 +10,19 @@ glowing用于魔法核心/边界免环境光，烟尘等保留世界受光。造
 
 ## 法术卡图标
 
-已注册卡采用32×32逻辑像素、最近邻放大至64×64，无抗锯齿，alpha仅0/255，有限色板。边框和主体对应类别/机制，抽牌类使用卡牌数量/抽取箭头等语义，不直接使用Noita素材。
+火球、汇聚之光、黑洞、锯片、穿刺、双重施放已替换为原生16×16样例：无抗锯齿，alpha仅0/255，每张4～7种实色，无通用圆形徽章。其余法术暂保留32×32逻辑像素、最近邻放大至64×64的旧图标，待样例评估后扩展；法术ID、物品模型和语言键不变。
 
-`python tools/spells/generate_icons.py` 重建资源及预览 `build/verify/spell-icons-mc.png`；同时检查64px与16px物品栏可读性。注册数量以ModSpells/SpellRegistry为准，不保留旧卡总数标题。
+`tools/spells/pixel_icons.py` 保存六张显式16×16像素原稿，每字符一个像素。`python tools/spells/generate_icons.py` 优先读取这些原稿，其他卡走原生成器；仅在尺寸或像素实际变化时写资源，避免PNG编码差异污染提交。输出全目录预览 `build/verify/spell-icons-mc.png` 和六张样例 `build/verify/spell-icons-selected.png`；同时检查放大图与原生16px物品栏。注册数量以ModSpells/SpellRegistry为准。
 
-### 待选美术提案
+### 图标表达与样例
 
-以下仅为画风与显示名提案，未替换运行时贴图、语言键或法术ID。[当前大像素预览](references/spell-style-coarse-accuracy.png)的像素密度向MC原版16×16靠拢：少量大色块、简洁轮廓、有限色阶，不做高分辨率物件插画。火球、黑洞、锯片、双重施放的表达已认可并保留；汇聚之光改为暖白金色的光束主体，由宽收窄，避免对称斜线形成大于号；穿刺改为投射物穿过有头、躯干、四肢的敌人剪影，不表达穿墙。聚光颜色对照ConcentratedLightFx的白光脊RGB(255,253,233)与金色侧线RGB(255,204,88)，不沿用Noita参考图的绿色。
+每张图只表达本法术的行为，不加无关封印片、宝石或碎屑。火球为火焰，黑洞为紫蓝漩涡，锯片为连续锯盘，双重施放仅展示抽出的两张空白卡，不附带闪电或投射物。汇聚之光为由宽收窄的暖白金色光束，避免对称斜线形成大于号；颜色对照ConcentratedLightFx白光脊RGB(255,253,233)与金色侧线RGB(255,204,88)。穿刺用投射物贯穿绿色史莱姆表达：保留方形身体与眼睛、两侧可见的贯通弹道，不表达穿墙。
 
-每张图只表达本法术的行为，不加无关封印片、宝石或碎屑。双重施放仅展示抽出的两张空白卡，不附带闪电或投射物。参考用户提供的Noita图标语义与像素密度，不直接复制素材或像素布局。2、5修订预览仍待确认，底部物品栏是概念缩略对照，并非游戏截图或精确16×16成品。
+[实际贴图对照](references/spell-icons-native.png)由生成器直接放大真实16px资源，下方保留原尺寸；[原版物品栏截图](references/spell-icons-inventory.png)来自spell_icons原生录制，不使用自绘界面或概念图拼接。六张尺寸、硬透明、色数及JAR内字节均检查通过；录制76帧、零丢帧、3项物品同步/界面检查和画面/日志门禁通过。复验命令见 [构建指南](../build-and-run.md#9-实机录制流水线)。
 
-原始对照：[A 遗迹石刻](references/spell-style-a-relic-carvings.png)、[B 秘典墨绘](references/spell-style-b-grimoire-ink.png)、[C 晶质珐琅](references/spell-style-c-crystal-enamel.png)、[D 黑曜封印](references/spell-style-d-obsidian-seals.png)。各图顺序为火球、汇聚之光、黑洞、锯片、穿刺、双重施放。使用内置imagegen生成与参考图编辑，完整提示词、参考图及命名备选见 [提案清单](references/spell-style-proposals.json)。
+原始概念对照：[A 遗迹石刻](references/spell-style-a-relic-carvings.png)、[B 秘典墨绘](references/spell-style-b-grimoire-ink.png)、[C 晶质珐琅](references/spell-style-c-crystal-enamel.png)、[D 黑曜封印](references/spell-style-d-obsidian-seals.png)。概念图由内置imagegen生成，提示词、参考图及命名备选见 [提案清单](references/spell-style-proposals.json)；它们不是真实游戏贴图。参考用户提供的Noita图标语义与像素密度，不直接复制素材或像素布局。
 
-选定后先以16×16逻辑像素制作六张样例，验证原生16px物品栏可读性，再扩展全套；不得通过缩小高分辨率插画代替逐像素设计。当前已注册资源的32×32规格在实际替换前保持不变。命名可选择短名术式、清晰奇幻或遗物铭文；保留穿刺、反弹、治疗等通用机制词，区分多链同时施放、单卡复制和独立荷载，避免只换名字后让玩法更难理解。
+后续按样例评估扩展全套；不得通过缩小高分辨率插画代替逐像素设计。显示名仍未改动，命名备选为短名术式、清晰奇幻、遗物铭文；保留穿刺、反弹、治疗等通用机制词，区分多链同时施放、单卡复制和独立荷载。
 
 ## 模型与界面
 

@@ -87,6 +87,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 | 场景 | 主要覆盖 |
 |---|---|
+| spell_icons | 六张原生16px贴图的真实物品栏/快捷栏与清空后恢复；背包第一排暖色ROI排除手臂、饥饿条及世界背景 |
 | light_boundary | 单颗原生PD光源慢移跨section、同位置/光强重建对照；检查当前地形照明与光场一致、结束无残留 |
 | spell_lighting | 默认投射物目录零光源、昼夜像素不变、光修正真实付费/去重/复制/荷载隔离与退场 |
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |

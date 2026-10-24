@@ -2,6 +2,7 @@
 from pathlib import Path
 import json, re
 from PIL import Image, ImageDraw, ImageFont
+from pixel_icons import SPRITES, pixel_icon
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'src/main/resources/assets/primalspells/textures/item'
@@ -22,6 +23,9 @@ ORANGE, YELLOW, RED, PURPLE = '#ee7b37', '#f4d375', '#c94a48', '#ac82db'
 
 
 def icon(name):
+    pixel = pixel_icon(name)
+    if pixel is not None:
+        return pixel
     im = Image.new('RGBA', (32,32))
     d = ImageDraw.Draw(im)
     rim = '#d6a650' if name in PROJECTILES else '#9972c8'
@@ -64,14 +68,8 @@ def icon(name):
         line(((6,21),(12,10),(18,21)),BLUE)
         arrow((18,21),(24,10),BLUE)
         line(((7,24),(25,24)),WHITE)
-    if name in ('fireball','trigger_fireball'):
-        flame()
-        if name=='trigger_fireball': plus(24,8,WHITE)
-    elif name=='concentrated_light':
-        for y in (10,16,22): arrow((7,y),(17,16),YELLOW)
-        line(((17,16),(26,16)),YELLOW,5)
-        line(((17,16),(26,16)),WHITE,2)
-        d.polygon(((13,16),(17,11),(21,16),(17,21)),fill=WHITE)
+    if name=='trigger_fireball':
+        flame();plus(24,8,WHITE)
     elif name in ('recoil_damper','recoil_boost'):
         d.rectangle((17,9,23,22),fill=DARK_BLUE,outline=BLUE,width=2)
         arrow((16,16),(6,16),YELLOW)
@@ -109,10 +107,6 @@ def icon(name):
     elif name in ('small_explosion','large_explosion','explosion_projectile'):
         burst(r=6 if name=='small_explosion' else 10)
         if name=='explosion_projectile':arrow((6,24),(13,20),ORANGE)
-    elif name=='black_hole':
-        d.ellipse((5,11,27,21),outline=PURPLE,width=2)
-        d.rectangle((12,10,20,22),fill='#070b14');d.rectangle((10,12,22,20),fill='#070b14')
-        line(((9,14),(11,11),(14,9)),WHITE,1);box(25,15,WHITE,1)
     elif name=='gravity_field':
         d.ellipse((6,7,26,25),outline=DARK_BLUE,width=1)
         for x in (10,16,22):arrow((x,9),(x,20),BLUE)
@@ -137,18 +131,9 @@ def icon(name):
         bounce()
         if name=='bounce_explosion':burst(9,8,4,ORANGE)
         if name=='bounce_duplicate':box(7,9,YELLOW,2);box(25,22,YELLOW,2)
-    elif name=='double_cast':
-        for x,y in ((6,10),(12,7)):
-            d.rectangle((x,y,x+11,y+15),fill='#332746',outline=PURPLE,width=1)
-            d.rectangle((x+2,y+2,x+9,y+13),fill='#dcecf0')
-            arrow((x+4,y+9),(x+8,y+5),DARK_BLUE,1)
-        arrow((20,23),(26,17),YELLOW,2)
     elif name in ('speed_boost','gradual_accelerate','gradual_decelerate'):
         sizes=(5,5,5) if name=='speed_boost' else ((2,4,6) if name=='gradual_accelerate' else (6,4,2))
         for x,r in zip((8,15,22),sizes):line(((x-3,16-r),(x+2,16),(x-3,16+r)),BLUE)
-    elif name=='piercing':
-        for x in (11,20):line(((x,7),(x,25)),PURPLE,3)
-        arrow((6,16),(27,16),WHITE)
     elif name=='homing':
         d.ellipse((18,7,26,15),outline=RED);plus(22,11,RED)
         line(((6,24),(11,24),(16,20),(18,15)),BLUE);arrow((18,15),(22,11),WHITE,1)
@@ -200,10 +185,6 @@ def icon(name):
         else: arrow((18,23),(26,23),WHITE,1)
     elif name=='reduce_recharge':
         orbit();arrow((9,15),(23,15),BLUE);line(((9,21),(23,21)),WHITE,2)
-    elif name=='sawblade':
-        d.ellipse((8,8,24,24),fill='#52626e',outline=WHITE,width=2)
-        for x,y in ((16,6),(25,10),(26,18),(21,26),(11,26),(6,18),(7,10)):box(x,y,WHITE,1)
-        box(16,16,DARK_BLUE,2)
     elif name=='healing_bolt':plus(16,16,'#7cffa0');arrow((5,24),(11,20),WHITE,1)
     elif name=='light':
         d.polygon(((16,10),(21,16),(16,22),(11,16)),fill=YELLOW)
@@ -232,18 +213,35 @@ def registered_ids():
 
 def main():
     assert set(registered_ids())==set(IDS), 'Glyph table must cover the registry exactly'
-    for name in IDS: icon(name).save(OUT/(name+'.png'))
+    for name in IDS:
+        image=icon(name);path=OUT/(name+'.png')
+        # Pillow版本或编码选项变化不应让未改画面的资源出现二进制噪声。
+        if path.exists():
+            with Image.open(path) as previous:
+                if previous.size==image.size and previous.convert('RGBA').tobytes()==image.tobytes():
+                    continue
+        image.save(path)
     # 验收图不进入游戏资源；中文名称与原生16px栏位同时展示。
     labels=json.loads((OUT.parents[1]/'lang/zh_cn.json').read_text(encoding='utf-8'))
     font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',13)
     sheet=Image.new('RGB',(8*136,((len(IDS)+7)//8)*120),'#192330'); d=ImageDraw.Draw(sheet)
     for i,name in enumerate(IDS):
         x,y=(i%8)*136,(i//8)*120
-        im=icon(name);sheet.paste(im,(x+36,y+8),im)
+        im=icon(name).resize((64,64),Image.Resampling.NEAREST);sheet.paste(im,(x+36,y+8),im)
         tiny=im.resize((16,16),Image.Resampling.NEAREST);sheet.paste(tiny,(x+110,y+52),tiny)
         d.text((x+8,y+76),labels['item.primalspells.'+name],fill='#f0e7d1',font=font)
         d.text((x+8,y+98),name,fill='#8499b3',font=ImageFont.load_default(size=10))
     target=ROOT/'build/verify/spell-icons-mc.png';target.parent.mkdir(parents=True,exist_ok=True);sheet.save(target)
+    # 样例只放大显式16px原稿，并列保留原生尺寸，避免概念图冒充游戏资源。
+    sample=Image.new('RGB',(6*144,210),'#25212d');preview=ImageDraw.Draw(sample)
+    for i,name in enumerate(SPRITES):
+        x=i*144;native=icon(name)
+        enlarged=native.resize((112,112),Image.Resampling.NEAREST)
+        sample.paste(enlarged,(x+16,16),enlarged)
+        preview.rectangle((x+62,140,x+81,159),fill='#6f6f76',outline='#a9a9b0')
+        sample.paste(native,(x+64,142),native)
+        preview.text((x+8,174),labels['item.primalspells.'+name],fill='#f0e7d1',font=font)
+    sample.save(target.with_name('spell-icons-selected.png'))
     print(f'Rebuilt {len(IDS)} icons; preview: {target}')
 
 if __name__=='__main__':main()

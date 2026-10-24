@@ -105,7 +105,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | death_attribution | 九种渠道的施法者/自伤/未知来源文本、原生战斗记录、真实玩家死亡界面及正常重生 |
 | recoil_light / concentrated_light_first_person / combat_impact / damage_mass | 固定聚光、后坐力、伤害/自伤与质量 |
 | wand_design | 暮紫封印户外材质、下半屏外侧位置、主副手/左惯用手与真实施法 |
-| wand_casting* / wand_aim / magic_hud | 主副手/FOV、阵列/模型、HUD与布局 |
+| wand_casting* / wand_aim / magic_hud | 主副手/FOV、阵列/模型、HUD布局；magic_hud还覆盖32t真实连续伤害的去重续播/同刻转击杀、逐帧反馈与有限退场 |
 | foundations / new_spells | 原编杖分色/真实V入口、抽牌控制和治疗/火把；foundations还覆盖NBT兼容/游标、注册目录与弹体生命周期顺序 |
 | exploration / progression | 实际结构掉落、术士、数据重载、生活卡与罗盘 |
 

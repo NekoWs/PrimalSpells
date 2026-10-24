@@ -17,8 +17,15 @@ object HudImpactChecks {
         record("impacts-start-transparent", born.all { it.alpha == 0.0 && it.draw == 0.0 && it.spread == 0.0 }, "born=$born")
         val old = queue.sample(4.0).single()
         repeat(64) { queue.add(10, false, 4.0) }
-        record("same-target-does-not-rewind-or-extend", queue.sample(4.0).single() == old && queue.sample(6.0).isEmpty(),
-            "original=$old")
+        val renewed = queue.sample(4.0).single()
+        record("same-target-renews-with-moving-tail", renewed.id == old.id && renewed.alpha == 0.0 &&
+            renewed.previous == old && queue.sample(4.4).single().previous!!.spread > old.spread,
+            "original=$old renewed=$renewed")
+        val after = queue.sample(4.4)
+        repeat(64) { queue.add(10, false, 4.4) }
+        record("same-tick-hits-do-not-restart-handoff", queue.sample(4.4) == after, "64 hits within 1t")
+        record("renewed-hit-finishes-after-last-contact", queue.sample(6.0).isNotEmpty() && queue.sample(10.0).isEmpty(),
+            "last contact=4t, finite lifetime=6t")
         queue.clear()
         repeat(3) { queue.add(it, false, 0.0) }
         val targets = queue.sample(1.0)
@@ -45,11 +52,32 @@ object HudImpactChecks {
             "targets=${burst.size}")
         queue.clear()
         var singleTarget = true
-        repeat(32) { t ->
+        var continuous = true
+        var bounded = true
+        fun energy(frame: HudImpactFrame): Double = frame.alpha * frame.draw + (frame.previous?.let { energy(it) } ?: 0.0)
+        repeat(64) { t ->
             repeat(16) { queue.add(7, false, t.toDouble()) }
             singleTarget = singleTarget && queue.sample(t + 0.5).size == 1
+            if (t > 0) for (step in 0 until 16) {
+                val frame = queue.sample(t + step / 16.0).single()
+                continuous = continuous && energy(frame) > 0.25
+                bounded = bounded && frame.spread < 1 && frame.previous?.previous == null
+            }
         }
-        record("sustained-single-target-never-stacks", singleTarget, "32t, 16 accepted hits per tick")
+        record("sustained-single-target-never-stacks", singleTarget, "64t, 16 accepted hits per tick")
+        record("sustained-hits-never-go-dark", continuous, "320Hz samples throughout repeated contacts")
+        record("renewals-do-not-drift-or-retain-history", bounded, "one outgoing hit layer, bounded crosshair position")
+        queue.clear()
+        queue.add(3, false, 0.0)
+        queue.add(3, false, 1.0)
+        val overlap = queue.sample(1.2).single()
+        queue.add(3, true, 1.2)
+        val interrupted = queue.sample(1.2).single()
+        record("kill-during-hit-renewal-preserves-all-tails", interrupted.killed && interrupted.previous == overlap &&
+            interrupted.previous.previous != null && energy(interrupted) == energy(overlap), "nested=$interrupted")
+        val dead = queue.sample(1.5)
+        repeat(32) { queue.add(3, false, 1.5); queue.add(3, true, 1.5) }
+        record("late-hit-cannot-downgrade-kill", queue.sample(1.5) == dead, "duplicate/late packets ignored after kill")
         queue.clear()
         record("impact-world-clear-releases-all", queue.sample(101.0).isEmpty(), "cleared")
         for (killed in listOf(false, true)) {

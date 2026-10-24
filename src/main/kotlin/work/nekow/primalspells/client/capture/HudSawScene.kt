@@ -37,6 +37,10 @@ object HudSawScene {
         var floor = 0
         var wand: Wand? = null
         var target: LivingEntity? = null
+        var sustainedTarget: LivingEntity? = null
+        var sustainedSamples = 0
+        var sustainedVisible = true
+        val sustainedIds = hashSetOf<Long>()
         val burstTargets = arrayListOf<LivingEntity>()
         var attacker: work.nekow.primalspells.entity.TestDummyEntity? = null
         var oldLayout: HudLayout? = null
@@ -87,7 +91,7 @@ object HudSawScene {
                 if (t == 57 || t == 62) {
                     val f = WandHudRenderer.snapshot()
                     record(t, "accepted-damage-reaches-hud-$t", f != null && f.impacts.any {
-                        it.killed == (t == 62) && it.alpha > 0
+                        it.killed == (t == 62) && (it.alpha > 0 || (it.previous?.alpha ?: 0.0) > 0)
                     }, "frame=$f")
                 }
                 if (t == 95 || t == 98) {
@@ -101,6 +105,24 @@ object HudSawScene {
                     record(t, "real-repeated-single-target-shows-one-feedback", events.size == 1 && !events.single().killed,
                         "events=$events")
                 }
+                if (t in 136..162) {
+                    val events = WandHudRenderer.snapshot()?.impacts.orEmpty()
+                    val hit = events.singleOrNull()
+                    sustainedSamples++
+                    sustainedVisible = sustainedVisible && hit != null && !hit.killed &&
+                        hit.targetId.toString() == shared["sustainedTarget"] &&
+                        (hit.alpha > 0.05 || (hit.previous?.alpha ?: 0.0) > 0.05)
+                    hit?.let { sustainedIds += it.id }
+                }
+                if (t == 165) {
+                    val events = WandHudRenderer.snapshot()?.impacts.orEmpty()
+                    record(t, "continuous-hits-stay-visible-and-deduplicated", sustainedSamples == 27 &&
+                        sustainedVisible && sustainedIds.size == 1, "samples=$sustainedSamples ids=$sustainedIds visible=$sustainedVisible")
+                    record(t, "renewed-hit-upgrades-to-real-kill", events.size == 1 && events.single().killed,
+                        "events=$events")
+                }
+                if (t == 176) record(t, "continuous-feedback-retires-after-last-impact",
+                    WandHudRenderer.snapshot()?.impacts?.isEmpty() == true, "last hit/kill=163t")
                 if (t == 70 || t == 77) {
                     val f = WandHudRenderer.snapshot()
                     val expected = if (t == 70) 0.0 else -Math.PI / 2
@@ -235,12 +257,27 @@ object HudSawScene {
                     target?.discard()
                     burstTargets.forEach { it.discard() }
                     attacker?.discard()
-                    ctx.player.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY)
                     ProjectileRuntime.projectiles.forEach { it.alive = false }
+                }
+                if (t == 132) {
+                    sustainedTarget = EntityTypes.COW.create(ctx.level, EntitySpawnReason.COMMAND)?.also {
+                        it.setPos(12.0, floor + 1.0, 8.0); it.isNoAi = true; ctx.level.addFreshEntity(it)
+                        shared["sustainedTarget"] = it.id.toString()
+                    }
+                }
+                if (t in 132..163) repeat(16) {
+                    check(SpellImpact.hurt(ctx.level, requireNotNull(sustainedTarget), ctx.player, 0.01, Vec3.ZERO))
+                }
+                if (t == 163) record(t, "continuous-target-real-kill-accepted", sustainedTarget?.let {
+                    SpellImpact.hurt(ctx.level, it, ctx.player, 100.0, Vec3.ZERO) && !it.isAlive
+                } == true, "kill interrupts same-tick hit renewal")
+                if (t == 180) {
+                    sustainedTarget?.discard()
+                    ctx.player.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY)
                 }
                 if (t == 199) record(t, "hud-scene-cleans-world-effects", ParticleManager.of(ctx.level).getEngine().particleCount() == 0 &&
                     ProjectileRuntime.projectiles.isEmpty(), "particles=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
-            }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> target?.discard(); burstTargets.forEach { it.discard() }; attacker?.discard(); ctx.command("difficulty peaceful"); Minecraft.getInstance().execute {
+            }, checksAt = { _, t -> checks[t] ?: emptyList() }, finish = { ctx -> target?.discard(); sustainedTarget?.discard(); burstTargets.forEach { it.discard() }; attacker?.discard(); ctx.command("difficulty peaceful"); Minecraft.getInstance().execute {
                 Minecraft.getInstance().gui.setScreen(null); oldLayout?.let { HudSettings.save(it) }; WandHudRenderer.clear()
             } })
     }

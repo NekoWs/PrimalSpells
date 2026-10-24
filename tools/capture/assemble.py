@@ -601,6 +601,9 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         prezero = energy[-2] / max(peak, 1)
         result["asserts"].append(("击杀笔画连续淡出到零", 3 <= span <= 10 and drop <= 0.35 and prezero <= 0.1 and energy[-1] == 0,
             f"原生红色能量={energy}，95→5%跨度={span}帧，最大损失={drop:.1%}，清零前={prezero:.1%}"))
+        continuous = [int(marker_mask(t)[260:460, 540:740].sum()) for t in range(136, 163)]
+        result["asserts"].append(("连续命中按目标去重且画面不中断", min(continuous) >= 50,
+            f"32t真实连击窗口的逐帧准星覆盖={continuous}"))
 
     if scene == "new_spells":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}

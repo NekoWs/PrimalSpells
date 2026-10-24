@@ -5,7 +5,7 @@ import kotlin.math.*
 /** 相对原版准星中心的短笔画；保留小数位置和长度，避免逐像素取整造成停顿。 */
 data class HudImpactStroke(val x: Double, val y: Double, val width: Double, val height: Double, val core: Boolean)
 
-/** 单个目标的反馈画面；击杀接续命中残影，不多占一个目标。 */
+/** 单个目标的反馈画面；重复命中与击杀保留有限交接残影，不多占一个目标。 */
 data class HudImpactFrame(
     val id: Long, val killed: Boolean,
     val alpha: Double, val draw: Double, val spread: Double,
@@ -40,12 +40,13 @@ data class HudImpactFrame(
     }
 }
 
-/** 客户端按目标管理短反馈；同一窗口内的重复命中不创建、延长或挪动笔画。 */
+/** 客户端按目标管理短反馈；同刻连击合并，后续命中接续有限尾段。 */
 class HudImpactAnimations {
     private data class Impact(val id: Long, val targetId: Int, val killed: Boolean,
                               val start: Double, val previous: Impact? = null) {
         val duration get() = if (killed) 8.0 else 6.0
-        private val origin = previous?.sample(start)?.spread ?: 0.0
+        // 重复命中在准星旁重新描出，不能累计外移到屏幕边缘；击杀保留当前接点。
+        private val origin = if (killed) previous?.sample(start)?.spread ?: 0.0 else 0.0
 
         fun sample(now: Double): HudImpactFrame {
             val age = (now - start).coerceAtLeast(0.0)
@@ -62,13 +63,18 @@ class HudImpactAnimations {
     private val active = arrayListOf<Impact>()
     private var nextId = 0L
 
-    /** 使用HUD游戏时钟和服务端目标ID去重；致死时在原位置平滑接成红色斜十字。 */
+    /** 同一目标每刻最多接续一次；旧笔画继续运动淡出，致死可立即升级为斜十字。 */
     fun add(targetId: Int, killed: Boolean, now: Double) {
         prune(now)
         val index = active.indexOfFirst { it.targetId == targetId }
         if (index >= 0) {
             val existing = active[index]
-            if (killed && !existing.killed) active[index] = Impact(existing.id, targetId, true, now, existing)
+            if (existing.killed) return
+            if (killed || now - existing.start >= 1.0) {
+                // 上次交接已结束时断开历史，持续射击也只保留当前动画和有限尾段。
+                val outgoing = if (now - existing.start >= 0.8) existing.copy(previous = null) else existing
+                active[index] = Impact(existing.id, targetId, killed, now, outgoing)
+            }
             return
         }
         active += Impact(nextId++, targetId, killed, now)

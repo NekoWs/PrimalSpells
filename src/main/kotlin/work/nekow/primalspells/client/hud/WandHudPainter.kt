@@ -98,7 +98,6 @@ object WandHudPainter {
     private fun feedback(g: GuiGraphicsExtractor, f: WandHudFrame, scale: Double) {
         val cx = 45; val cy = 29
         for (impact in f.impacts) {
-            impact.previous?.let { impactMarker(g, it, cx, cy, scale, f.presence) }
             impactMarker(g, impact, cx, cy, scale, f.presence)
         }
         // 受击弧位于外圈；折线缺口与晶齿保留像素魔法感。
@@ -122,6 +121,8 @@ object WandHudPainter {
 
     /** 正十字命中、斜十字击杀；GUI矩阵保留小数位，硬边短线持续移动，不逐格停顿。 */
     private fun impactMarker(g: GuiGraphicsExtractor, impact: HudImpactFrame, cx: Int, cy: Int, scale: Double, presence: Double) {
+        // 命中接续途中可能马上击杀；先画完整的有限尾段，不能丢掉上一层正在淡出的笔画。
+        impact.previous?.let { impactMarker(g, it, cx, cy, scale, presence) }
         val alpha = impact.alpha * presence
         if (alpha <= 0.003) return
         val core = if (impact.killed) 0xFFFFB1BA.toInt() else WHITE

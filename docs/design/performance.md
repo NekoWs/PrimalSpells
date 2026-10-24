@@ -38,7 +38,7 @@
 
 `explosion_performance`在真实ServerLevel调用正式ExplosionFx：三次单发相隔40t，再在同一刻生成八发。创建阶段记录System.nanoTime与ThreadMXBean分配；particles.tsv记录逐刻服务端数量，JFR保留真实客户端/服务端采样。shapes.tsv读取PD只读visitor的实际可见位置签名，确认三次爆炸不同、零动态光源与双端完整回收。记录的是固定内容负载，不能把录制FPS、样本CPU比例或创建耗时等同于整机FPS/MSPT。
 
-基线与当前使用相同机位、半径和发射时间线；首发含初始化不纳入预热后单发比较。原始基线在`build/capture/explosion-baseline/explosion_performance`，当前独立复测在`build/capture/out/explosion_performance`，完整四场回归在`build/capture/explosion-regression-verified`。最初摄影棚遮挡/旧跳字观察夹具的失败证据留在`explosion-fixture-audit`、`explosion-lighting-fixture-audit`与`explosion-room-audit`，不混作通过场。
+基线与有界粒子预算使用相同机位、半径和发射时间线；首发含初始化不纳入预热后单发比较。原始基线在`build/capture/explosion-baseline/explosion_performance`，独立复测在`build/capture/explosion-independent-verified/explosion_performance`，完整四场回归在`build/capture/explosion-regression-verified`。最初摄影棚遮挡/旧跳字观察夹具的失败证据留在`explosion-fixture-audit`、`explosion-lighting-fixture-audit`与`explosion-room-audit`，不混作通过场。
 
 | 固定工作负载 | 优化前 | 优化后 |
 |---|---:|---:|

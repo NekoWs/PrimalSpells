@@ -34,8 +34,8 @@ object ExplosionFx {
     private val crystalPalette = listOf(Color.ofInt(212, 239, 167), Color.ofInt(109, 216, 168), Color.ofInt(236, 173, 59))
     private val white = Color.ofInt(255, 251, 215)
     private val smokeColors = listOf(Color.ofInt(122, 110, 94), Color.ofInt(68, 62, 58))
-    private val square = spellVisual().style(ParticleStyle.SQUARE).anisoWorld(1f, 1f).additive(false)
-    private val streak = spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.5f, 0.125f).additive(false)
+    private val square = spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.55f, 0.55f).additive(false)
+    private val streak = spellVisual().style(ParticleStyle.SQUARE).anisoWorld(0.3f, 0.075f).additive(false)
 
     // PD曲线不可变，可以共享；不再为每片重建关键帧、排序与通道列表。
     private val fireLife = (12..24).associateWith { life ->

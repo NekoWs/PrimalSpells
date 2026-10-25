@@ -50,6 +50,32 @@ internal object RefreshSpellChecks {
             check("remaining-draws-return-to-head", loopPaid.tx.accepted.count { it.id == "double_cast" } == 2 && loopPaid.refreshes == 2 && loopPaid.shots.isEmpty(), loopPaid.tx.accepted.map { it.id })
             check("second-refresh-stops-wrapping-and-recharges", loop.status.recharge == 40.0 && loop.drawPile == loop.loadedMagics, "recharge=${loop.status.recharge}")
 
+            // 原生多抽与双重施放叠加会重抽刷新；减寿只影响虚空持续时间，不减双冷却。
+            fun voidRecipe(casts: Int, double: Boolean = true) = wand(*(
+                (if (double) listOf("double_cast") else emptyList()) + List(5) { "reduced_lifetime" } +
+                    listOf("void_escape", "wand_refresh")
+                ).toTypedArray(), casts = casts, mana = 450.0).also {
+                it.delayTickCount = 6.0; it.rechargeTickCount = 10.0
+            }
+            val doubleVoid = voidRecipe(2)
+            val doubleVoidPreview = doubleVoid.preview()
+            val doubleVoidPaid = settle(doubleVoid)
+            check("native-two-draws-repeat-void-and-refresh", doubleVoidPaid.refreshes == 2 && doubleVoidPaid.cards.count { it.id == "void_escape" } == 2 && doubleVoid.magics[6]!!.remainingUses == 25,
+                doubleVoidPaid.tx.accepted.map { it.id })
+            check("native-two-draws-accumulate-both-cooldowns", doubleVoid.status.delay == 400.0 && doubleVoid.status.recharge == 390.0 && doubleVoid.status.mana == 310.0,
+                "delay=${doubleVoid.status.delay}; recharge=${doubleVoid.status.recharge}; mana=${doubleVoid.status.mana}")
+            check("native-two-draws-preview-matches", doubleVoidPreview.delay == doubleVoid.status.delay && doubleVoidPreview.recharge == doubleVoid.status.recharge && doubleVoidPreview.manaAfter == doubleVoid.status.mana,
+                "delay=${doubleVoidPreview.delay}; recharge=${doubleVoidPreview.recharge}; mana=${doubleVoidPreview.manaAfter}")
+            val singleVoid = voidRecipe(2, double = false)
+            ready(singleVoid); singleVoid.spell(source)
+            check("native-two-without-double-refreshes-once", singleVoid.status.delay == 200.0 && singleVoid.status.recharge == 0.0 && singleVoid.status.mana == 380.0 && singleVoid.magics[5]!!.remainingUses == 25,
+                "delay=${singleVoid.status.delay}; recharge=${singleVoid.status.recharge}; mana=${singleVoid.status.mana}")
+            check("five-lifetime-reductions-leave-one-tick-of-void", source.getEffect(ModEffects.VOID_PHASE)?.duration == 1, source.getEffect(ModEffects.VOID_PHASE)?.duration)
+            val nativeOne = voidRecipe(1)
+            val nativeOnePaid = settle(nativeOne)
+            check("native-one-with-double-refreshes-once", nativeOnePaid.refreshes == 1 && nativeOne.status.delay == 200.0 && nativeOne.status.recharge == 0.0 && nativeOne.status.mana == 380.0,
+                "delay=${nativeOne.status.delay}; recharge=${nativeOne.status.recharge}; mana=${nativeOne.status.mana}")
+
             val preserved = wand("double_cast", "void_escape", "wand_refresh", "black_hole")
             val original = preserved.magics[1]!!; original.remainingUses = 7
             repeat(2) { ready(preserved); preserved.spell(source) }

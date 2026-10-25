@@ -132,7 +132,7 @@ spell_chain的TriggerLifecycleChecks读取实际新生子弹，覆盖两类命�
 
 recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹，不再用客户端固定帧号猜服务端年龄。spell_resonance的接触夹具使用真实发射后重叠位置，复制夹具实际装备bounce_duplicate并在子弹首次移动前检查继承。其混合视觉退场门禁见[open](issues/open.md)。
 
-刷新机制回归：`pwsh tools/capture/capture.ps1 -Offline -NoVideo -Scene new_spells,foundations,spell_chain -TimeoutSec 400 -FinishTimeoutSec 45`。三场369项检查、840帧零丢帧，机制、画面、日志门禁全过。RefreshSpellChecks的39项检查覆盖刷新前后次数、即时续抽/控制牌正常重入/第二次充能、MP失败与未付费祖先、仓库引用、普通/追加荷载、一分为多、只读预览和牌堆/NBT；已有引用、逐卡限制与独立荷载检查保留。完整原帧、meta、报告与正常退出日志在`build/capture/refresh-verified/`。
+刷新机制回归：`pwsh tools/capture/capture.ps1 -Offline -NoVideo -Scene new_spells,foundations,spell_chain -TimeoutSec 400 -FinishTimeoutSec 45`。三场369项检查、840帧零丢帧，机制、画面、日志门禁全过，证据在`build/capture/refresh-verified/`。RefreshSpellChecks覆盖刷新前后次数、即时续抽/控制牌正常重入/第二次充能、MP失败与未付费祖先、仓库引用、普通/追加荷载、一分为多、只读预览和牌堆/NBT。当前另用`-Scene new_spells`复验原生施放数与双重施放的组合：160项检查、180帧零丢帧，机制、画面、日志门禁全过；其中刷新检查45项，确认图示虚空组合在原生施放数2时为400t/390t，移除双重施放后为200t/0t，减寿后的真实虚空状态仅1t。完整原帧、meta、报告与正常退出日志在`build/capture/refresh-native-casts-verified/`。
 
 引用与实用法术覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。通过证据按场保存在`build/capture/reference-spells-suite-verified/`、`reference-spells-fields-verified/`及`before-limited-uses/`。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全，生成器像素幂等。
 

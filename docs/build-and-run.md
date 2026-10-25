@@ -132,6 +132,8 @@ spell_chain的TriggerLifecycleChecks读取实际新生子弹，覆盖两类命�
 
 recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹，不再用客户端固定帧号猜服务端年龄。spell_resonance的接触夹具使用真实发射后重叠位置，复制夹具实际装备bounce_duplicate并在子弹首次移动前检查继承。其混合视觉退场门禁见[open](issues/open.md)。
 
+刷新机制回归：`pwsh tools/capture/capture.ps1 -Offline -NoVideo -Scene new_spells,foundations,spell_chain -TimeoutSec 400 -FinishTimeoutSec 45`。三场369项检查、840帧零丢帧，机制、画面、日志门禁全过。RefreshSpellChecks的39项检查覆盖刷新前后次数、即时续抽/控制牌正常重入/第二次充能、MP失败与未付费祖先、仓库引用、普通/追加荷载、一分为多、只读预览和牌堆/NBT；已有引用、逐卡限制与独立荷载检查保留。完整原帧、meta、报告与正常退出日志在`build/capture/refresh-verified/`。
+
 引用与实用法术覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。通过证据按场保存在`build/capture/reference-spells-suite-verified/`、`reference-spells-fields-verified/`及`before-limited-uses/`。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全，生成器像素幂等。
 
 锯片/虚空与PD依赖复验：先执行`pwsh tools/capture/capture.ps1 -Offline -Scene new_spells,void_phase,sawblade_falling -TimeoutSec 300 -FinishTimeoutSec 45`，再独立执行`-Scene foundations,spell_lighting,pd_api`。六场259项机制检查、1090帧零丢帧，画面/日志门禁全过，PNG全部写完后正常保存退出。锯片保留出生曲线和8t resize，同UUID原生面积95%→5%跨7t、最大单步下降20.98%、清零前0.028%；虚空场景验证85t实际施法、双端锁位、真实位置包纠正、法阵零残留与到期恢复，普通放下法杖仍按现有短退场门禁检查。证据分别在`build/capture/void-saw-verified/`及`build/capture/void-pd-regression-verified/`。使用`-NoVideo`仍保留全分辨率原帧、拼图和完整门禁，报告不引用未生成媒体。

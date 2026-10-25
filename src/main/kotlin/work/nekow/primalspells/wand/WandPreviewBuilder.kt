@@ -21,7 +21,8 @@ internal object WandPreviewBuilder {
         copy.drawPile += wand.drawPile.map(::cloned)
         copy.discardPile += wand.discardPile.map(::cloned)
         copy.loadedMagics += wand.loadedMagics.map(::cloned)
-        val chain = WandDeck(copy, references, kotlin.random.Random(copy.referenceSeed)).draw(wand.cast)
+        val accounting = CastTransaction(copy)
+        val chain = accounting.draw(references)
         data class Draft(val card: Magic, val scope: String, val depth: Int, val kind: String)
         val draft = arrayListOf<Draft>()
         var scopeIndex = 0
@@ -42,7 +43,6 @@ internal object WandPreviewBuilder {
             }
         }
         visit(chain, "root", 0)
-        val accounting = CastTransaction(copy)
         val paid = accounting.pay(chain)
         accounting.finish()
         val reasons = copy.status.failedReason.toMutableList()
@@ -76,11 +76,13 @@ internal object WandPreviewBuilder {
         }
         var chain = 0
         while (copy.drawPile.isNotEmpty()) {
-            WandDeck(copy).draw(wand.cast.coerceAtLeast(1), false, { source, scope ->
-                sources[source]?.let { i -> slots[i] = slots[i].copy(scope = scope) }
+            val deck = WandDeck(copy)
+            deck.draw(wand.cast.coerceAtLeast(1), false, { source, scope ->
+                sources[source]?.let { i -> if (slots[i].scope.isEmpty()) slots[i] = slots[i].copy(scope = scope) }
             }, "chain${chain++}")
             // 下一条链只看余下配置，不把此前抽牌再次排回队列。
             copy.hand.clear()
+            if (deck.didRefresh) break
         }
         return slots
     }

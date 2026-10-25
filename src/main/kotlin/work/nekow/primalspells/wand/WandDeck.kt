@@ -17,7 +17,7 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
             if (copies != null) return copies.removeFirstOrNull() ?: if (useFallback) fallback?.take(false, true) else null
             val pile = when {
                 wand.drawPile.isNotEmpty() -> wand.drawPile
-                wrap && wand.discardPile.isNotEmpty() -> wand.discardPile
+                wrap && refreshes < 2 && wand.discardPile.isNotEmpty() -> wand.discardPile
                 else -> return null
             }
             return Source(pile.removeFirst().also { wand.hand += it }, physical = true)
@@ -27,12 +27,21 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
     private var nodes = 0
     private var depth = 0
     private var trace: ((Magic, String) -> Unit)? = null
+    private var onRefresh: ((DrawAction, List<Magic>, Set<Magic>) -> Boolean)? = null
+    private val root = arrayListOf<Magic>()
+    private val visible = Collections.newSetFromMap(IdentityHashMap<Magic, Boolean>())
+    private var refreshes = 0
+    val didRefresh: Boolean get() = refreshes > 0
+    private var copyDepth = 0
+    private var childScopes = 0
 
-    /** 同一解析器服务真实施放与只读预览；循环引用跳过活动原卡，过量展开有限终止。 */
+    /** 实际/预览由onRefresh校验前缀费用；纯配置分色缺省视为成功，循环与过量展开均有界。 */
     fun draw(budget: Int, wrapping: Boolean = true, trace: ((Magic, String) -> Unit)? = null,
-             scope: String = "root"): ArrayList<Magic> {
+             scope: String = "root", onRefresh: ((DrawAction, List<Magic>, Set<Magic>) -> Boolean)? = null): ArrayList<Magic> {
         this.trace = trace
-        return drawFrom(budget, Cursor(), wrapping, scope)
+        this.onRefresh = onRefresh
+        drawFrom(budget, Cursor(), wrapping, scope, into = root)
+        return root
     }
 
     private fun limit(): Boolean {
@@ -42,78 +51,78 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
     }
 
     private fun drawFrom(budget: Int, cursor: Cursor, wrapping: Boolean, scope: String,
-                         fallback: Boolean = true): ArrayList<Magic> {
+                         fallback: Boolean = true, into: ArrayList<Magic>): ArrayList<Magic> {
         var remaining = budget.toLong()
         var allowWrap = wrapping
-        val chain = arrayListOf<Magic>()
+        val chain = into
         while (remaining > 0 && !limit()) {
             val source = cursor.take(allowWrap, fallback) ?: break
             // 复制不消费实体槽；跟踪只记录真实抽取，防止预览反复改写原槽作用域。
             if (source.physical) trace?.invoke(source.card, scope)
             val firstVisit = active.add(source.card)
-            if (!firstVisit && source.card is DrawAction) continue
+            if (!firstVisit && !source.physical && source.card is DrawAction) continue
             nodes++
             val card = source.card.clone()
-            card.useOwner = if (source.physical) source.card else null
+            val copied = !source.physical || copyDepth > 0
+            card.useOwner = if (copied) null else source.card
             if (source.free) { card.mana = 0.0; card.delay = 0; card.recharge = 0; card.castingCostsWaived = true }
             chain += card
+            visible += card
             depth++
+            if (copied) copyDepth++
             val delta = prepare(card, source.card, cursor, scope)
+            if (copied) copyDepth--
             if (!source.physical) SpellAssembly.waiveUses(card)
             depth--
             if (firstVisit) active.remove(source.card)
             remaining += delta
-            if (card is DrawAction && card.kind in setOf(DrawAction.Kind.ALL, DrawAction.Kind.REFRESH)) allowWrap = false
+            if (card is DrawAction && card.kind == DrawAction.Kind.ALL) allowWrap = false
         }
         return chain
     }
 
     private fun prepare(card: Magic, original: Magic, cursor: Cursor, scope: String): Int {
         if (card !is DrawAction) {
-            if (card is TriggerSpell) card.payload += drawFrom(card.triggerCast, cursor, false, childScope(scope, "hit"))
+            if (card is TriggerSpell) drawFrom(card.triggerCast, cursor, false, childScope(scope, "hit"), into = card.payload)
             return card.cast - 1
         }
         when (card.kind) {
-            DrawAction.Kind.ALL -> card.expanded += drawFrom(Int.MAX_VALUE, cursor, false, scope)
-            DrawAction.Kind.REFRESH -> Unit
+            DrawAction.Kind.ALL -> drawFrom(Int.MAX_VALUE, cursor, false, scope, into = card.expanded)
+            DrawAction.Kind.REFRESH -> refresh(card)
             DrawAction.Kind.DIVIDE -> {
-                // 准备一张卡（包括它的荷载）后再深拷贝；继续抽牌预算只算一次。
+                // 第一份直接准备进树，复制其余份；刷新能在真实的第一份中立刻结算。
                 val source = cursor.take(false, true) ?: return -1
                 if (source.physical) trace?.invoke(source.card, scope)
                 if (limit()) return -1
                 val firstVisit = active.add(source.card)
-                if (!firstVisit && source.card is DrawAction) return -1
+                if (!firstVisit && !source.physical && source.card is DrawAction) return -1
                 nodes++
                 val next = source.card.clone()
-                next.useOwner = if (source.physical) source.card else null
+                next.useOwner = null
                 if (source.free) { next.mana = 0.0; next.delay = 0; next.recharge = 0; next.castingCostsWaived = true }
                 depth++
+                copyDepth++
+                card.expanded += next
+                visible += next
                 val delta = prepare(next, source.card, cursor, scope)
+                copyDepth--
                 depth--
                 if (firstVisit) active.remove(source.card)
                 val count = treeSize(next)
-                repeat(card.copies) {
+                repeat((card.copies - 1).coerceAtLeast(0)) {
                     if (nodes + count <= 4096) {
-                        card.expanded += SpellAssembly.copyCard(next).also(SpellAssembly::waiveUses); nodes += count
+                        val copy = SpellAssembly.copyCard(next).also(SpellAssembly::waiveUses)
+                        card.expanded += copy; nodes += count
+                        replay(copy)
                     }
                     else { nodes = 4096; limit() }
                 }
                 return delta
             }
             DrawAction.Kind.HIT, DrawAction.Kind.TIMER, DrawAction.Kind.EXPIRE -> {
-                val carrier = drawFrom(1, cursor, false, scope)
+                val carrier = drawFrom(1, cursor, false, scope, into = card.expanded)
                 val targets = shots(carrier)
                 if (targets.isNotEmpty()) {
-                    val payload = drawFrom(1, cursor, false, childScope(scope, card.kind.name.lowercase()))
-                    val payloadSize = payload.sumOf(::treeSize)
-                    targets.forEachIndexed { index, target ->
-                        // 第一枚载体直接接收已准备模板；其余独立副本同样计入展开预算。
-                        if (index == 0) target.addedTriggers += AppendedPayload(card.kind, ArrayList(payload))
-                        else if (nodes + payloadSize <= 4096) {
-                            target.addedTriggers += AppendedPayload(card.kind, ArrayList(payload.map(SpellAssembly::copyCard)))
-                            nodes += payloadSize
-                        } else { nodes = 4096; limit() }
-                    }
                     fun waive(cards: List<Magic>) {
                         cards.forEach { when (it) {
                             is Modifier -> it.mana = 0.0
@@ -121,9 +130,23 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
                             else -> Unit
                         } }
                     }
+                    // 搜索载体经过的修正先免MP，荷载内的刷新随后才能看到正确的前缀费用。
                     waive(carrier)
+                    val payload = arrayListOf<Magic>()
+                    targets.first().addedTriggers += AppendedPayload(card.kind, payload)
+                    drawFrom(1, cursor, false, childScope(scope, card.kind.name.lowercase()), into = payload)
+                    val payloadSize = payload.sumOf(::treeSize)
+                    targets.forEachIndexed { index, target ->
+                        // 第一枚载体直接接收已准备模板；其余独立副本同样计入展开预算。
+                        if (index == 0) Unit
+                        else if (nodes + payloadSize <= 4096) {
+                            val copied = ArrayList(payload.map(SpellAssembly::copyCard))
+                            target.addedTriggers += AppendedPayload(card.kind, copied)
+                            nodes += payloadSize
+                            copied.forEach(::replay)
+                        } else { nodes = 4096; limit() }
+                    }
                 }
-                card.expanded += carrier
             }
             else -> {
                 val all = wand.loadedMagics
@@ -141,12 +164,12 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
                     else -> emptyList()
                 }
                 val virtual = Cursor(ArrayDeque(selected), cursor)
-                card.expanded += drawFrom(Int.MAX_VALUE, virtual, false, scope, fallback = false)
+                drawFrom(Int.MAX_VALUE, virtual, false, scope, fallback = false, into = card.expanded)
                 // Miu明确继续抽牌；其它引用若只得到修正，也让该修正作用于后续实际法术。
                 val expanded = flatten(card.expanded)
                 val extra = expanded.filterIsInstance<Modifier>().sumOf { it.cast - 1 }
                 if (card.kind == DrawAction.Kind.MODIFIERS) {
-                    card.expanded += drawFrom(1 + extra, cursor, false, scope)
+                    drawFrom(1 + extra, cursor, false, scope, into = card.expanded)
                 } else if (expanded.isEmpty()) return -1
                 else if (expanded.none { it is Projectile || (it is OtherSpell && it !is DrawAction) ||
                             (it is DrawAction && it.kind == DrawAction.Kind.REFRESH) }) return extra
@@ -155,7 +178,29 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
         return -1
     }
 
-    private fun childScope(scope: String, kind: String) = if (trace == null) scope else "$scope/$kind${wand.hand.size}"
+    private fun childScope(scope: String, kind: String) = if (trace == null) scope else "$scope/$kind${childScopes++}"
+
+    /** 只有成功付费才移动牌堆；首次从杖首续抽，第二次后禁止由弃牌堆继续回绕。 */
+    private fun refresh(card: DrawAction) {
+        if (onRefresh?.invoke(card, root, visible) == false) return
+        refreshes++
+        wand.discardPile += wand.hand
+        wand.discardPile += wand.drawPile
+        wand.discardPile += wand.discarded
+        wand.hand.clear(); wand.drawPile.clear(); wand.discarded.clear()
+        if (refreshes == 1) { wand.discardPile.clear(); wand.drawPile += wand.loadedMagics }
+    }
+
+    /** 已准备复制品不重抽荷载；按树的实际顺序重放其刷新边界，不能结算模板或未来节点。 */
+    private fun replay(card: Magic) {
+        visible += card
+        if (card is DrawAction) {
+            if (card.kind == DrawAction.Kind.REFRESH) refresh(card)
+            card.expanded.forEach(::replay)
+        }
+        if (card is TriggerSpell) card.payload.forEach(::replay)
+        if (card is Projectile) card.addedTriggers.forEach { it.cards.forEach(::replay) }
+    }
     private fun flatten(cards: List<Magic>): List<Magic> = cards.flatMap {
         if (it is DrawAction) listOf(it) + flatten(it.expanded) else listOf(it)
     }
@@ -170,9 +215,10 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
         wand.discardPile += wand.hand
         wand.discardPile += wand.discarded
         wand.hand.clear(); wand.discarded.clear()
-        if (refreshes > 0 || (wand.drawPile.isEmpty() && wand.discardPile.isNotEmpty())) {
-            if (refreshes == 1) wand.status.recharge = 0.0 else wand.status.recharge += wand.rechargeTicks()
+        if (wand.drawPile.isEmpty() && wand.discardPile.isNotEmpty()) {
+            wand.status.recharge += wand.rechargeTicks()
             wand.drawPile.clear(); wand.discardPile.clear(); wand.drawPile += wand.loadedMagics
         }
+        if (refreshes == 1) wand.status.recharge = 0.0
     }
 }

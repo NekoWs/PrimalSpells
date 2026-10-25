@@ -288,7 +288,7 @@
   "item.primalspells.blood_magic": "血魔法",
   "lore.primalspells.blood_magic.desc": "支付1HP不可减免的诅咒伤害，返还100MP，施放延迟与充能各−7t；可能致死。",
   "item.primalspells.wand_refresh": "刷新法杖",
-  "lore.primalspells.wand_refresh.desc": "立即重新装填并跳过本次充能；同次施法接受两张及以上时正常充能。",
+  "lore.primalspells.wand_refresh.desc": "立即重装，剩余抽取从杖首继续；本次刷新前的法术免扣次数，重复刷新则正常充能。",
   "tooltip.primalspells.spell_uses": "剩余次数：%s / %s",
   "tooltip.primalspells.spell_exhausted": "次数已耗尽，仍可复制施放",
   "effect.primalspells.void_phase": "无界之界",

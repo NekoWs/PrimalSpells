@@ -5,7 +5,7 @@
 | 主题 | 当前保证 | 回归入口 |
 |---|---|---|
 | 实体卡次数 | 同名卡各自计数，普通施放扣原卡；玩法复制免次数且可复制耗尽卡，预览/拒绝施法不扣；装卸/小包/存档保留次数，移除旧ID不串卡；回洗与刷新不补满 | foundations的LimitedUseChecks与真实预览/组件同步 |
-| 引用与重装填 | 实体牌与副本游标隔离；首末卡/两卡/分类/跨杖引用保留独立荷载与费用标记，循环与大展开（含每枚载体的追加荷载副本）有界；全量预算不因多重施放溢出；单刷新免充能、多刷新正常充能 | new_spells的ReferenceSpellChecks、foundations |
+| 引用与重装填 | 实体牌与副本游标隔离；引用/追加荷载保持独立费用与有界展开；刷新即时重装并从杖首续抽，第二次正常充能；只免本次刷新前的次数，仓库不被普通抽取，预览与NBT保持一致 | new_spells的ReferenceSpellChecks、RefreshSpellChecks；foundations、spell_chain |
 | 诅咒付款与虚空 | 血魔法按接受卡支付不可减免HP；虚空默认60t且只受本链寿命修正，双端锁位、位置包纠正并隐藏法阵；普通及特殊原版锁定入口排除虚空目标，到期恢复移动/可见性 | new_spells的ReferenceSpellChecks、VoidSpellChecks、VoidMechanicChecks；void_phase、death_attribution |
 | 世界运行时清理 | 停服同时清空在场与待加入弹体、冻结和延迟动作，旧队列不进入下一个世界 | foundations的ArchitectureChecks |
 | 每刻性能 | 按需积分、同格邻域复用、无数组slab、反应分类配对；已加载区块查询避免同步生成，保留接点/曲线/伤害语义 | spell_performance、collision_precision；[基准](../design/performance.md) |

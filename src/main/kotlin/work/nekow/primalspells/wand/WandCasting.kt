@@ -48,8 +48,7 @@ internal object WandCasting {
         wand.status.delay = 0.0
         wand.status.recharge = 0.0
         val transaction = CastTransaction(wand)
-        val paid = transaction.pay(WandDeck(wand, WandReferences.others(caster, wand),
-            kotlin.random.Random(wand.referenceSeed)).draw(wand.cast))
+        val paid = transaction.pay(transaction.draw(WandReferences.others(caster, wand)))
         CurseDamage.pay(caster, transaction.healthCost)
         if (caster.isAlive) { transaction.commitUses(); launch(wand, caster, paid) }
         transaction.finish()

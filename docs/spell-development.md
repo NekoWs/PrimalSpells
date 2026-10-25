@@ -60,6 +60,7 @@ Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已�
 - 追加定时保留20t计时及更早的终结碰撞条件，反弹不提前消费；追加失效触发仍在到期/死亡时释放。延迟载体仍仅在onExpire按原施法朝向释放，不等下一刻死亡清理。
 - 一分为多复制后方单卡；例如十份加速是一张投射物获得十次加速，不复制整个链。复制牌各自付费，但实体牌只抽取/弃置一次。
 - 全量施放抽取剩余后方链，不回洗。追加系列寻找载体时经过的普通修正免费，控制牌仍收费；未付费控制牌不释放/收费其展开子树，已预留实体牌仍弃置。
+- 刷新通过CastTransaction.draw在抽牌当刻结算已进入的前缀，再决定是否重装；不能先展开全部右侧牌再于finish刷新。复制准备树必须按实际实例顺序处理刷新，不能先执行模板。次数与继续抽牌规则见[引用机制第2节](design/spell-references.md#2-刷新)。
 - 本次根链和递归荷载成功付费的代价汇总一次；任意成功付费链锯清整个事务delay，未付费不生效。
 
 引用、免费复制、刷新与生命付款的边界见[引用机制](design/spell-references.md)。SpellAssembly.copyCard必须保留mana/delay/recharge与castingCostsWaived；不能让二次复制重新收费。CURSE生命成本由CastTransaction汇总，在实际施法前支付，禁止注入每枚投射物。

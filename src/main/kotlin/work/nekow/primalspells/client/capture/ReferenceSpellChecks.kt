@@ -31,7 +31,7 @@ internal object ReferenceSpellChecks {
         }
         fun pay(w: Wand, refs: List<Wand> = emptyList()): Paid {
             val tx = CastTransaction(w)
-            val cards = tx.pay(WandDeck(w, refs, kotlin.random.Random(w.referenceSeed)).draw(w.cast))
+            val cards = tx.pay(tx.draw(refs))
             tx.finish()
             return Paid(cards, tx)
         }

@@ -59,6 +59,7 @@ object NewSpellScene {
                 voidChecks.tick(ctx, t, ::record)
                 if(t==8) {
                     ReferenceSpellChecks.run(ctx) { id, ok, detail -> record(id, ok, detail) }
+                    RefreshSpellChecks.run(ctx) { id, ok, detail -> record(id, ok, detail) }
                     for((id,n) in listOf("triple_cast" to 3,"quadruple_cast" to 4,"quintuple_cast" to 5)) {
                         val (_,shots)=cast(listOf(id)+List(n){"fireball"})
                         record("$id-draws-$n",shots.size==n,"shots=${shots.size}")

@@ -288,7 +288,7 @@
   "item.primalspells.blood_magic": "Blood Magic",
   "lore.primalspells.blood_magic.desc": "Pay 1 HP of unmitigated curse damage for 100 mana and −7t cast delay and recharge. Can be fatal.",
   "item.primalspells.wand_refresh": "Wand Refresh",
-  "lore.primalspells.wand_refresh.desc": "Reload immediately and skip recharge. Two or more refreshes in one cast require normal recharge.",
+  "lore.primalspells.wand_refresh.desc": "Reload immediately and continue drawing from the start. Earlier spells in this cast cost no uses. Repeated refreshes trigger normal recharge.",
   "tooltip.primalspells.spell_uses": "Uses remaining: %s / %s",
   "tooltip.primalspells.spell_exhausted": "Exhausted; copies can still be cast",
   "effect.primalspells.void_phase": "Boundless Realm",

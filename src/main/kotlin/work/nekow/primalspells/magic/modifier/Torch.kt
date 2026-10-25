@@ -29,5 +29,10 @@ class Torch : Modifier() {
     }
     override fun onPassiveIdle() = retire()
     override fun onUnloaded() = retire()
-    private fun retire() { group?.setVariableInterpolated("presence","0",3,work.nekow.particledrawing.core.easing.EasingType.LINEAR)?.destroyAfter(4);group=null }
+    private fun retire() {
+        // 六刻缓入缓出使最后一个可见采样已接近零，避免剩余约1/3光强直接熄灭。
+        group?.setVariableInterpolated("presence", "0", 6, work.nekow.particledrawing.core.easing.EasingType.EASE_IN_OUT)
+            ?.destroyAfter(7)
+        group = null
+    }
 }

@@ -2,6 +2,8 @@ package work.nekow.primalspells.client.capture
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.Executors
 import net.minecraft.client.CameraType
 import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
@@ -13,7 +15,6 @@ import net.minecraft.server.level.ParticleStatus
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.sounds.SoundSource
-import net.minecraft.util.Util
 import net.minecraft.world.item.DyeColor
 import net.minecraft.world.level.GameType
 import net.minecraft.world.level.LevelSettings
@@ -124,6 +125,14 @@ object CaptureDriver {
     private var lastCapturedTick = -2
 
     private val inflightWrites = AtomicInteger(0)
+    // PNG编码不占用原版区块I/O池；两条线程并行编码，最多24帧在途。
+    private val frameWriter = Executors.newFixedThreadPool(2) { task ->
+        Thread(task, "PrimalSpells capture PNG").apply { isDaemon = true }
+    }
+    private val completedWrites = AtomicInteger(0)
+    private val failedWrites = AtomicInteger(0)
+    private val writeNanos = AtomicLong(0)
+    private var writeQueueDrops = 0
 
     private val frameLines = StringBuilder()
     private val checkLog = ArrayList<Check>()
@@ -150,6 +159,7 @@ object CaptureDriver {
         // MC的隐藏HUD同时隐藏第一人称物品；模型场景只取消GUI绘制，保留真正的持物渲染。
         NeoForge.EVENT_BUS.addListener<RenderGuiEvent.Pre> { if (scene?.showHands == true && scene?.showHud != true) it.isCanceled = true }
         log("install: value=$wanted out=${outRoot.absolutePath} scenes=${scenes.map { it.name }}")
+        log("client pid=${ProcessHandle.current().pid()}")
         if (scenes.isEmpty()) abortRequested = true
     }
 
@@ -179,7 +189,11 @@ object CaptureDriver {
                 if (inflightWrites.get() > 0) {
                     stopDelayTicks = 1 // 还有帧在写：再等一 tick
                 } else {
-                    log("stopping client (all frames flushed)")
+                    frameWriter.shutdown()
+                    if (failedWrites.get() > 0 || completedWrites.get() != results.sumOf { it.frames }) {
+                        log("scene capture flush FAILED: PNG数量不一致 written=${completedWrites.get()} expected=${results.sumOf { it.frames }} failed=${failedWrites.get()}")
+                    }
+                    log("stopping client (all frames flushed): written=${completedWrites.get()} failed=${failedWrites.get()} averageWriteMs=${writeNanos.get() / 1e6 / completedWrites.get().coerceAtLeast(1)}")
                     mc.stop()
                 }
             }
@@ -299,6 +313,7 @@ object CaptureDriver {
         lastCapturedTick = -2
         frameIndex = 0
         framesDropped = 0
+        writeQueueDrops = 0
         frameLines.clear()
         checkLog.clear()
         sceneLog = StringBuilder()
@@ -390,13 +405,14 @@ object CaptureDriver {
                     appendLine("TOTAL\t$frames\t${results.sumOf { it.dropped }}\t$checks\t$failed")
                 },
             )
-        }
-        mc.stop()
+        }.onFailure { log("scene capture summary FAILED: $it") }
+        // 不在这里stop：后续client tick必须继续执行，等待最后的截图回调和PNG真正写完。
     }
 
     private fun writeSceneFiles(current: Scene, failed: Int) {
         sceneLog.appendLine("frames\t$frameIndex")
         sceneLog.appendLine("framesDropped\t$framesDropped")
+        sceneLog.appendLine("writeQueueDropped\t$writeQueueDrops")
         sceneLog.appendLine("checks\t${checkLog.size}")
         sceneLog.appendLine("checksFailed\t$failed")
         checkLog.forEach { sceneLog.appendLine("check\t${it.render()}") }
@@ -426,26 +442,33 @@ object CaptureDriver {
         val current = scene ?: return
         if (inflightWrites.get() >= MAX_INFLIGHT_WRITES) {
             framesDropped++
+            writeQueueDrops++
             return
         }
         val mc = Minecraft.getInstance()
         val file = File(current.framesDir, String.format("%05d.png", frameIndex))
         val index = frameIndex
+        // 在异步GPU回读之前预留，覆盖尚未回调的截图，而不只统计已经开始编码的帧。
+        inflightWrites.incrementAndGet()
         try {
             Screenshot.takeScreenshot(mc.gameRenderer.mainRenderTarget(), 1) { image ->
-                inflightWrites.incrementAndGet()
-                Util.ioPool().execute {
+                frameWriter.execute {
+                    val start = System.nanoTime()
                     try {
                         image.writeToFile(file)
+                        completedWrites.incrementAndGet()
                     } catch (t: Throwable) {
+                        failedWrites.incrementAndGet()
                         log("write frame $index FAILED: $t")
                     } finally {
+                        writeNanos.addAndGet(System.nanoTime() - start)
                         image.close()
                         inflightWrites.decrementAndGet()
                     }
                 }
             }
         } catch (t: Throwable) {
+            inflightWrites.decrementAndGet()
             log("screenshot FAILED at tick $want: $t")
             return
         }

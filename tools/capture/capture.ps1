@@ -30,7 +30,8 @@ param(
     [switch]$NoVideo,
     # 客户端录制的最长等待秒数：超过就杀掉游戏进程并以失败退出。
     # 为什么必须有：客户端一旦崩溃/卡死就不会自己退出，流水线会一直挂着（第 29 轮实测）。
-    [int]$TimeoutSec = 300
+    [int]$TimeoutSec = 300,
+    [ValidateRange(10,300)][int]$FinishTimeoutSec = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,14 +64,23 @@ Remove-Item -LiteralPath (Join-Path $root 'build/capture/failure.json') -ErrorAc
 Write-Host "[capture] ./gradlew runCapture -Pcapture=$Scene ...（超时 $TimeoutSec 秒）"
 $runFlags = @("runCapture", "--no-daemon", "--console=plain", "-Pcapture=$Scene")
 if ($Offline) { $runFlags += '--offline' }
+$captureStarted = [DateTime]::UtcNow
 $gradle = Start-Process -FilePath ".\gradlew.bat" `
     -ArgumentList $runFlags `
-    -NoNewWindow -PassThru -RedirectStandardOutput "build/capture/gradle.log" -RedirectStandardError "build/capture/gradle.stderr.log"
+    -WindowStyle Hidden -PassThru -RedirectStandardOutput "build/capture/gradle.log" -RedirectStandardError "build/capture/gradle.stderr.log"
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
+$finishPhase = $null
+$finishAt = $null
 while (-not $gradle.WaitForExit(1000)) {
     $failure = Get-CaptureFailure $root
+    $phase = Get-CaptureFinishPhase $root
+    if ($phase -and $phase -ne $finishPhase) { $finishPhase = $phase; $finishAt = [DateTime]::UtcNow }
+    if (-not $failure -and $finishAt -and ([DateTime]::UtcNow - $finishAt).TotalSeconds -ge $FinishTimeoutSec) {
+        $failure = @{ Reason="录制收尾超时：$finishPhase（$FinishTimeoutSec 秒）"; CrashReport=$null }
+    }
     if (-not $failure -and [DateTime]::UtcNow -ge $deadline) { $failure = @{ Reason="录制超过$TimeoutSec 秒"; CrashReport=$null } }
     if ($failure) {
+        Save-CaptureThreadDump $root $captureStarted
         Write-CaptureFailure $root $failure
         # 只结束本次启动的Gradle及其子进程，不扫描/终止其它MC实例。
         try { $gradle.Kill($true) } catch { Write-Host "[capture] 启动器已结束：$($_.Exception.Message)" }

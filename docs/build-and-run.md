@@ -81,7 +81,9 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 始终后台运行，PowerShell启动辅助进程使用Start-Process -WindowStyle Hidden并重定向stdout/stderr。客户端默认隐藏窗口，不抢键鼠；需要展示时显式使用runCapture的captureShowWindow属性。不要通过1×1窗口省略真实1280×720渲染。
 
-脚本先构建，-Offline同时传递给构建和runCapture；-SkipBuild只在确认现有类产物可用时使用。它只拥有本次Gradle/游戏子进程，监测FATAL、崩溃报告、驱动错误和超时，失败保存当前日志/部分帧并停止，不杀其他MC实例。构建失败仅引用本次build.log，不引用旧运行日志。NoVideo开关尚有 [已登记缺陷](issues/open.md#novideo开关未传递到合成流程)，不要依赖它跳过ffmpeg。
+脚本先构建，-Offline同时传递给构建和runCapture；-SkipBuild只在确认现有类产物可用时使用。它只拥有本次Gradle/游戏子进程，监测FATAL、崩溃报告、驱动错误和超时，失败保存当前日志/部分帧并停止，不杀其他MC实例。构建失败仅引用本次build.log。-NoVideo真正跳过视频/GIF与ffmpeg，但仍生成拼图和完整判定；画廊不引用未生成的媒体。
+
+PNG由独立双线程编码，不共用原版区块I/O池，最多24帧在途（含异步GPU回读）。结束后先等实际写完并核对数量，再正常退出/保存世界；日志记录written/failed/averageWriteMs，meta另记writeQueueDropped。-FinishTimeoutSec默认60，分别限制PNG排空与游戏保存退出的等待；超时用本次日志的客户端PID及启动时间验证身份，最多5秒采集threads.txt后，仅结束本次进程树。不要通过禁存档或强制成功退出绕过保存问题。
 
 ### 场景选择
 
@@ -131,4 +133,6 @@ recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹�
 
 引用与实用法术覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。通过证据按场保存在`build/capture/reference-spells-suite-verified/`、`reference-spells-fields-verified/`及`before-limited-uses/`。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全，生成器像素幂等。
 
-逐卡次数复验：`pwsh tools/capture/capture.ps1 -Offline -Scene foundations -TimeoutSec 600`。最新foundations机制104/104，含43项逐卡次数检查、旧ID移除/游标身份、25次耗尽与复制、物品/小包NBT及真实客户端同步；`build --offline`与架构/静音护栏通过。原帧和退出诊断在`build/capture/limited-uses-shutdown-audit/`：223帧、37丢帧超预算，区块写盘等待后终止本次Capturer，不能记作整场录制通过。先前foundations的61项UI/编辑检查及spell_chain的111项检查均连同画面门禁通过，证据在`limited-uses-initial-audit/`。`new_spells`的136项机制检查通过，混合特效退场门禁失败保存在`limited-uses-expanded-audit/`，未解决项与后续复验见[open](issues/open.md)。
+逐卡次数与录制收尾复验：`pwsh tools/capture/capture.ps1 -Offline -Scene new_spells,foundations -TimeoutSec 300 -FinishTimeoutSec 45`。foundations为260/260帧、104/104机制通过；new_spells为180/180帧、96/97机制通过，唯一失败是PD的锯片resize/SCALE曲线首刻跳零，门禁继续保留。两场零丢帧/零写盘失败，440帧全部flush后正常保存全部维度并退出；平均PNG编码/写盘耗时67.60ms，两条编码线程足以20FPS，单线程会造成队列丢帧。最新原帧、报告和日志在`build/capture/exit-io-verified/`，不能把该场PD失败描述成全部通过。火把退场的原生光强最大单步下降26.82%、清零前5.61%，原阈值通过；锯片缺陷见[PD需求](issues/pd-api-requests.md)。
+
+工具边界验证：`python -B tools/capture/test_capture_report.py`（2组）、`python -B tools/capture/test_log_filter.py`（5组）、`pwsh tools/capture/test_diagnostics.ps1`（6项）。覆盖缺失/重复/失败退场证据、NoVideo不调用编码器/不引用媒体、固定列解析、PNG/保存阶段与失败日志检测。旧失败原帧保存在`limited-uses-shutdown-audit/`、`exit-io-initial-probe/`与`exit-io-single-writer/`，不混作最新通过结果。

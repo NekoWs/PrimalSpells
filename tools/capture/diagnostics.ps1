@@ -1,4 +1,31 @@
-# 录制故障诊断：只读报告/日志，保存失败证据；可独立验证，不操作进程。
+# 录制故障诊断：保存当前报告/日志；必要时仅对本次客户端执行有界的只读线程诊断。
+function Get-CaptureFinishPhase {
+    param([Parameter(Mandatory)][string]$Workspace)
+    $path = Join-Path $Workspace 'run/capture/logs/latest.log'
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    if (Select-String -LiteralPath $path -Quiet -Pattern '\[Capture\] stopping client \(all frames flushed\)') { return '等待游戏保存并退出' }
+    if (Select-String -LiteralPath $path -Quiet -Pattern '\[Capture\] ALL SCENES DONE:') { return '等待PNG回读与落盘' }
+    return $null
+}
+
+# 只诊断本次新日志声明、且启动时间匹配的Java进程；jcmd自身也有5秒上限。
+function Save-CaptureThreadDump {
+    param([Parameter(Mandatory)][string]$Workspace, [Parameter(Mandatory)][DateTime]$Started)
+    try {
+        $line = Select-String -LiteralPath (Join-Path $Workspace 'run/capture/logs/latest.log') -Pattern '\[Capture\] client pid=(\d+)' | Select-Object -First 1
+        if (-not $line) { return }
+        $clientId = [int]$line.Matches[0].Groups[1].Value
+        $client = Get-Process -Id $clientId -ErrorAction Stop
+        if ($client.ProcessName -ne 'java' -or $client.StartTime.ToUniversalTime() -lt $Started.AddSeconds(-2)) { return }
+        $jcmd = Join-Path (Split-Path $client.Path) 'jcmd.exe'
+        if (-not (Test-Path -LiteralPath $jcmd)) { return }
+        $probe = Start-Process -FilePath $jcmd -ArgumentList @($clientId,'Thread.print') -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput (Join-Path $Workspace 'build/capture/threads.txt') `
+            -RedirectStandardError (Join-Path $Workspace 'build/capture/threads.stderr.txt')
+        if (-not $probe.WaitForExit(5000)) { $probe.Kill() }
+    } catch { Write-Host "[capture] 线程诊断未完成：$($_.Exception.Message)" }
+}
+
 function Get-CaptureFailure {
     param([Parameter(Mandatory)][string]$Workspace)
     $crashDir = Join-Path $Workspace 'run/capture/crash-reports'

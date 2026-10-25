@@ -23,6 +23,7 @@ object NewSpellScene {
         val name="new_spells"
         val checks=ConcurrentHashMap<Int,MutableList<Check>>()
         val voidChecks = VoidSpellChecks()
+        val exits = SpellExitChecks()
         val lights=ConcurrentHashMap<String,Double>()
         var source: work.nekow.primalspells.entity.TestDummyEntity?=null
         var torch: Torch?=null
@@ -159,6 +160,11 @@ object NewSpellScene {
                     p.caster=source!!;p.wand=Wand("saw-frame");p.wand.status.particleManager=ParticleManager.of(ctx.level)
                     // 摄影机正对盘面；下坠和侧面厚度另由sawblade_falling连续录制。
                     p.position=Vector3d((-2f).toDouble(), (ctx.floorBlockY(0,0)+3f).toDouble(), (0f).toDouble());p.velocity=Vector3f(0.05f,0f,0f)
+                    p.effects += object : BaseEffect() {
+                        override val phase = EffectPhase.VISUAL
+                        override fun onTick() { exits.sawPosition = net.minecraft.world.phys.Vec3(status.pos.x, status.pos.y, status.pos.z) }
+                        override fun onDie() { exits.sawEnded = true }
+                    }
                     p.spell();ProjectileRuntime.add(p);saw=p
                     val target=ctx.spawnDummy(6.0,ctx.floorBlockY(0,0)+1.0,0.0)
                     val before=target.totalDamage
@@ -181,9 +187,10 @@ object NewSpellScene {
                         lights["worldLightmap"]=DynamicLightManager.getLightmapWithDynamicLight(0,x,y,z).toDouble()
                     }
                 }
-                if(t==100){torch?.onUnloaded();saw?.alive=false;ProjectileRuntime.projectiles.forEach{it.alive=false}}
+                if(t==100){exits.torchEnded=true;torch?.onUnloaded();saw?.alive=false;ProjectileRuntime.projectiles.forEach{it.alive=false}}
                 if(t==112) source?.discard()
                 if(t==179){
+                    exits.checks(::record)
                     record("torch-registers-one-world-light",lights["emitters95"]==1.0 && (lights["worldLight"]?:0.0)>10.0 && (lights["worldLightmap"]?:0.0)>0.0,"samples=$lights")
                     record("torch-world-light-retires",lights["emitters110"]==0.0,"samples=$lights")
                     record("projectiles-cleaned",ProjectileRuntime.projectiles.isEmpty(),"shots=${ProjectileRuntime.projectiles.size}")
@@ -191,6 +198,7 @@ object NewSpellScene {
                     source?.discard()
                 }
             },clientTick={mc,t ->
+                exits.sample(t)
                 voidChecks.clientTick(mc,t) { id, ok, detail -> checks.getOrPut(t) { java.util.concurrent.CopyOnWriteArrayList() }.add(Check(name,t,id,ok,detail)) }
             },checksAt={_,t -> checks[t]?:emptyList()})
     }

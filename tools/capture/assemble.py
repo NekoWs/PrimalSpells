@@ -171,7 +171,7 @@ SCENES["crystal_lifecycle"] = {"length": 180, "title": "晶面四向 / 加速白
 SCENES["exploration"] = {"length": 240, "title": "结构战利品 / 游荡术士 / 实际持杖掉落", "metric": "warm", "quiet": (0, 6), "decay": "none", "decay_reason": "本场包含多次独立施法；玩法断言检查战斗收场粒子/投射物归零，并保留尾帧无残留判据"}
 SCENES["magic_hud"] = {"length": 200, "title": "魔法HUD / 双冷却 / 原生拖动缩放保存", "metric": "blue", "quiet": (0, 6), "decay": "none", "decay_reason": "HUD状态切换与编辑器预览各有独立生命周期；原生输入/配置断言与最终空场检查共同验收"}
 SCENES["sawblade_falling"] = {"length": 130, "title": "锯齿钢盘 / 下坠反弹 / 金属碎散", "metric": "white", "quiet": (0, 6), "short_exit": True, "fade_window": (65, 85), "decay": "collapse"}
-SCENES["new_spells"] = {"length": 180, "title": "复制抽牌 / 追加条件 / 正负治疗 / 锯片与火种", "metric": "white", "quiet": (0, 6), "decay": "instant"}
+SCENES["new_spells"] = {"length": 180, "title": "复制抽牌 / 追加条件 / 正负治疗 / 锯片与火种", "metric": "white", "quiet": (0, 6), "decay": "events"}
 SCENES["spell_timing"] = {"length": 150, "title": "链锯连射 / 移动延时锁印 / 同刻释放", "metric": "warm", "quiet": (0, 2), "decay": "collapse"}
 SCENES["spell_mechanics"] = {"length": 220, "title": "寿命触发 / 刻迁移 / 量子命中 / 环绕 / 短激光", "metric": "blue", "quiet": (0, 2), "decay": "instant"}
 SCENES["explosion"]["decay"] = "collapse"
@@ -307,14 +307,7 @@ def parse_meta(path: Path) -> tuple[dict[str, str], list[tuple[str, bool]]]:
     for row in read_tsv(path):
         if row[0] == "check":
             # 整行形如：check <TAB> <scene> <TAB> t=<tick> <TAB> <name> <TAB> ok=true <TAB> <detail>
-            fields = [f for f in row[1:] if f]
-            name, ok = "?", False
-            for field in fields:
-                if field.startswith("ok="):
-                    ok = field[len("ok="):] == "true"
-                elif "=" not in field:
-                    name = field
-            checks.append((name, ok))
+            checks.append((row[3], row[4] == "ok=true") if len(row) >= 5 else ("malformed-check", False))
         elif len(row) >= 2:
             meta[row[0]] = row[1]
     return meta, checks
@@ -364,7 +357,17 @@ def build_contact(frames: list[Path], out_png: Path, title: str) -> None:
     sheet.save(out_png)
 
 
-def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
+def event_exit_assertions(checks: list[tuple[str, bool, str]]) -> list[tuple[str, bool, str]]:
+    """混合场必须有唯一且通过的原生退出曲线，不能凭空场或全局峰值替代。"""
+    result = []
+    for name in ("saw-fragments-exits-continuously", "torch-light-exits-continuously"):
+        found = [(ok, detail) for check_name, ok, detail in checks if check_name == name]
+        result.append((f"独立原生退场-{name}", len(found) == 1 and found[0][0],
+                       found[0][1] if found else "缺少原生退场样本；不能以quiet窗口代替退场验证"))
+    return result
+
+
+def analyse(scene: str, spec: dict, root: Path, log_lines: list[str], no_video: bool = False) -> dict:
     sdir = root / scene
     frames = sorted((sdir / "frames").glob("*.png"))
     meta, checks = parse_meta(sdir / "meta.tsv")
@@ -381,6 +384,7 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         "dropped": dropped,
         "fps": fps,
         "checks": checks,
+        "media": not no_video,
         "asserts": [],
         "cover": [],
     }
@@ -427,7 +431,8 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     result["dark_cover"] = dark_cover
     peak = max(cover)
     peak_idx = cover.index(peak)
-    total_px = Image.open(frames[0]).size[0] * Image.open(frames[0]).size[1]
+    with Image.open(frames[0]) as first_frame:
+        total_px = first_frame.size[0] * first_frame.size[1]
     empty = max(1, int(peak * spec.get("empty_ratio", EMPTY_RATIO)))
 
     # 「完整」= 每个 tick 要么出了帧、要么被如实记为丢帧：录制是同步回读帧缓冲，
@@ -608,10 +613,11 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
     if scene == "new_spells":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
         # 当前真实锯盘位于画面左侧；旧右侧ROI只读到了飞散碎屑。
-        blades = [white_spell_mask(tick_frames[t])[340:445, 420:630] for t in (80, 90)]
+        blades = [white_spell_mask(tick_frames[t])[340:445, 420:630] for t in (80, 90) if t in tick_frames]
         counts = [int(a.sum()) for a in blades]
-        result["asserts"].append(("锯片本体持续可见且旋转移动", min(counts) >= 50 and int((blades[0] != blades[1]).sum()) >= 20,
-            f"独立锯片覆盖={counts}，图形变化={int((blades[0] != blades[1]).sum())}像素"))
+        change = int((blades[0] != blades[1]).sum()) if len(blades) == 2 else 0
+        result["asserts"].append(("锯片本体持续可见且旋转移动", len(counts) == 2 and min(counts) >= 50 and change >= 20,
+            f"独立锯片覆盖={counts}，图形变化={change}像素；需要80/90刻原帧，不用相邻帧冒充"))
 
     if scene == "pd_api":
         tick_frames = {int(row[1]): frames[int(row[0])] for row in read_tsv(sdir / "frames.tsv")}
@@ -673,6 +679,11 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         alpha_checks = [ok for name, ok in checks if name == "trail-alpha-decreases"]
         result["asserts"].append(("实际尾迹逐颗连续淡出", len(alpha_checks) == 1 and alpha_checks[0],
             "读取原生PD粒子逐帧透明度；高速尾迹短寿命不以整场50%覆盖量跨4刻代替"))
+    elif spec.get("decay") == "events":
+        # 完整曲线保留在meta中；不把描述文字误当检查名称。
+        result["asserts"].extend(event_exit_assertions([
+            (row[3], row[4] == "ok=true", "\t".join(row[5:]))
+            for row in read_tsv(sdir / "meta.tsv") if row[0] == "check" and len(row) >= 5]))
     elif spec.get("decay", "gradual") in ("gradual", "collapse"):
         result["asserts"].append(
             ("实色结构解体/颗粒分批结束" if spec.get("decay") == "collapse" else "退场是渐变而非闪现",
@@ -816,10 +827,11 @@ def analyse(scene: str, spec: dict, root: Path, log_lines: list[str]) -> dict:
         ))
 
     # 视频/动图/拼图
-    ok_mp4, err_mp4 = build_video(sdir / "frames", sdir / f"{scene}.mp4", fps)
-    ok_gif, err_gif = build_gif(sdir / "frames", sdir / f"{scene}.gif", fps, 640)
-    result["asserts"].append(("生成 mp4", ok_mp4, err_mp4 or (sdir / f"{scene}.mp4").name))
-    result["asserts"].append(("生成 gif", ok_gif, err_gif or (sdir / f"{scene}.gif").name))
+    if not no_video:
+        ok_mp4, err_mp4 = build_video(sdir / "frames", sdir / f"{scene}.mp4", fps)
+        ok_gif, err_gif = build_gif(sdir / "frames", sdir / f"{scene}.gif", fps, 640)
+        result["asserts"].append(("生成 mp4", ok_mp4, err_mp4 or (sdir / f"{scene}.mp4").name))
+        result["asserts"].append(("生成 gif", ok_gif, err_gif or (sdir / f"{scene}.gif").name))
     build_contact(frames, sdir / "contact.png", scene)
     return result
 
@@ -899,12 +911,12 @@ def write_gallery(results: list[dict], root: Path) -> None:
         ok = all(a[1] for a in r["asserts"])
         name = r["scene"]
         failed = [f"{a[0]}: {a[2]}" for a in r["asserts"] if not a[1]]
+        media = f'<video src="{name}/{name}.mp4" controls loop muted playsinline></video><img class="gif" src="{name}/{name}.gif" alt="{name} 动图">' if r.get("media", True) else ''
         rows.append(f"""
   <section class="scene">
     <h2>{name} <span class="tag">{r['title']}</span> <span class="{'pass' if ok else 'fail'}">{'PASS' if ok else 'FAIL'}</span></h2>
-    <video src="{name}/{name}.mp4" controls loop muted playsinline></video>
+    {media}
     <p class="meta">{r['frames']} 帧 @ {r['fps']}fps（每 tick 一帧）　丢帧 {r['dropped']}　场景内断言 {sum(1 for _, o in r['checks'] if o)}/{len(r['checks'])}</p>
-    <img class="gif" src="{name}/{name}.gif" alt="{name} 动图">
     <img class="sheet" src="{name}/contact.png" alt="{name} 拼图">
     {''.join(f'<p class="fail">✗ {f}</p>' for f in failed)}
   </section>""")
@@ -957,7 +969,7 @@ def main() -> int:
     for scene, spec in SCENES.items():
         if not (root / scene / "frames").is_dir():
             continue
-        results.append(analyse(scene, spec, root, log_lines))
+        results.append(analyse(scene, spec, root, log_lines, args.no_video))
 
     if not results:
         print(f"[assemble] {root} 下没有任何场景目录", file=sys.stderr)

@@ -36,7 +36,9 @@
 | HUD | 尊重原版隐藏界面；命中正十字、击杀斜十字，同一目标去重并以1t最小间隔续播，多目标可重叠；0.8t运动短尾交接，击杀打断保留全部尾层，位置与历史不累积；小数位描线、准星留空、受击方向及布局拖动缩放 | magic_hud、HudImpactChecks；32t真实连击每帧反馈持续可见 |
 | 原编杖 | 原容器滚轮/右键，V只读分色；创造专用包校验，生存原版协议 | foundations |
 | 获取与整合 | 原结构箱子追加、真实持杖敌人原物掉落、池/等级原子重载、不重掷旧杖 | exploration、progression |
-| 录制诊断 | 捕获启动崩溃/FATAL/超时/驱动错误，保留当前日志与部分帧，构建失败不误引旧MC日志 | capture.ps1、diagnostics.ps1 |
+| 录制写盘与诊断 | 独立双线程PNG编码、24帧在途上限，GPU回读预留计数；所有帧写完再正常保存退出，记录队列丢帧/平均写耗时；PNG等待与保存退出分阶段超时，有界采集本次客户端线程栈；启动/写盘/汇总错误保留失败证据 | foundations完整260帧、104项检查通过；new_spells完整180帧，锯片PD门禁独立失败；test_diagnostics.ps1 |
+| 录制报告与媒体 | NoVideo真正跳过视频/GIF编码与媒体引用，保留原帧/拼图/机制/像素门禁；按固定列解析检查名，缺少指定帧明确失败而不抛KeyError | test_capture_report.py、test_log_filter.py |
+| 火把退场 | presence六刻缓入缓出后回收；光强最大单刻下降26.82%，95%→5%跨5刻，清零前5.61%，保留14级照明与零残留 | new_spells的SpellExitChecks |
 | 抽牌与组合夹具 | MP上限与当前MP一致；在配方清场前验证复制；按真实悬停持续轮询异步分色；生物触发检查真实子弹与HitResult方向；锯盘ROI对准主体且保留原阈值，有限斥力使用同速慢弹/箭并在存活窗口观察 | foundations、new_spells、expansion_combinations、expansion_utilities |
 | OSHI处理 | 按用户要求忽略系统信息采集记录及其已知关联堆栈，保留原日志，不作为待修或待重启项；其他错误/FATAL照常阻塞 | assemble.classify_log_errors、test_log_filter.py |
 

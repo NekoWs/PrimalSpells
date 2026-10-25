@@ -8,7 +8,7 @@ Minecraft 26.2、NeoForge 26.2.0.59、Java toolchain 25、Kotlin 2.4.10、Gradle
 
 ParticleDrawing主JAR作为compileOnly与localRuntime本地依赖，sources JAR仅供API对照。当前lib版本1.0.21-ALPHA；版本号与加载下限统一来自gradle.properties，预发布下限必须含ALPHA，例如 `[1.0.21-ALPHA,)`。
 
-当前PD构建源码为本地提交 `8a01ffd`；`build sourcesJar --offline`和`test --rerun-tasks --offline`通过，共56组/377项测试、零失败。本项目 `build --no-build-cache --offline`通过，lib文件SHA-256与PD构建产物一致，打包的依赖下限为1.0.21-ALPHA。本次PD仍使用同一ALPHA版本号，以源码提交及JAR哈希区别构建：主JAR SHA-256为`2e98d6e7d4a12d0e4dd27f78316c442081d792bcfeeffd2e838a5612562dd3ad`，sources JAR为`263abeeadcbad3c0161516fc747d01399d56000dcb144ae1560413906262f89f`。
+当前PD构建源码为本地提交 `ebf3055`；`build sourcesJar --offline`和`test --rerun-tasks --offline`通过，共57组/384项测试、零失败。本项目 `build --no-build-cache --offline`通过，lib文件SHA-256与PD构建产物一致，打包的依赖下限为1.0.21-ALPHA。本次PD仍使用同一ALPHA版本号，以源码提交及JAR哈希区别构建：主JAR SHA-256为`004fece3f2e7e223b70ab175fefbcd9213d646917444e4ca457cc4f251004228`，sources JAR为`2dcb75a63c4d1cc23baf229523da8fe8271e2029c099321cf5b9d4623e0c7d29`。
 
 PD本地项目在 `D:/Backup/IDEA Projects/ParticleDrawing`。获授权升级时在那里执行 `gradlew.bat build sourcesJar`，将匹配的主/源码JAR复制到lib，更新版本和下限，再运行本项目 `build --no-build-cache` 与相关录制。磁盘源码较新不代表运行依赖已更新。API缺陷按 [政策](design/effects-api.md#0-职责与缺陷处理) 停止登记，不能在本模组绕过。
 
@@ -81,9 +81,9 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 始终后台运行，PowerShell启动辅助进程使用Start-Process -WindowStyle Hidden并重定向stdout/stderr。客户端默认隐藏窗口，不抢键鼠；需要展示时显式使用runCapture的captureShowWindow属性。不要通过1×1窗口省略真实1280×720渲染。
 
-脚本先构建，-Offline同时传递给构建和runCapture；-SkipBuild只在确认现有类产物可用时使用。它只拥有本次Gradle/游戏子进程，监测FATAL、崩溃报告、驱动错误和超时，失败保存当前日志/部分帧并停止，不杀其他MC实例。构建失败仅引用本次build.log。-NoVideo真正跳过视频/GIF与ffmpeg，但仍生成拼图和完整判定；画廊不引用未生成的媒体。
+脚本先构建，-Offline同时传递给构建和runCapture；-SkipBuild只在确认现有类产物可用时使用。它只拥有本次Gradle/游戏子进程，监测FATAL、崩溃报告、场景完成前断线、驱动错误和超时，失败保存当前日志/部分帧并停止，不杀其他MC实例。构建失败仅引用本次build.log。-NoVideo真正跳过视频/GIF与ffmpeg，但仍生成拼图和完整判定；画廊不引用未生成的媒体。
 
-PNG由独立双线程编码，不共用原版区块I/O池，最多24帧在途（含异步GPU回读）。结束后先等实际写完并核对数量，再正常退出/保存世界；日志记录written/failed/averageWriteMs，meta另记writeQueueDropped。-FinishTimeoutSec默认60，分别限制PNG排空与游戏保存退出的等待；超时用本次日志的客户端PID及启动时间验证身份，最多5秒采集threads.txt后，仅结束本次进程树。不要通过禁存档或强制成功退出绕过保存问题。
+PNG由独立双线程编码，不共用原版区块I/O池，最多24帧在途（含异步GPU回读）。结束后先等实际写完并核对数量，再正常退出/保存世界；场景收尾先在服务端排空末刻检查，再向渲染线程交付不可变快照，避免并发迭代及漏掉末刻断言；日志记录written/failed/averageWriteMs，meta另记writeQueueDropped。-FinishTimeoutSec默认60，分别限制PNG排空与游戏保存退出的等待；超时用本次日志的客户端PID及启动时间验证身份，最多5秒采集threads.txt后，仅结束本次进程树。不要通过禁存档或强制成功退出绕过保存问题。
 
 ### 场景选择
 
@@ -102,6 +102,7 @@ PNG由独立双线程编码，不共用原版区块I/O池，最多24帧在途（
 | black_hole / black_hole_moving / gravity_field / gravity_field_moving | 区域场原维度、移动跟随和收尾 |
 | energy_shield / shield_balance / spell_chain | 护盾预算/接点/束截断/穿刺荷载/同链作用域；TriggerLifecycleChecks覆盖每次生物接触的独立荷载、副本/费用隔离及墙/寿命排除，定时与失效仍消费一次 |
 | machinegun_visual / spell_timing | 高频视觉、随机链锯、延迟当刻释放 |
+| void_phase | 真实持杖85t虚空、双端锁位/位置包纠正、法阵完全隐藏与结束后重建 |
 | explosion / crystal_lifecycle / sawblade_falling | 爆炸外扩、临爆晶体与锯片下坠反弹 |
 | expansion_* / spell_resonance / spell_mechanics | 光束/冰冻/远距、跨弹反应、刻迁移与后代 |
 | death_attribution | 十种渠道的施法者/自伤/未知来源文本、原生战斗记录、真实玩家死亡界面及正常重生 |
@@ -133,6 +134,6 @@ recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹�
 
 引用与实用法术覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。通过证据按场保存在`build/capture/reference-spells-suite-verified/`、`reference-spells-fields-verified/`及`before-limited-uses/`。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全，生成器像素幂等。
 
-逐卡次数与录制收尾复验：`pwsh tools/capture/capture.ps1 -Offline -Scene new_spells,foundations -TimeoutSec 300 -FinishTimeoutSec 45`。foundations为260/260帧、104/104机制通过；new_spells为180/180帧、96/97机制通过，唯一失败是PD的锯片resize/SCALE曲线首刻跳零，门禁继续保留。两场零丢帧/零写盘失败，440帧全部flush后正常保存全部维度并退出；平均PNG编码/写盘耗时67.60ms，两条编码线程足以20FPS，单线程会造成队列丢帧。最新原帧、报告和日志在`build/capture/exit-io-verified/`，不能把该场PD失败描述成全部通过。火把退场的原生光强最大单步下降26.82%、清零前5.61%，原阈值通过；锯片缺陷见[PD需求](issues/pd-api-requests.md)。
+锯片/虚空与PD依赖复验：先执行`pwsh tools/capture/capture.ps1 -Offline -Scene new_spells,void_phase,sawblade_falling -TimeoutSec 300 -FinishTimeoutSec 45`，再独立执行`-Scene foundations,spell_lighting,pd_api`。六场259项机制检查、1090帧零丢帧，画面/日志门禁全过，PNG全部写完后正常保存退出。锯片保留出生曲线和8t resize，同UUID原生面积95%→5%跨7t、最大单步下降20.98%、清零前0.028%；虚空场景验证85t实际施法、双端锁位、真实位置包纠正、法阵零残留与到期恢复，普通放下法杖仍按现有短退场门禁检查。证据分别在`build/capture/void-saw-verified/`及`build/capture/void-pd-regression-verified/`。使用`-NoVideo`仍保留全分辨率原帧、拼图和完整门禁，报告不引用未生成媒体。
 
-工具边界验证：`python -B tools/capture/test_capture_report.py`（2组）、`python -B tools/capture/test_log_filter.py`（5组）、`pwsh tools/capture/test_diagnostics.ps1`（6项）。覆盖缺失/重复/失败退场证据、NoVideo不调用编码器/不引用媒体、固定列解析、PNG/保存阶段与失败日志检测。旧失败原帧保存在`limited-uses-shutdown-audit/`、`exit-io-initial-probe/`与`exit-io-single-writer/`，不混作最新通过结果。
+工具边界验证：`python -B tools/capture/test_capture_report.py`（2组）、`python -B tools/capture/test_log_filter.py`（5组）、`pwsh tools/capture/test_diagnostics.ps1`（9项）。覆盖缺失/重复/失败退场证据、NoVideo不调用编码器/不引用媒体、固定列解析、PNG/保存阶段、提前断线与失败日志检测。

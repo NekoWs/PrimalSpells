@@ -162,6 +162,7 @@ for _scene, _spec in SCENES.items():
 SCENES["recoil_light"] = {"length": 220, "title": "后坐力 / 创造飞行豁免 / 蓄能强光", "metric": "warm", "fade_window": (58, 85), "quiet": (0, 8), "decay": "collapse"}
 SCENES["shield_balance"] = {"length": 250, "title": "单卡与八卡护盾 / 破盾当次保护 / 靶子固定", "metric": "blue", "fade_window": (138, 225), "quiet": (0, 8), "decay": "collapse"}
 SCENES["concentrated_light_first_person"] = {"length": 180, "title": "第一人称汇聚之光 / 原地聚光阵与锁定方向", "metric": "warm", "warm_roi": (0, 0, 1280, 300), "quiet": (0, 8), "decay": "collapse"}
+SCENES["void_phase"] = {"length": 180, "title": "虚空锁位 / 隐藏法阵 / 寿命恢复", "metric": "wand", "quiet": (0, 6), "fade_window": (140, 170), "decay": "collapse"}
 SCENES["pd_api"] = {"length": 120, "title": "PD跟踪曲线 / 静止受光 / 帧间尺寸 / 完成销毁", "metric": "blue", "quiet": (0, 6), "decay": "collapse"}
 SCENES["damage_mass"] = {"length": 220, "title": "伤害渠道 / 质量受力 / 每刻伤害 / 双黑洞互吸", "metric": "blue", "quiet": (0, 8), "decay": "collapse"}
 SCENES["death_attribution"] = {"length": 110, "title": "法术死亡来源 / 真实死亡界面与重生", "metric": "white", "quiet": (0, 8), "decay": "none", "decay_reason": "原版死亡界面持续显示至玩家重生，不套用世界粒子退场时长；真实死亡/重生断言和尾帧验收"}
@@ -178,7 +179,7 @@ SCENES["explosion"]["decay"] = "collapse"
 SCENES["wand_casting_wide"] = {**SCENES["wand_casting_first_person"], "title": "宽视野90度 / 宝石位置校准 / 副手镜像"}
 SCENES["wand_casting_front"] = {**SCENES["wand_casting_first_person"], "title": "第三人称正面握柄 / 左右手姿势 / 块状符印"}
 
-for _name in ("wand_aim", "wand_casting", "wand_casting_first_person", "wand_casting_wide", "wand_casting_front"):
+for _name in ("void_phase", "wand_aim", "wand_casting", "wand_casting_first_person", "wand_casting_wide", "wand_casting_front"):
     SCENES[_name]["short_exit"] = True
 
 #: 「特效像素」判据：**偏冷的亮**像素（蓝 ≥ 红）。黑底摄影棚里只有粒子满足：

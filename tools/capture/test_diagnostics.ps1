@@ -18,7 +18,13 @@ try {
     if ($null -eq (Get-CaptureFailure $fixture)) { throw 'Flush failure was ignored' }
     Set-Content -LiteralPath $log -Value '[Capture] write frame 2 FAILED: disk full'
     if ($null -eq (Get-CaptureFailure $fixture)) { throw 'Writer failure was ignored' }
-    Write-Host 'capture diagnostics: 6 checks passed'
+    Set-Content -LiteralPath $log -Value 'Client disconnected with reason: Invalid move player packet received'
+    if ($null -eq (Get-CaptureFailure $fixture)) { throw 'Early disconnect was ignored' }
+    Set-Content -LiteralPath $log -Value 'Capturer lost connection: Disconnected'
+    if ($null -eq (Get-CaptureFailure $fixture)) { throw 'Server-side disconnect was ignored' }
+    Add-Content -LiteralPath $log -Value '[Capture] ALL SCENES DONE: scenes=1'
+    if ($null -ne (Get-CaptureFailure $fixture)) { throw 'Normal completed shutdown must not fail' }
+    Write-Host 'capture diagnostics: 9 checks passed'
 } finally {
     if ($fixture.StartsWith($verifyRoot + [IO.Path]::DirectorySeparatorChar)) { Remove-Item -LiteralPath $fixture -Recurse -Force }
 }

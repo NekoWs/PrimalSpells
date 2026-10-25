@@ -284,7 +284,7 @@
   "item.primalspells.zeta": "Zeta",
   "lore.primalspells.zeta.desc": "Copy a random spell from another carried wand, leaving its deck and mana untouched.",
   "item.primalspells.void_escape": "Void Escape",
-  "lore.primalspells.void_escape.desc": "Enter the Boundless Realm for 60t: unseen, untargetable and unhittable. You cannot attack or cast.",
+  "lore.primalspells.void_escape.desc": "Enter the Boundless Realm for 60t, modified by lifetime. You cannot move, attack or cast, and cannot be seen, targeted or hit.",
   "item.primalspells.blood_magic": "Blood Magic",
   "lore.primalspells.blood_magic.desc": "Pay 1 HP of unmitigated curse damage for 100 mana and −7t cast delay and recharge. Can be fatal.",
   "item.primalspells.wand_refresh": "Wand Refresh",

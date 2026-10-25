@@ -19,7 +19,7 @@ internal object PayloadRelease {
         val cards = if (repeatable) templates.map(SpellAssembly::copyCard) else templates
         val modifiers = cards.filterIsInstance<Modifier>()
         cards.filterIsInstance<work.nekow.primalspells.magic.core.OtherSpell>().forEach {
-            if (!VoidStatus.isPhased(carrier.caster)) { it.caster = carrier.caster; it.wand = carrier.wand; it.spell() }
+            if (!VoidStatus.isPhased(carrier.caster)) { it.caster = carrier.caster; it.wand = carrier.wand; it.prepare(modifiers); it.spell() }
         }
         if (VoidStatus.isPhased(carrier.caster)) return
         cards.filterIsInstance<Projectile>().forEach { shot ->

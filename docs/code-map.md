@@ -8,6 +8,7 @@
 |---|---|
 | 抽牌、作用域、MP、双冷却 | `wand/{Wand,WandDeck,CastTransaction,WandCasting}.kt`、`magic/core/{DrawAction,SpellAssembly}.kt` |
 | 引用/刷新/血魔法/虚空 | `magic/action/`、`wand/WandReferences.kt`、`magic/effect/lifecycle/{CurseDamage,VoidStatus,LifetimeAdjustment}.kt`、`event/VoidAndCurseEvents.kt`、`registry/ModEffects.kt`；行为见[引用机制](design/spell-references.md) |
+| 虚空的原版锁定与锁位 | `magic/effect/lifecycle/VoidStatus.kt`、Java `mixin/Void*Mixin.java`；法阵隐藏`WandCastingFx`，原生回归`VoidMechanicChecks`/`VoidPhaseScene` |
 | 只读预览/整副分色 | `wand/WandPreview.kt`、`wand/WandPreviewBuilder.kt`、`client/tooltip/WandPreviewCache.kt`、`client/screen/WandPreviewScreen.kt` |
 | 原容器编杖/小包 | `item/{WandItem,SpellPouchItem}.kt`、`client/input/{SpellSlotScrollHandler,ClientContainerDragHandler,CreativeWandEditHandler}.kt` |
 | 实体卡限制次数 | `magic/core/Magic.kt`、`wand/CastTransaction.kt`、`item/component/SpellCardData.kt`；保存/展示见`WandPersistence`与`SpellUseTooltip`，原生回归`client/capture/LimitedUseChecks.kt` |

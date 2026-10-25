@@ -2,7 +2,6 @@
 
 ## 混合场景退场门禁
 
-- `new_spells`已改为同批UUID的独立退场检查：火把光强通过；锯片死亡后首刻可见面积下降90.58%，未达≤35%阈值，根因是[PD resize与SCALE曲线叠加缺陷](pd-api-requests.md#运行期resize与scale曲线叠加时直接跳到目标尺寸)。停止该缩放接入的改写，保留失败回归；不是用全场峰值或quiet窗口代替退场。最新原帧在`build/capture/exit-io-verified/`，440帧零丢帧，机制200/201（唯一失败为该锯片断点）。
 - 级别：验证缺口。`machinegun_visual`机制6/6、可见性和零残留通过，但95%→5%跨度4帧、最大单帧覆盖下降42.2%，超35%阈值；归零前9.2%满足10%门槛。独立fireball_trail实际alpha检查通过。
 - `spell_resonance`机制12/12通过、可见性与零残留通过，但全局50%→5%覆盖量仅跨3帧，未达4帧；证据在 `build/capture/performance-interactions-audit/spell_resonance`。需拆分真实退出事件/ROI，未改阈值或粒子寿命掩盖此问题。
 - `spell_mechanics`混合多组独立生命周期，全局颜色峰值到末端的瞬退判据尚待按实际退出事件复验，不能以玩法断言通过替代视觉通过。

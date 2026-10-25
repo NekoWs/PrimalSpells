@@ -63,11 +63,11 @@ internal object WandCasting {
 
     /** 各链的修正只装配到本链投射物；荷载留到触发时独立装配。 */
     private fun launch(wand: Wand, caster: Entity, paid: List<Magic>) {
+        val modifiers = paid.filterIsInstance<Modifier>()
         paid.filterIsInstance<OtherSpell>().forEach {
-            if (!VoidStatus.isPhased(caster)) { it.caster = caster; it.wand = wand; it.spell() }
+            if (!VoidStatus.isPhased(caster)) { it.caster = caster; it.wand = wand; it.prepare(modifiers); it.spell() }
         }
         if (VoidStatus.isPhased(caster)) return
-        val modifiers = paid.filterIsInstance<Modifier>()
         var castVisualPlayed = false
         for (p in paid.filterIsInstance<Projectile>()) {
             SpellAssembly.apply(p, modifiers)

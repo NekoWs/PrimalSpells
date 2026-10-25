@@ -36,6 +36,10 @@ function Get-CaptureFailure {
     if (Test-Path -LiteralPath $logPath) {
         $fatal = Select-String -LiteralPath $logPath -Pattern '/FATAL\]|CaptureDriver.*(failed|失败)|\[Capture\] (scene .+|screenshot|write frame).*FAILED(?: at tick \d+)?:' | Select-Object -Last 1
         if ($fatal) { return @{ Reason=$fatal.Line; CrashReport=$null } }
+        if (-not (Select-String -LiteralPath $logPath -Quiet -Pattern '\[Capture\] ALL SCENES DONE:')) {
+            $disconnect = Select-String -LiteralPath $logPath -Pattern 'Client disconnected with reason:|lost connection:' | Select-Object -Last 1
+            if ($disconnect) { return @{ Reason=$disconnect.Line; CrashReport=$null } }
+        }
     }
     return $null
 }

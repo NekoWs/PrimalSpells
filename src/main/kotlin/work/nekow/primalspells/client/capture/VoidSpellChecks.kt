@@ -44,6 +44,7 @@ internal class VoidSpellChecks {
             record("void-native-projectile-contact-and-ai-excluded", !target.canBeHitByProjectile() && !target.canBeSeenAsEnemy() && target.isInvisible && enemy?.target == null, "projectile=${target.canBeHitByProjectile()}; target=${enemy?.target}")
             enemy?.target = target
             record("void-cannot-reacquire-target", enemy?.target == null, enemy?.target.toString())
+            VoidMechanicChecks.run(ctx, target, record)
             val health = target.health
             val accepted = target.hurtServer(ctx.level, ctx.level.damageSources().generic(), 5f)
             val magic = SpellImpact.hurt(ctx.level, target, ctx.player, 5.0, net.minecraft.world.phys.Vec3(0.0,0.0,1.0))

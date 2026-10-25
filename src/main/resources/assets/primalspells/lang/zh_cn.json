@@ -284,7 +284,7 @@
   "item.primalspells.zeta": "Zeta",
   "lore.primalspells.zeta.desc": "从随身另一根法杖随机复制一张法术；不消耗另一根杖的牌堆或MP。",
   "item.primalspells.void_escape": "遁入虚空",
-  "lore.primalspells.void_escape.desc": "进入无界之界60t：无法命中、锁定或看见；期间不能攻击或施法。",
+  "lore.primalspells.void_escape.desc": "进入无界之界，默认60t，受存在时间修正影响；期间无法移动、攻击、施法，也无法被命中、锁定或看见。",
   "item.primalspells.blood_magic": "血魔法",
   "lore.primalspells.blood_magic.desc": "支付1HP不可减免的诅咒伤害，返还100MP，施放延迟与充能各−7t；可能致死。",
   "item.primalspells.wand_refresh": "刷新法杖",

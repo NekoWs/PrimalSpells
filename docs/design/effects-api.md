@@ -36,6 +36,8 @@ ParticleVisual定义贴图、UV、广告牌/方向、各向异性尺寸、混合
 
 `scale`是编辑器单位，16px贴图整宽约 `scale × 0.2` 格；按世界格声明用 `anisoWorld`。各向异性世界尺寸不能假定由单一resize按格数改写，使用相应尺寸/组倍率API。
 
+`resize`运行期缓动与SCALE寿命曲线可组合：曲线乘PD当前缓动尺寸，保留出生曲线后仍能从当下外观连续缩到0。曲线完成后、进行中和中途重定向由PD统一取样，不在本模组删除曲线或另写缩放器。
+
 `ParticleLifeCurve`的通道是ALPHA、SCALE、RED、GREEN、BLUE、LIGHT；同通道多条曲线相乘，总计最多8条。`.sizeCurve/alphaCurve`是追加；重复热更必须用 `.lifeCurve(ParticleLifeCurve.of(...))`覆盖完整通道集合，避免不断叠乘或丢掉另一通道。
 
 爆炸使用共享的不可变寿命曲线，出生时一次提交；不逐片重建关键帧或逐刻热更。大像素火舌、碎片和烟团均低于spawnAll的256条单次上限；容量拒绝产生null时按原规格索引筛选速度，再交给ParticleBatch，避免存活成员与运动参数错位。数量与实测见[性能](performance.md#爆炸表现)。

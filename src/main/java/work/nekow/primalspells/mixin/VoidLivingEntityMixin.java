@@ -17,6 +17,11 @@ import net.minecraft.world.level.storage.ValueInput;
 /** 同时覆盖普通目标选择器与Brain对生物可见性的判断。 */
 @Mixin(LivingEntity.class)
 public abstract class VoidLivingEntityMixin {
+    @Inject(method = {"isPickable", "isPushable"}, at = @At("HEAD"), cancellable = true)
+    private void primalspells$noSelectionOrPush(CallbackInfoReturnable<Boolean> cir) {
+        if (VoidStatus.isPhased((LivingEntity) (Object) this)) cir.setReturnValue(false);
+    }
+
     @Unique
     private void primalspells$syncVoidState() {
         LivingEntity entity = (LivingEntity) (Object) this;

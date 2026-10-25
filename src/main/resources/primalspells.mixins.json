@@ -4,7 +4,14 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "VoidEntityMixin",
-    "VoidLivingEntityMixin"
+    "VoidLivingEntityMixin",
+    "VoidPlayerMovementMixin",
+    "VoidWardenMixin",
+    "VoidDragonStrafeMixin",
+    "VoidWitherMixin",
+    "VoidGuardianMixin",
+    "VoidShulkerBulletMixin",
+    "VoidVibrationMixin"
   ],
   "client": [
     "AbstractContainerScreenMixin",

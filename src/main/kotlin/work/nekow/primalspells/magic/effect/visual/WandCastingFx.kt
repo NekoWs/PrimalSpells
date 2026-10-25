@@ -10,6 +10,7 @@ import net.minecraft.world.entity.HumanoidArm
 import net.minecraft.world.phys.Vec3
 import work.nekow.particledrawing.api.*
 import work.nekow.particledrawing.core.easing.EasingType
+import work.nekow.primalspells.magic.effect.lifecycle.VoidStatus
 import work.nekow.primalspells.item.WandItem
 import work.nekow.primalspells.util.spellParticle
 import work.nekow.primalspells.util.spellVisual
@@ -182,19 +183,20 @@ object WandCastingFx {
     /** 结算完成立即发布真实冷却状态，避免等待下一次会话tick。 */
     fun cooldownsChanged(caster: Entity, wand: Wand) {
         val player = caster as? ServerPlayer ?: return
+        if (VoidStatus.isPhased(player)) { forget(player.uuid); return }
         if (selected(player) === wand) state(player, wand).update()
     }
 
     /** 切杖/放下播放有限退场；死亡、维度变化、登出立即清理，避免追踪失效实体。 */
     fun tick(server: MinecraftServer) {
         retiring.removeAll {
-            val invalid = !it.player.isAlive || it.player.level() !== it.level || server.playerList.getPlayer(it.player.uuid) !== it.player
+            val invalid = !it.player.isAlive || VoidStatus.isPhased(it.player) || it.player.level() !== it.level || server.playerList.getPlayer(it.player.uuid) !== it.player
             if (invalid) it.remove() else it.followPosition()
             invalid || it.groups.all { group -> group.size() == 0 }
         }
         val held = hashSetOf<UUID>()
         for (player in server.playerList.players) {
-            val wand = if (player.isAlive && !work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(player)) selected(player) else null
+            val wand = if (player.isAlive && !VoidStatus.isPhased(player)) selected(player) else null
             if (wand == null) continue
             held += player.uuid
             state(player, wand).update()
@@ -203,7 +205,7 @@ object WandCastingFx {
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (entry.key !in held) {
-                if (entry.value.player.isAlive && entry.value.player.level() === entry.value.level && server.playerList.getPlayer(entry.key) === entry.value.player)
+                if (entry.value.player.isAlive && !VoidStatus.isPhased(entry.value.player) && entry.value.player.level() === entry.value.level && server.playerList.getPlayer(entry.key) === entry.value.player)
                     entry.value.retire() else entry.value.remove()
                 iterator.remove()
             }
@@ -219,7 +221,7 @@ object WandCastingFx {
 
     /** HUD只读实际拿起会话；背包内其它法杖不创建表现会话。 */
     fun equipRemaining(player: ServerPlayer, wand: Wand): Int {
-        if (!player.isAlive || selected(player) !== wand) return 0
+        if (!player.isAlive || VoidStatus.isPhased(player) || selected(player) !== wand) return 0
         val held = state(player, wand)
         return (EQUIP_TICKS - (held.level.gameTime - held.started)).coerceIn(0, EQUIP_TICKS.toLong()).toInt()
     }

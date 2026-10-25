@@ -104,6 +104,7 @@ object CaptureDriver {
     private var scenes: List<Scene> = emptyList()
     private var sceneIndex = -1
     private var scene: Scene? = null
+    private var endingScene = false
 
     /** 当前场景内的相对 tick：负数 = 预热（不录），>= 0 = 正式录制。 */
     private var tickInScene = 0
@@ -216,6 +217,7 @@ object CaptureDriver {
             beginNextScene(mc)
             return
         }
+        if (endingScene) return
         stepScene(mc, current)
     }
 
@@ -379,15 +381,22 @@ object CaptureDriver {
     private fun endScene(mc: Minecraft, current: Scene) {
         captureArmed = false
         pendingCaptureTick = -1
-        mc.singleplayerServer?.let { server ->
-            server.execute { inServer(current.name, "finish") { current.finish(ctx(server)) } }
+        val server = mc.singleplayerServer ?: return
+        endingScene = true
+        // 等已经提交的末刻检查完成后，在服务端取快照；渲染线程不迭代仍在写入的列表。
+        server.execute {
+            inServer(current.name, "finish") { current.finish(ctx(server)) }
+            val checks = checkLog.toList()
+            mc.execute {
+                val failed = checks.count { !it.ok }
+                checks.forEach { log("CHECK ${it.render()}") }
+                results += SceneResult(current.name, frameIndex, framesDropped, checks.size, failed)
+                writeSceneFiles(current, checks)
+                log("=== scene ${current.name} done: frames=$frameIndex dropped=$framesDropped checks=${checks.size} failed=$failed ===")
+                scene = null
+                endingScene = false
+            }
         }
-        val failed = checkLog.count { !it.ok }
-        checkLog.forEach { log("CHECK ${it.render()}") }
-        results += SceneResult(current.name, frameIndex, framesDropped, checkLog.size, failed)
-        writeSceneFiles(current, failed)
-        log("=== scene ${current.name} done: frames=$frameIndex dropped=$framesDropped checks=${checkLog.size} failed=$failed ===")
-        scene = null
     }
 
     private fun finishAll(mc: Minecraft) {
@@ -409,13 +418,13 @@ object CaptureDriver {
         // 不在这里stop：后续client tick必须继续执行，等待最后的截图回调和PNG真正写完。
     }
 
-    private fun writeSceneFiles(current: Scene, failed: Int) {
+    private fun writeSceneFiles(current: Scene, checks: List<Check>) {
         sceneLog.appendLine("frames\t$frameIndex")
         sceneLog.appendLine("framesDropped\t$framesDropped")
         sceneLog.appendLine("writeQueueDropped\t$writeQueueDrops")
-        sceneLog.appendLine("checks\t${checkLog.size}")
-        sceneLog.appendLine("checksFailed\t$failed")
-        checkLog.forEach { sceneLog.appendLine("check\t${it.render()}") }
+        sceneLog.appendLine("checks\t${checks.size}")
+        sceneLog.appendLine("checksFailed\t${checks.count { !it.ok }}")
+        checks.forEach { sceneLog.appendLine("check\t${it.render()}") }
         inServer(current.name, "write-meta") {
             File(current.dir, "meta.tsv").writeText(sceneLog.toString())
             File(current.dir, "frames.tsv").writeText(frameLines.toString())

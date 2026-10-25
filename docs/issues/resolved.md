@@ -4,9 +4,9 @@
 
 | 主题 | 当前保证 | 回归入口 |
 |---|---|---|
-| 实体卡次数 | 同名卡各自计数，普通施放扣原卡；玩法复制免次数且可复制耗尽卡，预览/拒绝施法不扣；装卸/小包/存档保留次数，移除旧ID不串卡；回洗与刷新不补满 | foundations的LimitedUseChecks与真实预览/组件同步；录制帧/退出问题另见open |
+| 实体卡次数 | 同名卡各自计数，普通施放扣原卡；玩法复制免次数且可复制耗尽卡，预览/拒绝施法不扣；装卸/小包/存档保留次数，移除旧ID不串卡；回洗与刷新不补满 | foundations的LimitedUseChecks与真实预览/组件同步 |
 | 引用与重装填 | 实体牌与副本游标隔离；首末卡/两卡/分类/跨杖引用保留独立荷载与费用标记，循环与大展开（含每枚载体的追加荷载副本）有界；全量预算不因多重施放溢出；单刷新免充能、多刷新正常充能 | new_spells的ReferenceSpellChecks、foundations |
-| 生命代价与虚空 | 血魔法每张接受卡只支付一次不可减免的诅咒HP，死亡来源走原版流程；虚空同步附件覆盖所有观察者，统一限制索敌、接触、伤害、交互与施法，并恢复原状态 | new_spells的ReferenceSpellChecks/VoidSpellChecks、death_attribution |
+| 诅咒付款与虚空 | 血魔法按接受卡支付不可减免HP；虚空默认60t且只受本链寿命修正，双端锁位、位置包纠正并隐藏法阵；普通及特殊原版锁定入口排除虚空目标，到期恢复移动/可见性 | new_spells的ReferenceSpellChecks、VoidSpellChecks、VoidMechanicChecks；void_phase、death_attribution |
 | 世界运行时清理 | 停服同时清空在场与待加入弹体、冻结和延迟动作，旧队列不进入下一个世界 | foundations的ArchitectureChecks |
 | 每刻性能 | 按需积分、同格邻域复用、无数组slab、反应分类配对；已加载区块查询避免同步生成，保留接点/曲线/伤害语义 | spell_performance、collision_precision；[基准](../design/performance.md) |
 | 爆炸表现开销 | 大爆炸从约两千片改为最多177片相关火舌/余烬/烟团，共享不可变曲线；三种独立随机轮廓，原生批次与有限外扩退场，零默认光源，保留当刻伤害与晶体引爆 | explosion_performance的JFR/分配/数量/位置签名，explosion、crystal_lifecycle、spell_lighting；[实测](../design/performance.md#爆炸表现) |
@@ -36,11 +36,15 @@
 | HUD | 尊重原版隐藏界面；命中正十字、击杀斜十字，同一目标去重并以1t最小间隔续播，多目标可重叠；0.8t运动短尾交接，击杀打断保留全部尾层，位置与历史不累积；小数位描线、准星留空、受击方向及布局拖动缩放 | magic_hud、HudImpactChecks；32t真实连击每帧反馈持续可见 |
 | 原编杖 | 原容器滚轮/右键，V只读分色；创造专用包校验，生存原版协议 | foundations |
 | 获取与整合 | 原结构箱子追加、真实持杖敌人原物掉落、池/等级原子重载、不重掷旧杖 | exploration、progression |
-| 录制写盘与诊断 | 独立双线程PNG编码、24帧在途上限，GPU回读预留计数；所有帧写完再正常保存退出，记录队列丢帧/平均写耗时；PNG等待与保存退出分阶段超时，有界采集本次客户端线程栈；启动/写盘/汇总错误保留失败证据 | foundations完整260帧、104项检查通过；new_spells完整180帧，锯片PD门禁独立失败；test_diagnostics.ps1 |
+| 录制写盘与诊断 | 双线程PNG编码、24帧在途上限；帧完成后正常保存退出；末刻检查在服务端完成后交付不可变快照，不跨线程迭代可变列表；场景完成前断线立即记录失败；收尾分阶段超时，只诊断/结束本次进程 | 六场1090帧、259项检查零丢帧通过；test_diagnostics.ps1的9项边界检查 |
 | 录制报告与媒体 | NoVideo真正跳过视频/GIF编码与媒体引用，保留原帧/拼图/机制/像素门禁；按固定列解析检查名，缺少指定帧明确失败而不抛KeyError | test_capture_report.py、test_log_filter.py |
 | 火把退场 | presence六刻缓入缓出后回收；光强最大单刻下降26.82%，95%→5%跨5刻，清零前5.61%，保留14级照明与零残留 | new_spells的SpellExitChecks |
 | 抽牌与组合夹具 | MP上限与当前MP一致；在配方清场前验证复制；按真实悬停持续轮询异步分色；生物触发检查真实子弹与HitResult方向；锯盘ROI对准主体且保留原阈值，有限斥力使用同速慢弹/箭并在存活窗口观察 | foundations、new_spells、expansion_combinations、expansion_utilities |
 | OSHI处理 | 按用户要求忽略系统信息采集记录及其已知关联堆栈，保留原日志，不作为待修或待重启项；其他错误/FATAL照常阻塞 | assemble.classify_log_errors、test_log_filter.py |
+
+## 锯片连续退场
+
+PD `ebf3055`修复运行期resize与SCALE寿命曲线的组合：取当前缓动尺寸后乘曲线，不再首刻跳至目标0。PS继续使用原有出生曲线、径向运动和8t resize，不删曲线、不重生碎片、不自管插值。`new_spells`同UUID原生面积95%→5%跨7t，最大单刻损失20.98%、清零前0.028%，均通过原阈值；`sawblade_falling`画面、`spell_lighting`与`pd_api`复验通过。证据见[构建指南](../build-and-run.md#9-实机录制流水线)。
 
 ## 已接入的PD能力
 

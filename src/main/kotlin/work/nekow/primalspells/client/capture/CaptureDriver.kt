@@ -410,7 +410,10 @@ object CaptureDriver {
         SceneCtx(server, server.overworld(), server.playerList.players.first(), this)
 
     private inline fun inServer(name: String, what: String, body: () -> Unit) {
-        runCatching(body).onFailure { log("scene $name $what FAILED: $it") }
+        runCatching(body).onFailure {
+            log("scene $name $what FAILED: $it")
+            org.slf4j.LoggerFactory.getLogger("primalspells-capture").error("scene $name $what failed", it)
+        }
     }
 
     // ---------------------------------------------------------------- 抓帧（渲染线程）

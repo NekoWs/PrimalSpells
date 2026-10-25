@@ -57,7 +57,7 @@ class ModItems {
                         val magic = factory()
                         when {
                             magic.needInventory -> 4
-                            magic is work.nekow.primalspells.magic.core.DrawAction -> 3
+                            magic is work.nekow.primalspells.magic.core.OtherSpell -> 3
                             magic is work.nekow.primalspells.magic.core.Modifier -> 2
                             magic is work.nekow.primalspells.magic.projectile.Projectile && magic.speed == 0f -> 1
                             else -> 0

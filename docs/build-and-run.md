@@ -87,7 +87,7 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 
 | 场景 | 主要覆盖 |
 |---|---|
-| spell_icons | 完整66张原生16px贴图按三页展示，真实物品栏/快捷栏与清空后恢复；背包三排暖色ROI排除手臂、饥饿条与角色预览 |
+| spell_icons | 完整78张原生16px贴图按三页展示，真实物品栏/快捷栏与清空后恢复；背包三排暖色ROI排除手臂、饥饿条与角色预览 |
 | light_boundary | 单颗原生PD光源慢移跨section、同位置/光强重建对照；检查当前地形照明与光场一致、结束无残留 |
 | spell_lighting | 默认投射物目录零光源、昼夜像素不变、光修正真实付费/去重/复制/荷载隔离与退场 |
 | particle_lighting / pd_api | 原生光强连续性；track/Bridge/受光缓存/完成回报 |
@@ -102,11 +102,11 @@ pwsh tools/capture/capture.ps1 -Offline -Scene all -TimeoutSec 1200
 | machinegun_visual / spell_timing | 高频视觉、随机链锯、延迟当刻释放 |
 | explosion / crystal_lifecycle / sawblade_falling | 爆炸外扩、临爆晶体与锯片下坠反弹 |
 | expansion_* / spell_resonance / spell_mechanics | 光束/冰冻/远距、跨弹反应、刻迁移与后代 |
-| death_attribution | 九种渠道的施法者/自伤/未知来源文本、原生战斗记录、真实玩家死亡界面及正常重生 |
+| death_attribution | 十种渠道的施法者/自伤/未知来源文本、原生战斗记录、真实玩家死亡界面及正常重生 |
 | recoil_light / concentrated_light_first_person / combat_impact / damage_mass | 固定聚光、后坐力、伤害/自伤与质量 |
 | wand_design | 暮紫封印户外材质、下半屏外侧位置、主副手/左惯用手与真实施法 |
 | wand_casting* / wand_aim / magic_hud | 主副手/FOV、阵列/模型、HUD布局；magic_hud还覆盖32t真实连续伤害的去重续播/同刻转击杀、逐帧反馈与有限退场 |
-| foundations / new_spells | 原编杖分色/真实V入口、抽牌控制和治疗/火把；foundations还覆盖NBT兼容/游标、注册目录与弹体生命周期顺序 |
+| foundations / new_spells | 原编杖分色/真实V入口、引用/刷新/生命付款/虚空、抽牌控制和治疗/火把；foundations还覆盖NBT兼容/游标、注册目录与弹体生命周期顺序 |
 | exploration / progression | 实际结构掉落、术士、数据重载、生活卡与罗盘 |
 
 完整名称/帧数取CaptureScenes.all和assemble.SCENES，新场景两处一起更新。取景摄影棚用于对比，不代替自然地形/多人体验。
@@ -128,3 +128,5 @@ spell_chain的TriggerLifecycleChecks读取实际新生子弹，覆盖两类命�
 当前性能与运动回归命令、测量负载和结果统一见[性能基准](design/performance.md)。正常捕获还检查碰撞、前方追踪/穿透切线、实际法杖命中、付费/独立荷载、护盾和晶体生命周期；机制与视觉门禁分别统计，未用FPS代替服务端计时。
 
 recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹，不再用客户端固定帧号猜服务端年龄。spell_resonance的接触夹具使用真实发射后重叠位置，复制夹具实际装备bounce_duplicate并在子弹首次移动前检查继承。其混合视觉退场门禁见[open](issues/open.md)。
+
+引用与实用法术回归：`new_spells,spell_chain,shield_balance,foundations,spell_icons,exploration,death_attribution,damage_mass`按各场最新结果汇总8场411项机制检查、1803帧、1丢帧（预算内），机制、画面与日志门禁通过。七场原帧在`build/capture/reference-spells-suite-verified/`，damage_mass在`build/capture/reference-spells-fields-verified/`，最新new_spells在`build/capture/out/`。覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空观察者同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全；图标生成器重复运行像素幂等。

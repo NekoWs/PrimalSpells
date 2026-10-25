@@ -21,7 +21,8 @@ import work.nekow.primalspells.wand.Wand
 object NewSpellScene {
     fun scene(): Scene {
         val name="new_spells"
-        val checks=linkedMapOf<Int,MutableList<Check>>()
+        val checks=ConcurrentHashMap<Int,MutableList<Check>>()
+        val voidChecks = VoidSpellChecks()
         val lights=ConcurrentHashMap<String,Double>()
         var source: work.nekow.primalspells.entity.TestDummyEntity?=null
         var torch: Torch?=null
@@ -54,7 +55,9 @@ object NewSpellScene {
                     w.spell(source!!);ProjectileRuntime.tick()
                     return w to ProjectileRuntime.projectiles.filter { it.alive }.toList()
                 }
+                voidChecks.tick(ctx, t, ::record)
                 if(t==8) {
+                    ReferenceSpellChecks.run(ctx) { id, ok, detail -> record(id, ok, detail) }
                     for((id,n) in listOf("triple_cast" to 3,"quadruple_cast" to 4,"quintuple_cast" to 5)) {
                         val (_,shots)=cast(listOf(id)+List(n){"fireball"})
                         record("$id-draws-$n",shots.size==n,"shots=${shots.size}")
@@ -187,6 +190,8 @@ object NewSpellScene {
                     record("pd-particles-zero",ParticleManager.of(ctx.level).getEngine().particleCount()==0,"remaining=${ParticleManager.of(ctx.level).getEngine().particleCount()}")
                     source?.discard()
                 }
+            },clientTick={mc,t ->
+                voidChecks.clientTick(mc,t) { id, ok, detail -> checks.getOrPut(t) { java.util.concurrent.CopyOnWriteArrayList() }.add(Check(name,t,id,ok,detail)) }
             },checksAt={_,t -> checks[t]?:emptyList()})
     }
 }

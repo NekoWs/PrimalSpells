@@ -70,7 +70,8 @@ class TestDummyEntity(
     private var statsDisplay: DummyStatsDisplay? = null
 
     override fun hurtServer(level: ServerLevel, source: DamageSource, amount: Float): Boolean {
-        if (isRemoved || !isAlive) return false
+        if (isRemoved || !isAlive || work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(this) ||
+            work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(source.entity)) return false
         if (amount <= 0) return false // 会让生命值增加的"伤害"（治疗）一律归零
         val now = level.gameTime
         if (lastDamageTick != Long.MIN_VALUE && now - lastDamageTick >= 200) resetStats()

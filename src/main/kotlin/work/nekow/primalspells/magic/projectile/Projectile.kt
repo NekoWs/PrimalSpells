@@ -129,7 +129,9 @@ abstract class Projectile: Magic() {
         }
 
     /** 自伤仅改变施法者豁免，创造/旁观无敌与护盾仍按各自原规则结算。 */
-    fun canHarm(target: Entity): Boolean = target !== caster || selfDamage
+    fun canHarm(target: Entity): Boolean = (target !== caster || selfDamage) &&
+        !work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(target) &&
+        !work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(caster)
 
     /** 实体接触使用原版箭的可命中能力契约，不让掉落物/经验球/交互实体消耗命中或触发荷载。 */
     fun canHitEntity(target: Entity): Boolean = target.isAlive && !target.isSpectator &&
@@ -164,6 +166,7 @@ abstract class Projectile: Magic() {
         }
 
         super.spell()
+        maxAge = maxAge.coerceAtLeast(1)
 
         status.bounces = maxBounces
         status.hitTargets = 0

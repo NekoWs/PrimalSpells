@@ -31,7 +31,7 @@ glowing用于魔法核心/边界免环境光，烟尘等保留世界受光。造
 | 晶体与光束 | 晶体使用实际薄荷绿色；激光为短光脊，等离子束保留紫色发生源，聚光保留白金色 |
 | 范围与被动 | 爆炸突出橙黄外爆，吸引与斥力方向相反；护盾、治疗、火把分别保留盾面、十字、火焰轮廓 |
 
-[完整目录](references/spell-icons-all.png)与[重点贴图](references/spell-icons-native.png)由生成器直接放大真实16px资源，旁边保留原尺寸。[原版物品栏第一页](references/spell-icons-inventory.png)、[第二页](references/spell-icons-inventory-2.png)、[第三页](references/spell-icons-inventory-3.png)来自spell_icons原生录制，不使用自绘界面或概念图拼接。66张图标的尺寸、硬透明、色数、类型框、主体唯一性、生成幂等性及JAR内字节均检查通过。三页录制144帧、零丢帧、5项物品同步/清理检查和画面/日志门禁通过。复验命令见 [构建指南](../build-and-run.md#9-实机录制流水线)。
+[完整目录](references/spell-icons-all.png)与[重点贴图](references/spell-icons-native.png)由生成器直接放大真实16px资源，旁边保留原尺寸。[原版物品栏第一页](references/spell-icons-inventory.png)、[第二页](references/spell-icons-inventory-2.png)、[第三页](references/spell-icons-inventory-3.png)来自spell_icons原生录制，不使用自绘界面或概念图拼接。78张图标的尺寸、硬透明、色数、类型框、主体唯一性、生成幂等性及JAR内字节均检查通过。三页录制144帧、零丢帧、5项物品同步/清理检查和画面/日志门禁通过。复验命令见 [构建指南](../build-and-run.md#9-实机录制流水线)。
 
 原始概念对照：[A 遗迹石刻](references/spell-style-a-relic-carvings.png)、[B 秘典墨绘](references/spell-style-b-grimoire-ink.png)、[C 晶质珐琅](references/spell-style-c-crystal-enamel.png)、[D 黑曜封印](references/spell-style-d-obsidian-seals.png)。概念图由内置imagegen生成，提示词、参考图及命名备选见 [提案清单](references/spell-style-proposals.json)；它们不是真实游戏贴图。参考用户提供的Noita图标语义与像素密度，不直接复制素材或像素布局。
 

@@ -52,6 +52,7 @@ class PrimalSpellsClient(bus: IEventBus, container: ModContainer) {
     private var builtinsReady = false
 
     init {
+        work.nekow.primalspells.client.render.VoidVisibility.register(bus)
         val hudCategory = net.minecraft.client.KeyMapping.Category(Identifier.fromNamespaceAndPath(PrimalSpells.MODID, "hud"))
         val editHud = net.minecraft.client.KeyMapping("key.primalspells.hud_editor", org.lwjgl.glfw.GLFW.GLFW_KEY_H, hudCategory)
         bus.addListener<net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent> { event ->

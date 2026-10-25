@@ -3,21 +3,25 @@ package work.nekow.primalspells.wand
 import work.nekow.primalspells.magic.core.DrawAction
 import work.nekow.primalspells.magic.core.Magic
 import work.nekow.primalspells.magic.core.Modifier
+import work.nekow.primalspells.magic.core.OtherSpell
 import work.nekow.primalspells.magic.core.TriggerSpell
 import work.nekow.primalspells.magic.projectile.Projectile
 
 /** 在独立副本中观察真实解析与付费，不调用装备、施法、被动或网络钩子。 */
 internal object WandPreviewBuilder {
     /** 只读预览：在独立牌堆/法力副本上复用WandDeck与CastTransaction，不激活任何效果。 */
-    fun build(wand: Wand): WandPreview {
+    fun build(wand: Wand, references: List<Wand> = emptyList()): WandPreview {
         val copy = Wand(wand.id)
         copy.mana = wand.mana; copy.charge = wand.charge; copy.cast = wand.cast; copy.size = wand.size
         copy.delayTickCount = wand.delayTickCount; copy.rechargeTickCount = wand.rechargeTickCount
         copy.status.mana = wand.status.mana
-        copy.drawPile += wand.drawPile.map { it.clone() }
-        copy.discardPile += wand.discardPile.map { it.clone() }
-        copy.loadedMagics += wand.loadedMagics.map { it.clone() }
-        val chain = WandDeck(copy).draw(wand.cast)
+        copy.referenceSeed = wand.referenceSeed
+        val clones = java.util.IdentityHashMap<Magic, Magic>()
+        fun cloned(card: Magic) = clones.getOrPut(card) { card.clone() }
+        copy.drawPile += wand.drawPile.map(::cloned)
+        copy.discardPile += wand.discardPile.map(::cloned)
+        copy.loadedMagics += wand.loadedMagics.map(::cloned)
+        val chain = WandDeck(copy, references, kotlin.random.Random(copy.referenceSeed)).draw(wand.cast)
         data class Draft(val card: Magic, val scope: String, val depth: Int, val kind: String)
         val draft = arrayListOf<Draft>()
         var scopeIndex = 0
@@ -26,6 +30,7 @@ internal object WandPreviewBuilder {
                 val kind = when (card) {
                     is DrawAction -> card.kind.name.lowercase()
                     is Modifier -> "modifier"
+                    is OtherSpell -> "other"
                     else -> "projectile"
                 }
                 draft += Draft(card, scope, depth, kind)
@@ -43,7 +48,8 @@ internal object WandPreviewBuilder {
         val reasons = copy.status.failedReason.toMutableList()
         if (wand.status.delay > 0) reasons += "Delay ${wand.status.delay.toInt()}t"
         if (wand.status.recharge > 0) reasons += "Recharge ${wand.status.recharge.toInt()}t"
-        if (paid.none { it is Projectile }) reasons += "No payable projectile"
+        if (paid.none { it is Projectile || it is OtherSpell } &&
+            accounting.accepted.none { it is DrawAction && it.kind == DrawAction.Kind.REFRESH }) reasons += "No payable projectile"
         val accepted = accounting.accepted.toSet()
         val modifiersByScope = draft.filter { it.card is Modifier && it.card in accepted }
             .groupBy({ it.scope }, { it.card.id })
@@ -58,7 +64,11 @@ internal object WandPreviewBuilder {
     private fun slots(wand: Wand): List<WandPreview.Slot> {
         val copy = Wand(wand.id)
         val sources = java.util.IdentityHashMap<Magic, Int>()
-        wand.magics.forEachIndexed { index, card -> card?.clone()?.let { sources[it] = index; copy.drawPile += it } }
+        val clones = java.util.IdentityHashMap<Magic, Magic>()
+        wand.magics.forEachIndexed { index, card -> card?.let {
+            val cloned = it.clone(); clones[it] = cloned; sources[cloned] = index; copy.drawPile += cloned
+        } }
+        copy.loadedMagics += wand.loadedMagics.map { clones[it] ?: it.clone() }
         val slots = MutableList(maxOf(wand.size, wand.magics.size)) { i -> WandPreview.Slot(wand.magics.getOrNull(i)?.id.orEmpty(), "") }
         var chain = 0
         while (copy.drawPile.isNotEmpty()) {

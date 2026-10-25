@@ -52,7 +52,7 @@ object ShieldGuard {
     }
 
     /** Move宽相位只保留真正持盾的实体，避免对子步中的每个生物反复查杖。 */
-    fun hasShield(entity: LivingEntity): Boolean = HANDS.any { hand ->
+    fun hasShield(entity: LivingEntity): Boolean = !VoidStatus.isPhased(entity) && HANDS.any { hand ->
         WandItem.getWand(entity.getItemInHand(hand))?.loadedMagics?.any { it is EnergyShield } == true
     }
 
@@ -101,6 +101,7 @@ object ShieldGuard {
 
     /** 按「主手 → 副手」找出带护盾的法杖，交给护盾自己判断；第一把说不挡就试下一把。 */
     private inline fun withShield(entity: LivingEntity, action: (EnergyShield, Wand) -> Boolean): Boolean {
+        if (VoidStatus.isPhased(entity)) return false
         for (hand in HANDS) {
             val wand = WandItem.getWand(entity.getItemInHand(hand)) ?: continue
             val shield = wand.loadedMagics.firstOrNull { it is EnergyShield } as? EnergyShield ?: continue

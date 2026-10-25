@@ -6,6 +6,9 @@ import work.nekow.primalspells.integration.SpellEvents
 import work.nekow.primalspells.item.component.WandID
 import work.nekow.primalspells.magic.core.Magic
 import work.nekow.primalspells.magic.core.Modifier
+import work.nekow.primalspells.magic.core.OtherSpell
+import work.nekow.primalspells.magic.effect.lifecycle.CurseDamage
+import work.nekow.primalspells.magic.effect.lifecycle.VoidStatus
 import work.nekow.primalspells.magic.core.SpellAssembly
 import work.nekow.primalspells.magic.effect.visual.WandCastingFx
 import work.nekow.primalspells.magic.projectile.Projectile
@@ -22,6 +25,7 @@ internal object WandCasting {
      * @return 完成抽牌事务时为true；装备预热、冷却或事件取消时为false
      */
     fun cast(wand: Wand, caster: Entity): Boolean {
+        if (VoidStatus.isPhased(caster) || !caster.isAlive) return false
         // 持有者记录入口 2/2：任何实体主动施法都算一次「确认持有」。
         // 手持法杖的**生物**不走 WandItem.inventoryTick 的被动驱动路径，只能在这里补记，
         // 否则 WandManager 的回收判定会把它当成无人持有；玩家两处都会记，重复写同一张表无副作用。
@@ -44,9 +48,12 @@ internal object WandCasting {
         wand.status.delay = 0.0
         wand.status.recharge = 0.0
         val transaction = CastTransaction(wand)
-        val paid = transaction.pay(WandDeck(wand).draw(wand.cast))
-        launch(wand, caster, paid)
+        val paid = transaction.pay(WandDeck(wand, WandReferences.others(caster, wand),
+            kotlin.random.Random(wand.referenceSeed)).draw(wand.cast))
+        CurseDamage.pay(caster, transaction.healthCost)
+        if (caster.isAlive) launch(wand, caster, paid)
         transaction.finish()
+        wand.referenceSeed++
         wand.status.lastDelay = wand.status.delay
         wand.status.lastRecharge = wand.status.recharge
         WandCastingFx.cooldownsChanged(caster, wand)
@@ -56,6 +63,10 @@ internal object WandCasting {
 
     /** 各链的修正只装配到本链投射物；荷载留到触发时独立装配。 */
     private fun launch(wand: Wand, caster: Entity, paid: List<Magic>) {
+        paid.filterIsInstance<OtherSpell>().forEach {
+            if (!VoidStatus.isPhased(caster)) { it.caster = caster; it.wand = wand; it.spell() }
+        }
+        if (VoidStatus.isPhased(caster)) return
         val modifiers = paid.filterIsInstance<Modifier>()
         var castVisualPlayed = false
         for (p in paid.filterIsInstance<Projectile>()) {

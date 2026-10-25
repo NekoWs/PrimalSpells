@@ -40,6 +40,9 @@ object SpellAssembly {
     fun copyCard(card: Magic): Magic = card.clone().also { copied ->
         // 追加系列的免费修正属于准备态费用，复制后仍然免费。
         copied.mana = card.mana
+        copied.delay = card.delay
+        copied.recharge = card.recharge
+        copied.castingCostsWaived = card.castingCostsWaived
         copyPayload(card, copied)
         if (card is DrawAction && copied is DrawAction) copied.expanded += card.expanded.map(::copyCard)
         if (card is Projectile && copied is Projectile) {

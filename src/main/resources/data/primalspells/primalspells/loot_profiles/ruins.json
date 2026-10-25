@@ -18,7 +18,8 @@
     "survey_pulse",
     "item_pull",
     "feather_ward",
-    "light"
+    "light",
+    "reduced_lifetime"
   ],
   "loadouts": [
     [

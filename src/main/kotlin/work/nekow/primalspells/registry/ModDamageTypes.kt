@@ -16,7 +16,8 @@ object ModDamageTypes {
     val DAMAGE_TYPES = DeferredRegister.create(Registries.DAMAGE_TYPE, PrimalSpells.MODID)
     private val types = SpellDamageType.entries.associateWith { channel ->
         DAMAGE_TYPES.register(channel.id, Supplier {
-            DamageType("primalspells_${channel.id}", DamageScaling.WHEN_CAUSED_BY_LIVING_NON_PLAYER, 0.1f)
+            DamageType("primalspells_${channel.id}", if (channel == SpellDamageType.CURSE) DamageScaling.NEVER
+                else DamageScaling.WHEN_CAUSED_BY_LIVING_NON_PLAYER, if (channel == SpellDamageType.CURSE) 0f else 0.1f)
         })
     }
     val PROJECTILE = types.getValue(SpellDamageType.PROJECTILE)

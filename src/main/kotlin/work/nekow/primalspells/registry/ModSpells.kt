@@ -22,6 +22,18 @@ import work.nekow.primalspells.magic.projectile.immobile.*
 /** 内置法术内容清单；公共入口先注册工厂，再创建依赖此表的物品。 */
 object ModSpells {
     fun registerAll() {
+        SpellRegistry.register { ReducedLifetime() }
+        SpellRegistry.register { Alpha() }
+        SpellRegistry.register { Gamma() }
+        SpellRegistry.register { Tau() }
+        SpellRegistry.register { Omega() }
+        SpellRegistry.register { Mu() }
+        SpellRegistry.register { Phi() }
+        SpellRegistry.register { Sigma() }
+        SpellRegistry.register { Zeta() }
+        SpellRegistry.register { VoidEscape() }
+        SpellRegistry.register { BloodMagic() }
+        SpellRegistry.register { WandRefresh() }
         SpellRegistry.register { SurveyPulse() }
         SpellRegistry.register { ItemPull() }
         SpellRegistry.register { FeatherWard() }

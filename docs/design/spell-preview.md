@@ -24,7 +24,7 @@ Wand.preview委托WandPreviewBuilder，在独立的牌堆、卡牌和法力副�
 
 创造物品栏的光标按原版由客户端选取，因此CreativeWandEditHandler仅把右键法杖装卸交给已有EditWandPayload，不显示窗口，不接管其他物品/左键/Shift操作。服务端只接受创造玩家、真实菜单槽/wandId、注册散卡与合法数量，拒绝任意物品组件；完整菜单同步回交光标。生存玩家不能走这个专用包。
 
-WandPreviewPayload由ModNetworking注册，经ClientPayloadSink和RegisterClientPayloadHandlersEvent接线，服务端校验集中在WandRequestHandler。当前协议1.6.0，包含整副槽位归属；客户端/服务端同步升级，不修改原法术id、wandId和存档键。tooltip使用原版bundle槽背景与法术物品模型，资源包可覆盖其引用资源。
+WandPreviewPayload由ModNetworking注册，经ClientPayloadSink和RegisterClientPayloadHandlersEvent接线，服务端校验集中在WandRequestHandler。当前协议1.7.0，包含整副槽位归属；客户端/服务端同步升级，不修改原法术id、wandId和存档键。tooltip使用原版bundle槽背景与法术物品模型，资源包可覆盖其引用资源。
 
 ## 验证
 

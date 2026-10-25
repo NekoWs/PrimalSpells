@@ -4,6 +4,8 @@
 
 | 主题 | 当前保证 | 回归入口 |
 |---|---|---|
+| 引用与重装填 | 实体牌与副本游标隔离；首末卡/两卡/分类/跨杖引用保留独立荷载与费用标记，循环与大展开（含每枚载体的追加荷载副本）有界；全量预算不因多重施放溢出；单刷新免充能、多刷新正常充能 | new_spells的ReferenceSpellChecks、foundations |
+| 生命代价与虚空 | 血魔法每张接受卡只支付一次不可减免的诅咒HP，死亡来源走原版流程；虚空同步附件覆盖所有观察者，统一限制索敌、接触、伤害、交互与施法，并恢复原状态 | new_spells的ReferenceSpellChecks/VoidSpellChecks、death_attribution |
 | 世界运行时清理 | 停服同时清空在场与待加入弹体、冻结和延迟动作，旧队列不进入下一个世界 | foundations的ArchitectureChecks |
 | 每刻性能 | 按需积分、同格邻域复用、无数组slab、反应分类配对；已加载区块查询避免同步生成，保留接点/曲线/伤害语义 | spell_performance、collision_precision；[基准](../design/performance.md) |
 | 爆炸表现开销 | 大爆炸从约两千片改为最多177片相关火舌/余烬/烟团，共享不可变曲线；三种独立随机轮廓，原生批次与有限外扩退场，零默认光源，保留当刻伤害与晶体引爆 | explosion_performance的JFR/分配/数量/位置签名，explosion、crystal_lifecycle、spell_lighting；[实测](../design/performance.md#爆炸表现) |

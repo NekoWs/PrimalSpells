@@ -13,10 +13,15 @@ internal object PayloadRelease {
     fun emit(carrier: Projectile, payload: MutableList<Magic>, pos: Vector3d, direction: Vector3f,
              repeatable: Boolean = false) {
         if (payload.isEmpty()) return
+        if (VoidStatus.isPhased(carrier.caster)) return
         val templates = payload.toList()
         if (!repeatable) payload.clear()
         val cards = if (repeatable) templates.map(SpellAssembly::copyCard) else templates
         val modifiers = cards.filterIsInstance<Modifier>()
+        cards.filterIsInstance<work.nekow.primalspells.magic.core.OtherSpell>().forEach {
+            if (!VoidStatus.isPhased(carrier.caster)) { it.caster = carrier.caster; it.wand = carrier.wand; it.spell() }
+        }
+        if (VoidStatus.isPhased(carrier.caster)) return
         cards.filterIsInstance<Projectile>().forEach { shot ->
             SpellAssembly.apply(shot, modifiers)
             shot.caster = carrier.caster; shot.wand = carrier.wand

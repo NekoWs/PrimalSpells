@@ -194,7 +194,7 @@ object WandCastingFx {
         }
         val held = hashSetOf<UUID>()
         for (player in server.playerList.players) {
-            val wand = if (player.isAlive) selected(player) else null
+            val wand = if (player.isAlive && !work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(player)) selected(player) else null
             if (wand == null) continue
             held += player.uuid
             state(player, wand).update()

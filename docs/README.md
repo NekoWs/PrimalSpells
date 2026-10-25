@@ -20,6 +20,7 @@ PrimalSpells 是 Minecraft NeoForge 魔法模组：玩家把法术卡装入法�
 | 法杖数值、单位、存档迁移 | [法杖等级](design/wand-tiers.md) |
 | 粒子API职责与接线 | [PD接入](design/effects-api.md) |
 | 视觉与动画 | [像素风格](design/minecraft-visuals.md)、[连贯性](design/animation-continuity.md)、[法术联动](design/spell-quality.md) |
+| 引用与特殊控制 | [复制、刷新、血魔法与虚空](design/spell-references.md) |
 | 特定效果 | [持杖施法](design/wand-casting.md)、[模型资源](design/wand-materials.md)、[区域场](design/field-effects.md)、[特殊法术](design/spell-expansion.md) |
 | 界面 | [HUD](design/hud.md)、[编杖与预览](design/spell-preview.md) |
 | 获取与世界交互 | [探索获取](design/acquisition.md)、[生活法术与罗盘](design/world-utility.md) |

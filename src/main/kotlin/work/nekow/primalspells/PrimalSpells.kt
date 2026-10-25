@@ -56,6 +56,9 @@ class PrimalSpells(bus: IEventBus, container: ModContainer) {
         ModItems.COMPONENTS.register(bus)
         ModItems.ITEMS.register(bus)
         ModItems.TABS.register(bus)
+        work.nekow.primalspells.registry.ModEffects.EFFECTS.register(bus)
+        work.nekow.primalspells.registry.ModEffects.ATTACHMENTS.register(bus)
+        NeoForge.EVENT_BUS.register(work.nekow.primalspells.event.VoidAndCurseEvents)
         ModDamageTypes.DAMAGE_TYPES.register(bus)
         ModEntities.ENTITY_TYPES.register(bus)
 

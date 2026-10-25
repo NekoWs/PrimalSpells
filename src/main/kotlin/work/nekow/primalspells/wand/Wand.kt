@@ -10,6 +10,8 @@ import work.nekow.primalspells.magic.core.Magic
 
 /** 法杖权威状态与装卸/每刻维护；解析、事务、发射、预览和NBT各有独立实现。 */
 class Wand(var id: String) {
+    /** 随机引用的事务种子；预览不推进，真实抽牌后推进并随存档恢复。 */
+    var referenceSeed: Long = id.hashCode().toLong()
     val innate = arrayListOf<Magic>()
 
     val magics = arrayListOf<Magic?>()
@@ -119,7 +121,8 @@ class Wand(var id: String) {
     fun spell(caster: Entity): Boolean = WandCasting.cast(this, caster)
 
     /** 独立副本上的只读预览，不执行任何玩法钩子。 */
-    fun preview(): WandPreview = WandPreviewBuilder.build(this)
+    @JvmOverloads
+    fun preview(caster: Entity? = null): WandPreview = WandPreviewBuilder.build(this, WandReferences.others(caster, this))
 
     /**
      * 检查并消耗法术所需法力。
@@ -187,7 +190,9 @@ class Wand(var id: String) {
             if (lastPassiveTick == gameTime) return
             lastPassiveTick = gameTime
             loadedMagics.forEach { magic ->
-                if (magic.needInventory) {
+                if (magic.needInventory && work.nekow.primalspells.magic.effect.lifecycle.VoidStatus.isPhased(caster)) {
+                    magic.onPassiveIdle()
+                } else if (magic.needInventory) {
                     magic.caster = caster
                     magic.wand = this
                     magic.onInventoryTick()

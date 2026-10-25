@@ -9,6 +9,7 @@
     "primalspells:electricity",
     "primalspells:energy",
     "primalspells:gravity",
-    "primalspells:healing"
+    "primalspells:healing",
+    "primalspells:curse"
   ]
 }

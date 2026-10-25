@@ -7,6 +7,7 @@
 | 要改什么 | 入口 |
 |---|---|
 | 抽牌、作用域、MP、双冷却 | `wand/{Wand,WandDeck,CastTransaction,WandCasting}.kt`、`magic/core/{DrawAction,SpellAssembly}.kt` |
+| 引用/刷新/血魔法/虚空 | `magic/action/`、`wand/WandReferences.kt`、`magic/effect/lifecycle/{CurseDamage,VoidStatus,LifetimeAdjustment}.kt`、`event/VoidAndCurseEvents.kt`、`registry/ModEffects.kt`；行为见[引用机制](design/spell-references.md) |
 | 只读预览/整副分色 | `wand/WandPreview.kt`、`wand/WandPreviewBuilder.kt`、`client/tooltip/WandPreviewCache.kt`、`client/screen/WandPreviewScreen.kt` |
 | 原容器编杖/小包 | `item/{WandItem,SpellPouchItem}.kt`、`client/input/{SpellSlotScrollHandler,ClientContainerDragHandler,CreativeWandEditHandler}.kt` |
 | 法杖创建/保存/持有者 | `wand/{WandTier,WandPersistence,WandManager,WandSavedData}.kt`，WandStats定义在WandTier.kt |
@@ -50,6 +51,18 @@
 
 | ID / 名称 | 实现 |
 |---|---|
+| `reduced_lifetime` / 缩短存在时间 | `magic/modifier/ReducedLifetime.kt` |
+| `alpha` / Alpha | `magic/action/Alpha.kt` |
+| `gamma` / Gama | `magic/action/Gamma.kt` |
+| `tau` / Tau | `magic/action/Tau.kt` |
+| `omega` / Omiga | `magic/action/Omega.kt` |
+| `mu` / Miu | `magic/action/Mu.kt` |
+| `phi` / Phi | `magic/action/Phi.kt` |
+| `sigma` / Sigma | `magic/action/Sigma.kt` |
+| `zeta` / Zeta | `magic/action/Zeta.kt` |
+| `void_escape` / 遁入虚空 | `magic/action/VoidEscape.kt` |
+| `blood_magic` / 血魔法 | `magic/modifier/BloodMagic.kt` |
+| `wand_refresh` / 刷新法杖 | `magic/action/WandRefresh.kt` |
 | `survey_pulse` / 显踪脉冲 | `magic/projectile/immobile/SurveyPulse.kt` |
 | `item_pull` / 收纳术 | `magic/projectile/immobile/ItemPull.kt` |
 | `feather_ward` / 轻羽庇护 | `magic/projectile/immobile/FeatherWard.kt` |

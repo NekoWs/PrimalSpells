@@ -5,6 +5,7 @@ import kotlin.math.min
 import work.nekow.primalspells.magic.core.DrawAction
 import work.nekow.primalspells.magic.core.Magic
 import work.nekow.primalspells.magic.core.Modifier
+import work.nekow.primalspells.magic.core.OtherSpell
 import work.nekow.primalspells.magic.core.TriggerSpell
 import work.nekow.primalspells.magic.projectile.Projectile
 
@@ -15,13 +16,18 @@ internal class CastTransaction(private val wand: Wand) {
     private var delay = 0.0
     private var recharge = 0.0
     private var delayReduction = 0.0
+    var healthCost = 0f
+        private set
+    private var refreshes = 0
 
     private fun account(card: Magic) {
         accepted += card
         delay += card.delay
         recharge += card.recharge
         delayReduction += min(0.0, card.delay.toDouble())
-        resetDelay = resetDelay || card.resetsCastDelay
+        resetDelay = resetDelay || (card.resetsCastDelay && !card.castingCostsWaived)
+        healthCost += card.healthCost
+        if (card is DrawAction && card.kind == DrawAction.Kind.REFRESH) refreshes++
     }
 
     /** 同一链先收集修正，荷载递归独立付费；每张被接受的牌只结算一次费用。 */
@@ -55,6 +61,9 @@ internal class CastTransaction(private val wand: Wand) {
                 trigger.cards.clear(); trigger.cards += payload
             }
         }
+        for (other in expanded.filterIsInstance<OtherSpell>().filter { it !is DrawAction }) {
+            if (wand.consumeMana(other)) { paid += other; account(other) }
+        }
         return paid
     }
 
@@ -62,7 +71,7 @@ internal class CastTransaction(private val wand: Wand) {
     fun finish() {
         wand.status.delay = delay
         wand.status.recharge = recharge
-        WandDeck(wand).discard()
+        WandDeck(wand).discard(refreshes)
         wand.status.delay = (if (resetDelay) 0.0 else max(wand.status.delay,
             (wand.delayTicks() + delayReduction).coerceAtLeast(0.0))).coerceAtLeast(0.0)
         wand.status.recharge = wand.status.recharge.coerceAtLeast(0.0)

@@ -12,6 +12,7 @@ internal object WandPersistence {
     fun save(wand: Wand): CompoundTag = with(wand) {
         val tag = CompoundTag()
         tag.putString("id", id)
+        tag.putLong("reference_seed", referenceSeed)
         tag.putDouble("mana", mana)
         tag.putInt("delay_ticks", delayTicks().toInt())
         tag.putInt("recharge_ticks", rechargeTicks().toInt())
@@ -37,6 +38,7 @@ internal object WandPersistence {
 
     fun load(tag: CompoundTag): Wand {
         val wand = Wand(tag.getStringOr("id", ""))
+        wand.referenceSeed = tag.getLongOr("reference_seed", wand.referenceSeed)
         wand.mana = tag.getDoubleOr("mana", 0.0)
         wand.delayTickCount = readTicks(tag, "delay")
         wand.rechargeTickCount = readTicks(tag, "recharge")
@@ -102,9 +104,14 @@ internal object WandPersistence {
 
     private fun restorePiles(wand: Wand, tag: CompoundTag) {
         if (!tag.contains("draw_pile")) return
-        val draw = magicsFrom(tag.getListOrEmpty("draw_pile"))
-        val hand = magicsFrom(tag.getListOrEmpty("hand"))
-        val discard = magicsFrom(tag.getListOrEmpty("discard_pile"))
+        // 三牌堆必须引用已装载的实体卡，才能准确识别“自己”及首/末槽的递归边界。
+        val available = wand.loadedMagics.groupBy { it.id }.mapValues { ArrayDeque(it.value) }
+        fun restore(name: String) = tag.getListOrEmpty(name).mapNotNull {
+            available[(it as StringTag).asString().get()]?.removeFirstOrNull()
+        }
+        val draw = restore("draw_pile")
+        val hand = restore("hand")
+        val discard = restore("discard_pile")
         // 异常的全空牌堆退回load生成的初始配置，避免永久抽不到牌。
         if (draw.isEmpty() && hand.isEmpty() && discard.isEmpty() && wand.loadedMagics.isNotEmpty()) return
         wand.drawPile.clear(); wand.drawPile += draw

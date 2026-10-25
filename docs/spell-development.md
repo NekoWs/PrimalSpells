@@ -9,7 +9,8 @@
 | 飞行法术 | Projectile，magic/projectile |
 | 静态场或瞬时法术 | Projectile，magic/projectile/immobile |
 | 参数/行为修正 | Modifier，magic/modifier |
-| 复制单卡/抽牌控制 | DrawAction，magic/action |
+| 复制单卡/引用/刷新/抽牌控制 | DrawAction，magic/action |
+| 非投射物主动法术 | OtherSpell，magic/action；直接与荷载释放入口执行 |
 | 投射物行为 | BaseEffect，按geometry/lifecycle/visual归位 |
 | 手持被动 | 当前使用needInventory=true的Modifier；需处理闲置与卸载 |
 
@@ -58,6 +59,8 @@ Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已�
 - 一分为多复制后方单卡；例如十份加速是一张投射物获得十次加速，不复制整个链。复制牌各自付费，但实体牌只抽取/弃置一次。
 - 全量施放抽取剩余后方链，不回洗。追加系列寻找载体时经过的普通修正免费，控制牌仍收费；未付费控制牌不释放/收费其展开子树，已预留实体牌仍弃置。
 - 本次根链和递归荷载成功付费的代价汇总一次；任意成功付费链锯清整个事务delay，未付费不生效。
+
+引用、免费复制、刷新与生命付款的边界见[引用机制](design/spell-references.md)。SpellAssembly.copyCard必须保留mana/delay/recharge与castingCostsWaived；不能让二次复制重新收费。CURSE生命成本由CastTransaction汇总，在实际施法前支付，禁止注入每枚投射物。
 
 同源复制使用SpellAssembly.copy/inherit，重建非生成配方、复制独立荷载。SpellAssembly.copyCard用于待发射模板的完整复制，保留该卡已装配的修正及嵌套树，每份配方只装一次。生成型修正不递归继承；当前实际速度经SpellAssembly.launch抵消模板与加速倍率，避免再乘一遍。独立触发荷载不能调用父配方inherit。
 

@@ -20,7 +20,7 @@ internal object WandRequestHandler {
         val stacks = player.containerMenu.slots.map { it.item } + player.containerMenu.carried
         val stack = stacks.firstOrNull { it.item is WandItem && it.get(ModItems.WAND_ID)?.wandId == payload.wandId }
         val wand = stack?.let(WandItem::getWand) ?: return
-        PacketDistributor.sendToPlayer(player, WandPreviewPayload(payload.wandId, wand.preview()))
+        PacketDistributor.sendToPlayer(player, WandPreviewPayload(payload.wandId, wand.preview(player)))
     }
 
     fun edit(player: ServerPlayer, payload: EditWandPayload) {
@@ -49,7 +49,7 @@ internal object WandRequestHandler {
         })
         // 创造界面忽略原版单独光标包，完整同步包含服务端权威光标。
         menu.broadcastFullState()
-        PacketDistributor.sendToPlayer(player, WandPreviewPayload(payload.wandId, wand.preview()))
+        PacketDistributor.sendToPlayer(player, WandPreviewPayload(payload.wandId, wand.preview(player)))
     }
 
     fun select(player: ServerPlayer, payload: SelectSpellSlotPayload) {

@@ -17,7 +17,12 @@
     "long_distance_cast",
     "teleport",
     "dormant_crystal",
-    "crystal_detonation"
+    "crystal_detonation",
+    "alpha",
+    "gamma",
+    "tau",
+    "blood_magic",
+    "wand_refresh"
   ],
   "loadouts": [
     [

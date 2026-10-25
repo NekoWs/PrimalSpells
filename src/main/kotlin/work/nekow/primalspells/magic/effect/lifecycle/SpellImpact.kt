@@ -18,7 +18,7 @@ object SpellImpact {
     fun hurt(level: ServerLevel, target: Entity, caster: Entity, damage: Double, direction: Vec3,
              blast: Boolean = false, knockback: Boolean = true,
              type: work.nekow.primalspells.magic.core.SpellDamageType = work.nekow.primalspells.magic.core.SpellDamageType.PROJECTILE): Boolean {
-        if (!damage.isFinite() || !target.isAlive) return false
+        if (!damage.isFinite() || !target.isAlive || VoidStatus.isPhased(target) || VoidStatus.isPhased(caster)) return false
         val event = net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(work.nekow.primalspells.integration.SpellEvents.BeforeImpact(caster, target, type, damage, direction))
         val amount = event.amount
         if (event.isCanceled || !amount.isFinite()) return false

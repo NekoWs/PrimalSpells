@@ -17,7 +17,7 @@ def registered_categories():
     """按已注册类的继承链识别类型，避免新卡遗漏在手写分类表之外。"""
     classes = re.findall(r'register \{ (\w+)\(\) }', (ROOT/'src/main/kotlin/work/nekow/primalspells/registry/ModSpells.kt').read_text(encoding='utf-8'))
     sources = {p.stem: p.read_text(encoding='utf-8') for p in MAGIC.rglob('*.kt')}
-    roots = {'Projectile': 'projectile', 'Modifier': 'modifier', 'DrawAction': 'other'}
+    roots = {'Projectile': 'projectile', 'Modifier': 'modifier', 'DrawAction': 'other', 'OtherSpell': 'other'}
     result={}
     for cls in classes:
         name = re.search(r'override val id = "([^"]+)"', sources[cls])[1]

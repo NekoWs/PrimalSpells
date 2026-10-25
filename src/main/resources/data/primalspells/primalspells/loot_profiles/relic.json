@@ -11,7 +11,13 @@
     "cast_all",
     "quintuple_cast",
     "quantum_entanglement",
-    "bounce_duplicate"
+    "bounce_duplicate",
+    "omega",
+    "mu",
+    "phi",
+    "sigma",
+    "zeta",
+    "void_escape"
   ],
   "loadouts": [
     [

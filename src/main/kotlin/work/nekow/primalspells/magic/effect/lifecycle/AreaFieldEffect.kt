@@ -107,7 +107,7 @@ abstract class AreaFieldEffect(
 
         val aabb = AABB.ofSize(center, radius * projectile.areaScale * 2.0, radius * projectile.areaScale * 2.0, radius * projectile.areaScale * 2.0)
         val inRange = level.getEntitiesOfClass(LivingEntity::class.java, aabb) {
-            it.isAlive && affectsEntity(it) && it.boundingBox.center.distanceToSqr(center) <= radius * radius * projectile.areaScale * projectile.areaScale
+            it.isAlive && !VoidStatus.isPhased(it) && !VoidStatus.isPhased(caster) && affectsEntity(it) && it.boundingBox.center.distanceToSqr(center) <= radius * radius * projectile.areaScale * projectile.areaScale
         }
 
         // 1) 先处理离开范围的生物：立刻撤销迟缓（不等效果自然到期）
@@ -146,6 +146,7 @@ abstract class AreaFieldEffect(
      * 排除本效果自己所在的投射物 —— 否则区域弹会被自己往下压、或被自己吸住。
      */
     private fun applyProjectileForces(center: Vec3) {
+        if (VoidStatus.isPhased(caster)) return
         val projectiles = ProjectileRuntime.projectiles
         if (projectiles.isEmpty()) return
         val radiusSq = radius * radius * projectile.areaScale * projectile.areaScale

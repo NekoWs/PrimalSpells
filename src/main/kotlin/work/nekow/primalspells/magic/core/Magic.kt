@@ -23,6 +23,10 @@ abstract class Magic {
     var recharge: Int = 0
     /** 本张投射物成功付费时归零整次施放延迟，含触发荷载；与牌序无关。 */
     open val resetsCastDelay: Boolean = false
+    /** 引用卡可免除复制品的MP与双冷却，不能免除生命代价等玩法效果。 */
+    var castingCostsWaived: Boolean = false
+    /** 成功接受此卡时支付的诅咒生命代价；预览只记账，不修改实体。 */
+    open val healthCost: Float = 0f
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()
 
@@ -138,7 +142,7 @@ abstract class Magic {
         base += LoreEntry(Lore.DESCRIPTION, emptyArray())
         base += LoreEntry(Lore.CATEGORY, arrayOf(net.minecraft.network.chat.Component.translatable("category.primalspells." + when {
             needInventory -> "passive"
-            this is DrawAction -> "other"
+            this is OtherSpell -> "other"
             this is Modifier -> "modifier"
             else -> "projectile"
         })))

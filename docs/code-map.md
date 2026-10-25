@@ -54,14 +54,14 @@
 | ID / 名称 | 实现 |
 |---|---|
 | `reduced_lifetime` / 缩短存在时间 | `magic/modifier/ReducedLifetime.kt` |
-| `alpha` / Alpha | `magic/action/Alpha.kt` |
-| `gamma` / Gama | `magic/action/Gamma.kt` |
-| `tau` / Tau | `magic/action/Tau.kt` |
-| `omega` / Omiga | `magic/action/Omega.kt` |
-| `mu` / Miu | `magic/action/Mu.kt` |
-| `phi` / Phi | `magic/action/Phi.kt` |
-| `sigma` / Sigma | `magic/action/Sigma.kt` |
-| `zeta` / Zeta | `magic/action/Zeta.kt` |
+| `alpha` / 阿尔法 | `magic/action/Alpha.kt` |
+| `gamma` / 伽马 | `magic/action/Gamma.kt` |
+| `tau` / 陶 | `magic/action/Tau.kt` |
+| `omega` / 欧米伽 | `magic/action/Omega.kt` |
+| `mu` / 缪 | `magic/action/Mu.kt` |
+| `phi` / 斐 | `magic/action/Phi.kt` |
+| `sigma` / 西格玛 | `magic/action/Sigma.kt` |
+| `zeta` / 泽塔 | `magic/action/Zeta.kt` |
 | `void_escape` / 遁入虚空 | `magic/action/VoidEscape.kt` |
 | `blood_magic` / 血魔法 | `magic/modifier/BloodMagic.kt` |
 | `wand_refresh` / 刷新法杖 | `magic/action/WandRefresh.kt` |

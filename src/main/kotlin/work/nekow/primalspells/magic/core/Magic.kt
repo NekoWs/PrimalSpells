@@ -27,6 +27,14 @@ abstract class Magic {
     var castingCostsWaived: Boolean = false
     /** 成功接受此卡时支付的诅咒生命代价；预览只记账，不修改实体。 */
     open val healthCost: Float = 0f
+    /** 每张实体卡的总次数；0表示不限次，不与同ID的其他卡共享。 */
+    open val maxUses: Int = 0
+    private var savedUses: Int? = null
+    var remainingUses: Int
+        get() = savedUses ?: maxUses
+        set(value) { savedUses = value.coerceIn(0, maxUses) }
+    /** 本次准备实例对应的实体卡；null表示玩法复制，不扣次数。普通工厂clone不等于玩法复制。 */
+    internal var useOwner: Magic? = this
     var effects = arrayListOf<BaseEffect>()
     var lore = arrayListOf<LoreEntry>()
 

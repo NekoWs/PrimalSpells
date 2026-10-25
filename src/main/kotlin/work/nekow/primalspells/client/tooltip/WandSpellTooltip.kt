@@ -13,6 +13,7 @@ class WandSpellTooltip(
     val spells: List<String>,
     val wandId: String,
     val slots: List<work.nekow.primalspells.wand.WandPreview.Slot>? = null,
+    val uses: List<Int> = emptyList(),
 ): TooltipComponent
 
 class ClientWandSpellTooltip(
@@ -47,6 +48,7 @@ class ClientWandSpellTooltip(
                 val stack = ItemStack(item)
                 graphics.item(stack, sx + 1, sy + 1)
                 graphics.itemDecorations(font, stack, sx + 1, sy + 1)
+                SpellUseTooltip.draw(graphics, font, tooltip.uses.getOrNull(i) ?: slots?.getOrNull(i)?.remainingUses ?: -1, sx, sy)
             }
         }
     }

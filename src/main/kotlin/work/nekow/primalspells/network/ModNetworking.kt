@@ -5,7 +5,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 
 /** 公共协议接线；客户端回调经sink分发，服务端请求统一交给权威校验入口。 */
 object ModNetworking {
-    const val PROTOCOL_VERSION = "1.7.0"
+    const val PROTOCOL_VERSION = "1.8.0"
 
     fun register(event: RegisterPayloadHandlersEvent) {
         val registrar = event.registrar(PROTOCOL_VERSION)

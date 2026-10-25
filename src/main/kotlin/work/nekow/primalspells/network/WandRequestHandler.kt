@@ -36,9 +36,12 @@ internal object WandRequestHandler {
         // 只允许已注册散卡与合法堆叠数，不接收客户端任意组件或法杖数值。
         val cursor = if (payload.creativeCount == 0 && payload.creativeSpell.isEmpty()) ItemStack.EMPTY else {
             val spellItem = ModItems.spellItem(payload.creativeSpell) ?: return
+            val maxUses = work.nekow.primalspells.magic.core.SpellRegistry.create(payload.creativeSpell)?.maxUses ?: return
+            if (payload.creativeUses !in -1..maxUses) return
             ItemStack(spellItem).also {
                 if (payload.creativeCount !in 1..it.maxStackSize) return
                 it.count = payload.creativeCount
+                if (payload.creativeUses >= 0 && maxUses > 0) it.set(ModItems.SPELL_USES, payload.creativeUses)
             }
         }
         menu.carried = cursor

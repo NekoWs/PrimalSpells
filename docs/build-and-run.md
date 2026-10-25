@@ -129,4 +129,6 @@ spell_chain的TriggerLifecycleChecks读取实际新生子弹，覆盖两类命�
 
 recoil_light在服务端延迟队列和实际墙命中回调记录蓄能/反弹，不再用客户端固定帧号猜服务端年龄。spell_resonance的接触夹具使用真实发射后重叠位置，复制夹具实际装备bounce_duplicate并在子弹首次移动前检查继承。其混合视觉退场门禁见[open](issues/open.md)。
 
-引用与实用法术回归：`new_spells,spell_chain,shield_balance,foundations,spell_icons,exploration,death_attribution,damage_mass`按各场最新结果汇总8场411项机制检查、1803帧、1丢帧（预算内），机制、画面与日志门禁通过。七场原帧在`build/capture/reference-spells-suite-verified/`，damage_mass在`build/capture/reference-spells-fields-verified/`，最新new_spells在`build/capture/out/`。覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空观察者同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全；图标生成器重复运行像素幂等。
+引用与实用法术覆盖78卡注册/贴图/来源、只读引用预览与NBT、免费复制与荷载隔离、有限展开、刷新计数、诅咒HP/真实死亡、虚空同步与60t恢复、区域力豁免；原有护盾与触发回归一并保留。通过证据按场保存在`build/capture/reference-spells-suite-verified/`、`reference-spells-fields-verified/`及`before-limited-uses/`。纯资源检查确认78张16px硬透明图标主体唯一、模型/双语键齐全，生成器像素幂等。
+
+逐卡次数复验：`pwsh tools/capture/capture.ps1 -Offline -Scene foundations -TimeoutSec 600`。最新foundations机制104/104，含43项逐卡次数检查、旧ID移除/游标身份、25次耗尽与复制、物品/小包NBT及真实客户端同步；`build --offline`与架构/静音护栏通过。原帧和退出诊断在`build/capture/limited-uses-shutdown-audit/`：223帧、37丢帧超预算，区块写盘等待后终止本次Capturer，不能记作整场录制通过。先前foundations的61项UI/编辑检查及spell_chain的111项检查均连同画面门禁通过，证据在`limited-uses-initial-audit/`。`new_spells`的136项机制检查通过，混合特效退场门禁失败保存在`limited-uses-expanded-audit/`，未解决项与后续复验见[open](issues/open.md)。

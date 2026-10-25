@@ -17,7 +17,7 @@ internal object WandPreviewBuilder {
         copy.status.mana = wand.status.mana
         copy.referenceSeed = wand.referenceSeed
         val clones = java.util.IdentityHashMap<Magic, Magic>()
-        fun cloned(card: Magic) = clones.getOrPut(card) { card.clone() }
+        fun cloned(card: Magic) = clones.getOrPut(card) { card.clone().also { it.remainingUses = card.remainingUses } }
         copy.drawPile += wand.drawPile.map(::cloned)
         copy.discardPile += wand.discardPile.map(::cloned)
         copy.loadedMagics += wand.loadedMagics.map(::cloned)
@@ -66,14 +66,18 @@ internal object WandPreviewBuilder {
         val sources = java.util.IdentityHashMap<Magic, Int>()
         val clones = java.util.IdentityHashMap<Magic, Magic>()
         wand.magics.forEachIndexed { index, card -> card?.let {
-            val cloned = it.clone(); clones[it] = cloned; sources[cloned] = index; copy.drawPile += cloned
+            val cloned = it.clone().also { cloned -> cloned.remainingUses = it.remainingUses }
+            clones[it] = cloned; sources[cloned] = index; copy.drawPile += cloned
         } }
         copy.loadedMagics += wand.loadedMagics.map { clones[it] ?: it.clone() }
-        val slots = MutableList(maxOf(wand.size, wand.magics.size)) { i -> WandPreview.Slot(wand.magics.getOrNull(i)?.id.orEmpty(), "") }
+        val slots = MutableList(maxOf(wand.size, wand.magics.size)) { i ->
+            val card = wand.magics.getOrNull(i)
+            WandPreview.Slot(card?.id.orEmpty(), "", card?.takeIf { it.maxUses > 0 }?.remainingUses ?: -1)
+        }
         var chain = 0
         while (copy.drawPile.isNotEmpty()) {
             WandDeck(copy).draw(wand.cast.coerceAtLeast(1), false, { source, scope ->
-                sources[source]?.let { i -> slots[i] = WandPreview.Slot(source.id, scope) }
+                sources[source]?.let { i -> slots[i] = slots[i].copy(scope = scope) }
             }, "chain${chain++}")
             // 下一条链只看余下配置，不把此前抽牌再次排回队列。
             copy.hand.clear()

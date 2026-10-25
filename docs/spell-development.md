@@ -51,6 +51,8 @@ Modifier提供独立effect；BaseEffect默认MODIFIER。onActive用于修改已�
 
 被动以onInventoryTick工作；重复卡如护盾/火把只由主卡建一套视觉。onPassiveIdle用于正常退场，onUnloaded处理取下/替换后不再tick的清理。读档钩子只读写自身字段，不能访问尚未注入的caster/wand；magic_states按ID共享，不适合每张重复卡独立进度。
 
+主动卡需要限制次数时覆盖`maxUses`，默认0不限次；剩余次数由核心逐卡保存/结算，不写进magic_states或具体effect。复制、荷载预付、旧存档及物品转移规则见[实体卡使用次数](design/spell-references.md#5-实体卡使用次数)。
+
 ## 4. 荷载与抽牌控制
 
 - 触发牌从后续牌独立抽取一条链；父链修正不会传入荷载，费用只在原施法事务结算。重复命中不重新抽牌或收费。

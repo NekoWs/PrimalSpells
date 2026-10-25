@@ -17,7 +17,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.neoforged.neoforge.network.PacketDistributor
 import work.nekow.primalspells.item.component.WandID
-import work.nekow.primalspells.magic.core.SpellRegistry
+import work.nekow.primalspells.item.component.SpellCardData
 import work.nekow.primalspells.network.SyncWandStatsPayload
 import work.nekow.primalspells.registry.ModItems
 import work.nekow.primalspells.wand.Wand
@@ -186,9 +186,9 @@ class WandItem(properties: Properties) : Item(properties.component(
     private fun addToCursor(
         stack: ItemStack, wand: Wand, other: ItemStack, carried: SlotAccess, player: Player
     ): Boolean {
-        val spellId = findMagic(other.item) ?: return false
+        val card = SpellCardData.read(other) ?: return false
         val target = selectedSlot(stack, wand)
-        val existing = placeMagic(wand, stack, target, spellId)
+        val existing = placeMagic(wand, stack, target, card)
         if (other.count == 1) carried.set(existing?.let(::makeStack) ?: ItemStack.EMPTY)
         else {
             other.shrink(1)
@@ -203,10 +203,10 @@ class WandItem(properties: Properties) : Item(properties.component(
         carried.set(makeStack(magic))
     }
 
-    private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, id: String): work.nekow.primalspells.magic.core.Magic? {
+    private fun placeMagic(wand: Wand, stack: ItemStack, target: Int, card: work.nekow.primalspells.magic.core.Magic): work.nekow.primalspells.magic.core.Magic? {
         while (wand.magics.size <= target) wand.magics.add(null)
         val existing = wand.magics.getOrNull(target)
-        wand.magics[target] = SpellRegistry.create(id)!!
+        wand.magics[target] = card
         wand.load(); tickSync(stack)
         return existing
     }
@@ -221,8 +221,7 @@ class WandItem(properties: Properties) : Item(properties.component(
     private fun findMagic(item: Item) = ModItems.spellIdOf(item)
 
     private fun makeStack(magic: work.nekow.primalspells.magic.core.Magic): ItemStack {
-        val item = ModItems.spellItem(magic.id) ?: return ItemStack.EMPTY
-        return ItemStack(item)
+        return SpellCardData.stack(magic)
     }
 
     /**
@@ -242,5 +241,7 @@ class WandItem(properties: Properties) : Item(properties.component(
         val size = maxOf(wand.size, wand.magics.size)
         val ids = (0 until size).map { i -> wand.magics.getOrNull(i)?.id ?: "" }
         if (stack.get(ModItems.WAND_SPELLS.get()) != ids) stack.set(ModItems.WAND_SPELLS, ids)
+        val uses = (0 until size).map { i -> wand.magics.getOrNull(i)?.takeIf { it.maxUses > 0 }?.remainingUses ?: -1 }
+        if (stack.get(ModItems.WAND_SPELL_USES) != uses) stack.set(ModItems.WAND_SPELL_USES, uses)
     }
 }

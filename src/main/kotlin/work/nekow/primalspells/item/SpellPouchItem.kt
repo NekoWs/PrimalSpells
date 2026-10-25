@@ -13,6 +13,7 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import work.nekow.primalspells.item.component.WandID
+import work.nekow.primalspells.item.component.SpellCardData
 import work.nekow.primalspells.registry.ModItems
 import java.util.UUID
 
@@ -51,16 +52,18 @@ class SpellPouchItem(properties: Properties) : Item(properties) {
             // 放入：只接受法术物品；目标槽原有法术回到光标
             val spellId = ModItems.spellIdOf(other.item) ?: return false
             val existing = getSpells(self).getOrNull(index).orEmpty()
-            setSpell(self, index, spellId)
-            carried.set(stackOf(existing))
+            val existingUses = getUses(self).getOrNull(index) ?: -1
+            setSpell(self, index, spellId, other.get(ModItems.SPELL_USES) ?: -1)
+            carried.set(SpellCardData.stack(existing, existingUses))
             return true
         }
 
         // 取出：把选中槽的法术放到光标（空槽交回原版处理）
         val existing = getSpells(self).getOrNull(index).orEmpty()
         if (existing.isEmpty()) return false
+        val existingUses = getUses(self).getOrNull(index) ?: -1
         setSpell(self, index, "")
-        carried.set(stackOf(existing))
+        carried.set(SpellCardData.stack(existing, existingUses))
         return true
     }
 
@@ -71,6 +74,8 @@ class SpellPouchItem(properties: Properties) : Item(properties) {
         /** 读取小包内的法术 id 列表 */
         fun getSpells(stack: ItemStack): List<String> =
             stack.get(ModItems.SPELL_POUCH_CONTENTS.get()) ?: emptyList()
+
+        fun getUses(stack: ItemStack): List<Int> = stack.get(ModItems.POUCH_SPELL_USES) ?: emptyList()
 
         /** 读取小包唯一 id（未初始化时 null） */
         fun getPouchId(stack: ItemStack): String? =
@@ -92,19 +97,17 @@ class SpellPouchItem(properties: Properties) : Item(properties) {
          * 写入第 [index] 个槽位的法术 id（空串 = 清空），并把长度恰为 [SLOT_COUNT] 的列表回写组件。
          * 越界索引直接忽略，保证组件长度始终等于容量（旧实现按需 grow，读档后槽位会整体前移）。
          */
-        fun setSpell(stack: ItemStack, index: Int, spellId: String) {
+        fun setSpell(stack: ItemStack, index: Int, spellId: String, uses: Int = -1) {
             if (index !in 0 until SLOT_COUNT) return
             val list = getSpells(stack).toMutableList()
             while (list.size < SLOT_COUNT) list.add("")
             list[index] = spellId
             stack.set(ModItems.SPELL_POUCH_CONTENTS.get(), list)
-        }
-
-        /** 法术 id → 单个物品栈（id 为空或未注册时返回空栈） */
-        private fun stackOf(spellId: String): ItemStack {
-            if (spellId.isEmpty()) return ItemStack.EMPTY
-            val item = ModItems.spellItem(spellId) ?: return ItemStack.EMPTY
-            return ItemStack(item)
+            val counts = getUses(stack).toMutableList()
+            while (counts.size < SLOT_COUNT) counts += -1
+            val maximum = work.nekow.primalspells.magic.core.SpellRegistry.create(spellId)?.maxUses ?: 0
+            counts[index] = if (maximum > 0) (if (uses < 0) maximum else uses.coerceAtMost(maximum)) else -1
+            stack.set(ModItems.POUCH_SPELL_USES, counts)
         }
     }
 }

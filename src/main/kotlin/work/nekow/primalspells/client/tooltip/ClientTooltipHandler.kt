@@ -30,7 +30,7 @@ object ClientTooltipHandler {
             val spells = SpellPouchItem.getSpells(stack)
             if (spells.isNotEmpty()) {
                 val pouchId = SpellPouchItem.getPouchId(stack).orEmpty()
-                event.tooltipElements.add(Either.right(PouchTooltip(spells, pouchId)))
+                event.tooltipElements.add(Either.right(PouchTooltip(spells, pouchId, SpellPouchItem.getUses(stack))))
                 addSelectedSpellLines(event, spells, pouchId, pouch = true)
             }
             return
@@ -51,7 +51,8 @@ object ClientTooltipHandler {
             ))
         }
         event.tooltipElements.add(Either.left(Component.translatable("preview.primalspells.hint").withStyle(ChatFormatting.DARK_GRAY)))
-        event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId)))
+        event.tooltipElements.add(Either.right(WandSpellTooltip(spells, wandId,
+            uses = stack.get(ModItems.WAND_SPELL_USES) ?: emptyList())))
         addSelectedSpellLines(event, spells, wandId, pouch = false)
     }
 
@@ -93,6 +94,7 @@ object ClientTooltipHandler {
     private fun addSpellLore(event: RenderTooltipEvent.GatherComponents) {
         val id = ModItems.spellIdOf(event.itemStack.item) ?: return
         val magic = SpellRegistry.create(id) ?: return
+        addUsesLine(event, magic, event.itemStack.get(ModItems.SPELL_USES))
         for ((type, args) in magic.lore) {
             addLoreLine(event, type, args, id)
         }
@@ -126,9 +128,20 @@ object ClientTooltipHandler {
                 Component.translatable(item.descriptionId).withStyle(ChatFormatting.WHITE)
             ))
         }
+        val uses = event.itemStack.get(if (pouch) ModItems.POUCH_SPELL_USES else ModItems.WAND_SPELL_USES)?.getOrNull(selected)
+        addUsesLine(event, magic, uses)
         for ((type, args) in magic.lore) {
             addLoreLine(event, type, args, spellId)
         }
+    }
+
+    private fun addUsesLine(event: RenderTooltipEvent.GatherComponents, card: work.nekow.primalspells.magic.core.Magic, uses: Int?) {
+        if (card.maxUses <= 0) return
+        val remaining = if (uses != null && uses >= 0) uses.coerceAtMost(card.maxUses) else card.maxUses
+        event.tooltipElements.add(Either.left(Component.translatable("tooltip.primalspells.spell_uses", remaining, card.maxUses)
+            .withStyle(if (remaining == 0) ChatFormatting.RED else ChatFormatting.GRAY)))
+        if (remaining == 0) event.tooltipElements.add(Either.left(Component.translatable("tooltip.primalspells.spell_exhausted")
+            .withStyle(ChatFormatting.DARK_GRAY)))
     }
 
     private fun addLoreLine(event: RenderTooltipEvent.GatherComponents, type: Lore, args: Array<out Any>, spellId: String) {

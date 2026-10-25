@@ -28,7 +28,8 @@ object CreativeWandEditHandler {
         val cursor = screen.menu.carried
         val spell = if (cursor.isEmpty) "" else ModItems.spellIdOf(cursor.item) ?: return
         ClientPacketDistributor.sendToServer(EditWandPayload(menu.containerId, slot.index, id,
-            stack.getOrDefault(ModItems.WAND_SELECTED_SLOT, 0), spell, cursor.count))
+            stack.getOrDefault(ModItems.WAND_SELECTED_SLOT, 0), spell, cursor.count,
+            cursor.get(ModItems.SPELL_USES) ?: -1))
         event.isCanceled = true
     }
 }

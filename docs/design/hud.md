@@ -40,7 +40,7 @@ HUD随原版F1隐藏界面一起隐藏，录制非HUD场景也遵守同一入口
 
 `client/hud/HudLayout.kt`管理布局和本机JSON；`WandHudPainter.kt`共享正式/编辑预览绘制；`WandHudRenderer.kt`管理客户端缓存和事件；`HudImpactAnimations.kt`按游戏时间管理独立命中/击杀动画；`client/screen/HudEditorScreen.kt`管理原生Screen输入。
 
-`SyncWandStatsPayload`包含equipRemaining/equipTotal/manaBlocked；手持杖每刻同步，背包其它杖仍按20刻节流。当前网络协议1.7.0，客户端和服务端需要使用同一版。`HudImpactPayload`携带目标运行时ID（VarInt）和击杀标记，将实际接受的非治疗、非自伤命中回报给玩家施法者；去重只作用于客户端HUD，不减少真实伤害、穿刺或触发次数，也不要求目标实体仍在客户端存活。退出世界清数值与动画，保留本机布局。
+`SyncWandStatsPayload`包含equipRemaining/equipTotal/manaBlocked；手持杖每刻同步，背包其它杖仍按20刻节流。当前网络协议1.8.0，客户端和服务端需要使用同一版。`HudImpactPayload`携带目标运行时ID（VarInt）和击杀标记，将实际接受的非治疗、非自伤命中回报给玩家施法者；去重只作用于客户端HUD，不减少真实伤害、穿刺或触发次数，也不要求目标实体仍在客户端存活。退出世界清数值与动画，保留本机布局。
 
 `magic_hud`使用真实伤害及网络回报，检查同一目标每刻16次连击只保留一组，三个不同目标保留三条独立动画记录，其中两个被击杀后只保留一条命中和两条击杀。额外持续32t、每刻16次伤害，检查原生画面逐帧不中断、稳定目标ID、同刻转击杀与最后完整退场。像素检查固定正/斜十字、允许同形重叠、准星保护区、持续外移与严格淡出；不再用分离笔画数量推算同时命中的目标数。
 

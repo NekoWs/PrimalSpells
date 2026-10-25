@@ -34,6 +34,7 @@ object SpellAssembly {
         inherit(parent, child)
         copyPayload(parent, child)
         copyAppended(parent, child)
+        waiveUses(child)
     }
 
     /** 深拷贝尚未发射的抽牌树，不继承运行时状态。 */
@@ -43,12 +44,21 @@ object SpellAssembly {
         copied.delay = card.delay
         copied.recharge = card.recharge
         copied.castingCostsWaived = card.castingCostsWaived
+        copied.useOwner = card.useOwner
         copyPayload(card, copied)
         if (card is DrawAction && copied is DrawAction) copied.expanded += card.expanded.map(::copyCard)
         if (card is Projectile && copied is Projectile) {
             apply(copied, card.modifierOrder.map { SpellRegistry.create(it) as Modifier })
             copyAppended(card, copied)
         }
+    }
+
+    /** 玩法复制整棵准备树均不消耗原卡次数；结构性深拷贝默认仍保留实体卡来源。 */
+    internal fun waiveUses(card: Magic) {
+        card.useOwner = null
+        if (card is DrawAction) card.expanded.forEach(::waiveUses)
+        if (card is TriggerSpell) card.payload.forEach(::waiveUses)
+        if (card is Projectile) card.addedTriggers.forEach { it.cards.forEach(::waiveUses) }
     }
 
     private fun copyAppended(parent: Projectile, child: Projectile) {

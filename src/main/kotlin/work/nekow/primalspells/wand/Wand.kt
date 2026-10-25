@@ -216,7 +216,7 @@ class Wand(var id: String) {
 
     private var lastPassiveTick: Long = -1
 
-    /** 保存法杖配置、运行状态和牌堆游标；不改变现有NBT格式。 */
+    /** 保存法杖配置、运行状态、逐卡次数和牌堆游标；保留旧键兼容读取。 */
     fun saveTag(): CompoundTag = WandPersistence.save(this)
 
     companion object {

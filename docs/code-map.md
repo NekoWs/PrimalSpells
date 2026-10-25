@@ -10,6 +10,7 @@
 | 引用/刷新/血魔法/虚空 | `magic/action/`、`wand/WandReferences.kt`、`magic/effect/lifecycle/{CurseDamage,VoidStatus,LifetimeAdjustment}.kt`、`event/VoidAndCurseEvents.kt`、`registry/ModEffects.kt`；行为见[引用机制](design/spell-references.md) |
 | 只读预览/整副分色 | `wand/WandPreview.kt`、`wand/WandPreviewBuilder.kt`、`client/tooltip/WandPreviewCache.kt`、`client/screen/WandPreviewScreen.kt` |
 | 原容器编杖/小包 | `item/{WandItem,SpellPouchItem}.kt`、`client/input/{SpellSlotScrollHandler,ClientContainerDragHandler,CreativeWandEditHandler}.kt` |
+| 实体卡限制次数 | `magic/core/Magic.kt`、`wand/CastTransaction.kt`、`item/component/SpellCardData.kt`；保存/展示见`WandPersistence`与`SpellUseTooltip`，原生回归`client/capture/LimitedUseChecks.kt` |
 | 法杖创建/保存/持有者 | `wand/{WandTier,WandPersistence,WandManager,WandSavedData}.kt`，WandStats定义在WandTier.kt |
 | 法术注册 | `registry/ModSpells.kt`、`magic/core/SpellRegistry.kt`；物品由 `registry/ModItems.kt` 自动创建 |
 | 法术图标 | `tools/spells/pixel_icons.py`的16px原稿、`tools/spells/generate_icons.py`生成器；`client/capture/SpellIconScene.kt`录制原版物品栏 |

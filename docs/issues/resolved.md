@@ -4,6 +4,7 @@
 
 | 主题 | 当前保证 | 回归入口 |
 |---|---|---|
+| 实体卡次数 | 同名卡各自计数，普通施放扣原卡；玩法复制免次数且可复制耗尽卡，预览/拒绝施法不扣；装卸/小包/存档保留次数，移除旧ID不串卡；回洗与刷新不补满 | foundations的LimitedUseChecks与真实预览/组件同步；录制帧/退出问题另见open |
 | 引用与重装填 | 实体牌与副本游标隔离；首末卡/两卡/分类/跨杖引用保留独立荷载与费用标记，循环与大展开（含每枚载体的追加荷载副本）有界；全量预算不因多重施放溢出；单刷新免充能、多刷新正常充能 | new_spells的ReferenceSpellChecks、foundations |
 | 生命代价与虚空 | 血魔法每张接受卡只支付一次不可减免的诅咒HP，死亡来源走原版流程；虚空同步附件覆盖所有观察者，统一限制索敌、接触、伤害、交互与施法，并恢复原状态 | new_spells的ReferenceSpellChecks/VoidSpellChecks、death_attribution |
 | 世界运行时清理 | 停服同时清空在场与待加入弹体、冻结和延迟动作，旧队列不进入下一个世界 | foundations的ArchitectureChecks |

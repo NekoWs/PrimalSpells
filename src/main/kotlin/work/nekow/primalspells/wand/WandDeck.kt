@@ -54,10 +54,12 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
             if (!firstVisit && source.card is DrawAction) continue
             nodes++
             val card = source.card.clone()
+            card.useOwner = if (source.physical) source.card else null
             if (source.free) { card.mana = 0.0; card.delay = 0; card.recharge = 0; card.castingCostsWaived = true }
             chain += card
             depth++
             val delta = prepare(card, source.card, cursor, scope)
+            if (!source.physical) SpellAssembly.waiveUses(card)
             depth--
             if (firstVisit) active.remove(source.card)
             remaining += delta
@@ -83,6 +85,7 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
                 if (!firstVisit && source.card is DrawAction) return -1
                 nodes++
                 val next = source.card.clone()
+                next.useOwner = if (source.physical) source.card else null
                 if (source.free) { next.mana = 0.0; next.delay = 0; next.recharge = 0; next.castingCostsWaived = true }
                 depth++
                 val delta = prepare(next, source.card, cursor, scope)
@@ -90,7 +93,9 @@ internal class WandDeck(private val wand: Wand, private val references: List<Wan
                 if (firstVisit) active.remove(source.card)
                 val count = treeSize(next)
                 repeat(card.copies) {
-                    if (nodes + count <= 4096) { card.expanded += SpellAssembly.copyCard(next); nodes += count }
+                    if (nodes + count <= 4096) {
+                        card.expanded += SpellAssembly.copyCard(next).also(SpellAssembly::waiveUses); nodes += count
+                    }
                     else { nodes = 4096; limit() }
                 }
                 return delta

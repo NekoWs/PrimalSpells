@@ -23,7 +23,7 @@
 
 | 对象 | 职责 |
 |---|---|
-| Magic | ID、MP、delay/recharge、抽牌预算cast与生命周期钩子 |
+| Magic | ID、MP、delay/recharge、逐卡剩余次数、抽牌预算cast与生命周期钩子 |
 | Projectile | 独立MagicStatus、存活/寿命、碰撞/速度、配方、荷载、自伤、质量与后坐力 |
 | Modifier | 为所属链提供独立effect实例；自身不进入投射物循环 |
 | OtherSpell / DrawAction | 其他主动法术；DrawAction专门解析引用、复制、全量、追加与刷新，不生成弹体 |
@@ -37,7 +37,7 @@
 
 1. `WandItem`/公共SpellApi调用 `Wand.tick/spell`，检查装备预热、双冷却、施法者和BeforeCast事件。
 2. `WandDeck.draw`从drawPile抽取一条树；cast预算消耗于投射物，多重施放增加预算；触发牌立即独立抽取荷载。
-3. `CastTransaction.pay`按链收集修正并结算成功付费牌。每张牌收费一次，荷载费用计入整次施法，不写进父投射物。
+3. `CastTransaction.pay`按链收集修正并结算成功付费牌，同时预留实体卡次数。每张牌收费一次，荷载费用计入整次施法，不写进父投射物；真实施法在生命付款后提交次数，预览不提交。
 4. `WandCasting`将本链修正统一装入本链投射物，设置caster/wand/杖首出生点/准星方向，激活后加入pendingAdd。荷载等触发时才释放，不重新抽牌或扣蓝。
 5. `CastTransaction.finish`汇总双冷却并弃牌/回洗；任意成功付费链锯清零整次施放延迟，与牌序无关。所有抽到的实体牌进弃牌堆，抽空后回洗并加recharge；成功刷新可提前回洗，单张免充能、多张正常充能。
 
@@ -79,13 +79,15 @@ damageOncePerTick是每弹体、每目标、每刻的预算：Projectile在护�
 
 `Wand.saveTag/fromTag`委托`WandPersistence`；保存数值、法力/冷却、固定槽位、三牌堆与可选magic_states。空槽占位、未知/已删除法术保留空位，不前移后续牌。magic_states按法术ID索引，重复ID共享状态；loadRuntimeState只能读取自身字段，不能依赖尚未设置的caster/wand。
 
+限制次数属于实体卡，使用独立逐槽NBT与物品组件，不使用按ID共享的magic_states。三牌堆以新增槽位索引恢复同名卡身份，保留旧ID列表兼容读取；装卸转换统一经`item/component/SpellCardData`。字段与结算边界见[实体卡使用次数](design/spell-references.md#5-实体卡使用次数)。
+
 WandManager通过背包tick及主动施法markHeld确认任意实体持有者；周期回收闲置内存实例前先落盘，get按需懒加载，存档条目不因无人持有删除。服务器换世界先清实例和持有记录。投射物不跨存档存活。
 
 时间以完整刻保存，旧秒/毫秒键迁移与法杖配置见 [等级与单位](design/wand-tiers.md)。MP在读档、支付和维护边界钳制到0～上限。
 
 ## 6. 网络与整合
 
-公共协议版本统一定义在`ModNetworking.PROTOCOL_VERSION`，当前1.7.0。S→C数值、命中反馈、成功施法模型通知、镜头冲击和预览结果经ClientPayloadSink分发。C→S选槽/预览校验实际菜单与背包中的身份和范围；创造专用编辑包只接受创造玩家和合法散卡，生存走原版PICKUP。
+公共协议版本统一定义在`ModNetworking.PROTOCOL_VERSION`，当前1.8.0。S→C数值、命中反馈、成功施法模型通知、镜头冲击和预览结果经ClientPayloadSink分发。C→S选槽/预览校验实际菜单与背包中的身份和范围；创造专用编辑包只接受创造玩家和合法散卡，生存走原版PICKUP。
 
 `WandPreviewBuilder`在隔离牌堆/卡牌/法力副本上调用同一WandDeck与CastTransaction，不运行施法钩子、不影响原杖。整副配置分色只观察WandDeck.draw，不付费、不回洗；按卡牌对象身份标记槽，重复ID不合并。
 
@@ -109,6 +111,7 @@ PackRules校验数据包后原子发布池/等级快照，新数值仅作用于�
 - 爆炸不破坏方块。穿刺开启所属链自伤并绕盾；独立荷载不继承。静态场不碰撞，仍参与质量受力和位置积分。
 - 区域场在原维度运行；不能每刻追读已跨维度施法者的新level。离场/结束即时撤销本场迟缓；黑洞不吸创造飞行者。
 - 引用副本不写回实体牌堆；Miu/Phi/Sigma仅免复制品的资源/时间代价，生命付费不免；预览不得推进随机流或扣HP。虚空状态同时限制命中、索敌与对外施法。
+- 次数属于每张实体卡，不能按ID共享；正常运行实例绑定原卡，玩法复制免次数且可复制耗尽卡。预览不提交次数，回洗/刷新/装卸不补次数。
 - MP不得超过上限；触发时不重复付费。链锯清整次施放延迟，不消除法力或充能门槛。
 - 卸下/闲置被动必须有限退场，死亡/换维/登出清理；PD成员、时钟、插值和光照由PD管理，遇缺陷按 [约定第9节](conventions.md#9-外部依赖政策particledrawing) 停止并登记。
 

@@ -19,6 +19,26 @@ internal class CastTransaction(private val wand: Wand) {
     var healthCost = 0f
         private set
     private var refreshes = 0
+    private val reservedUses = java.util.IdentityHashMap<Magic, Int>()
+    private var usesCommitted = false
+
+    private fun fund(card: Magic): Boolean {
+        val owner = card.useOwner?.takeIf { it.maxUses > 0 }
+        if (owner != null && owner.remainingUses <= (reservedUses[owner] ?: 0)) {
+            wand.status.failedReason += "Uses exhausted (${card.id})"
+            return false
+        }
+        if (!wand.consumeMana(card)) return false
+        if (owner != null) reservedUses[owner] = (reservedUses[owner] ?: 0) + 1
+        return true
+    }
+
+    /** 仅真实施放提交次数；荷载与MP一样预付，预览、拒绝施法和复制均不修改实体卡。 */
+    fun commitUses() {
+        check(!usesCommitted) { "法术次数事务不能重复提交" }
+        usesCommitted = true
+        reservedUses.forEach { (card, count) -> card.remainingUses -= count }
+    }
 
     private fun account(card: Magic) {
         accepted += card
@@ -36,19 +56,19 @@ internal class CastTransaction(private val wand: Wand) {
         fun expand(cards: List<Magic>): List<Magic> {
             // 同层普通回蓝修正先结算，放在控制牌前后均能支付该控制牌。
             val refunds = cards.filterIsInstance<Modifier>().filter { it.mana < 0.0 }.sortedBy { it.id }
-            refunds.forEach { if (wand.consumeMana(it)) { paid += it; account(it) } }
+            refunds.forEach { if (fund(it)) { paid += it; account(it) } }
             return cards.filter { it !in refunds }.flatMap { card ->
                 if (card is DrawAction) {
-                    if (wand.consumeMana(card)) { account(card); expand(card.expanded) } else emptyList()
+                    if (fund(card)) { account(card); expand(card.expanded) } else emptyList()
                 } else listOf(card)
             }
         }
         val expanded = expand(chain)
         for (modifier in expanded.filterIsInstance<Modifier>().sortedWith(compareBy<Modifier> { it.mana >= 0.0 }.thenBy { it.id })) {
-            if (wand.consumeMana(modifier)) { paid += modifier; account(modifier) }
+            if (fund(modifier)) { paid += modifier; account(modifier) }
         }
         for (shot in expanded.filterIsInstance<Projectile>()) {
-            if (!wand.consumeMana(shot)) continue
+            if (!fund(shot)) continue
             paid += shot
             account(shot)
             if (shot is TriggerSpell) {
@@ -62,7 +82,7 @@ internal class CastTransaction(private val wand: Wand) {
             }
         }
         for (other in expanded.filterIsInstance<OtherSpell>().filter { it !is DrawAction }) {
-            if (wand.consumeMana(other)) { paid += other; account(other) }
+            if (fund(other)) { paid += other; account(other) }
         }
         return paid
     }

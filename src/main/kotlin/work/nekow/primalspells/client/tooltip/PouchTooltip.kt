@@ -16,6 +16,7 @@ import work.nekow.primalspells.registry.ModItems
 class PouchTooltip(
     val spells: List<String>,
     val pouchId: String,
+    val uses: List<Int> = emptyList(),
 ) : TooltipComponent
 
 /** 法术小包 tooltip 渲染：收纳袋式槽位网格（固定容量，空槽留空，选中槽高亮）。 */
@@ -47,6 +48,7 @@ class ClientPouchTooltip(
                 val stack = ItemStack(item)
                 graphics.item(stack, sx + 1, sy + 1)
                 graphics.itemDecorations(font, stack, sx + 1, sy + 1)
+                SpellUseTooltip.draw(graphics, font, tooltip.uses.getOrNull(i) ?: -1, sx, sy)
             }
         }
     }

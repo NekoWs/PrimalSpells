@@ -4,6 +4,7 @@ import kotlin.math.ceil
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
+import net.minecraft.nbt.IntTag
 import work.nekow.primalspells.magic.core.Magic
 import work.nekow.primalspells.magic.core.SpellRegistry
 
@@ -29,10 +30,18 @@ internal object WandPersistence {
             slots.add(StringTag.valueOf(magics.getOrNull(i)?.id.orEmpty()))
         }
         tag.put("magics", slots)
+        tag.put("innate_uses", usesTag(innate))
+        tag.put("spell_uses", usesTag((0 until maxOf(size, magics.size, 1)).map(magics::getOrNull)))
         tag.put("magic_states", saveMagicStates(wand))
         tag.put("draw_pile", pileTag(drawPile))
         tag.put("hand", pileTag(hand))
         tag.put("discard_pile", pileTag(discardPile))
+        // 重复ID的卡也必须恢复到各自槽位，不能按ID队列交换剩余次数。
+        for ((key, pile) in listOf("draw_pile" to drawPile, "hand" to hand, "discard_pile" to discardPile)) {
+            tag.put(key + "_slots", ListTag().also { list ->
+                pile.forEach { list.add(IntTag.valueOf(loadedMagics.indexOf(it))) }
+            })
+        }
         tag
     }
 
@@ -49,15 +58,23 @@ internal object WandPersistence {
         wand.clampMana()
         wand.status.delay = ceil(tag.getDoubleOr("status_delay", 0.0).coerceAtLeast(0.0))
         wand.status.recharge = ceil(tag.getDoubleOr("status_recharge", 0.0).coerceAtLeast(0.0))
-        wand.innate += magicsFrom(tag.getListOrEmpty("innate"))
-        tag.getListOrEmpty("magics").forEach {
+        // 在过滤已删除ID之前恢复次数，并保留索引占位供旧牌堆定位。
+        val innateSlots = tag.getListOrEmpty("innate").map { SpellRegistry.create((it as StringTag).asString().get()) }
+        restoreUses(innateSlots, tag.getListOrEmpty("innate_uses"))
+        wand.innate += innateSlots.filterNotNull()
+        val savedSlots = tag.getListOrEmpty("magics")
+        savedSlots.forEach {
             val id = (it as StringTag).asString().get()
             wand.magics += if (id.isEmpty()) null else SpellRegistry.create(id)
+        }
+        restoreUses(wand.magics, tag.getListOrEmpty("spell_uses"))
+        val pileSlots = innateSlots + wand.magics.filterIndexed { index, _ ->
+            (savedSlots[index] as StringTag).asString().get().isNotEmpty()
         }
         // 钩子只能恢复卡自身字段，此时caster/wand尚未注入。
         wand.load()
         restoreMagicStates(wand, tag)
-        restorePiles(wand, tag)
+        restorePiles(wand, tag, pileSlots)
         return wand
     }
 
@@ -71,9 +88,16 @@ internal object WandPersistence {
         pile.forEach { list.add(StringTag.valueOf(it.id)) }
     }
 
-    /** 牌堆不包含空槽，已删除的卡从游标序列中跳过。 */
-    private fun magicsFrom(list: ListTag): List<Magic> =
-        list.mapNotNull { SpellRegistry.create((it as StringTag).asString().get()) }
+    private fun usesTag(cards: List<Magic?>) = ListTag().also { list ->
+        cards.forEach { list.add(IntTag.valueOf(if (it != null && it.maxUses > 0) it.remainingUses else -1)) }
+    }
+
+    private fun restoreUses(cards: List<Magic?>, uses: ListTag) {
+        cards.forEachIndexed { index, card ->
+            val count = (uses.getOrNull(index) as? IntTag)?.asInt()?.orElse(-1) ?: -1
+            if (card != null && count >= 0) card.remainingUses = count
+        }
+    }
 
     private fun saveMagicStates(wand: Wand): ListTag {
         // 重建而非合并，取下的被动不能把陈旧状态留在存档里。
@@ -102,12 +126,19 @@ internal object WandPersistence {
         }
     }
 
-    private fun restorePiles(wand: Wand, tag: CompoundTag) {
+    private fun restorePiles(wand: Wand, tag: CompoundTag, slots: List<Magic?>) {
         if (!tag.contains("draw_pile")) return
         // 三牌堆必须引用已装载的实体卡，才能准确识别“自己”及首/末槽的递归边界。
         val available = wand.loadedMagics.groupBy { it.id }.mapValues { ArrayDeque(it.value) }
-        fun restore(name: String) = tag.getListOrEmpty(name).mapNotNull {
-            available[(it as StringTag).asString().get()]?.removeFirstOrNull()
+        val used = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Magic, Boolean>())
+        fun restore(name: String): List<Magic> {
+            if (tag.contains(name + "_slots")) return tag.getListOrEmpty(name + "_slots").mapNotNull {
+                val slot = (it as? IntTag)?.asInt()?.orElse(-1) ?: -1
+                slots.getOrNull(slot)?.takeIf { card -> used.add(card) }
+            }
+            return tag.getListOrEmpty(name).mapNotNull {
+                available[(it as StringTag).asString().get()]?.removeFirstOrNull()?.takeIf { card -> used.add(card) }
+            }
         }
         val draw = restore("draw_pile")
         val hand = restore("hand")

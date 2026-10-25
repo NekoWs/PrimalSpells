@@ -96,6 +96,22 @@ class ModItems {
                 .build()
         }
 
+        /** 单张实体卡剩余次数；列表组件以槽位对齐，-1代表不限次/旧数据未指定。 */
+        val SPELL_USES = COMPONENTS.register("spell_uses") { _ ->
+            DataComponentType.builder<Int>().persistent(Codec.INT).networkSynchronized(ByteBufCodecs.VAR_INT).build()
+        }
+        val WAND_SPELL_USES = COMPONENTS.register("wand_spell_uses") { _ -> usesComponent() }
+        val POUCH_SPELL_USES = COMPONENTS.register("pouch_spell_uses") { _ -> usesComponent() }
+
+        private fun usesComponent(): DataComponentType<List<Int>> = DataComponentType.builder<List<Int>>()
+            .persistent(Codec.INT.listOf())
+            .networkSynchronized(object : StreamCodec<net.minecraft.network.RegistryFriendlyByteBuf, List<Int>> {
+                override fun decode(buf: net.minecraft.network.RegistryFriendlyByteBuf) = List(buf.readVarInt()) { buf.readVarInt() }
+                override fun encode(buf: net.minecraft.network.RegistryFriendlyByteBuf, value: List<Int>) {
+                    buf.writeVarInt(value.size); value.forEach { buf.writeVarInt(it) }
+                }
+            }).build()
+
         /** 蓄能型变体标记（见 [WandVariant.CHARGED]）：打在物品栈上，创建法杖时读一次。 */
         val WAND_CHARGED = COMPONENTS.register("wand_charged") { _ ->
             DataComponentType.builder<Boolean>()

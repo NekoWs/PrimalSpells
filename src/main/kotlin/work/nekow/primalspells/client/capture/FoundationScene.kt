@@ -23,17 +23,21 @@ object FoundationScene {
             tick = { ctx, t ->
                 if (t == 8) {
                     ArchitectureChecks.run(ctx) { name, ok, detail -> record(t, name, ok, detail) }
+                    LimitedUseChecks.run(ctx) { name, ok, detail -> record(t, name, ok, detail) }
                     val stack = ItemStack(ModItems.WAND.get())
                     wand = WandManager[WandManager.createWand(stack)]
                     id = requireNotNull(wand).id
                     val cards = listOf("double_cast", "trigger_fireball", "omnidirectional_scatter", "chainsaw")
                     requireNotNull(wand).magics += cards.map { SpellRegistry.create(it)!! }; while (requireNotNull(wand).magics.size < 18) requireNotNull(wand).magics += null; requireNotNull(wand).load(); requireNotNull(wand).status.mana = 3000.0
-                    stack.set(ModItems.WAND_SPELLS, cards + List(14) { "" })
+                    requireNotNull(wand).magics[6] = SpellRegistry.create("void_escape")!!.also { it.remainingUses = 7 }
+                    requireNotNull(wand).magics[7] = SpellRegistry.create("void_escape")!!.also { it.remainingUses = 0 }
+                    requireNotNull(wand).load()
+                    stack.set(ModItems.WAND_SPELLS, requireNotNull(wand).magics.map { it?.id.orEmpty() })
                     ctx.player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack)
                     val before = requireNotNull(wand).saveTag().toString()
                     val p = requireNotNull(wand).preview()
                     record(t, "preview-is-read-only", before == requireNotNull(wand).saveTag().toString(), before)
-                    record(t, "layout-isolates-payload-and-empty-slots", p.slots[0].scope == p.slots[1].scope && p.slots[1].scope != p.slots[2].scope && p.slots[2].scope == p.slots[3].scope && p.slots.drop(4).all { it.scope.isEmpty() }, p.slots.toString())
+                    record(t, "layout-isolates-payload-and-empty-slots", p.slots[0].scope == p.slots[1].scope && p.slots[1].scope != p.slots[2].scope && p.slots[2].scope == p.slots[3].scope && p.slots.filter { it.id.isEmpty() }.all { it.scope.isEmpty() }, p.slots.toString())
                     val all = Wand("layout-all"); all.magics += listOf("fireball", "fireball", "trigger_fireball", "fireball", "fireball").map { SpellRegistry.create(it)!! }; all.load(); all.status.mana = 0.0
                     val scopes = all.preview().slots.take(5).map { it.scope }
                     record(t, "layout-covers-all-casts-with-duplicate-cards-and-zero-mana", scopes.toSet().size == 5 && scopes[3].startsWith(scopes[2] + "/"), scopes.toString())
@@ -103,6 +107,12 @@ object FoundationScene {
                 }
                 if (t == 20) net.minecraft.client.KeyMapping.click(com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(org.lwjgl.glfw.GLFW.GLFW_KEY_V))
                 if (t == 35) record(t, "world-v-opens-real-network-preview", (mc.gui.screen() as? WandPreviewScreen)?.preview?.rows?.isNotEmpty() == true, "screen=${mc.gui.screen()}")
+                if (t == 35) {
+                    val slots = (mc.gui.screen() as? WandPreviewScreen)?.preview?.slots.orEmpty()
+                    record(t, "preview-network-keeps-per-card-uses", slots.getOrNull(6)?.remainingUses == 7 && slots.getOrNull(7)?.remainingUses == 0, slots.toString())
+                    val uses = mc.player?.mainHandItem?.get(ModItems.WAND_SPELL_USES)
+                    record(t, "inventory-component-syncs-independent-uses", uses?.getOrNull(6) == 7 && uses.getOrNull(7) == 0, uses.toString())
+                }
                 if (t == 40 || t == 61) mc.gui.setScreen(null)
                 if (t == 45) mc.gui.setScreen(net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!))
                 if (t == 85) mc.gui.setScreen(net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!))

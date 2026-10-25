@@ -51,7 +51,7 @@ Java mixin放 `src/main/java/work/nekow/primalspells/mixin/`。资源放 `src/ma
 
 ## 6. 网络
 
-Payload放network，提供ID、StreamCodec；公共协议注册集中在 `network/ModNetworking`，服务端编杖/预览校验在 `WandRequestHandler`，由PrimalSpells挂载，客户端处理注册集中在客户端入口。当前协议为1.7.0，改编码需同步两端。
+Payload放network，提供ID、StreamCodec；公共协议注册集中在 `network/ModNetworking`，服务端编杖/预览校验在 `WandRequestHandler`，由PrimalSpells挂载，客户端处理注册集中在客户端入口。当前协议为1.8.0，改编码需同步两端。
 
 生存编杖/编包优先原版物品PICKUP交互；创造编杖使用受服务端校验的专用包。选择槽和预览请求校验实际拥有的菜单/背包物品、范围与请求频率。只同步展示所需数据，不把客户端组件当权威状态。
 

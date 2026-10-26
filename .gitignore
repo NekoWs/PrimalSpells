@@ -53,3 +53,7 @@ test_img/
 # Python 辅助工具的本机字节码缓存
 __pycache__/
 *.pyc
+
+### Local AI instructions and internal documentation ###
+AGENTS.md
+/docs/

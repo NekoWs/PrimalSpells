@@ -116,4 +116,4 @@ chmod +x gradlew
 
 ## 许可证
 
-项目许可证为 **GNU AGPLv3**，声明见 [gradle.properties](gradle.properties) 中的 `mod_license`。
+项目采用 **GNU GPLv3** 许可证，完整条款见 [LICENSE](LICENSE)。
